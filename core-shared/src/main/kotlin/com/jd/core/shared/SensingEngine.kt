@@ -5,6 +5,7 @@ import kotlin.math.*
 /**
  * SensingEngine: 100% Kotlin implementation of high-frequency sensor logic.
  * Corrected Revol29.4: Aligned with R-ID 16 floor (1Hz) for low battery survival.
+ * Updated Nov1.3: Integrated Velocity-Based Adaptive Sampling (Revol34.0 / R-ID 82).
  */
 object SensingEngine {
 
@@ -36,16 +37,27 @@ object SensingEngine {
     }
 
     /**
-     * Determines the optimal sensing interval based on device heat and power source.
-     * Aligned with R-ID 16: 10Hz (100ms) to 1Hz (1000ms).
+     * Determines the optimal sensing interval based on movement, heat, and power source.
+     * Aligned with Revol34.0: 10Hz (moving), 1Hz (slow), 0.1Hz (stationary).
      */
-    fun getOptimalIntervalMs(currentTemp: Float, isCharging: Boolean, batteryLevel: Int): Long {
-        if (currentTemp >= THERMAL_CRITICAL_CELSIUS) return 1000L // Thermal Protection (1Hz)
+    fun getOptimalIntervalMs(
+        currentTemp: Float, 
+        isCharging: Boolean, 
+        batteryLevel: Int,
+        velocityMps: Float = 0f
+    ): Long {
+        if (currentTemp >= THERMAL_CRITICAL_CELSIUS) return 1000L // Thermal Protection
         
+        val baseInterval = when {
+            velocityMps > 5.0f -> 100L   // 10Hz: Moving (> 18 km/h)
+            velocityMps > 0.5f -> 1000L  // 1Hz: Slow/Walking
+            else -> 10000L               // 0.1Hz: Stationary
+        }
+
         return when {
-            isCharging -> 100L               // 10Hz: Performance Mode
-            batteryLevel < 15 -> 1000L       // 1Hz: Survival Mode (Aligned with R-ID 16)
-            else -> 1000L                    // 1Hz: Battery Saving Mode
+            isCharging -> min(100L, baseInterval) // Max performance when charging
+            batteryLevel < 15 -> baseInterval.coerceAtLeast(1000L) // Survival Mode floor
+            else -> baseInterval
         }
     }
 

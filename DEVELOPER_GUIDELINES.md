@@ -50,7 +50,8 @@ Perform these steps in strict sequence once an issue is resolved:
 10. **Baseline Synchronization (R-ID 744)**: Create the directory `STATUS/BASELINE/[Version Name]/` and copy all final forensic documents (`issues.md`, `Handover.md`, `SOT_MASTER_REQUIREMENTS.md`, `RESOLUTION_ARCHIVE.md`) into it.
 11. **Resumption Verification**: If the session was resumed from a `chat_session.md`, verify that all "Planned Remediation" tasks identified in that export are fully addressed and documented.
 12. **Cleanup**: Remove `chat_session.md` from the project root.
-13. **Final Stop**: Display the final Git command block and Audit Recalculation line, then **STOP ALL PROCESSING.**
+13. **Final Git Command Block Preparation**: Prepare a single, ready-to-use Git command block for the user. This block **MUST** include all necessary commands in sequence: `git add .`, `git commit -m "[Exhaustive Message]"`, `git tag [Version Name]`, and `git push origin main --tags`. Ensure each command is on its own line.
+14. **Final Stop**: Display the prepared **Final Git Command Block** and the **Audit Recalculation** line, then **STOP ALL PROCESSING.**
 
 ---
 
@@ -71,5 +72,5 @@ Perform these steps when starting a session if `chat_session.md` exists:
 
 1.  **Context Loading**: Read `chat_session.md` and `Handover.md`.
 2.  **State Verification**: Verify if the `Planned Remediation` steps in the export were already partially implemented.
-3.  **Issue Validation**: Ensure the `## 🎯 Current Resumption Focus` in `issues.md` aligns with the export.
+3.  **Issue Validation**: Ensure the `## 🎯 Next Resumption Focus` in `issues.md` aligns with the export.
 4.  **Traceability Hook**: Reference the specific Issue ID from the export in the first action performed.

@@ -11,13 +11,16 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.location.Location
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Build
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.*
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.*
 import dagger.hilt.android.AndroidEntryPoint
@@ -31,6 +34,7 @@ import javax.inject.Inject
  * Refactored for Revol30.1: Robust API 34 compliance and periodic trace confirmation.
  * Updated Revol30.3: Integrated Adaptive Telemetry Backfill (R-ID 768).
  * Updated Nov1.0: Hardened FGS startup with API 34 permission guards (R-ID 10).
+ * Updated Nov1.3: Adaptive Sampling Logic (Revol34.0 / R-ID 82).
  */
 @AndroidEntryPoint
 class SensorService : Service(), SensorEventListener {
@@ -39,6 +43,8 @@ class SensorService : Service(), SensorEventListener {
     @Inject lateinit var signalingClient: SignalingClient
     private lateinit var forensicBuffer: ForensicBuffer
     private lateinit var sensorManager: SensorManager
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var wakeLock: PowerManager.WakeLock? = null
     private var isMuzzled = false
@@ -46,8 +52,20 @@ class SensorService : Service(), SensorEventListener {
     // Raw IMU caches
     private var lastAccel = DoubleArray(3)
     private var lastGravity = DoubleArray(3)
-    private var currentIntervalMs = 100L
+    
+    // Adaptive Sampling State
+    private var currentIntervalMs = 1000L
+    private var lastLocation: Location? = null
     private var sequenceIdCounter = 0L
+
+    private val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(result: LocationResult) {
+            result.lastLocation?.let { location ->
+                lastLocation = location
+                updateSamplingRate(location.speed)
+            }
+        }
+    }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -57,7 +75,7 @@ class SensorService : Service(), SensorEventListener {
 
     override fun onCreate() {
         super.onCreate()
-        SystemLogger.i("SensorService", "onCreate called. Version: Nov1.0")
+        SystemLogger.i("SensorService", "onCreate called. Version: Nov1.3")
         
         val protectedContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             createDeviceProtectedStorageContext()
@@ -67,6 +85,7 @@ class SensorService : Service(), SensorEventListener {
         forensicBuffer.initialize()
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         
         registerNetworkCallback()
         acquireWakeLock()
@@ -84,7 +103,6 @@ class SensorService : Service(), SensorEventListener {
                     return@onEach
                 }
 
-                // Batch updates in chunks of 50 to avoid payload limits
                 val chunks = updates.chunked(50)
                 chunks.forEachIndexed { index, chunk ->
                     val response = BackfillResponse(
@@ -104,6 +122,7 @@ class SensorService : Service(), SensorEventListener {
         if (hasRequiredPermissions()) {
             startForegroundServiceInternal()
             registerSensors()
+            startLocationUpdates()
             
             if (!isMuzzled) {
                 startSensingLoop()
@@ -117,8 +136,7 @@ class SensorService : Service(), SensorEventListener {
     }
 
     private fun hasRequiredPermissions(): Boolean {
-        val locationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val locationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         
         val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
@@ -139,6 +157,31 @@ class SensorService : Service(), SensorEventListener {
         
         accel?.let { sensorManager.registerListener(this, it, delay) }
         gravity?.let { sensorManager.registerListener(this, it, delay) }
+    }
+
+    private fun startLocationUpdates() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
+            .setMinUpdateIntervalMillis(500L)
+            .build()
+
+        fusedLocationClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+    }
+
+    private fun updateSamplingRate(speed: Float) {
+        val newInterval = SensingEngine.getOptimalIntervalMs(
+            currentTemp = 30f, // TODO: Integrate thermal sensor
+            isCharging = false, // TODO: Integrate battery receiver
+            batteryLevel = 80, 
+            velocityMps = speed
+        )
+        
+        if (newInterval != currentIntervalMs) {
+            SystemLogger.i("SensorService", "Adaptive Sampling: Interval changed to ${newInterval}ms (Speed: ${speed}m/s)")
+            currentIntervalMs = newInterval
+            orchestrator.preemptLoop("sensing_loop")
+        }
     }
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -178,17 +221,20 @@ class SensorService : Service(), SensorEventListener {
                 update.sequenceId = sequenceIdCounter++
                 update.status = "VALID"
                 
-                currentIntervalMs = SensingEngine.getOptimalIntervalMs(
-                    currentTemp = 30f, 
-                    isCharging = true, 
-                    batteryLevel = 80
-                )
+                lastLocation?.let { loc ->
+                    update.lat = loc.latitude
+                    update.lng = loc.longitude
+                    update.accuracy = loc.accuracy
+                    update.speed = loc.speed
+                    update.bearing = loc.bearing
+                    update.altitude = loc.altitude
+                }
                 
                 forensicBuffer.writeTrace(update)
                 signalingClient.sendTelemetry(update)
 
-                if (System.currentTimeMillis() % 5000 < currentIntervalMs) {
-                    SystemLogger.i("SensorService", "Telemetry sent. Seq: ${update.sequenceId}")
+                if (System.currentTimeMillis() % 10000 < currentIntervalMs) {
+                    SystemLogger.i("SensorService", "Telemetry sent. Seq: ${update.sequenceId} | Interval: ${currentIntervalMs}ms")
                 }
             } catch (e: Exception) {
                 SystemLogger.e("SensorService", "Loop error: ${e.message}")
@@ -242,6 +288,7 @@ class SensorService : Service(), SensorEventListener {
         serviceScope.cancel()
         orchestrator.cancelAll()
         sensorManager.unregisterListener(this)
+        fusedLocationClient.removeLocationUpdates(locationCallback)
         try {
             val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             cm.unregisterNetworkCallback(networkCallback)

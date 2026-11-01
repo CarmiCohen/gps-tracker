@@ -1,42 +1,44 @@
 git add .
-git commit -m "Revolution Phase Nov1.2: Forensic Signaling Batching.
-- Resolved Forensic Signaling Batching (ISSUE-REVOL33.0-F1).
-- Implemented Adaptive Forensic Batching in SocketioSignalingClient (R-ID 81) with dual-trigger flush (500ms/10-item).
-- Integrated Critical Event Protection to ensure immediate delivery of ViolationEvents and Geofence transitions.
-- Hardened SignalingBatchTest and updated PipelineSoakTest to verify zero loss under 2000-event stress.
-- Updated build versions and SOT requirements to Nov1.2."
-git tag Nov1.2
+git commit -m "Revolution Phase Nov1.3: Adaptive Telemetry Sampling.
+- Resolved Adaptive Sampling Logic (ISSUE-REVOL34.0-F1).
+- Implemented velocity-based adaptive sampling in SensorService (R-ID 82).
+- Integrated FusedLocationProviderClient for real-time speed monitoring.
+- Scaled telemetry frequency: 10Hz (>5m/s), 1Hz (>0.5m/s), 0.1Hz (stationary).
+- Utilized TickOrchestrator preemption for immediate interval adaptation.
+- Hardened AdaptiveSamplingTest and updated ProductionReadinessAuditTest.
+- Updated build versions and SOT requirements to Nov1.3."
+git tag Nov1.3
 git push origin main --tags
 
-# Project Handover - REVOLUTION PHASE (Nov1.2)
+# Project Handover - REVOLUTION PHASE (Nov1.3)
 
-## ✅ Status: SIGNALING BATCHING IMPLEMENTED (Nov1.2)
+## ✅ Status: ADAPTIVE SAMPLING IMPLEMENTED (Nov1.3)
 
-The signaling pipeline now utilizes adaptive batching for telemetry updates, significantly reducing packet overhead during high-frequency bursts and recovery. `SocketioSignalingClient` buffers updates using a `Mutex`-protected list, flushing every 500ms or when the 10-item limit is reached. **Critical Event Protection** ensures that violations and geofence transitions bypass batching delays, maintaining real-time responsiveness.
+The sensing loop now dynamically adjusts its frequency based on movement velocity, significantly optimizing battery life while maintaining high-fidelity tracking during motion. `SensorService` utilizes `FusedLocationProviderClient` to monitor speed and `TickOrchestrator` to preempt the sensing loop for immediate adaptation to state changes (Stationary 0.1Hz -> Moving 10Hz).
 
-**Resumption Token**: REVOLUTION-SIGNALING-BATCHING-SUCCESS-V1.2
+**Resumption Token**: REVOLUTION-ADAPTIVE-SAMPLING-SUCCESS-V1.3
 
 ---
 
-## 🎯 Next Resumption Focus: Adaptive Sampling Logic (Revol34.0)
+## 🎯 Next Resumption Focus: Battery-Aware Thermal Throttling (Revol35.0)
 
 ### 🛡️ Revolution Blueprint Implementation
-- **Objective**: Optimize battery consumption by dynamically adjusting telemetry sampling rates based on movement velocity and power state.
-- **Verification**: Zero impact on violation detection latency while extending operational duration.
+- **Objective**: Implement multi-stage thermal and battery level throttling to prevent device shutdown during extreme heat or critical low power.
+- **Verification**: Smooth transition to 0.1Hz sampling and notification triggers when thermal thresholds are breached.
 
 ---
 
 ## 📂 Key Implementation Files & Forensic Status
-- `core-network/src/main/kotlin/com/jd/core/network/SocketioSignalingClient.kt`: Hardened with adaptive batching and mutex control.
-- `core-network/src/test/kotlin/com/jd/core/network/SignalingBatchTest.kt`: New audit test for batching logic.
-- `app-sensor/src/androidTest/kotlin/com/jd/app/sensor/PipelineSoakTest.kt`: Updated to verify batching under stress.
-- `app-monitor/build.gradle.kts`: Version incremented to Nov1.2.
-- `app-sensor/build.gradle.kts`: Version incremented to Nov1.2.
+- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorService.kt`: Hardened with velocity-based sampling and FusedLocation integration.
+- `core-shared/src/main/kotlin/com/jd/core/shared/SensingEngine.kt`: Updated `getOptimalIntervalMs` with velocity support.
+- `app-sensor/src/androidTest/kotlin/com/jd/app/sensor/AdaptiveSamplingTest.kt`: New audit test for sampling transitions.
+- `app-monitor/build.gradle.kts`: Version incremented to Nov1.3.
+- `app-sensor/build.gradle.kts`: Version incremented to Nov1.3.
 
 ---
 
 ## 🔴 Immediate Resumption Tasks
-1. **Sampling Baseline**: Review `STATUS/BASELINE/Nov1.2/` for final forensic state.
-2. **Power Profiling**: Initialize battery consumption baseline for 10Hz sampling.
+1. **Sampling Baseline**: Review `STATUS/BASELINE/Nov1.3/` for final forensic state.
+2. **Throttling Logic**: Plan integration of `Intent.ACTION_BATTERY_CHANGED` and `Intent.ACTION_THERMAL_EVENT` (if available via PowerManager).
 
-**Handover complete. Signaling Batching successful. Version Nov1.2 sealed.**
+**Handover complete. Adaptive Sampling successful. Version Nov1.3 sealed.**

@@ -1,5 +1,14 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov1.3)
+
+### 1. ISSUE-REVOL34.0-F1: Adaptive Sampling Logic
+- **Symptoms**: High battery consumption due to constant 10Hz telemetry sampling even when the device is stationary or moving slowly.
+- **Root Cause**: The sensing loop in `SensorService` was hardcoded to a high frequency (10Hz) regardless of the physical movement state of the device.
+- **Resolution**: Implemented **Velocity-Based Adaptive Sampling**. Integrated `FusedLocationProviderClient` in `SensorService` to monitor real-time speed. Updated `SensingEngine.getOptimalIntervalMs` to return dynamic intervals: 10Hz (>5m/s), 1Hz (>0.5m/s), and 0.1Hz (stationary). Utilized `TickOrchestrator.preemptLoop` to force the sensing loop to adapt immediately when a velocity-driven interval change occurs. Verified transition logic and battery survival floors in `AdaptiveSamplingTest`. (R-ID 82).
+
+---
+
 ## ✅ Resolved Issues (Nov1.2)
 
 ### 1. ISSUE-REVOL33.0-F1: Forensic Signaling Batching

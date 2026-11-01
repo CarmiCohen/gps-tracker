@@ -14,8 +14,8 @@ android {
         applicationId = "com.jd.app.sensor"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "Nov1.2"
+        versionCode = 4
+        versionName = "Nov1.3"
         testInstrumentationRunner = "com.jd.app.sensor.HiltTestRunner"
     }
 
@@ -57,6 +57,8 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+    
+    implementation("com.google.android.gms:play-services-location:21.1.0")
     
     implementation("com.google.dagger:hilt-android:2.50")
     ksp("com.google.dagger:hilt-compiler:2.50")

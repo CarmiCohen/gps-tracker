@@ -16,6 +16,7 @@ import javax.inject.Inject
 /**
  * ProductionReadinessAuditTest: Ported to JD Revol31.2.
  * Exercises the Sensing Engine and Forensic Pipeline under high-pressure bursts.
+ * Updated Nov1.3: Aligned with Adaptive Sampling (Revol34.0).
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -56,23 +57,26 @@ class ProductionReadinessAuditTest {
         val highTempInterval = SensingEngine.getOptimalIntervalMs(
             currentTemp = 50f,
             isCharging = false,
-            batteryLevel = 50
+            batteryLevel = 50,
+            velocityMps = 10f
         )
         assertEquals("Thermal protection MUST scale to 1Hz", 1000L, highTempInterval)
         
         val lowBatteryInterval = SensingEngine.getOptimalIntervalMs(
             currentTemp = 30f,
             isCharging = false,
-            batteryLevel = 10
+            batteryLevel = 10,
+            velocityMps = 10f
         )
-        assertEquals("Power protection MUST scale to 1Hz", 1000L, lowBatteryInterval)
+        assertEquals("Power protection MUST scale to 1Hz even when moving", 1000L, lowBatteryInterval)
         
-        val nominalInterval = SensingEngine.getOptimalIntervalMs(
+        val stationaryInterval = SensingEngine.getOptimalIntervalMs(
             currentTemp = 30f,
-            isCharging = true,
-            batteryLevel = 80
+            isCharging = false,
+            batteryLevel = 80,
+            velocityMps = 0f
         )
-        assertEquals("Nominal sensing should maintain 10Hz", 100L, nominalInterval)
+        assertEquals("Stationary sensing should scale to 0.1Hz", 10000L, stationaryInterval)
     }
 
     /**
