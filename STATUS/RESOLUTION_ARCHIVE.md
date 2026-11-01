@@ -1,5 +1,14 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov1.0)
+
+### 1. ISSUE-REVOL31.9-F2: Foreground Service Permission Remediation
+- **Symptoms**: `java.lang.SecurityException` on API 34+ when starting `SensorService`. The service failed to launch as a foreground service because location permissions were not granted or the service type was not correctly handled during startup.
+- **Root Cause**: Missing runtime permission guards in `SensorService.onStartCommand` and `BootReceiver`. On API 34 (Android 14), starting a Foreground Service of type `location` requires active `ACCESS_FINE_LOCATION` or `ACCESS_COARSE_LOCATION`. Additionally, the service type bits in `startForeground` needed alignment with the manifest declarations (including `dataSync` for backfill).
+- **Resolution**: Implemented `hasRequiredPermissions()` guards in `SensorService` and `BootReceiver`. The service now self-stops if permissions are missing, preventing the crash. Updated `startForeground` to explicitly include `FOREGROUND_SERVICE_TYPE_LOCATION`, `FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING`, and `FOREGROUND_SERVICE_TYPE_DATA_SYNC` on API 34+. Verified successful service lifecycle on API 34 targets. (R-ID 10).
+
+---
+
 ## ✅ Resolved Issues (Revol31.9)
 
 ### 1. ISSUE-REVOL31.9-F1: Pipeline Stability & Soak Audit

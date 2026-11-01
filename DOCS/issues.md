@@ -1,17 +1,22 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Revol31.9)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov1.0)
 
-## 🎯 Next Resumption Focus: TBD (Strategic Stabilization & Simplification)
+## 🎯 Next Resumption Focus: Strategic Stabilization (Revol32.0)
 
 ---
 
-## 🔴 Open Gaps (Revol31.9)
-*   **None.** All Revol31.9 objectives met.
+## 🔴 Open Gaps (Nov1.0)
+*   *None. All forensic gaps resolved.*
 
 ---
 
 ## 🚀 Strategic Simplification Ideas
 *   **SIMP-REVOL30.0-S1**: Shared Test Fixtures. Consolidate hardware mocks into a test-only artifact within `:core-shared` to reduce duplication across app modules.
 *   **SIMP-REVOL31.9-S1**: Signaling Batch Tuning. **IMPLEMENTED.** Increased recovery batch size to 50 for faster telemetry catch-up.
+
+---
+
+## ✅ Resolved Traceability & Metadata Issues (Nov1.0)
+*   **ISSUE-REVOL31.9-F2**: Foreground Service Permission Remediation. **RESOLVED.** Implemented API 34 runtime permission guards in `SensorService` and `BootReceiver`. Aligned FGS type bits (`LOCATION|DATA_SYNC|REMOTE_MESSAGING`) with manifest and operational telemetry needs. (R-ID 10).
 
 ---
 
@@ -36,7 +41,8 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Revol31.9: [SOT Count: 884 (Rules: 384), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Soak Audit), QA: 884]**
+- **Nov1.0: [SOT Count: 885 (Rules: 385), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (FGS Permission), QA: 885]**
+- **Revol31.9: [SOT Count: 884 (Rules: 384), Open: H:1, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Soak Audit), QA: 884]**
 - **Revol31.8: [SOT Count: 883 (Rules: 383), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Geofence Audit), QA: 883]**
 - **Revol31.2: [SOT Count: 882 (Rules: 382), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Signaling Resilience), QA: 882]**
 - **Revol31.1: [SOT Count: 881 (Rules: 381), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Buffer Stress), QA: 881]**

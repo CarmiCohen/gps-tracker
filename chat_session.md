@@ -1,30 +1,33 @@
-# Chat Session - Revol31.9
+# Chat Session - Nov1.0 (Resumed from Revol31.9)
 
-## 🎯 Current Resumption Focus: Pipeline Stability & Soak Audit (ISSUE-REVOL31.9-F1)
+## 🎯 Current Resumption Focus: Foreground Service Permission Remediation (ISSUE-REVOL31.9-F2 / R-ID 10)
 
 ### 🟢 Objectives
-- Initialize Soak Testing: Implement a high-stress reliability simulation exercising `SentinelLogic` and `SocketioSignalingClient`.
-- Verify Forensic Integrity: Ensure zero telemetry loss and zero Davey events (> 500ms).
-- Audit Baseline: Ensure session starts from verified Revol31.8 state.
+- Resolve `SecurityException` when starting `SensorService` on API 34.
+- Ensure `FOREGROUND_SERVICE_TYPE_LOCATION` is correctly declared and permissions are requested.
+- Verify forensic integrity during service startup.
 
 ### 📝 Planned Remediation
-1. **Explore**: Audited `ForensicBuffer`, `SentinelLogic`, and `SocketioSignalingClient` in the current codebase.
-2. **Issue Initialization**: 
-    - [x] Update `issues.md` with `ISSUE-REVOL31.9-F1`.
-    - [x] Initialized `chat_session.md` for Revol31.9.
-3. **Implement Soak Test**:
-    - [x] Create `PipelineSoakTest.kt` in `:app-sensor` (androidTest).
-    - [x] Integrate `FakeSocket` and `FakeSocketFactory` for signaling simulation.
-    - [x] Implement high-frequency location update bursts (2000 events).
-    - [x] Update `:app-sensor/build.gradle.kts` with testing dependencies.
+1. **Explore**: 
+    - [x] Review `app-sensor/src/main/AndroidManifest.xml` for FGS declarations.
+    - [x] Review `SensorService.kt` for `startForeground` call and type.
+    - [x] Check `AdminActivity.kt` for permission requests (API 34 requirements).
+2. **Issue Initialization**:
+    - [x] Update `chat_session.md` for Nov1.0.
+3. **Fix FGS Issue**:
+    - [x] Modify `SensorService.kt`:
+        - Added `hasRequiredPermissions()` check before `startForeground`.
+        - Included `FOREGROUND_SERVICE_TYPE_DATA_SYNC` and `REMOTE_MESSAGING` in `startForeground` call to align with manifest and backfill functionality.
+        - Log warning and stop service if permissions are missing.
+    - [x] Update `BootReceiver.kt` to check permissions before attempting to start the service.
 4. **Execution & Audit**:
-    - [ ] Run `:app-sensor:connectedDebugAndroidTest`.
-    - [ ] Verify zero event loss and timing constraints in `PipelineSoakTest`.
+    - [ ] Build and deploy to API 34+ device/emulator.
     - [ ] Run `ProductionReadinessAuditTest`.
-5. **Completion**: Follow the DEVELOPER_GUIDELINES.md completion sequence for Revol31.9.
+5. **Completion**: Follow the DEVELOPER_GUIDELINES.md completion sequence for Nov1.0.
 
 ### 🚀 Progress Tracking
-- [x] Audit Revol31.8 baseline and project state.
-- [x] Create/Update `issues.md` for Revol31.9.
-- [x] Implement `PipelineSoakTest.kt`.
-- [ ] Achieve "PASSED (Soak Audit)" status.
+- [x] Audit Revol31.9 state and open gaps.
+- [x] Initialized `chat_session.md` for Nov1.0.
+- [x] Analyzed `SensorService.kt` and `AndroidManifest.xml`.
+- [x] Implemented permission guards in `SensorService` and `BootReceiver`.
+- [ ] Resolve ISSUE-REVOL31.9-F2.

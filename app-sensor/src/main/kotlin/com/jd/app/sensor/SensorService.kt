@@ -30,6 +30,7 @@ import javax.inject.Inject
  * SensorService: Ultimate Hardened Version.
  * Refactored for Revol30.1: Robust API 34 compliance and periodic trace confirmation.
  * Updated Revol30.3: Integrated Adaptive Telemetry Backfill (R-ID 768).
+ * Updated Nov1.0: Hardened FGS startup with API 34 permission guards (R-ID 10).
  */
 @AndroidEntryPoint
 class SensorService : Service(), SensorEventListener {
@@ -56,7 +57,7 @@ class SensorService : Service(), SensorEventListener {
 
     override fun onCreate() {
         super.onCreate()
-        SystemLogger.i("SensorService", "onCreate called. Version: Revol30.3")
+        SystemLogger.i("SensorService", "onCreate called. Version: Nov1.0")
         
         val protectedContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             createDeviceProtectedStorageContext()
@@ -100,14 +101,30 @@ class SensorService : Service(), SensorEventListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         SystemLogger.i("SensorService", "onStartCommand received. Handling FGS activation...")
         
-        startForegroundServiceInternal()
-        registerSensors()
-        
-        if (!isMuzzled) {
-            startSensingLoop()
+        if (hasRequiredPermissions()) {
+            startForegroundServiceInternal()
+            registerSensors()
+            
+            if (!isMuzzled) {
+                startSensingLoop()
+            }
+        } else {
+            SystemLogger.e("SensorService", "Critical permissions missing for FGS. Self-stopping.")
+            stopSelf()
         }
         
         return START_STICKY
+    }
+
+    private fun hasRequiredPermissions(): Boolean {
+        val locationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        
+        val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else true
+
+        return locationGranted && notificationGranted
     }
 
     private fun registerSensors() {
@@ -210,6 +227,7 @@ class SensorService : Service(), SensorEventListener {
             var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+                type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             }
             startForeground(1, notification, type)
         } else {
