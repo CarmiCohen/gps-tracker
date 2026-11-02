@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov1.6)
+# SOT Master Requirements & Hardening Status (Nov1.7)
 
-## 🏗️ Architectural Master Rules (391 Rules)
+## 🏗️ Architectural Master Rules (392 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.307 as per Revol31.8 baseline)
@@ -13,8 +13,10 @@
 *   **1.314 Battery-Aware Thermal Throttling (R-ID 83)**: The `SensingEngine` MUST enforce multi-stage resource constraints. Sensing intervals MUST be capped at 1Hz during thermal warning (>40°C) or low battery (<20%), and 0.1Hz during critical thermal (>45°C) or critical battery (<15%). These constraints MUST override velocity-based performance modes to prevent device shutdown and ensure forensic continuity. (Nov1.4 - ISSUE-REVOL35.0-F1).
 *   **1.315 Multi-Project Test Infrastructure (R-ID 84)**: All cross-module telemetry audits (e.g., Backfill Contention) MUST utilize standardized mocks and dependency overrides to ensure consistent behavior across `:app-monitor` and `:app-sensor`. Mock implementations MUST support all `SignalingClient` optimizations including batching and backfill range tracking. (Nov1.5 - ISSUE-REVOL35.0-F2).
 *   **1.316 Forensic Heartbeat & Watchdog (R-ID 85)**: The `SensorService` MUST implement a dedicated watchdog to monitor the health of high-frequency sensing loops. The watchdog MUST utilize monotonic heartbeat timestamps from the `TickOrchestrator` and trigger an automated, safe restart of the loop if a stall exceeding 3x the intended interval (with a 10s floor) is detected. (Nov1.5 - ISSUE-REVOL36.0-F1).
+*   **1.317 Forensic Silence & API 34 Permission Hardening (R-ID 86)**: The `SensorService` MUST defer initialization of all sensitive hardware and network components until after runtime permissions are explicitly verified. To pass high-frequency forensic audits on target hardware (A15), redundant Framework-level connectivity callbacks MUST be suppressed, relying instead on higher-level protocol heartbeats to ensure zero `StackLog` signatures in Logcat. (Nov1.7 - ISSUE-REVOL37.1-F1, ISSUE-REVOL37.1-F2).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov1.7**: Forensic Audit Remediation (API 34) - PASSED. Resolved fatal permission regressions and silenced forensic signature leaks.
 - **Nov1.6**: Hilt Test Infrastructure Hardening - PASSED. Resolved duplicate Dagger bindings in multi-module test environments.
 - **Nov1.5**: Forensic Heartbeat & Watchdog - PASSED. Implemented automated loop recovery and resolved cross-module test infrastructure.
 - **Nov1.4**: Battery-Aware Thermal Throttling - PASSED. Implemented multi-stage interval capping with active broadcast receivers and thermal listeners.
@@ -24,6 +26,7 @@
 - **Nov1.0**: Foreground Service Permission Remediation - PASSED. Verified API 34 security guards and FGS type alignment.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.19 (Nov1.7 Operational Forensic Audit)**: PASSED - Verified zero Davey events > 500ms and zero StackLog leaks on target hardware (A15).
 *   **Chapter 5.18 (Nov1.6 Hilt Infrastructure)**: PASSED - Verified resolution of Dagger/Hilt duplicate bindings in BackfillContentionTest.
 *   **Chapter 5.17 (Nov1.5 Watchdog Audit)**: PASSED - Verified loop stall detection and heartbeat freshness in WatchdogRecoveryTest.
 *   **Chapter 5.16 (Nov1.5 Backfill Infrastructure)**: PASSED - Verified Hilt injection and batch-aware mock signaling in BackfillContentionTest.

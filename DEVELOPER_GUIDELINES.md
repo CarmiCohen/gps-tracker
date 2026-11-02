@@ -50,7 +50,10 @@ Perform these steps in strict sequence once an issue is resolved:
 10. **Baseline Synchronization (R-ID 744)**: Create the directory `STATUS/BASELINE/[Version Name]/` and copy all final forensic documents (`issues.md`, `Handover.md`, `SOT_MASTER_REQUIREMENTS.md`, `RESOLUTION_ARCHIVE.md`) into it.
 11. **Resumption Verification**: If the session was resumed from a `chat_session.md`, verify that all "Planned Remediation" tasks identified in that export are fully addressed and documented.
 12. **Cleanup**: Remove `chat_session.md` from the project root.
-13. **Final Git Command Block Preparation**: Prepare a single, ready-to-use Git command block for the user. This block **MUST** include all necessary commands in sequence: `git add .`, `git commit -m "[Exhaustive Message]"`, `git tag [Version Name]`, and `git push origin main --tags`. Ensure each command is on its own line.
+13. **Final Git Command Block Preparation**: Prepare a single, ready-to-use Git command block for the user. This block **MUST** include all necessary commands in sequence: `git add .`, `git commit -m "[Exhaustive Message]"`, `git tag [Version Name]`, and `git push origin main --tags`. 
+    *   **Environment Safety**: Ensure each command is on its own line.
+    *   **Format**: Use a plain code block (no `powershell` or `bash` identifier).
+    *   **No Chaining**: Do not use `&&` or `;`.
 14. **Final Stop**: Display the prepared **Final Git Command Block** and the **Audit Recalculation** line, then **STOP ALL PROCESSING.**
 
 ---
@@ -66,7 +69,7 @@ Perform these steps if the session is terminated before an issue is resolved:
 
 ---
 
-## 🧩 Resumption Sequence
+## 💡 Resumption Sequence
 
 Perform these steps when starting a session if `chat_session.md` exists:
 

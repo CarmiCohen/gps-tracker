@@ -1,3 +1,15 @@
+```
+git add .
+git commit -m "REVOLUTION PHASE Nov1.7 - VERIFIED
+
+- ISSUE-REVOL37.1-F1: Fixed API 34 Foreground Service permission regression by deferring hardware and network initialization until runtime permissions are granted.
+- ISSUE-REVOL37.1-F2: Silenced forensic StackLog signatures by removing redundant Framework connectivity callbacks and relying on protocol heartbeats for resilience.
+- Verified Zero Davey (>500ms) and Zero StackLog events on A15 hardware.
+- Updated DEVELOPER_GUIDELINES.md with hardened PowerShell-compatible completion sequences."
+git tag Nov1.7
+git push origin main --tags
+```
+
 # Project Handover - REVOLUTION PHASE (Nov1.7 - VERIFIED)
 
 ## 🟢 Status: VERIFIED - REMEDIATION COMPLETE (Nov1.7)

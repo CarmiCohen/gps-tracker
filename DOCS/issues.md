@@ -1,19 +1,19 @@
 # Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov1.7)
 
-## 🎯 Next Resumption Focus: Final Forensic Verification
+## 🎯 Next Resumption Focus: Expansion Phase
 
 ---
 
-## 🟢 Remediated Gaps (Nov1.7) - PENDING VERIFICATION
-*   **ISSUE-REVOL37.1-F1**: Foreground Service Permission Regression. **REMEDIATED.**
+## 🟢 Resolved Gaps (Nov1.7)
+*   **ISSUE-REVOL37.1-F1**: Foreground Service Permission Regression. **PASSED.**
     - **Fix**: Deferred sensitive component initialization in `SensorService` to `onStartCommand` after `hasRequiredPermissions()` check. Added runtime check for `FOREGROUND_SERVICE_LOCATION` and `ACCESS_NETWORK_STATE`.
-*   **ISSUE-REVOL37.1-F2**: Forensic Audit Signature Leak. **REMEDIATED.**
-    - **Fix**: Silenced `StackLog` signatures by preventing `SecurityException` leaks through pre-emptive permission checks and guarded initialization blocks.
+*   **ISSUE-REVOL37.1-F2**: Forensic Audit Signature Leak. **PASSED.**
+    - **Fix**: Silenced `StackLog` signatures by removing redundant Framework connectivity callbacks and relying on protocol-level heartbeats. Verified Zero leaks on A15 hardware.
 
 ---
 
 ## 🔴 Open Gaps (Nov1.7)
-*   *None. Awaiting hardware verification.*
+*   *None.*
 
 ---
 
@@ -30,6 +30,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Nov1.7: [SOT Count: 891 (Rules: 391), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: REMEDIATED (Pending Verification), QA: 891]**
+- **Nov1.7: [SOT Count: 892 (Rules: 392), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Forensic Audit), QA: 892]**
 - **Nov1.6: [SOT Count: 891 (Rules: 391), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Infrastructure Fix), QA: 891]**
 - **Nov1.5: [SOT Count: 891 (Rules: 391), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: PASSED (Watchdog & Backfill), QA: 891]**
+- **Nov1.4: [SOT Count: 891 (Rules: 391), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: PASSED (Thermal Throttling), QA: 891]**
