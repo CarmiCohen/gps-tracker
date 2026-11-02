@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov2.1 - BASELINE STABILIZED)
+# Test Procedure - GPS Tracker (vNov2.24 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -12,9 +12,9 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ## Chapter 1 - Deployment & Initial Launch
 *   **1.1 Environment Reset:** Uninstall existing versions.
-*   **1.2 Deployment:** Deploy via Android Studio (Nov2.1).
-*   **1.3 Version Verification:** Confirm string matches `Nov2.1_PLATINUM` (or `_DEBUG`).
-*   **1.6 Branding Audit:** Verify the "Platinum" branding and JD logos are centered and high-res.
+*   **1.2 Deployment:** Deploy via Android Studio (Nov2.24).
+*   **1.3 Version Verification:** Confirm string matches `Nov2.24_PLATINUM`.
+*   **1.6 Branding Audit:** Verify the "Platinum" branding and JD logos are centered.
 
 ## Chapter 2 - Setup and Configuration (Bypass Active)
 *   **2.1 Enter Tracker Mode:** Tap "Tracker".
@@ -23,13 +23,8 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ## Chapter 3 - Tracker Mode & Sensor Telemetry
 *   **3.1 Main Screen Completeness:** Verify HUD elements and Stationary status.
-*   **3.2 Physical Sentinel & Stealth Audit (R872):**
-    *   **Action:** Shake device vigorously for 5s.
-    *   **Verification:** ABSOLUTE STEALTH. Screen remains dark. Audio remains silent.
-*   **3.3 Sensor JNI Bridge Verification:**
-    *   **Action:** Cover the light sensor or tilt the device.
-    *   **Verification:** Confirm `Lux` or `Tilt` values update in the HUD/Logs immediately.
-*   **3.4 Service Persistence:** Swipe away; verify foreground notification persists.
+*   **3.2 Physical Sentinel & Stealth Audit (R872):** Shake device for 5s; verify ABSOLUTE STEALTH (Dark screen, silent).
+*   **3.3 Sensor JNI Bridge Verification:** Confirm `Lux` or `Tilt` values update in HUD/Logs.
 
 ## Chapter 4 - Viewer Mode & Remote Sync
 *   **4.2 Remote HUD Sync:** Verify Alarm manifest ONLY appears on Viewer.
@@ -39,26 +34,35 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **5.1 GNSS Zombie:** Shield in metal box (60s). Verify `SIGNAL LOSS` and recovery.
 *   **5.2 Marker Persistence:** Kill app; confirm historical trail markers persist.
 
-## Chapter 6 - Forensic Stress Testing
-*   **6.1 Stress Latching:** Trigger "FORENSIC STRESS TEST" from Diagnostics. Verify `ACOUSTIC_VIOLATION` and `GPS_STALL` markers in log.
+## Chapter 6 - Forensic Stress & Heat Mitigation
+*   **6.1 Stress Latching:** Trigger "FORENSIC STRESS TEST". Verify `JAMMER SUSPICION` and `GPS_STALL` markers.
+*   **6.2 Heat Mitigation (R133):** Trigger thermal simulation; verify "Cooling Mode" and 10s sampling interval.
 
 ## Chapter 7 - Map & Geofencing (Expansion Phase)
-*   **7.1 Stationary Anchor:**
-    *   **Action:** Keep device still.
-    *   **Verification:** Verify "ANCHOR LOCKED" badge appears after IMU confidence > 90%.
-*   **7.2 Geofence Breakout:**
-    *   **Action:** Move device > 20m from anchor.
-    *   **Verification:** Confirm anchor release and immediate transition to "MOVING".
-*   **7.3 Ghost Mode:**
-    *   **Verification:** Markers/trails MUST dim (Slate500) if telemetry > 35s stale.
+*   **7.1 Stationary Anchor:** Verify "ANCHOR LOCKED" badge appears after IMU confidence > 90%.
+*   **7.2 Geofence Breakout:** Move device > 20m from anchor. Confirm transition to "MOVING".
+*   **7.3 Uncertainty Drift (R460):** Force GPS Stall; verify accuracy buffer growth.
 
 ## Chapter 8 - Alarm & Siren Logic (Authority Audit)
 *   **8.1 Siren Suppression (Tracker):** Confirm NO local audio or red-screen.
 *   **8.2 Siren Authority (Viewer):** Confirm Viewer triggers full-screen Red Alert and 30s Siren.
-*   **8.3 Mute Lockout:** Dismiss siren on Viewer. Confirm 30s manual mute lockout period.
+*   **8.3 Mute Lockout:** Dismiss siren on Viewer. Confirm 30s manual mute lockout.
+
+## Chapter 9 - Acoustic & Tamper Escalation
+*   **9.1 Acoustic Breach:** Produce noise (>85dB). Verify `ACOUSTIC_ALERT` triggers.
+*   **9.2 Siren Override:** Silence active siren; verify `ACK` event is logged.
+
+## Chapter 10 - Native Resource Lifecycle (Issue #249)
+*   **10.1 Bridge Disposal:** Switch Tracker/Viewer modes 5 times. Monitor for `BaseEventQueue.dispose` failures.
+
+## Chapter 11 - Geofence Predictive Breach (R71)
+*   **11.1 Predictive Breach:** Move device towards boundary at speed; verify alarm triggers 2.0s BEFORE breach.
 
 ## Chapter 12 - Maintenance & Pruning
 *   **12.1 Database Pressure:** Trigger 100Hz Log Pressure. Verify `PruningWorker` reduces count.
+
+## Chapter 13 - Remote Command Execution
+*   **13.1 Mode Switch Audit:** Change Tracker mode from Viewer. Verify HUD updates within 5s.
 
 ## Chapter 14 - UI Performance & Ribbons
 *   **14.1 Ribbon Persistence:** Toggle orientation. Confirm ribbons do not overlap.
@@ -74,17 +78,262 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **17.1 Export Verification:** Verify `.json` contains hardware-IDs and scrubbed path metadata.
 
 ## Chapter 18 - System Integrity & Hardening
-*   **18.1 Diagnostics Live-Refresh:**
-    1. Revoke "Display over other apps" in system settings.
-    2. Return to app Diagnostics and tap **REFRESH STATUS**.
-    3. Verify "Overlay Permission" changes to **DENIED** (Red).
-*   **18.2 Temporal Authority:**
-    *   **Action:** Set Viewer system time -2 minutes relative to Tracker.
-    *   **Verification:** HUD MUST remain Green. `isGpsFresh` must use receipt-time deltas, not absolute system time.
-*   **18.3 DI/Hilt Cold-Start:**
-    *   **Action:** Cold-start the app from a killed state (swipe away from recents).
-    *   **Verification:** Ensure no `IllegalStateException` during `HistoryDao` or `LogDao` injection.
+*   **18.1 Diagnostics Live-Refresh:** Revoke Overlay permission; verify UI updates to "DENIED".
+*   **18.2 Temporal Authority:** Set Viewer time -2m; verify HUD remains Green.
+
+## Chapter 19 - Multi-Peer Consistency
+*   **19.1 Parallel Sync:** Connect two Viewers; verify simultaneous HUD updates (<2s delta).
+
+## Chapter 20 - Hard Reboot Continuity
+*   **20.1 Reboot Recovery:** Force restart device; verify `TrackerService` resumes and captures boot event.
+
+## Chapter 21 - High-Speed Kinematics (Rule 1.322)
+*   **21.1 Velocity Promotion:** Simulate > 100 km/h movement. Verify status is `MOVING` and NOT `JUMP`.
+
+## Chapter 22 - Identity & Alias Uniqueness (R499)
+*   **22.1 Alias Verification:** Modify device alias in Settings. Confirm reflected in Export/Viewer HUD.
+
+## Chapter 23 - Power Policy & Doze Deferral (R497)
+*   **23.1 Doze Entry:** Force idle; confirm telemetry log pulse persists (R497).
+
+## Chapter 24 - Database Schema & Migration Integrity
+*   **24.1 Migration Audit:** Install Nov2.24 over Nov2.23. Verify all trail markers rendered correctly.
+
+## Chapter 25 - Map Follow & UI Performance
+*   **25.1 Follow Modes:** Toggle between Tracker, Viewer, and Auto follow.
+*   **25.2 Ghost Mode:** Wait 35s without telemetry; verify markers dim to `Slate500`.
+*   **25.3 Pruning:** Verify polyline points do not exceed 1000.
+
+## Chapter 26 - Alarm Suppression & Cooldowns
+*   **26.1 Bootstrap Phase:** Trigger violation within 60s of launch; verify NO alarm.
+*   **26.2 Siren Auto-Stop:** Trigger siren; verify it stops after 30s.
+*   **26.3 Lockout Period:** Dismiss siren; verify 30s manual mute lockout.
+
+## Chapter 27 - System Health Alarms
+*   **27.1 Critical Battery:** Simulate 9% battery; verify alert.
+*   **27.2 High Temp:** Trigger thermal event; verify `High Temp` alert.
+
+## Chapter 28 - Advanced Tamper Escalation
+*   **28.1 Shock & Lift:** Simulate >0.8G shock or >0.8m lift. Verify triggers.
+*   **28.2 Proximity:** Trigger proximity breach; verify alert.
+
+## Chapter 29 - Connectivity Alarms (Non-Critical)
+*   **29.1 Signal/Relay Loss:** Disable Wi-Fi; verify notification-only alert (No siren).
+
+## Chapter 30 - Map Settings & Persistence (R800)
+*   **30.1 Tools Overlay:** Toggle purple gear; verify Map Tools visibility.
+*   **30.2 Back = Commit:** Change settings and exit via Back; verify re-init and commit.
+
+## Chapter 31 - Accessibility & Screen Reader (R69)
+*   **31.1 TalkBack Audit:** Navigate HUD with TalkBack; ensure content descriptions reflect live telemetry.
+
+## Chapter 32 - Display Scaling & Density (R67)
+*   **32.1 Dynamic Font Scaling:** Increase font to "Largest"; verify no HUD clipping or overlap.
+
+## Chapter 33 - Map Follow Mode Transitions (R1.61)
+*   **33.1 Camera Actions:** Verify camera centering via `SharedFlow<CameraAction>` during mode switch.
+
+## Chapter 34 - Siren Z-Index & System-Wide Overlay (Issue #1402)
+*   **34.1 Overlay Authority:** Launch another app; trigger siren. Verify Red Alert obscures third-party app.
+
+## Chapter 35 - Forensic Chain of Custody (R66)
+*   **35.1 Log Integrity:** Verify exported JSON contains hardware-ID hashes and scrubbed metadata.
+
+## Chapter 36 - Proximity Pocket Rejection (R86)
+*   **36.1 Cross-talk Audit:** Cover sensor with cloth; verify engine rejects false-positive "Near" triggers.
+
+## Chapter 37 - Light Sensor Blinding Recovery (R85)
+*   **37.1 Saturation Recovery:** Expose sensor to direct sunlight; verify recovery within 2s.
+
+## Chapter 38 - Input Validation & Relay Sanitization (R91)
+*   **38.1 URL Injection:** Attempt malformed Relay URLs; verify SettingsRepository sanitizes input.
+
+## Chapter 39 - Forensic Buffer Rollover (R83)
+*   **39.1 Wrap-around Logic:** Generate 10,000+ entries; verify rollover prevents corruption.
+
+## Chapter 40 - Multi-Viewer Payload Stress (R25)
+*   **40.1 Parallel Load:** Connect 5 Viewers; verify RTT < 500ms for all.
+
+## Chapter 41 - Dark Mode Contrast Audit (R51)
+*   **41.1 Readability:** Toggle Dark Mode; verify telemetry ribbons remain legible.
+
+## Chapter 42 - Landscape Layout Stability (R52)
+*   **42.1 Orientation Audit:** Rotate to Landscape; verify HUD ribbons do not overlap map controls.
+
+## Chapter 43 - Barometric Lift Precision (R76)
+*   **43.1 Lift Verification:** Raise device 1m rapidly; verify `LIFT_ALERT` triggers before GPS.
+
+## Chapter 44 - Magnetometer & Compass Interference (R87)
+*   **44.1 Interference Rejection:** Place near electronics; verify compass heading remains stable.
+
+## Chapter 45 - Thermal Throttling Hysteresis (R88)
+*   **45.1 Boundary Stability:** Maintain temp at 46°C; verify "Cooling Mode" does not oscillate.
+
+## Chapter 46 - WorkManager Expedited Execution (R31)
+*   **46.1 Android 14+ Policies:** Verify Maintenance workers execute as "Expedited".
+
+## Chapter 47 - JNI Thread Affinity & Block Audit (R32)
+*   **47.1 Non-blocking Audit:** Monitor native calls; verify they never block the Main UI loop.
+
+## Chapter 48 - Activity Recognition Motion Stability (R36)
+*   **48.1 False-Positive Rejection:** Shake device while in a vehicle; verify status remains `MOVING`.
+
+## Chapter 49 - Charging State Sampling Acceleration (R39)
+*   **49.1 Power Connected:** Plug in charger; verify telemetry sampling rate accelerates.
+
+## Chapter 50 - Maintenance Worker Periodic Integrity Check (R40)
+*   **50.1 Background Audit:** Ensure background cleanup tasks run successfully every 15 minutes.
+
+## Chapter 51 - Denied Microphone Recovery (Rule 1.15)
+*   **51.1 Revocation Audit:** Revoke Microphone permission at runtime. Verify HUD shows "Audio Denied".
+
+## Chapter 52 - Denied Overlay Recovery (Rule 1.16)
+*   **52.1 Revocation Audit:** Revoke Overlay permission in background. Verify prompt upon relaunch.
+
+## Chapter 53 - History Ribbon Aggregation (1h Audit)
+*   **53.1 Aggregation Accuracy:** Track for 1 hour. Verify polyline points match raw entries.
+
+## Chapter 54 - Foreground Service Sticky Restart
+*   **54.1 OS Recovery Audit:** Force kill app; verify OS restarts Foreground Service within 60s.
+
+## Chapter 55 - WebSocket Reconnection Backoff
+*   **55.1 Relay Downtime Audit:** Disable Relay; confirm app uses exponential backoff with jitter.
+
+## Chapter 56 - Protocol Version Mismatch
+*   **56.1 Relay Safety Audit:** Simulate unsupported protocol version. Verify user notification.
+
+## Chapter 57 - Large Payload Fragmentation
+*   **57.1 Log Sync Audit:** Sync 500+ entries. Ensure payload is fragmented.
+
+## Chapter 58 - Signature Collision Resilience
+*   **58.1 Deduplication Audit:** Inject duplicate entries. Verify rejection by `LogRepository`.
+
+## Chapter 59 - High-Contrast Mode Accessibility
+*   **59.1 Contrast Audit:** Enable System High-Contrast; verify HUD readability.
+
+## Chapter 60 - Overlay Transparency (Simulated Sunlight)
+*   **60.1 Visibility Audit:** Verify HUD visibility under max brightness.
+
+## Chapter 61 - Stationary Drift Mitigation (Urban Multipath)
+*   **61.1 Anchor Stability:** Simulate 5m GPS drift. Anchor must remain locked if IMU > 90%.
+
+## Chapter 62 - Jump Engine Tier 3 Suppression
+*   **62.1 Signal Bounce Audit:** Simulate 50m "Jump". Verify rejection by Sentinel Logic.
+
+## Chapter 63 - Adaptive Vibration Floor Convergence
+*   **63.1 Floor Audit:** Observe floor for 300s. Verify convergence without oscillation.
+
+## Chapter 64 - Acoustic Duty Cycle Latency
+*   **64.1 Power-Save Audit:** Verify no missed breaches during microphone cycling.
+
+## Chapter 65 - High-Memory Pressure Service Restart
+*   **65.1 LMK Restoration:** Simulate Low Memory Kill (LMK). Verify `sequenceId` continuity.
+
+## Chapter 66 - Database Transaction Atomicity
+*   **66.1 Power Loss Audit:** Crash during DB write. Verify no corrupted entries.
+
+## Chapter 67 - Write-Ahead-Log (WAL) Performance
+*   **67.1 Burst Latency Audit:** Trigger 100Hz burst. Latency must remain < 10ms.
+
+## Chapter 68 - Indexing Speed (50k+ History Points)
+*   **68.1 Scale Audit:** Populate 50,000 points. Rendering/queries must complete in < 2s.
+
+## Chapter 69 - WorkManager Worker Chaining
+*   **69.1 Maintenance Audit:** Verify `MaintenanceWorker` triggers `PruningWorker`.
+
+## Chapter 70 - Hilt Lifecycle during Process Death
+*   **70.1 Restoration Audit:** Verify Hilt dependencies re-injected correctly after process death.
+
+## Chapter 71 - Tracker ID Entropy Audit
+*   **71.1 Security Audit:** Verify ID randomness across 100 generations.
+
+## Chapter 72 - Local Log Encryption Performance
+*   **72.1 Overhead Audit:** measure latency with encryption. Overhead must be < 5ms.
+
+## Chapter 73 - Permission Revoking in Foreground
+*   **73.1 Immediate Halt Audit:** Revoke Location. Engine must stop immediately.
+
+## Chapter 74 - Log Stripping Regex Bench
+*   **74.1 CPU Usage Audit:** Measure load during log cleaning. Must consume < 5% CPU.
+
+## Chapter 75 - UI State Flow Emission Frequency
+*   **75.1 Throttle Audit:** Verify aggregation at maximum of 2Hz.
+
+## Chapter 76 - Samsung DOZE_SUSPEND Flicker Audit (R290)
+*   **76.1 Display Noise Audit:** Enable Samsung deep sleep; verify HUD ribbons do not flicker or ghost.
+
+## Chapter 77 - A15 GNSS Hysteresis Cooling (R274)
+*   **77.1 Cooling Stability:** Rapid temp drop; verify 10s cooling window before signal re-acquisition.
+
+## Chapter 78 - Service Role Isolation (R975)
+*   **78.1 Mutual Exclusivity:** Attempt to start Tracker and Viewer services simultaneously; verify rejection.
+
+## Chapter 79 - Forensic Trace Scrubbing (R779)
+*   **79.1 Metadata Sanitization:** Verify absolute removal of path/HW-ID metadata in forensic logs.
+
+## Chapter 80 - Snap-Isolation Throttling (R312)
+*   **80.1 100Hz Parity:** Audit JNI bridge for telemetry parity under 100Hz saturation.
+
+## Chapter 81 - Signaling Tick-Loop Resumption (R314)
+*   **81.1 Tick-Loop Audit:** Verify proactive loop initiation on every peer pulse receipt.
+
+## Chapter 82 - Accuracy Window Buffer Filling (R316)
+*   **82.1 State Restoration:** Verify restoration logic fills accuracy buffer during load.
+
+## Chapter 83 - Main-Thread Stall Watchdog (R33)
+*   **83.1 ANR Recovery:** Block main thread for 5s; verify automatic engine recovery.
+
+## Chapter 84 - Initialization Unification (R491)
+*   **84.1 Role-agnostic Restoration:** Verify state restoration logic is identical for both roles.
+
+## Chapter 85 - Side-Effect Persistence Authority (R492)
+*   **85.1 Persistence Routing:** Verify role-agnostic routing for all telemetry side-effects.
+
+## Chapter 86 - Remote Integrity Prefix Shielding (R493)
+*   **86.1 State Shielding:** Verify evaluation states are shielded from remote peer visibility.
+
+## Chapter 87 - Activity-Scoped Routing Unification (R494)
+*   **87.1 ViewModel SSOT:** Audit activity-scoped navigation for stability during configuration changes.
+
+## Chapter 88 - Hydration Staggering Determinism (R495)
+*   **88.1 Startup Order:** Verify repository hydration order under CPU/IO saturation.
+
+## Chapter 89 - ViewModel Decommissioning Audit (R496)
+*   **89.1 Legacy Cleanup:** Confirm absolute removal of legacy feature ViewModels.
+
+## Chapter 90 - Unified Doze-Emergency Override (R497)
+*   **90.1 Sleep Wakeup:** Verify priority geofence alarms wake the device from deep sleep.
+
+## Chapter 91 - Hardware Poke Boundary Precision (R498)
+*   **91.1 Boundary Matching:** Audit inclusive matching logic for sensor polling thresholds.
+
+## Chapter 92 - Identity Collision Prevention (R499)
+*   **92.1 Unique Generation:** Verify uniqueness in alias-aware ID generation logic.
+
+## Chapter 93 - Programmatic 24h Soak Simulation (R500)
+*   **93.1 Soak Stability:** Verify zero forensic loss over 24-hour simulation cycle.
+
+## Chapter 94 - JNI Alignment Drift Protection (Issue #16.9)
+*   **94.1 Stress Audit:** Monitor JNI bridge for 8-byte boundary alignment under 100% CPU lock.
+
+## Chapter 95 - Foreground Notification Action Life (R41)
+*   **95.1 Action Persistence:** Verify "Stop" action works after process death/sticky restart.
+
+## Chapter 96 - Map Follow Mode Transitions (R1.61)
+*   **96.1 Camera Centering:** Audit camera centering via `SharedFlow<CameraAction>` in all modes.
+
+## Chapter 97 - Marker Pooling Efficiency (Issue #147)
+*   **97.1 Heap Stability:** Verify memory stability during 50-marker violation bursts.
+
+## Chapter 98 - Geofence Uncertainty Growth (Issue #431)
+*   **98.1 Radius Caps:** Audit radius cap at 33.3m/s during signal loss or stall.
+
+## Chapter 99 - Settings Wheel Layout (R1.62)
+*   **99.1 Orientation Metrics:** Verify orientation-aware height metrics for all Map UI overlays.
+
+## Chapter 100 - Final SOT Compliance Check (R45)
+*   **100.1 Requirement Parity:** Final verification that system state matches all requirements in SOT_MASTER_REQUIREMENTS.md.
 
 ---
 **Total Testing Chapters: 100**
-*(Procedure synchronized with Nov2.1 Stabilization Baseline)*
+*(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

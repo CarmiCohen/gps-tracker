@@ -1,9 +1,10 @@
 ﻿plugins {
-    id("com.android.application") version "8.2.2" apply false
-    id("com.android.library") version "8.2.2" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
-    id("org.jetbrains.kotlin.jvm") version "1.9.24" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24" apply false
-    id("com.google.dagger.hilt.android") version "2.50" apply false
-    id("com.google.devtools.ksp") version "1.9.24-1.0.20" apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.kapt) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.hilt) apply false
+    alias(libs.plugins.ksp) apply false
 }
