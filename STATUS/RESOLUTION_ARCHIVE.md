@@ -1,5 +1,14 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov2.0)
+
+### 1. ISSUE-REVOL37.4-F1: Dependency Mismatch in :app-sensor
+- **Symptoms**: Instrumented tests failed to compile due to unresolved references (`runTest`, `ServiceTestRule`, `Composable`) and missing libraries (`play-services-location`, `datastore-preferences`).
+- **Root Cause**: The `app-sensor` module was missing explicit dependencies for Compose testing, Google Play Services, and DataStore, which were previously assumed to be transitively available but were pruned during the Revol37.3 hardening.
+- **Resolution**: Synchronized the Compose BOM to `2024.02.01` and added explicit `androidTestImplementation` for `ui-test-junit4`, `rules`, `runner`, and `kotlinx-coroutines-test`. Restored `play-services-location` and `datastore-preferences` to the main implementation block. (R-ID 88).
+
+---
+
 ## ✅ Resolved Issues (Nov1.7)
 
 ### 1. ISSUE-REVOL37.1-F1: Foreground Service Permission Regression

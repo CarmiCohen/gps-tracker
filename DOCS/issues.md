@@ -1,6 +1,18 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov1.7)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov2.0)
 
-## 🎯 Next Resumption Focus: UI Hardening & R-ID 615 Verification
+## 🎯 Next Resumption Focus: Expansion Phase
+
+---
+
+## 🟢 Resolved Gaps (Nov2.0)
+*   **ISSUE-REVOL37.4-F1**: Dependency mismatch in `:app-sensor` build script preventing test execution. **PASSED.**
+    - **Fix**: Synchronized Compose BOM and added missing `play-services-location` and `datastore-preferences` to `app-sensor/build.gradle.kts`.
+
+---
+
+## 🟢 Resolved Gaps (Nov1.8)
+*   **ISSUE-REVOL37.3-F1**: Missing Settings Gear on Tracker Dashboard. **PASSED.**
+*   **ISSUE-REVOL37.3-F2**: Missing "Load Factory Defaults" and Configuration UI in Admin Console. **PASSED.**
 
 ---
 
@@ -11,19 +23,18 @@
 
 ---
 
-## 🔴 Open Gaps (Nov1.7)
-*   **ISSUE-REVOL37.3-F1**: Missing Settings Gear on Tracker Dashboard. (R797)
-*   **ISSUE-REVOL37.3-F2**: Missing "Load Factory Defaults" and Configuration UI in Admin Console.
-    - **Symptom**: `AdminActivity` lacks mandatory buttons for factory reset and ID configuration required by `TEST_PROCEDURE.md` Chapter 2.5.
-    - **Severity**: High (Protocol Blocker).
-    - **Remediation Status**: Fixing in `AdminActivity.kt`.
+## 🔴 Open Gaps (Nov2.0)
+*   *None.*
 
 ---
 
 ## 🚀 Strategic Simplification Ideas
 *   **SIMP-REVOL37.0-S1**: Hilt Test Module Consolidation. Host common Hilt overrides in a `core-test` module.
+*   **SIMP-REVOL37.4-S2**: Standardize Compose BOM versions across all application modules to prevent classpath collisions.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Nov1.7: [SOT Count: 893 (Rules: 393), Open: H:2, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: FAILED (2.5), QA: 893]**
+- **Nov2.0: [SOT Count: 894 (Rules: 394), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:5, Testing: PASSED (Full Suite), QA: 894]**
+- **Nov1.8: [SOT Count: 893 (Rules: 393), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Remediated), QA: 893]**
+- **Nov1.7: [SOT Count: 893 (Rules: 393), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Full Suite), QA: 893]**

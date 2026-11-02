@@ -1,9 +1,8 @@
 ﻿plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.serialization")
-    id("com.google.dagger.hilt.android")
-    id("com.google.devtools.ksp")
+    id("kotlin-android")
+    id("kotlin-kapt")
+    id("dagger.hilt.android.plugin")
 }
 
 android {
@@ -14,14 +13,15 @@ android {
         applicationId = "com.jd.app.sensor"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "Nov1.7"
-        testInstrumentationRunner = "com.jd.app.sensor.HiltTestRunner"
+        versionCode = 1
+        versionName = "Nov2.0"
+
+        testInstrumentationRunner = "com.jd.app.sensor.CustomTestRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -38,46 +38,46 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
     }
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
 }
 
 dependencies {
-    implementation(project(":core-shared"))
     implementation(project(":core-network"))
     implementation(project(":core-ui"))
-
+    implementation(project(":core-shared"))
+    
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.10.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
+
     implementation("androidx.datastore:datastore-preferences:1.0.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-    
-    implementation("com.google.android.gms:play-services-location:21.1.0")
-    
-    implementation("com.google.dagger:hilt-android:2.50")
-    ksp("com.google.dagger:hilt-compiler:2.50")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
 
     val composeBom = platform("androidx.compose:compose-bom:2024.02.01")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    
+    implementation("com.google.dagger:hilt-android:2.48")
+    kapt("com.google.dagger:hilt-compiler:2.48")
 
-    // Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test:rules:1.5.0")
+    androidTestImplementation("androidx.test:runner:1.5.2")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.48")
+    kaptAndroidTest("com.google.dagger:hilt-compiler:2.48")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-    androidTestImplementation("io.socket:socket.io-client:2.1.0")
-    
-    androidTestImplementation("com.google.dagger:hilt-android-testing:2.50")
-    kspAndroidTest("com.google.dagger:hilt-android-compiler:2.50")
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
