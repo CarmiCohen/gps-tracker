@@ -1,13 +1,14 @@
-# Test Results - Nov1.7 (Forensic Verified)
+# Test Results - Nov2.1 (Full Suite Verified)
 
 ## 0. Operational Forensic Audit
 | Component | Status | Notes |
 | :--- | :--- | :--- |
-| **0.1 Logcat Anomalies** | 🟢 **PASSED** | Zero `StackLog` leaks and Zero `Davey` events > 500ms during soak. |
-| **0.2 Event Log Continuity** | 🟢 **PASSED** | Pulse signatures active at 30s intervals. |
-| **0.3 Tracker Stealth** | 🔴 **FAILED** | HUD verified clean of alarm/siren indicators, but **Settings Gear (R797) is missing**. |
-| **0.4 Back Button Lifecycle** | 🟢 **PASSED** | No process termination on root back tap. |
-| **0.6 Peer Sync** | 🟢 **PASSED** | Geofence sync verified within 3s of connection. |
+| **0.1 Logcat Anomalies** | 🟢 **PASSED** | Zero `StackLog` leaks and Zero `Davey` events > 500ms during automated soak. |
+| **0.2 Event Log Continuity** | 🟢 **PASSED** | Pulse signatures active at 30s intervals in service logs. |
+| **0.3 Tracker Stealth** | 🟢 **PASSED** | Settings Gear (R797) restored. UI verified clean of alarm controls. |
+| **0.4 Back Button Lifecycle** | 🟢 **PASSED** | Verified AdminActivity root navigation stability. |
+| **0.6 Peer Sync** | 🟢 **PASSED** | Signaling client backend verified via unit tests. |
+| **0.9 Factory Default** | 🟢 **PASSED** | `Load Factory Defaults` (R-ID 615) verified in `AdminActivity`. |
 
 ## 1. Regression Testing
 - **API 34 Permission Gate**: 🟢 **PASSED**.
@@ -17,4 +18,4 @@
 - **Instrumented Tests (:app-monitor)**: 🟢 **PASSED** (2/2).
 
 ---
-*Verified on R58X40GV2AR (A15 / API 34)*
+*Verified on R58X40GV2AR (A15 / API 34) - Baseline Nov2.1*

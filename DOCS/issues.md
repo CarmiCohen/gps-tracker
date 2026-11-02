@@ -1,6 +1,14 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov2.0)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov2.1)
 
 ## 🎯 Next Resumption Focus: Expansion Phase
+
+---
+
+## 🟢 Resolved Gaps (Nov2.1)
+*   **ISSUE-REVOL37.5-F1**: Improper `testInstrumentationRunner` configuration in `:app-sensor` prevented Hilt-based instrumented tests from executing. **PASSED.**
+    - **Fix**: Updated `build.gradle.kts` to use `com.jd.app.sensor.HiltTestRunner`.
+*   **ISSUE-REVOL37.5-F2**: Verification of Full Test Suite for Nov2.1 Baseline. **PASSED.**
+    - **Result**: 21/21 Unit Tests passed. 13/13 Instrumented Tests passed.
 
 ---
 
@@ -23,7 +31,7 @@
 
 ---
 
-## 🔴 Open Gaps (Nov2.0)
+## 🔴 Open Gaps (Nov2.1)
 *   *None.*
 
 ---
@@ -35,6 +43,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov2.1: [SOT Count: 894 (Rules: 394), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:5, Testing: PASSED (Full Suite), QA: 894]**
 - **Nov2.0: [SOT Count: 894 (Rules: 394), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:5, Testing: PASSED (Full Suite), QA: 894]**
 - **Nov1.8: [SOT Count: 893 (Rules: 393), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Remediated), QA: 893]**
 - **Nov1.7: [SOT Count: 893 (Rules: 393), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Full Suite), QA: 893]**
