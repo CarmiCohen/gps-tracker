@@ -14,8 +14,8 @@ android {
         applicationId = "com.jd.app.monitor"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "Nov2.1"
+        versionCode = 9
+        versionName = "Nov2.21"
         testInstrumentationRunner = "com.jd.app.monitor.HiltTestRunner"
     }
 

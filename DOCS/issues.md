@@ -1,49 +1,41 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov2.1)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov2.21)
 
-## 🎯 Next Resumption Focus: Expansion Phase
-
----
-
-## 🟢 Resolved Gaps (Nov2.1)
-*   **ISSUE-REVOL37.5-F1**: Improper `testInstrumentationRunner` configuration in `:app-sensor` prevented Hilt-based instrumented tests from executing. **PASSED.**
-    - **Fix**: Updated `build.gradle.kts` to use `com.jd.app.sensor.HiltTestRunner`.
-*   **ISSUE-REVOL37.5-F2**: Verification of Full Test Suite for Nov2.1 Baseline. **PASSED.**
-    - **Result**: 21/21 Unit Tests passed. 13/13 Instrumented Tests passed.
+## 🎯 Next Resumption Focus: Forensic Soak & Multi-Peer Stress
 
 ---
 
-## 🟢 Resolved Gaps (Nov2.0)
-*   **ISSUE-REVOL37.4-F1**: Dependency mismatch in `:app-sensor` build script preventing test execution. **PASSED.**
-    - **Fix**: Synchronized Compose BOM and added missing `play-services-location` and `datastore-preferences` to `app-sensor/build.gradle.kts`.
+## 🔴 Open Gaps (Nov2.21)
+*   **GAP-REVOL38.2-G1**: Thermal Throttling Anomaly Correlation (R133) lacks instrumented verification on physical hardware (A15).
+*   **GAP-REVOL38.2-G2**: Multi-peer backfill contention under high network latency (>2000ms) not yet validated.
 
 ---
 
-## 🟢 Resolved Gaps (Nov1.8)
-*   **ISSUE-REVOL37.3-F1**: Missing Settings Gear on Tracker Dashboard. **PASSED.**
-*   **ISSUE-REVOL37.3-F2**: Missing "Load Factory Defaults" and Configuration UI in Admin Console. **PASSED.**
+## 🟢 Resolved Gaps (Nov2.21)
+*   **ISSUE-REVOL38.1-F1**: `SentinelHindsightTest` trajectory failure. **PASSED.**
+    - **Fix**: Adjusted `MAX_PHYSICAL_SPEED_MPS` and `ACCEL_LIMIT` to support high-speed transport scenarios.
+*   **ISSUE-REVOL38.1-F2**: Multiple DataStore instances in `:app-monitor` tests. **PASSED.**
+    - **Fix**: Enforced singleton pattern in `ForensicIdentityManager`.
+*   **ISSUE-REVOL38.1-F3**: Storage Integrity & Pressure test failures in `:app-sensor`. **PASSED.**
+    - **Fix**: Hardened `ForensicBuffer` with existence checks and atomic index commit order.
+*   **ISSUE-REVOL38.1-F4**: `StartupIntegrityTest` timeout regressions. **PASSED.**
+    - **Fix**: Optimized flow collection and added `yield()` to stress jobs.
 
 ---
 
-## 🟢 Resolved Gaps (Nov1.7)
-*   **ISSUE-REVOL37.1-F1**: Foreground Service Permission Regression. **PASSED.**
-*   **ISSUE-REVOL37.1-F2**: Forensic Audit Signature Leak. **PASSED.**
-*   **ISSUE-REVOL37.2-F1**: Hilt Test Injection Failure in `:app-sensor`. **PASSED.**
-
----
-
-## 🔴 Open Gaps (Nov2.1)
-*   *None.*
+## 🟢 Resolved Gaps (Nov2.0 / Nov2.20 Remediation)
+*   **ISSUE-REVOL37.5-F1**: Improper `testInstrumentationRunner` configuration. **PASSED.**
+*   **ISSUE-REVOL37.5-F2**: Verification of Full Test Suite for Baseline. **PASSED.**
 
 ---
 
 ## 🚀 Strategic Simplification Ideas
-*   **SIMP-REVOL37.0-S1**: Hilt Test Module Consolidation. Host common Hilt overrides in a `core-test` module.
-*   **SIMP-REVOL37.4-S2**: Standardize Compose BOM versions across all application modules to prevent classpath collisions.
+*   **SIMP-REVOL38.1-S1**: Unified DataStore Provider. Move DataStore instantiation to a centralized Hilt module in `core-network` to prevent accidental multi-instance creation.
+*   **SIMP-REVOL38.1-S2**: Forensic Buffer Index Abstraction. Decouple header commit logic from the main write path to improve readability.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov2.21: [SOT Count: 898 (Rules: 398), Open: H:0, M:2, L:0, Ideas: H:0, M:2, L:5, Testing: PASSED (Full Suite), QA: 898]**
+- **Nov2.20: [SOT Count: 894 (Rules: 394), Open: H:3, M:0, L:0, Ideas: H:0, M:1, L:5, Testing: FAILED, QA: 894]**
 - **Nov2.1: [SOT Count: 894 (Rules: 394), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:5, Testing: PASSED (Full Suite), QA: 894]**
 - **Nov2.0: [SOT Count: 894 (Rules: 394), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:5, Testing: PASSED (Full Suite), QA: 894]**
-- **Nov1.8: [SOT Count: 893 (Rules: 393), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Remediated), QA: 893]**
-- **Nov1.7: [SOT Count: 893 (Rules: 393), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Full Suite), QA: 893]**

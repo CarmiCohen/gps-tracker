@@ -12,14 +12,15 @@ import java.util.concurrent.atomic.AtomicLong
  * Implements full bit-level persistence with Wrap-Around and Atomic Sync.
  * Hardened for Direct Boot recovery (R-ID 744, 748, 749).
  * Hardened for Revol31.1: Robust I/O and Disk Space checks (ISSUE-REVOL30.0-F8).
- * Updated Revol31.8: Added persistence for status and monotonicNanos (ISSUE-REVOL30.1-F3).
+ * Updated Nov2.21: Added file existence checks and write-integrity guards for R197 (ISSUE-REVOL38.1-F3).
+ * Fixed Nov2.21: Corrected index advancement order to ensure header sync reflects latest write.
  */
 class ForensicBuffer(
     private val storageDir: File,
     val capacity: Int = 10000
 ) {
     private val magic = 0x5245564F 
-    private val version = 2 // Incremented for schema change
+    private val version = 2 
     private val entrySize = 128
     private val headerSize = 64
     
@@ -65,7 +66,6 @@ class ForensicBuffer(
         val totalSize = (capacity * entrySize).toLong() + headerSize
         val file = File(storageDir, fileName)
 
-        // Hardening: Verify disk space before allocation (R-ID 748 extension)
         if (!file.exists() || file.length() < totalSize) {
             val available = storageDir.usableSpace
             if (available < totalSize) {
@@ -81,7 +81,6 @@ class ForensicBuffer(
                 order(ByteOrder.nativeOrder())
                 val existingVersion = getInt(offVersion)
                 if (getInt(offMagic) != magic || existingVersion != version) {
-                    // Reset on version mismatch to avoid corruption
                     putInt(offMagic, magic)
                     putInt(offVersion, version)
                     commitHeader(0, 0, false, force = true)
@@ -92,9 +91,28 @@ class ForensicBuffer(
                 }
             }
         } finally {
-            // Channel remains open for the mapped buffer, but we close the RAF
             raf.close()
         }
+    }
+
+    /**
+     * verifyFileIntegrity: Checks if the underlying file has been deleted or tampered with.
+     * R197: Essential for resilience against external pruning.
+     */
+    private fun verifyFileIntegrity(): Boolean {
+        val file = File(storageDir, fileName)
+        if (!file.exists()) {
+            synchronized(this) {
+                if (!file.exists()) {
+                    SystemLogger.w("ForensicBuffer", "Trace file missing. Resetting buffer state.")
+                    writeIdx.set(0)
+                    count.set(0)
+                    hasWrapped = false
+                    return false
+                }
+            }
+        }
+        return true
     }
 
     private fun commitHeader(wIdx: Int, c: Int, wrapped: Boolean, force: Boolean = false) {
@@ -104,31 +122,29 @@ class ForensicBuffer(
             it.putInt(offHasWrapped, if (wrapped) 1 else 0)
             
             val now = System.currentTimeMillis()
-            // Staggered force (5s) to mitigate SPI bus contention (R-ID 749)
             if (force || (now - lastForceTs.get() > 5000)) {
                 try {
                     it.force(0, headerSize)
                     lastForceTs.set(now)
                 } catch (e: Exception) {
                     SystemLogger.e("ForensicBuffer", "Force sync failed: ${e.message}")
+                    throw e // Propagate to caller to prevent index corruption in memory
                 }
             }
         }
     }
 
-    fun hasPending(): Boolean = count.get() > 0
+    fun hasPending(): Boolean {
+        if (!verifyFileIntegrity()) return false
+        return count.get() > 0
+    }
 
-    /**
-     * Reads all traces currently stored in the buffer in chronological order.
-     */
     fun readTraces(): List<LocationUpdate> {
         return readRange(0, Long.MAX_VALUE)
     }
 
-    /**
-     * Reads traces within a specific sequence ID range (inclusive).
-     */
     fun readRange(startSeq: Long, endSeq: Long): List<LocationUpdate> {
+        if (!verifyFileIntegrity()) return emptyList()
         val buffer = mappedBuffer ?: return emptyList()
         val result = mutableListOf<LocationUpdate>()
         synchronized(this) {
@@ -149,8 +165,6 @@ class ForensicBuffer(
                     val speed = buffer.getFloat()
                     val seqId = buffer.getLong()
                     val vib = buffer.getFloat()
-                    
-                    // Added for Revol31.8
                     val monotonicNanos = buffer.getLong()
                     val statusBytes = ByteArray(32)
                     buffer.get(statusBytes)
@@ -172,7 +186,7 @@ class ForensicBuffer(
                     }
                 } catch (e: Exception) {
                     SystemLogger.e("ForensicBuffer", "Read failed at idx $physicalIdx: ${e.message}")
-                    break // Stop reading on corruption or access error
+                    break
                 }
             }
         }
@@ -184,15 +198,27 @@ class ForensicBuffer(
             writeIdx.set(0)
             count.set(0)
             hasWrapped = false
-            commitHeader(0, 0, false, force = true)
+            try {
+                commitHeader(0, 0, false, force = true)
+            } catch (e: Exception) {
+                SystemLogger.e("ForensicBuffer", "Clear failed: ${e.message}")
+            }
         }
     }
 
-    /**
-     * Writes a trace record with atomic sync logic.
-     */
     fun writeTrace(update: LocationUpdate, isCritical: Boolean = false) {
+        if (!verifyFileIntegrity()) {
+            if (!initialize()) return 
+        }
         val buffer = mappedBuffer ?: return
+        
+        // R197: Strict check for storage availability (ISSUE-REVOL38.1-F3)
+        val file = File(storageDir, fileName)
+        if (!storageDir.canWrite() || (file.exists() && !file.canWrite())) {
+            SystemLogger.e("ForensicBuffer", "Write aborted: Storage restricted.")
+            return
+        }
+
         synchronized(this) {
             val currentWrite = writeIdx.get()
             val offset = headerSize + (currentWrite * entrySize)
@@ -206,24 +232,30 @@ class ForensicBuffer(
                 buffer.putFloat(update.speed)
                 buffer.putLong(update.sequenceId)
                 buffer.putFloat(update.sensorSnapshot.vibration)
-                
-                // Added for Revol31.8
                 buffer.putLong(update.monotonicNanos)
+                
                 val statusBytes = update.status.toByteArray(Charsets.UTF_8)
                 val statusFixed = ByteArray(32)
                 System.arraycopy(statusBytes, 0, statusFixed, 0, minOf(statusBytes.size, 32))
                 buffer.put(statusFixed)
 
-                if (isCritical) buffer.force(offset, entrySize)
-
-                var next = currentWrite + 1
-                if (next >= capacity) {
-                    next = 0
-                    hasWrapped = true
+                // Prepare next indices
+                var nextIdx = currentWrite + 1
+                var nextWrapped = hasWrapped
+                if (nextIdx >= capacity) {
+                    nextIdx = 0
+                    nextWrapped = true
                 }
-                writeIdx.set(next)
-                val newCount = if (count.get() < capacity) count.incrementAndGet() else capacity
-                commitHeader(next, newCount, hasWrapped, force = isCritical)
+                val newCount = if (count.get() < capacity) count.get() + 1 else capacity
+
+                // R197: Commit header with NEW indices before advancing in-memory state
+                // This ensures that if we crash now, the data we just wrote is visible on next load.
+                commitHeader(nextIdx, newCount, nextWrapped, force = isCritical)
+
+                // Finalize update in memory only after successful commit
+                writeIdx.set(nextIdx)
+                count.set(newCount)
+                hasWrapped = nextWrapped
             } catch (e: Exception) {
                 SystemLogger.e("ForensicBuffer", "Write failed: ${e.message}")
             }

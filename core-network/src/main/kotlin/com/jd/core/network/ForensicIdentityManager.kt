@@ -20,6 +20,7 @@ import javax.inject.Singleton
  * ForensicIdentityManager: Unified identity handling for Sensor and Monitor (Point 25).
  * Centralizes hardware-bound hashed ID generation and target tracking (Revol30.1).
  * Hardened for Direct Boot (Point 77): Uses Device Protected Storage.
+ * Updated Nov2.21: Enforced DataStore singleton pattern to prevent multi-instance exceptions in tests (ISSUE-REVOL38.1-F2).
  */
 @Singleton
 class ForensicIdentityManager @Inject constructor(private val context: Context) {
@@ -28,9 +29,7 @@ class ForensicIdentityManager @Inject constructor(private val context: Context) 
         context.createDeviceProtectedStorageContext()
     } else context
 
-    private val dataStore: DataStore<Preferences> = PreferenceDataStoreFactory.create(
-        produceFile = { File(protectedContext.noBackupFilesDir, "forensic_identity.preferences_pb") }
-    )
+    private val dataStore: DataStore<Preferences> = DataStoreSingleton.getInstance(protectedContext)
     
     private val selfIdKey = stringPreferencesKey("forensic_id")
     private val saltKey = stringPreferencesKey("identity_salt")
@@ -88,5 +87,21 @@ class ForensicIdentityManager @Inject constructor(private val context: Context) 
 
     suspend fun clearTargetId() {
         dataStore.edit { it.remove(targetIdKey) }
+    }
+
+    /**
+     * Internal singleton to ensure only one DataStore instance exists per process for the identity file.
+     */
+    private object DataStoreSingleton {
+        @Volatile
+        private var INSTANCE: DataStore<Preferences>? = null
+
+        fun getInstance(context: Context): DataStore<Preferences> {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: PreferenceDataStoreFactory.create(
+                    produceFile = { File(context.noBackupFilesDir, "forensic_identity.preferences_pb") }
+                ).also { INSTANCE = it }
+            }
+        }
     }
 }
