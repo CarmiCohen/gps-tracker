@@ -57,16 +57,26 @@ class ForensicIdentityManager @Inject constructor(private val context: Context) 
         val prefs = dataStore.data.first()
         
         if (prefs[selfIdKey] == null) {
-            val androidId = Settings.Secure.getString(protectedContext.contentResolver, Settings.Secure.ANDROID_ID)
-            val salt = prefs[saltKey] ?: ForensicIdentity.generateSalt()
-            
-            // Standardized hashing: rolePrefix + ANDROID_ID + salt
-            val id = ForensicIdentity.create("$rolePrefix:$androidId", salt)
-            
-            dataStore.edit { settings ->
-                settings[selfIdKey] = id
-                settings[saltKey] = salt
-            }
+            generate(rolePrefix)
+        }
+    }
+
+    /**
+     * R-ID 615: Forces regeneration of identity to factory defaults.
+     */
+    suspend fun resetIdentity(rolePrefix: String) {
+        dataStore.edit { it.clear() }
+        generate(rolePrefix)
+    }
+
+    private suspend fun generate(rolePrefix: String) {
+        val androidId = Settings.Secure.getString(protectedContext.contentResolver, Settings.Secure.ANDROID_ID)
+        val salt = ForensicIdentity.generateSalt()
+        val id = ForensicIdentity.create("$rolePrefix:$androidId", salt)
+        
+        dataStore.edit { settings ->
+            settings[selfIdKey] = id
+            settings[saltKey] = salt
         }
     }
 

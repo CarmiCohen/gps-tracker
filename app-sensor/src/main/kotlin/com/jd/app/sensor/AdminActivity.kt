@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,8 +43,7 @@ import javax.inject.Inject
 
 /**
  * AdminActivity: The "Admin Console" for the Sensor.
- * Hardened for Revol30.1: Uses unified ForensicIdentityManager for identity stability.
- * Updated Nov1.7: Hardened PermissionGuard for API 34 compliance (Issue #REVOL37.1-F1).
+ * Hardened for Revol37.3: Restored mandatory Settings Gear (R797) and Factory Defaults (R-ID 615).
  */
 @AndroidEntryPoint
 class AdminActivity : ComponentActivity() {
@@ -56,10 +57,10 @@ class AdminActivity : ComponentActivity() {
             RevolutionTheme {
                 val trackerId by identityManager.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
                 val logs by SystemLogger.logs.collectAsStateWithLifecycle()
+                val scope = rememberCoroutineScope()
                 
                 LaunchedEffect(Unit) {
                     identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_SENSOR)
-                    // Periodic log snapshot update
                     while(true) {
                         SystemLogger.updateUiSnapshot()
                         delay(1000)
@@ -71,7 +72,7 @@ class AdminActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var isLocked by remember { mutableStateOf(true) }
-                    var isMuzzled by remember { mutableStateOf(false) }
+                    var showSettings by remember { mutableStateOf(false) }
 
                     if (isLocked) {
                         Box(
@@ -84,12 +85,23 @@ class AdminActivity : ComponentActivity() {
                         }
                     } else {
                         PermissionGuard {
-                            SensorAdminConsole(
-                                trackerId = trackerId,
-                                logs = logs,
-                                isMuzzled = isMuzzled,
-                                onIgnoreBatteryOptimization = { requestIgnoreBatteryOptimization() }
-                            )
+                            if (showSettings) {
+                                SettingsOverlay(
+                                    onClose = { showSettings = false },
+                                    onLoadDefaults = { 
+                                        scope.launch {
+                                            identityManager.resetIdentity(ForensicIdentity.PREFIX_SENSOR)
+                                        }
+                                    }
+                                )
+                            } else {
+                                SensorAdminConsole(
+                                    trackerId = trackerId,
+                                    logs = logs,
+                                    onSettingsClick = { showSettings = true },
+                                    onIgnoreBatteryOptimization = { requestIgnoreBatteryOptimization() }
+                                )
+                            }
                         }
                     }
                 }
@@ -110,7 +122,6 @@ fun PermissionGuard(content: @Composable () -> Unit) {
     val context = LocalContext.current
     val requiredPermissions = mutableListOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.ACCESS_COARSE_LOCATION,
         Manifest.permission.ACCESS_NETWORK_STATE
     ).apply {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -140,13 +151,7 @@ fun PermissionGuard(content: @Composable () -> Unit) {
             verticalArrangement = Arrangement.Center
         ) {
             Text("Permissions Required", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                "This app needs location, network state, and notification access to function as a reliable tracker.",
-                modifier = Modifier.padding(vertical = 16.dp)
-            )
-            Button(onClick = {
-                launcher.launch(requiredPermissions.toTypedArray())
-            }) {
+            Button(onClick = { launcher.launch(requiredPermissions.toTypedArray()) }) {
                 Text("Grant Permissions")
             }
         }
@@ -156,52 +161,54 @@ fun PermissionGuard(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun SensorAdminConsole(trackerId: String, logs: List<SystemLogger.LogEntry>, isMuzzled: Boolean, onIgnoreBatteryOptimization: () -> Unit) {
+fun SettingsOverlay(onClose: () -> Unit, onLoadDefaults: () -> Unit) {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("CONFIGURATION", style = MaterialTheme.typography.headlineSmall)
+            TextButton(onClick = onClose) { Text("CLOSE (X)") }
+        }
+        Spacer(modifier = Modifier.height(32.dp))
+        Button(
+            onClick = { 
+                onLoadDefaults()
+                onClose()
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = StatusRed)
+        ) {
+            Text("LOAD FACTORY DEFAULTS")
+        }
+    }
+}
+
+@Composable
+fun SensorAdminConsole(
+    trackerId: String, 
+    logs: List<SystemLogger.LogEntry>, 
+    onSettingsClick: () -> Unit,
+    onIgnoreBatteryOptimization: () -> Unit
+) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
 
-    LaunchedEffect(logs.size) {
-        if (logs.isNotEmpty()) {
-            listState.animateScrollToItem(logs.size - 1)
-        }
-    }
-    
     Column(modifier = Modifier.padding(16.dp)) {
-        if (isMuzzled) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = StatusRed),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("SYSTEM MUZZLED", fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("Safe-start triggered after crash loop. Factory reset required.", fontSize = 12.sp, color = Color.White)
-                    Button(onClick = { /* TODO */ }, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = StatusRed)) {
-                        Text("RESET TO FACTORY")
-                    }
-                }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "SENSOR ADMIN",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            IconButton(onClick = onSettingsClick) {
+                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.Gray)
             }
         }
-
-        Text(
-            text = "SENSOR ADMIN CONSOLE",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
         
-        Text(text = "ID: $trackerId", fontSize = 12.sp, color = Color.Gray)
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            StatusIndicator("GPS", !isMuzzled)
-            StatusIndicator("RELAY", true)
-            StatusIndicator("POWER", true)
-        }
+        Text(text = "ID: ${trackerId.take(12)}...", fontSize = 12.sp, color = Color.Gray)
         
         Spacer(modifier = Modifier.height(16.dp))
         
         Button(onClick = onIgnoreBatteryOptimization, modifier = Modifier.fillMaxWidth()) {
-            Text("WHITELIST BATTERY SAVER")
+            Text("WHITELIST BATTERY")
         }
 
         Button(
@@ -226,28 +233,17 @@ fun SensorAdminConsole(trackerId: String, logs: List<SystemLogger.LogEntry>, isM
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.1f))
-                .padding(4.dp)
+                .background(Color.Black.copy(alpha = 0.05f))
         ) {
             LazyColumn(state = listState) {
                 items(logs) { entry ->
                     Text(
                         text = entry.toString(),
                         fontSize = 10.sp,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        color = if (entry.level == "E") Color.Red else Color.Unspecified
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                     )
                 }
             }
         }
-    }
-}
-
-@Composable
-fun StatusIndicator(label: String, isActive: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(12.dp).background(if (isActive) StatusGreen else Color.Gray))
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(text = label, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }

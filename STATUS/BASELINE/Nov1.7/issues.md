@@ -9,6 +9,8 @@
     - **Fix**: Deferred sensitive component initialization in `SensorService` to `onStartCommand` after `hasRequiredPermissions()` check. Added runtime check for `FOREGROUND_SERVICE_LOCATION` and `ACCESS_NETWORK_STATE`.
 *   **ISSUE-REVOL37.1-F2**: Forensic Audit Signature Leak. **PASSED.**
     - **Fix**: Silenced `StackLog` signatures by removing redundant Framework connectivity callbacks and relying on protocol-level heartbeats. Verified Zero leaks on A15 hardware.
+*   **ISSUE-REVOL37.2-F1**: Hilt Test Injection Failure in `:app-sensor`. **PASSED.**
+    - **Fix**: Stabilized `HiltAndroidRule` declaration in sensor instrumented tests to ensure robust injection during hardening audits.
 
 ---
 
@@ -30,7 +32,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Nov1.7: [SOT Count: 892 (Rules: 392), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Forensic Audit), QA: 892]**
+- **Nov1.7: [SOT Count: 893 (Rules: 393), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Full Suite), QA: 893]**
 - **Nov1.6: [SOT Count: 891 (Rules: 391), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Infrastructure Fix), QA: 891]**
 - **Nov1.5: [SOT Count: 891 (Rules: 391), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: PASSED (Watchdog & Backfill), QA: 891]**
 - **Nov1.4: [SOT Count: 891 (Rules: 391), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: PASSED (Thermal Throttling), QA: 891]**

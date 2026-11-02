@@ -1,36 +1,29 @@
 # Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov1.7)
 
-## 🎯 Next Resumption Focus: Expansion Phase
+## 🎯 Next Resumption Focus: UI Hardening & R-ID 615 Verification
 
 ---
 
 ## 🟢 Resolved Gaps (Nov1.7)
 *   **ISSUE-REVOL37.1-F1**: Foreground Service Permission Regression. **PASSED.**
-    - **Fix**: Deferred sensitive component initialization in `SensorService` to `onStartCommand` after `hasRequiredPermissions()` check. Added runtime check for `FOREGROUND_SERVICE_LOCATION` and `ACCESS_NETWORK_STATE`.
 *   **ISSUE-REVOL37.1-F2**: Forensic Audit Signature Leak. **PASSED.**
-    - **Fix**: Silenced `StackLog` signatures by removing redundant Framework connectivity callbacks and relying on protocol-level heartbeats. Verified Zero leaks on A15 hardware.
+*   **ISSUE-REVOL37.2-F1**: Hilt Test Injection Failure in `:app-sensor`. **PASSED.**
 
 ---
 
 ## 🔴 Open Gaps (Nov1.7)
-*   *None.*
+*   **ISSUE-REVOL37.3-F1**: Missing Settings Gear on Tracker Dashboard. (R797)
+*   **ISSUE-REVOL37.3-F2**: Missing "Load Factory Defaults" and Configuration UI in Admin Console.
+    - **Symptom**: `AdminActivity` lacks mandatory buttons for factory reset and ID configuration required by `TEST_PROCEDURE.md` Chapter 2.5.
+    - **Severity**: High (Protocol Blocker).
+    - **Remediation Status**: Fixing in `AdminActivity.kt`.
 
 ---
 
 ## 🚀 Strategic Simplification Ideas
-*   **SIMP-REVOL30.0-S1**: Shared Test Fixtures. Consolidate hardware mocks into a test-only artifact within `:core-shared`.
-*   **SIMP-REVOL33.0-S1**: Batch Buffer Pooling. Implement object pooling for telemetry batch JSON arrays.
 *   **SIMP-REVOL37.0-S1**: Hilt Test Module Consolidation. Host common Hilt overrides in a `core-test` module.
 
 ---
 
-## ✅ Resolved Traceability & Metadata Issues (Nov1.6)
-*   **ISSUE-REVOL36.1-F1**: Hilt Test Infrastructure Hardening. **RESOLVED.** Fixed duplicate Dagger bindings in `:app-monitor`. (R-ID 84).
-
----
-
 ## 📊 Hardening Progress Dashboard
-- **Nov1.7: [SOT Count: 892 (Rules: 392), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Forensic Audit), QA: 892]**
-- **Nov1.6: [SOT Count: 891 (Rules: 391), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: PASSED (Infrastructure Fix), QA: 891]**
-- **Nov1.5: [SOT Count: 891 (Rules: 391), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: PASSED (Watchdog & Backfill), QA: 891]**
-- **Nov1.4: [SOT Count: 891 (Rules: 391), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: PASSED (Thermal Throttling), QA: 891]**
+- **Nov1.7: [SOT Count: 893 (Rules: 393), Open: H:2, M:0, L:0, Ideas: H:0, M:0, L:5, Testing: FAILED (2.5), QA: 893]**
