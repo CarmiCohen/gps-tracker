@@ -42,6 +42,7 @@ import javax.inject.Inject
 /**
  * AdminActivity: The "Admin Console" for the Sensor.
  * Hardened for Revol30.1: Uses unified ForensicIdentityManager for identity stability.
+ * Updated Nov1.7: Hardened PermissionGuard for API 34 compliance (Issue #REVOL37.1-F1).
  */
 @AndroidEntryPoint
 class AdminActivity : ComponentActivity() {
@@ -109,10 +110,14 @@ fun PermissionGuard(content: @Composable () -> Unit) {
     val context = LocalContext.current
     val requiredPermissions = mutableListOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.ACCESS_COARSE_LOCATION
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+        Manifest.permission.ACCESS_NETWORK_STATE
     ).apply {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            add(Manifest.permission.FOREGROUND_SERVICE_LOCATION)
         }
     }
 
@@ -136,7 +141,7 @@ fun PermissionGuard(content: @Composable () -> Unit) {
         ) {
             Text("Permissions Required", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "This app needs location and notification access to function as a reliable tracker.",
+                "This app needs location, network state, and notification access to function as a reliable tracker.",
                 modifier = Modifier.padding(vertical = 16.dp)
             )
             Button(onClick = {

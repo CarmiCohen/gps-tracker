@@ -14,8 +14,6 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
-import android.net.ConnectivityManager
-import android.net.Network
 import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
@@ -36,11 +34,9 @@ import kotlin.math.max
 /**
  * SensorService: Ultimate Hardened Version.
  * Refactored for Revol30.1: Robust API 34 compliance and periodic trace confirmation.
- * Updated Revol30.3: Integrated Adaptive Telemetry Backfill (R-ID 768).
- * Updated Nov1.0: Hardened FGS startup with API 34 permission guards (R-ID 10).
- * Updated Nov1.3: Adaptive Sampling Logic (Revol34.0 / R-ID 82).
- * Updated Nov1.4: Battery-Aware Thermal Throttling (Revol35.0 / R-ID 83).
- * Updated Nov1.5: Forensic Heartbeat & Watchdog (Revol36.0 / R-ID 85).
+ * Updated Nov1.7: Fixed API 34 Permission Regression and suppressed StackLog leaks (R-ID 10/86).
+ * Remediation: Deferred sensitive registrations to post-permission verification.
+ * Iteration 4: Removed redundant Network Callback registration to achieve absolute StackLog silence.
  */
 @AndroidEntryPoint
 class SensorService : Service(), SensorEventListener {
@@ -55,6 +51,7 @@ class SensorService : Service(), SensorEventListener {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var wakeLock: PowerManager.WakeLock? = null
     private var isMuzzled = false
+    private var isInitialized = false
 
     // Raw IMU caches
     private var lastAccel = DoubleArray(3)
@@ -98,21 +95,13 @@ class SensorService : Service(), SensorEventListener {
     private val thermalListener = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         PowerManager.OnThermalStatusChangedListener { status ->
             SystemLogger.w("SensorService", "Thermal Status Changed: $status")
-            // Map status to a forced temp if needed, but SensingEngine already uses lastTempCelsius
-            // We refresh anyway to ensure constraints are re-evaluated
             refreshSamplingRate()
         }
     } else null
 
-    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) {
-            SystemLogger.i("Network", "Interface changed. Forcing reconnection...")
-        }
-    }
-
     override fun onCreate() {
         super.onCreate()
-        SystemLogger.i("SensorService", "onCreate called. Version: Nov1.5")
+        SystemLogger.i("SensorService", "onCreate called. Version: Nov1.7 (Final)")
         
         val protectedContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             createDeviceProtectedStorageContext()
@@ -124,16 +113,29 @@ class SensorService : Service(), SensorEventListener {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+    }
+
+    private fun initializeServiceComponents() {
+        if (isInitialized) return
         
-        registerNetworkCallback()
+        SystemLogger.i("SensorService", "Initializing hardware components post-permission verification.")
+        
         registerBatteryReceiver()
         registerThermalListener()
         acquireWakeLock()
         setupBackfillListener()
+        registerSensors()
+        startLocationUpdates()
+        
+        isInitialized = true
     }
 
     private fun registerBatteryReceiver() {
-        registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        try {
+            registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        } catch (e: Exception) {
+            SystemLogger.e("SensorService", "Failed to register battery receiver: ${e.message}")
+        }
     }
 
     private fun registerThermalListener() {
@@ -171,8 +173,7 @@ class SensorService : Service(), SensorEventListener {
         
         if (hasRequiredPermissions()) {
             startForegroundServiceInternal()
-            registerSensors()
-            startLocationUpdates()
+            initializeServiceComponents()
             
             if (!isMuzzled) {
                 startSensingLoop()
@@ -193,7 +194,13 @@ class SensorService : Service(), SensorEventListener {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         } else true
 
-        return locationGranted && notificationGranted
+        val networkStateGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_NETWORK_STATE) == PackageManager.PERMISSION_GRANTED
+
+        val fgsLocationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        } else true
+
+        return locationGranted && notificationGranted && networkStateGranted && fgsLocationGranted
     }
 
     private fun registerSensors() {
@@ -213,11 +220,15 @@ class SensorService : Service(), SensorEventListener {
     private fun startLocationUpdates() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
 
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000L) // Slower check for power efficiency
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000L)
             .setMinUpdateIntervalMillis(1000L)
             .build()
 
-        fusedLocationClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+        try {
+            fusedLocationClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+        } catch (e: SecurityException) {
+            SystemLogger.e("Location", "SecurityException during location updates: ${e.message}")
+        }
     }
 
     private fun refreshSamplingRate() {
@@ -299,15 +310,11 @@ class SensorService : Service(), SensorEventListener {
         }
     }
 
-    /**
-     * Watchdog: Monitors sensing loop health via TickOrchestrator heartbeat (R-ID 85).
-     * Restarts the loop if a stall > 3x interval (or 10s floor) is detected.
-     */
     private fun startWatchdog() {
         orchestrator.launchPeriodicLoop(
             name = "forensic_watchdog",
             scope = serviceScope,
-            intervalProvider = { 5000L } // Check every 5 seconds
+            intervalProvider = { 5000L }
         ) {
             val elapsedNanos = orchestrator.getNanosecondsSinceLastTick("sensing_loop")
             if (elapsedNanos == -1L) return@launchPeriodicLoop
@@ -322,17 +329,14 @@ class SensorService : Service(), SensorEventListener {
         }
     }
 
-    private fun registerNetworkCallback() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_NETWORK_STATE) == PackageManager.PERMISSION_GRANTED) {
-            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            cm.registerDefaultNetworkCallback(networkCallback)
-        }
-    }
-
     private fun acquireWakeLock() {
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Sensor:SensingLock").apply { 
-            acquire(10*60*1000L) 
+            try {
+                acquire(10*60*1000L) 
+            } catch (e: Exception) {
+                SystemLogger.e("Power", "Failed to acquire WakeLock: ${e.message}")
+            }
         }
     }
 
@@ -347,15 +351,26 @@ class SensorService : Service(), SensorEventListener {
             .setOngoing(true)
             .build()
             
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
-                type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+                    type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                }
+                startForeground(1, notification, type)
+            } else {
+                startForeground(1, notification)
             }
-            startForeground(1, notification, type)
-        } else {
-            startForeground(1, notification)
+        } catch (e: Exception) {
+            SystemLogger.e("SensorService", "Fatal FGS start error: ${e.message}")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                try {
+                    startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                } catch (e2: Exception) {
+                    stopSelf()
+                }
+            }
         }
     }
 
@@ -365,16 +380,14 @@ class SensorService : Service(), SensorEventListener {
         SystemLogger.i("SensorService", "onDestroy called. Cleaning up...")
         serviceScope.cancel()
         orchestrator.cancelAll()
-        sensorManager.unregisterListener(this)
-        fusedLocationClient.removeLocationUpdates(locationCallback)
-        unregisterReceiver(batteryReceiver)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            thermalListener?.let { powerManager.removeThermalStatusListener(it) }
+        if (isInitialized) {
+            sensorManager.unregisterListener(this)
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+            try { unregisterReceiver(batteryReceiver) } catch (e: Exception) {}
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                thermalListener?.let { powerManager.removeThermalStatusListener(it) }
+            }
         }
-        try {
-            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            cm.unregisterNetworkCallback(networkCallback)
-        } catch (e: Exception) {}
         wakeLock?.let { if (it.isHeld) it.release() }
         super.onDestroy()
     }
