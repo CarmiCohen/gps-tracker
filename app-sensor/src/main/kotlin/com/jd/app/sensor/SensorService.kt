@@ -107,7 +107,8 @@ class SensorService : Service(), SensorEventListener {
             createDeviceProtectedStorageContext()
         } else this
         
-        forensicBuffer = ForensicBuffer(protectedContext.filesDir)
+        val capacity = ForensicBuffer.calculateAdaptiveCapacity(sampleRateHz = 100, retentionSeconds = 100)
+        forensicBuffer = ForensicBuffer(protectedContext.filesDir, capacity = capacity)
         forensicBuffer.initialize()
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager

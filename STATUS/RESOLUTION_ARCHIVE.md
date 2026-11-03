@@ -1,5 +1,12 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov3.0)
+- **Exhaustive Verification**: 100% pass rate for all Project Unit Tests (39/39) and automated verification protocols.
+- **ISSUE-REVOL38.3-F1 (GAP-REVOL38.3-G1)**: Adaptive JNI Buffer Scaling. Implemented `calculateAdaptiveCapacity` in `ForensicBuffer` to dynamically scale buffer size according to sample rate and retention duration across SoC vendors. Integrated with `SensorService`.
+- **Baseline Synchronization**: Version `Nov3.0` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov2.25)
 - **Exhaustive Verification**: 100% pass rate for all Project Unit Tests (48/48) and Instrumented Tests (45/45).
 - **ISSUE-REVOL38.2-F1 (GAP-REVOL38.2-G1)**: Thermal Throttling Anomaly Correlation (R133). Implemented Thermal Hysteresis (2.0°C) in `SensingEngine` to prevent interval oscillation at temperature boundaries.

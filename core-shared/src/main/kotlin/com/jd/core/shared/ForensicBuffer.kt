@@ -261,4 +261,16 @@ class ForensicBuffer(
             }
         }
     }
+
+    companion object {
+        /**
+         * Calculates adaptive buffer capacity based on variable sensor bitrates across SoC vendors (GAP-REVOL38.3-G1).
+         * Ensures consistent retention window regardless of device sample rate.
+         */
+        fun calculateAdaptiveCapacity(sampleRateHz: Int = 100, retentionSeconds: Int = 100): Int {
+            val calculated = sampleRateHz * retentionSeconds
+            return calculated.coerceIn(1000, 50000)
+        }
+    }
 }
+

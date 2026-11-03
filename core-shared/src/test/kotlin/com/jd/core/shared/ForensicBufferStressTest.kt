@@ -136,6 +136,21 @@ class ForensicBufferStressTest {
         assertEquals(999L, newBuffer.readTraces().first().sequenceId)
     }
 
+    @Test
+    fun testAdaptiveCapacityScaling() {
+        val capacity100Hz = ForensicBuffer.calculateAdaptiveCapacity(sampleRateHz = 100, retentionSeconds = 100)
+        assertEquals(10000, capacity100Hz)
+
+        val capacity50Hz = ForensicBuffer.calculateAdaptiveCapacity(sampleRateHz = 50, retentionSeconds = 100)
+        assertEquals(5000, capacity50Hz)
+
+        val capacity500Hz = ForensicBuffer.calculateAdaptiveCapacity(sampleRateHz = 500, retentionSeconds = 100)
+        assertEquals(50000, capacity500Hz)
+
+        val minBound = ForensicBuffer.calculateAdaptiveCapacity(sampleRateHz = 1, retentionSeconds = 10)
+        assertEquals(1000, minBound)
+    }
+
     private fun createUpdate(seq: Long) = LocationUpdate().apply {
         sequenceId = seq
         timestamp = System.currentTimeMillis()
