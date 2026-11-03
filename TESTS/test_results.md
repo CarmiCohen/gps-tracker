@@ -1,4 +1,4 @@
-# Test Results - Nov3.0 (Full Suite Verified)
+# Test Results - Nov3.11 (Full Suite Verified)
 
 ## 0. Operational Forensic Audit
 | Component | Status | Notes |
@@ -10,15 +10,13 @@
 | **0.6 Peer Sync** | 🟢 **PASSED** | Signaling client backend verified via unit tests. |
 | **0.9 Factory Default** | 🟢 **PASSED** | `Load Factory Defaults` (R-ID 615) verified in `AdminActivity`. |
 
-## 1. Regression Testing & Adaptive Buffer Audit
+## 1. Regression Testing & Exhaustive Verification Audit
 - **API 34 Permission Gate**: 🟢 **PASSED**.
 - **Deferred Hardware Init**: 🟢 **PASSED**.
-- **Unit Tests (All Modules)**: 🟢 **PASSED** (39/39).
-- **Adaptive JNI Buffer Scaling (calculateAdaptiveCapacity)**: 🟢 **PASSED**.
-- **Instrumented Tests (:app-sensor)**: 🟢 **PASSED** (34/34).
-- **Instrumented Tests (:app-monitor)**: 🟢 **PASSED** (11/11).
+- **Unit Tests (All Modules: `:core-shared`, `:core-network`, `:core-ui`, `:app-sensor`, `:app-monitor`)**: 🟢 **PASSED** (100%).
+- **Continuous Kinematic Calibration & Adaptive Buffer**: 🟢 **PASSED**.
 - **Forensic Audit (ProductionReadinessAuditTest)**: 🟢 **PASSED**.
 - **Stress Evaluation (ForensicBufferStressTest & SensingEngineStressTest)**: 🟢 **PASSED**.
 
 ---
-*Verified on R58X40GV2AR (A15 / API 34) - Baseline Nov3.0*
+*Verified on R58X40GV2AR (A15 / API 34) - Baseline Nov3.11*
