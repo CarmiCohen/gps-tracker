@@ -1,5 +1,6 @@
 package com.jd.app.monitor
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -45,6 +46,20 @@ class MonitorActivity : ComponentActivity() {
                 val trackerId by viewModel.targetId.collectAsStateWithLifecycle(initialValue = null)
                 val monitorId by viewModel.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
                 val trail by viewModel.trail.collectAsStateWithLifecycle()
+                val context = LocalContext.current
+
+                LaunchedEffect(trackerId) {
+                    val serviceIntent = Intent(context, MonitorSessionService::class.java)
+                    if (trackerId != null) {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            context.startForegroundService(serviceIntent)
+                        } else {
+                            context.startService(serviceIntent)
+                        }
+                    } else {
+                        context.stopService(serviceIntent)
+                    }
+                }
 
                 if (trackerId == null) {
                     PairingWizard(onPair = { id -> viewModel.setTargetId(id) })
@@ -53,7 +68,10 @@ class MonitorActivity : ComponentActivity() {
                         trackerId = trackerId!!,
                         monitorId = monitorId,
                         trail = trail,
-                        onReset = { viewModel.clearTargetId() }
+                        onReset = { 
+                            viewModel.clearTargetId()
+                            context.stopService(Intent(context, MonitorSessionService::class.java))
+                        }
                     )
                 }
             }

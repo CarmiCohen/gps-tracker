@@ -1,0 +1,26 @@
+# Resolution Archive
+
+## ✅ Resolved Issues (Nov3.22)
+- **Telemetry Ingestion Service Activation & Parameter Configuration (GAP-REVOL47.0-G1)**: Fixed the "Waiting for Telemetry..." idle state by ensuring `MonitorSessionService` starts automatically upon target pairing in `MonitorActivity`, with API 34+ `dataSync` foreground service compliance. Documented parameter configuration (Pairing Wizard in Monitor, Settings Overlay in Sensor). **PASSED.**
+- **Baseline Synchronization**: Version `Nov3.22` established as the new forensic stabilization baseline.
+
+---
+
+## ✅ Resolved Issues (Nov3.21)
+- **Manual Tracker/Device ID Customization & Version Display (GAP-REVOL46.0-G1)**: Enabled manual selection and configuration of device / tracker ID (any non-blank sequence of characters, including single-character IDs) via `ForensicIdentityManager#setSelfId` and the Settings Overlay in `AdminActivity`. Added application version name display to the first screen of both the Sensor (`AdminActivity`) and Monitor (`MonitorActivity`). **PASSED.**
+- **Baseline Synchronization**: Version `Nov3.21` established as the new forensic stabilization baseline.
+
+---
+
+## ✅ Resolved Issues (Nov3.20)
+- **Flexible Device ID Entry (GAP-REVOL45.0-G1)**: Enabled entering any sequence of characters, even a single character, for device ID / tracker ID in the pairing wizard and identity validation logic. Updated unit tests (`ForensicIdentityTest`) and instrumented tests (`IdentityAuditTest`) to verify flexible ID acceptance and non-blank validation. **PASSED.**
+- **Baseline Synchronization**: Version `Nov3.20` established as the new forensic stabilization baseline.
+
+---
+
+## ✅ Resolved Issues (Nov3.14)
+- **Physical Device Instrumented Verification**: Executed and verified instrumented test suites (`connectedDebugAndroidTest`) using A15 (`R58X40GV2AR`) for sensor and S21FW (`R5CRC14PG4F`) for monitor (35/35 on app-sensor, 10/10 on app-monitor). **PASSED.**
+- **Reciprocal Virtual Presence Simulation**: Conducted reciprocal virtual presence testing (simulating viewer device to validate tracker behavior, and simulating tracker device to validate viewer behavior). **PASSED.**
+- **Exhaustive Verification**: 100% pass rate for all Project Unit Tests across all modules (`:core-shared`, `:core-network`, `:core-ui`, `:app-sensor`, `:app-monitor`).
+- **Forensic Stabilization & Versioning**: Updated version name to `Nov3.22_PLATINUM` and synchronized all SOT master requirements, issues tracking, test results, and baseline documentation.
+- **Baseline Synchronization**: Version `Nov3.22` established as the new forensic stabilization baseline.

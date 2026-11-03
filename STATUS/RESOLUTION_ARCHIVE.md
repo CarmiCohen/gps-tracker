@@ -1,5 +1,11 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov3.22)
+- **Telemetry Ingestion Service Activation & Parameter Configuration (GAP-REVOL47.0-G1)**: Fixed the "Waiting for Telemetry..." idle state by ensuring `MonitorSessionService` starts automatically upon target pairing in `MonitorActivity`, with API 34+ `dataSync` foreground service compliance. Documented parameter configuration (Pairing Wizard in Monitor, Settings Overlay in Sensor). **PASSED.**
+- **Baseline Synchronization**: Version `Nov3.22` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov3.21)
 - **Manual Tracker/Device ID Customization & Version Display (GAP-REVOL46.0-G1)**: Enabled manual selection and configuration of device / tracker ID (any non-blank sequence of characters, including single-character IDs) via `ForensicIdentityManager#setSelfId` and the Settings Overlay in `AdminActivity`. Added application version name display to the first screen of both the Sensor (`AdminActivity`) and Monitor (`MonitorActivity`). **PASSED.**
 - **Baseline Synchronization**: Version `Nov3.21` established as the new forensic stabilization baseline.
