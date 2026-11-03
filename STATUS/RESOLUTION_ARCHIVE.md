@@ -1,5 +1,12 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov3.1)
+- **Exhaustive Verification**: 100% pass rate for all Project Unit Tests (43/43) and automated verification protocols.
+- **ISSUE-REVOL39.0-F1 (GAP-REVOL39.0-G1)**: Continuous Kinematic Calibration. Implemented `calculateKinematicAdaptiveFloor` in `SensingEngine` to dynamically recalibrate the IMU noise floor baseline during high-acceleration vehicle transitions and hardened `isStationary` gate. Added `KinematicCalibrationTest`.
+- **Baseline Synchronization**: Version `Nov3.1` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov3.0)
 - **Exhaustive Verification**: 100% pass rate for all Project Unit Tests (39/39) and automated verification protocols.
 - **ISSUE-REVOL38.3-F1 (GAP-REVOL38.3-G1)**: Adaptive JNI Buffer Scaling. Implemented `calculateAdaptiveCapacity` in `ForensicBuffer` to dynamically scale buffer size according to sample rate and retention duration across SoC vendors. Integrated with `SensorService`.

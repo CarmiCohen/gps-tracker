@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov3.0)
+# SOT Master Requirements & Hardening Status (Nov3.1)
 
-## 🏗️ Architectural Master Rules (399 Rules)
+## 🏗️ Architectural Master Rules (400 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.319 preserved)
@@ -9,8 +9,10 @@
 *   **1.322 Sentinel Kinematic Expansion (R-ID 93)**: `SentinelLogic` MUST support high-speed transport scenarios (up to 200 km/h) and rapid vehicle acceleration (5.0 m/s²) to prevent false-positive `JUMP` detections during valid high-velocity trajectories.
 *   **1.323 Test Stress Mitigation (R-ID 94)**: Instrumented stress tests MUST utilize `yield()` in tight loops and provide adequate collection timeouts (min 2000ms) to prevent thread starvation and false-positive timeouts on budget hardware (A15).
 *   **1.324 Adaptive Buffer Capacity Scaling (R-ID 95)**: The `ForensicBuffer` MUST dynamically scale buffer allocation (`calculateAdaptiveCapacity`) based on sensor sampling frequency and retention window requirements across variable SoC vendor bitrates (GAP-REVOL38.3-G1).
+*   **1.325 Continuous Kinematic Calibration (R-ID 96)**: The `SensingEngine` MUST dynamically recalibrate the IMU noise floor during high-acceleration vehicle transitions (`calculateKinematicAdaptiveFloor`), scaling the noise floor baseline relative to acceleration magnitude (`accelFactor`) to ensure robust stationary detection (`isStationary`) under changing kinetic baselines (GAP-REVOL39.0-G1).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov3.1**: Continuous Kinematic Calibration & Dynamic IMU Noise Floor Recalibration (GAP-REVOL39.0-G1) - PASSED.
 - **Nov3.0**: Adaptive JNI Buffer Scaling & Variable Bitrate Retention (GAP-REVOL38.3-G1) - PASSED.
 - **Nov2.25**: Multi-Peer Forensic Integrity & Thermal Hysteresis (R133) - PASSED.
 - **Nov2.24**: Exhaustive Full-Project Verification & Stress Evaluation - PASSED.
@@ -20,6 +22,7 @@
 - **Nov2.0**: Dependency Synchronization & Build Integrity - PASSED.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.31 (Nov3.1 Validation Audit)**: PASSED - Verified Continuous Kinematic Calibration (`calculateKinematicAdaptiveFloor`, `isStationary`) in `SensingEngine` under high-acceleration vehicle transitions.
 *   **Chapter 5.30 (Nov3.0 Validation Audit)**: PASSED - Verified Adaptive Buffer Scaling (`calculateAdaptiveCapacity`) in `ForensicBuffer` and full lifecycle integration in `SensorService`.
 *   **Chapter 5.25 (Nov2.25 Validation Audit)**: PASSED - Verified Thermal Hysteresis (R133) and Multi-peer backfill contention deduplication under high latency.
 *   **Chapter 5.24 (Nov2.24 Validation Audit)**: PASSED - Exhaustive verification of all 100 chapters in `TEST_PROCEDURE.md` and high-load stress protocols.

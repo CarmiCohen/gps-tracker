@@ -8,6 +8,7 @@ import kotlin.math.*
  * Updated Nov1.3: Integrated Velocity-Based Adaptive Sampling (Revol34.0 / R-ID 82).
  * Updated Nov1.4: Integrated Multi-Stage Thermal & Battery Throttling (Revol35.0 / R-ID 83).
  * Updated Nov2.25: Added Thermal Hysteresis (R133 / R-ID 88) to prevent interval oscillation.
+ * Updated Nov3.1: Continuous Kinematic Calibration (GAP-REVOL39.0-G1 / R-ID 96).
  */
 object SensingEngine {
 
@@ -104,17 +105,49 @@ object SensingEngine {
      * specific device hardware noise.
      */
     fun calculateAutoTunedFloor(recentNoiseSamples: DoubleArray): Float {
-        if (recentNoiseSamples.isEmpty()) return 0.12f
-        val mean = recentNoiseSamples.average()
-        val variance = recentNoiseSamples.map { (it - mean).pow(2.0) }.average()
-        val standardDeviation = sqrt(variance)
-        // Set floor to Mean + 3 Sigma (99.7% confidence interval)
-        return (mean + (standardDeviation * 3.0)).coerceIn(0.05, 0.5).toFloat()
+        return calculateKinematicAdaptiveFloor(recentNoiseSamples, accelerationMps2 = 0.0, velocityMps = 0.0)
     }
 
-    fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean {
+    /**
+     * Continuous Kinematic Calibration (GAP-REVOL39.0-G1 / R-ID 96):
+     * Calculates dynamic IMU vibration floor continuously recalibrated for high-acceleration vehicle transitions.
+     */
+    fun calculateKinematicAdaptiveFloor(
+        recentNoiseSamples: DoubleArray,
+        accelerationMps2: Double = 0.0,
+        velocityMps: Double = 0.0
+    ): Float {
+        val baseFloor = if (recentNoiseSamples.isEmpty()) {
+            0.12f
+        } else {
+            val mean = recentNoiseSamples.average()
+            val variance = recentNoiseSamples.map { (it - mean).pow(2.0) }.average()
+            val standardDeviation = sqrt(variance)
+            (mean + (standardDeviation * 3.0)).toFloat()
+        }
+
+        val accelFactor = (1.0 + (abs(accelerationMps2) / GRAVITY_EARTH)).coerceIn(1.0, 3.0)
+        val velocityFactor = if (velocityMps > 5.0) 1.25 else 1.0
+
+        return (baseFloor * accelFactor * velocityFactor).coerceIn(0.05, 1.5).toFloat()
+    }
+
+    /**
+     * Hardened Stationary Detection (GAP-REVOL39.0-G1 / R-ID 96):
+     * Evaluates stationary state under changing kinetic baselines and high acceleration vehicle transitions.
+     */
+    fun isStationary(
+        vibration: Double,
+        adaptiveFloor: Double,
+        cpuLoad: Double = 0.0,
+        accelerationMps2: Double = 0.0,
+        velocityMps: Double = 0.0
+    ): Boolean {
+        // Active vehicle motion (>0.5 m/s) or high acceleration transition (>2.0 m/s^2) cannot be stationary
+        if (velocityMps > 0.5 || abs(accelerationMps2) > 2.0) return false
+
         val loadFactor = if (cpuLoad > 0.85) 2.0 else 1.0
-        val dynamicGate = (adaptiveFloor * 1.5 * loadFactor).coerceIn(0.05, 0.24)
+        val dynamicGate = (adaptiveFloor * 1.5 * loadFactor).coerceIn(0.05, 0.50)
         return vibration < dynamicGate
     }
 }
