@@ -1,11 +1,16 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov3.14)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov3.20)
 
-## 🎯 Next Resumption Focus: Multi-Device Telemetry Sync & Expansion (GAP-REVOL44.0-G1)
+## 🎯 Next Resumption Focus: Multi-Device Telemetry Sync & Expansion (GAP-REVOL46.0-G1)
 
 ---
 
-## 🔴 Open Gaps (Nov3.14)
-*   *None. All gaps resolved in Nov3.14 baseline.*
+## 🔴 Open Gaps (Nov3.20)
+*   *None. All gaps resolved in Nov3.20 baseline.*
+
+---
+
+## 🟢 Resolved Gaps (Nov3.20)
+*   **Flexible Device ID Entry (Nov3.20)**: Enabled entering any sequence of characters, even a single character, for device ID / tracker ID in the pairing wizard and identity validation logic. Updated unit tests (`ForensicIdentityTest`) and instrumented tests (`IdentityAuditTest`) to verify flexible ID acceptance and non-blank validation. **PASSED.**
 
 ---
 
@@ -25,6 +30,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov3.20: [SOT Count: 901 (Rules: 401), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Flexible Device ID Entry & Unit Suites), QA: 901]**
 - **Nov3.14: [SOT Count: 900 (Rules: 400), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Physical Instrumented & Unit Suites on A15/S21FW), QA: 900]**
 - **Nov3.13: [SOT Count: 900 (Rules: 400), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Physical Instrumented & Unit Suites), QA: 900]**
 - **Nov3.12: [SOT Count: 900 (Rules: 400), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Sub-items: 100), QA: 900]**

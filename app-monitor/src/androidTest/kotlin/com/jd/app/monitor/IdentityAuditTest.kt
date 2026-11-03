@@ -50,16 +50,16 @@ class IdentityAuditTest {
     }
 
     /**
-     * verifyIdentityFormatValidation: Ensures only valid 64-char 
-     * hex hashes are accepted as target IDs.
+     * verifyFlexibleDeviceIdAccepted: Ensures that any non-blank sequence of characters 
+     * (including a single character) is accepted as a target ID.
      */
     @Test
-    fun verifyIdentityFormatValidation() = runBlocking {
-        val invalidId = "short-id"
-        identityManager.setTargetId(invalidId)
+    fun verifyFlexibleDeviceIdAccepted() = runBlocking {
+        val flexibleId = "a" // Single character ID
+        identityManager.setTargetId(flexibleId)
         
         val currentId = identityManager.targetId.first()
-        assertNotEquals("Invalid ID format must be rejected", invalidId, currentId)
+        assertEquals("Flexible single-character ID must be accepted", flexibleId, currentId)
     }
 
     /**

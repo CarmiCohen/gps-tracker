@@ -84,7 +84,7 @@ fun PairingWizard(onPair: (String) -> Unit) {
             isError = isError,
             supportingText = {
                 if (isError) {
-                    Text("Invalid ID format (Expected 64-char hex)")
+                    Text("Device ID cannot be blank")
                 }
             },
             modifier = Modifier.fillMaxWidth()

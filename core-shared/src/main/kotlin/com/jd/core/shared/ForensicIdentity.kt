@@ -24,9 +24,9 @@ object ForensicIdentity {
     fun generateSalt(): String = UUID.randomUUID().toString()
 
     /**
-     * Validates that an ID is a valid 64-character hex hash.
+     * Validates that an ID is not blank (allows any sequence of characters including a single character).
      */
     fun isValid(id: String): Boolean {
-        return id.length == 64 && id.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
+        return id.isNotBlank()
     }
 }

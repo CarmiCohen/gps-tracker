@@ -36,14 +36,16 @@ class ForensicIdentityTest {
 
     @Test
     fun verifyIdentityValidationLogic() {
-        val validId = "a".repeat(64)
-        val shortId = "a".repeat(63)
-        val longId = "a".repeat(65)
-        val nonHexId = "g".repeat(64)
+        val singleCharId = "a"
+        val shortId = "device-1"
+        val nonHexId = "my_tracker_id_123!"
+        val blankId = "   "
+        val emptyId = ""
 
-        assertTrue("Valid ID must be accepted", ForensicIdentity.isValid(validId))
-        assertFalse("Short ID must be rejected", ForensicIdentity.isValid(shortId))
-        assertFalse("Long ID must be rejected", ForensicIdentity.isValid(longId))
-        assertFalse("Non-hex ID must be rejected", ForensicIdentity.isValid(nonHexId))
+        assertTrue("Single-character ID must be accepted", ForensicIdentity.isValid(singleCharId))
+        assertTrue("Short ID must be accepted", ForensicIdentity.isValid(shortId))
+        assertTrue("Non-hex / arbitrary ID must be accepted", ForensicIdentity.isValid(nonHexId))
+        assertFalse("Blank ID must be rejected", ForensicIdentity.isValid(blankId))
+        assertFalse("Empty ID must be rejected", ForensicIdentity.isValid(emptyId))
     }
 }
