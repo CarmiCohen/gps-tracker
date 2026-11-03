@@ -7,12 +7,25 @@ import kotlin.math.*
  * Corrected Revol29.4: Aligned with R-ID 16 floor (1Hz) for low battery survival.
  * Updated Nov1.3: Integrated Velocity-Based Adaptive Sampling (Revol34.0 / R-ID 82).
  * Updated Nov1.4: Integrated Multi-Stage Thermal & Battery Throttling (Revol35.0 / R-ID 83).
+ * Updated Nov2.25: Added Thermal Hysteresis (R133 / R-ID 88) to prevent interval oscillation.
  */
 object SensingEngine {
 
     const val THERMAL_WARNING_CELSIUS = 40.0
     const val THERMAL_CRITICAL_CELSIUS = 45.0
+    const val THERMAL_HYSTERESIS_CELSIUS = 2.0
+    
     private const val GRAVITY_EARTH = 9.80665
+    
+    private var activeThermalThrottlingMs = 0L
+
+    /**
+     * Resets the internal thermal state. Primarily used for unit testing.
+     */
+    @Synchronized
+    fun resetThermalState() {
+        activeThermalThrottlingMs = 0L
+    }
 
     /**
      * Rotates raw accelerometer data into World Space using the Gravity Vector.
@@ -41,17 +54,24 @@ object SensingEngine {
     /**
      * Determines the optimal sensing interval based on movement, heat, and power source.
      * Aligned with Revol35.0: Multi-stage throttling (10Hz moving, 1Hz slow/warn, 0.1Hz stationary/crit).
+     * Updated Nov2.25: Implemented Hysteresis for boundary stability (R133).
      */
+    @Synchronized
     fun getOptimalIntervalMs(
         currentTemp: Float, 
         isCharging: Boolean, 
         batteryLevel: Int,
         velocityMps: Float = 0f
     ): Long {
-        // 1. Thermal Throttling (Highest Priority)
-        if (currentTemp >= THERMAL_CRITICAL_CELSIUS) return 10000L // 0.1Hz: Critical Protection
-        
-        val thermalCap = if (currentTemp >= THERMAL_WARNING_CELSIUS) 1000L else 100L
+        // 1. Thermal Throttling with Hysteresis (Highest Priority)
+        val thermalCap = when {
+            currentTemp >= THERMAL_CRITICAL_CELSIUS -> 10000L
+            activeThermalThrottlingMs == 10000L && currentTemp >= (THERMAL_CRITICAL_CELSIUS - THERMAL_HYSTERESIS_CELSIUS) -> 10000L
+            currentTemp >= THERMAL_WARNING_CELSIUS -> 1000L
+            activeThermalThrottlingMs == 1000L && currentTemp >= (THERMAL_WARNING_CELSIUS - THERMAL_HYSTERESIS_CELSIUS) -> 1000L
+            else -> 100L
+        }
+        activeThermalThrottlingMs = thermalCap
         
         // 2. Battery Throttling
         val batteryCap = when {
@@ -68,10 +88,11 @@ object SensingEngine {
         }
 
         // Combine constraints: The longest interval wins (throttling)
-        // Except when charging, which allows performance mode if thermal is okay
         val combinedInterval = max(baseInterval, max(thermalCap, batteryCap))
 
-        return if (isCharging && currentTemp < THERMAL_WARNING_CELSIUS) {
+        // Special case for charging: allows performance mode if thermal is safe
+        // Charging respects thermal caps and hysteresis
+        return if (isCharging && thermalCap == 100L) {
             min(100L, combinedInterval)
         } else {
             combinedInterval

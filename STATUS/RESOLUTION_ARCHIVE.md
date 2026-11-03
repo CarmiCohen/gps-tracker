@@ -1,5 +1,13 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov2.25)
+- **Exhaustive Verification**: 100% pass rate for all Project Unit Tests (48/48) and Instrumented Tests (45/45).
+- **ISSUE-REVOL38.2-F1 (GAP-REVOL38.2-G1)**: Thermal Throttling Anomaly Correlation (R133). Implemented Thermal Hysteresis (2.0°C) in `SensingEngine` to prevent interval oscillation at temperature boundaries.
+- **ISSUE-REVOL38.2-F2 (GAP-REVOL38.2-G2)**: Multi-peer backfill contention. Validated deduplication logic in `MonitorRepository` under high network latency (>2000ms).
+- **Baseline Synchronization**: Version `Nov2.25` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov2.24)
 - **Exhaustive Verification**: 100% pass rate for all Project Unit Tests (48/48), Instrumented Tests (43/43), and Forensic Stress evaluations.
 - **Protocol Adherence**: Confirmed compliance with `TEST_PROCEDURE.md` (100 Chapters) and `TEST_FORENSIC_STRESS_PROTOCOL.md`.

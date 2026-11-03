@@ -40,8 +40,7 @@ import javax.inject.Singleton
 /**
  * BackfillContentionTest: Audits the MonitorRepository under multi-peer backfill contention.
  * Verifies that redundant requests are minimized and data integrity is maintained.
- * Fixed Nov1.5: Relocated Hilt module to top-level and replaced both MonitorModule and NetworkModule 
- * to resolve duplicate binding for SignalingClient.
+ * Updated Nov2.25: Added high-latency simulation (>2000ms) to validate deduplication under pressure (GAP-REVOL38.2-G2).
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -65,54 +64,70 @@ class BackfillContentionTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun testBackfillDeduplication() = runTest {
+    fun testBackfillDeduplicationWithLatency() = runTest {
         val mockClient = signalingClient as FakeSignalingClient
         
-        // 1. Initial state: DB is empty.
-        // 2. Simulate arrival of a live update with a large gap (seq 100).
-        val liveUpdate = LocationUpdate(
-            deviceId = testDeviceId,
-            sequenceId = 100L,
-            timestamp = System.currentTimeMillis(),
-            lat = 1.0,
-            lng = 1.0
-        )
-
+        // Use a list to capture all backfill requests sent by the repository
         val backfillRequests = mutableListOf<BackfillRequest>()
-        
-        // Use a flow to capture requests
         val requestCapture = MutableSharedFlow<BackfillRequest>(extraBufferCapacity = 10)
+        
         mockClient.onRequestBackfill = { req ->
             backfillRequests.add(req)
             requestCapture.tryEmit(req)
             true
         }
 
-        // Trigger processing
-        mockClient.emitTelemetry(liveUpdate)
+        // 1. Trigger a gap: Seq 0 exists (implicit), Seq 100 arrives.
+        val update100 = LocationUpdate(
+            deviceId = testDeviceId,
+            sequenceId = 100L,
+            timestamp = System.currentTimeMillis(),
+            lat = 1.0,
+            lng = 1.0
+        )
+        mockClient.emitTelemetry(update100)
         
-        // Wait for the first backfill request
+        // Wait for the first request (1..99)
         val firstReq = requestCapture.first()
         assertEquals(1L, firstReq.startSequenceId)
         assertEquals(99L, firstReq.endSequenceId)
 
-        // 3. Simulate arrival of another live update (seq 101) BEFORE backfill completes.
-        // Repository should NOT trigger another backfill request for the same range.
-        val liveUpdate2 = LocationUpdate(
-            deviceId = testDeviceId,
-            sequenceId = 101L,
-            timestamp = System.currentTimeMillis() + 1000,
-            lat = 1.1,
-            lng = 1.1
-        )
-        mockClient.emitTelemetry(liveUpdate2)
+        // 2. Simulate High Network Latency: Delay the response by 2500ms
+        // While waiting, multiple telemetry pulses arrive, each detecting the same gap.
+        repeat(5) { i ->
+            delay(500) // Total 2500ms
+            val fillerUpdate = LocationUpdate(
+                deviceId = testDeviceId,
+                sequenceId = 101L + i,
+                timestamp = System.currentTimeMillis(),
+                lat = 1.1,
+                lng = 1.1
+            )
+            mockClient.emitTelemetry(fillerUpdate)
+        }
 
-        // Give it some time for processing
-        delay(1000)
-
-        // Verify only one request was sent for the gap
+        // 3. Verify Deduplication
+        // Repository must NOT have sent more than 1 request for the (1..99) range.
         val redundantRequests = backfillRequests.filter { it.startSequenceId == 1L && it.endSequenceId == 99L }
-        assertEquals("Redundant backfill requests detected", 1, redundantRequests.size)
+        assertEquals("Redundant backfill requests detected during latency period", 1, redundantRequests.size)
+
+        // 4. Complete the backfill
+        mockClient.emitBackfillResponse(BackfillResponse(firstReq.requestId, emptyList(), true))
+        delay(100)
+
+        // 5. Verify the gap is closed and future updates don't trigger backfill
+        val update110 = LocationUpdate(
+            deviceId = testDeviceId,
+            sequenceId = 110L,
+            timestamp = System.currentTimeMillis(),
+            lat = 1.2,
+            lng = 1.2
+        )
+        mockClient.emitTelemetry(update110)
+        
+        // This should trigger a backfill for 106..109 (since 105 was the last from the repeat loop)
+        val secondReq = requestCapture.first { it.startSequenceId == 106L }
+        assertEquals(109L, secondReq.endSequenceId)
     }
 }
 

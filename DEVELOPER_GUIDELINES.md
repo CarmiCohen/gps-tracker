@@ -54,7 +54,14 @@ Perform these steps in strict sequence once an issue is resolved:
     *   **Environment Safety**: Ensure each command is on its own line.
     *   **Format**: Use a plain code block (no `powershell` or `bash` identifier).
     *   **No Chaining**: Do not use `&&` or `;`.
-14. **Final Stop**: Display the prepared **Final Git Command Block** and the **Audit Recalculation** line, then **STOP ALL PROCESSING.**
+    *   **Example Block (Mandatory Format)**:
+        ```
+        git add .
+        git commit -m "Exhaustive Message"
+        git tag VersionName
+        git push origin main --tags
+        ```
+14. **Final Stop**: Display the prepared **Final Git Command Block** and the **Audit Recalculation** line, then **STOP ALL PROCESSING.** The Git command block **MUST NOT** be truncated or split into multiple snippets.
 
 ---
 
