@@ -1,0 +1,27 @@
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov3.21)
+
+## 🎯 Next Resumption Focus: Multi-Device Telemetry Sync & Expansion (GAP-REVOL47.0-G1)
+
+---
+
+## 🔴 Open Gaps (Nov3.21)
+*   *None. All gaps resolved in Nov3.21 baseline.*
+
+---
+
+## 🟢 Resolved Gaps (Nov3.21)
+*   **Manual Tracker/Device ID Customization & Version Display (Nov3.21)**: Enabled manual selection and configuration of device / tracker ID (any non-blank sequence of characters, including single-character IDs) via `ForensicIdentityManager#setSelfId` and the Settings Overlay in `AdminActivity`. Added application version name display to the first screen of both the Sensor (`AdminActivity`) and Monitor (`MonitorActivity`). **PASSED.**
+
+---
+
+## 🚀 Strategic Simplification Ideas
+*   **SIMP-REVOL39.0-S1**: Integrated Kinetic State Observer. Consolidate acceleration, velocity, and thermal status evaluation into a single unified observer in `core-shared`.
+*   **SIMP-REVOL38.3-S1**: Dynamic Buffer Auto-tuner. Consolidate bitrate detection and buffer resizing into an adaptive native manager.
+*   **SIMP-REVOL38.2-S1**: Thermal Status Observer Unification. Move all thermal listening logic to a specialized `ThermalManager` in `core-shared`.
+
+---
+
+## 📊 Hardening Progress Dashboard
+- **Nov3.21: [SOT Count: 902 (Rules: 402), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Manual ID Customization & Version Display), QA: 902]**
+- **Nov3.20: [SOT Count: 901 (Rules: 401), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Flexible Device ID Entry & Unit Suites), QA: 901]**
+- **Nov3.14: [SOT Count: 900 (Rules: 400), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Physical Instrumented & Unit Suites on A15/S21FW), QA: 900]**

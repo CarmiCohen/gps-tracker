@@ -85,6 +85,14 @@ class ForensicIdentityManager @Inject constructor(private val context: Context) 
         }
     }
 
+    suspend fun setSelfId(id: String) {
+        if (ForensicIdentity.isValid(id)) {
+            dataStore.edit { settings ->
+                settings[selfIdKey] = id
+            }
+        }
+    }
+
     suspend fun clearTargetId() {
         dataStore.edit { it.remove(targetIdKey) }
     }

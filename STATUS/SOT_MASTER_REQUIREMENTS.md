@@ -1,12 +1,13 @@
-# SOT Master Requirements & Hardening Status (Nov3.20)
+# SOT Master Requirements & Hardening Status (Nov3.21)
 
-## 🏗️ Architectural Master Rules (401 Rules)
+## 🏗️ Architectural Master Rules (402 Rules)
 
 ### 1. Lifecycle & Resource Management
-*   ... (Rules 1.1 to 1.325 preserved)
-*   **1.326 Flexible Device ID Validation (R-ID 97)**: The `ForensicIdentity.isValid` validation and pairing wizard UI MUST support any non-blank sequence of characters (including single-character IDs and arbitrary strings) for device ID / tracker ID entry while rejecting blank or empty strings (GAP-REVOL45.0-G1).
+*   ... (Rules 1.1 to 1.326 preserved)
+*   **1.327 Manual Device ID Customization & Version Display (R-ID 98)**: The system MUST allow users to manually configure and set custom device / tracker IDs (any non-blank sequence of characters, including single-character IDs) via `ForensicIdentityManager#setSelfId` and the Settings Overlay. Furthermore, the application version name MUST be displayed on the first screen of both the Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) (GAP-REVOL46.0-G1).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov3.21**: Manual Device ID Customization & Version Display on First Screens (GAP-REVOL46.0-G1) - PASSED.
 - **Nov3.20**: Flexible Device ID Entry & UI/Test Adaptation (GAP-REVOL45.0-G1) - PASSED.
 - **Nov3.14**: Physical Device Verification (A15 for Sensor, S21FW for Monitor), Reciprocal Simulation, Full-Project Verification, & Stabilization - PASSED.
 - **Nov3.13**: Reciprocal Virtual Presence Simulation, Full-Project Verification, & Stabilization - PASSED.
@@ -22,6 +23,7 @@
 - **Nov2.0**: Dependency Synchronization & Build Integrity - PASSED.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.37 (Nov3.21 Validation Audit)**: PASSED - Manual device ID customization (`setSelfId`) and version name display on the first screen of both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`).
 *   **Chapter 5.36 (Nov3.20 Validation Audit)**: PASSED - Flexible device ID validation allowing any non-blank sequence of characters (including single-character IDs) across UI pairing wizard, identity validation logic, and unit/instrumented tests.
 *   **Chapter 5.35 (Nov3.14 Validation Audit)**: PASSED - Physical device verification using A15 (`R58X40GV2AR`) for sensor and S21FW (`R5CRC14PG4F`) for monitor, reciprocal virtual presence testing, and exhaustive test suite verification.
 *   **Chapter 5.34 (Nov3.13 Validation Audit)**: PASSED - Reciprocal virtual presence testing (viewer presence validating tracker behavior, and tracker presence validating tracker behavior), plus exhaustive test suite verification.

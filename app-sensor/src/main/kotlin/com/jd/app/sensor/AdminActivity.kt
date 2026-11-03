@@ -92,6 +92,11 @@ class AdminActivity : ComponentActivity() {
                                         scope.launch {
                                             identityManager.resetIdentity(ForensicIdentity.PREFIX_SENSOR)
                                         }
+                                    },
+                                    onSetCustomId = { customId ->
+                                        scope.launch {
+                                            identityManager.setSelfId(customId)
+                                        }
                                     }
                                 )
                             } else {
@@ -160,13 +165,57 @@ fun PermissionGuard(content: @Composable () -> Unit) {
     }
 }
 
+fun getAppVersionName(context: android.content.Context): String {
+    return try {
+        val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        pInfo.versionName ?: "Nov3.21_PLATINUM"
+    } catch (e: Exception) {
+        "Nov3.21_PLATINUM"
+    }
+}
+
 @Composable
-fun SettingsOverlay(onClose: () -> Unit, onLoadDefaults: () -> Unit) {
+fun SettingsOverlay(onClose: () -> Unit, onLoadDefaults: () -> Unit, onSetCustomId: (String) -> Unit) {
+    var customId by remember { mutableStateOf("") }
+    var isError by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("CONFIGURATION", style = MaterialTheme.typography.headlineSmall)
             TextButton(onClick = onClose) { Text("CLOSE (X)") }
         }
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Text("Manual Device ID Setup", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(
+            value = customId,
+            onValueChange = { 
+                customId = it
+                isError = it.isNotEmpty() && !ForensicIdentity.isValid(it)
+            },
+            label = { Text("Enter Custom ID (Any non-blank chars)") },
+            isError = isError,
+            supportingText = {
+                if (isError) {
+                    Text("Device ID cannot be blank")
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(
+            onClick = {
+                if (!isError && customId.isNotBlank()) {
+                    onSetCustomId(customId)
+                    onClose()
+                }
+            },
+            enabled = customId.isNotBlank() && !isError,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+        ) {
+            Text("APPLY CUSTOM ID")
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
         Button(
             onClick = { 
@@ -204,6 +253,7 @@ fun SensorAdminConsole(
         }
         
         Text(text = "ID: ${trackerId.take(12)}...", fontSize = 12.sp, color = Color.Gray)
+        Text(text = "Version: ${getAppVersionName(context)}", fontSize = 12.sp, color = Color.Gray)
         
         Spacer(modifier = Modifier.height(16.dp))
         

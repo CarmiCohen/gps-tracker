@@ -97,6 +97,18 @@ fun PairingWizard(onPair: (String) -> Unit) {
         ) {
             Text("Pair Device")
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(text = "Version: ${getAppVersionName(LocalContext.current)}", fontSize = androidx.compose.ui.unit.TextUnit(12f, androidx.compose.ui.unit.TextUnitType.Sp), color = androidx.compose.ui.graphics.Color.Gray)
+    }
+}
+
+fun getAppVersionName(context: android.content.Context): String {
+    return try {
+        val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        pInfo.versionName ?: "Nov3.21_PLATINUM"
+    } catch (_: Exception) {
+        "Nov3.21_PLATINUM"
     }
 }
 
@@ -158,7 +170,7 @@ fun MonitorScreen(
             ) {
                 Column {
                     Text(text = "Tracking: ${trackerId.take(8)}...", style = MaterialTheme.typography.headlineMedium)
-                    Text(text = "My ID: ${monitorId.take(8)}...", style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.Gray)
+                    Text(text = "My ID: ${monitorId.take(8)}... | Version: ${getAppVersionName(LocalContext.current)}", style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.Gray)
                 }
             }
         }

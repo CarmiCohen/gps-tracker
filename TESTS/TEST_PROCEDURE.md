@@ -334,6 +334,10 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 100 - Final SOT Compliance Check (R45)
 *   **100.1 Requirement Parity:** Final verification that system state matches all requirements in SOT_MASTER_REQUIREMENTS.md.
 
+## Chapter 101 - Manual Tracker ID Customization & Version Display (Nov3.21)
+*   **101.1 Manual Device ID Entry:** Verify that users can manually set custom device IDs (any non-blank sequence of characters, including single-character IDs) via the Sensor configuration settings overlay and Monitor pairing wizard.
+*   **101.2 Version Name Display:** Verify that the application version name is visible on the first screen of both the Sensor (`AdminActivity`) and Monitor (`MonitorActivity`).
+
 ---
-**Total Testing Chapters: 100**
+**Total Testing Chapters: 101**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

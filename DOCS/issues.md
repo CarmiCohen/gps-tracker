@@ -1,24 +1,21 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov3.20)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov3.21)
 
-## 🎯 Next Resumption Focus: Multi-Device Telemetry Sync & Expansion (GAP-REVOL46.0-G1)
+## 🎯 Next Resumption Focus: Multi-Device Telemetry Sync & Expansion (GAP-REVOL47.0-G1)
 
 ---
 
-## 🔴 Open Gaps (Nov3.20)
-*   *None. All gaps resolved in Nov3.20 baseline.*
+## 🔴 Open Gaps (Nov3.21)
+*   *None. All gaps resolved in Nov3.21 baseline.*
+
+---
+
+## 🟢 Resolved Gaps (Nov3.21)
+*   **Manual Tracker/Device ID Customization & Version Display (Nov3.21)**: Enabled manual selection and configuration of device / tracker ID (any non-blank sequence of characters, including single-character IDs) via `ForensicIdentityManager#setSelfId` and the Settings Overlay in `AdminActivity`. Added application version name display to the first screen of both the Sensor (`AdminActivity`) and Monitor (`MonitorActivity`). **PASSED.**
 
 ---
 
 ## 🟢 Resolved Gaps (Nov3.20)
 *   **Flexible Device ID Entry (Nov3.20)**: Enabled entering any sequence of characters, even a single character, for device ID / tracker ID in the pairing wizard and identity validation logic. Updated unit tests (`ForensicIdentityTest`) and instrumented tests (`IdentityAuditTest`) to verify flexible ID acceptance and non-blank validation. **PASSED.**
-
----
-
-## 🟢 Resolved Gaps (Nov3.14)
-*   **Physical Device Instrumented Verification (Nov3.14)**: Successfully executed and verified instrumented test suites (`connectedDebugAndroidTest`) on physical Android devices A15 (`R58X40GV2AR` for sensor) and S21FW (`R5CRC14PG4F` for monitor) (35/35 on app-sensor, 10/10 on app-monitor). **PASSED.**
-*   **Exhaustive Verification**: Completed 100% pass rate for all automated unit tests, hardening procedures, and forensic stress protocols for version Nov3.14. **PASSED.**
-*   **Reciprocal Virtual Presence Simulation**: Conducted reciprocal virtual presence testing (simulating viewer device to validate tracker behavior, and simulating tracker device to validate viewer behavior). **PASSED.**
-*   **Version Nov3.14 Stabilization**: Synchronized all build configurations, SOT requirements, and test archives to `Nov3.14_PLATINUM`. **PASSED.**
 
 ---
 
@@ -30,15 +27,6 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov3.21: [SOT Count: 902 (Rules: 402), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Manual ID Customization & Version Display), QA: 902]**
 - **Nov3.20: [SOT Count: 901 (Rules: 401), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Flexible Device ID Entry & Unit Suites), QA: 901]**
 - **Nov3.14: [SOT Count: 900 (Rules: 400), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Physical Instrumented & Unit Suites on A15/S21FW), QA: 900]**
-- **Nov3.13: [SOT Count: 900 (Rules: 400), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Physical Instrumented & Unit Suites), QA: 900]**
-- **Nov3.12: [SOT Count: 900 (Rules: 400), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Sub-items: 100), QA: 900]**
-- **Nov3.11: [SOT Count: 900 (Rules: 400), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Sub-items: 100), QA: 900]**
-- **Nov3.1: [SOT Count: 900 (Rules: 400), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:7, Testing: PASSED (Sub-items: 100), QA: 900]**
-- **Nov3.0: [SOT Count: 899 (Rules: 399), Open: H:0, M:1, L:0, Ideas: H:0, M:5, L:7, Testing: PASSED (Sub-items: 100), QA: 899]**
-- **Nov2.25: [SOT Count: 898 (Rules: 398), Open: H:0, M:1, L:0, Ideas: H:0, M:4, L:7, Testing: PASSED (Sub-items: 100), QA: 898]**
-- **Nov2.24: [SOT Count: 898 (Rules: 398), Open: H:0, M:2, L:0, Ideas: H:0, M:2, L:5, Testing: PASSED (Sub-items: 100), QA: 898]**
-- **Nov2.23: [SOT Count: 898 (Rules: 398), Open: H:0, M:2, L:0, Ideas: H:0, M:2, L:5, Testing: PASSED (Sub-items: 100), QA: 898]**
-- **Nov2.21: [SOT Count: 898 (Rules: 398), Open: H:0, M:2, L:0, Ideas: H:0, M:2, L:5, Testing: PASSED (Full Suite), QA: 898]**
-- **Nov2.1: [SOT Count: 894 (Rules: 394), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:5, Testing: PASSED (Full Suite), QA: 894]**
