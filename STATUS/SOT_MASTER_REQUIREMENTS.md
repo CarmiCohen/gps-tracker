@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Nov3.13)
+# SOT Master Requirements & Hardening Status (Nov3.14)
 
 ## 🏗️ Architectural Master Rules (400 Rules)
 
@@ -12,6 +12,7 @@
 *   **1.325 Continuous Kinematic Calibration (R-ID 96)**: The `SensingEngine` MUST dynamically recalibrate the IMU noise floor during high-acceleration vehicle transitions (`calculateKinematicAdaptiveFloor`), scaling the noise floor baseline relative to acceleration magnitude (`accelFactor`) to ensure robust stationary detection (`isStationary`) under changing kinetic baselines (GAP-REVOL39.0-G1).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov3.14**: Physical Device Verification (A15 for Sensor, S21FW for Monitor), Reciprocal Simulation, Full-Project Verification, & Stabilization - PASSED.
 - **Nov3.13**: Reciprocal Virtual Presence Simulation, Full-Project Verification, & Stabilization - PASSED.
 - **Nov3.12**: Reciprocal Virtual Presence Simulation, Full-Project Verification, & Stabilization - PASSED.
 - **Nov3.11**: Exhaustive Full-Project Verification, Stress Evaluation, & Stabilization - PASSED.
@@ -25,8 +26,9 @@
 - **Nov2.0**: Dependency Synchronization & Build Integrity - PASSED.
 
 ## ✅ Verification Chapters
-*   **Chapter 5.34 (Nov3.13 Validation Audit)**: PASSED - Reciprocal virtual presence testing (viewer presence validating tracker behavior, and tracker presence validating viewer behavior), plus exhaustive test suite verification.
-*   **Chapter 5.33 (Nov3.12 Validation Audit)**: PASSED - Reciprocal virtual presence testing (viewer presence validating tracker behavior, and tracker presence validating viewer behavior), plus exhaustive test suite verification.
+*   **Chapter 5.35 (Nov3.14 Validation Audit)**: PASSED - Physical device verification using A15 (`R58X40GV2AR`) for sensor and S21FW (`R5CRC14PG4F`) for monitor, reciprocal virtual presence testing, and exhaustive test suite verification.
+*   **Chapter 5.34 (Nov3.13 Validation Audit)**: PASSED - Reciprocal virtual presence testing (viewer presence validating tracker behavior, and tracker presence validating tracker behavior), plus exhaustive test suite verification.
+*   **Chapter 5.33 (Nov3.12 Validation Audit)**: PASSED - Reciprocal virtual presence testing (viewer presence validating tracker behavior, and tracker presence validating tracker behavior), plus exhaustive test suite verification.
 *   **Chapter 5.32 (Nov3.11 Validation Audit)**: PASSED - Exhaustive verification of all automated unit tests, hardening procedures, and stress evaluations across all modules.
 *   **Chapter 5.31 (Nov3.1 Validation Audit)**: PASSED - Verified Continuous Kinematic Calibration (`calculateKinematicAdaptiveFloor`, `isStationary`) in `SensingEngine` under high-acceleration vehicle transitions.
 *   **Chapter 5.30 (Nov3.0 Validation Audit)**: PASSED - Verified Adaptive Buffer Scaling (`calculateAdaptiveCapacity`) in `ForensicBuffer` and full lifecycle integration in `SensorService`.
