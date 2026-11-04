@@ -15,6 +15,19 @@ object ForensicIdentity {
     const val PREFIX_MONITOR = "MON"
 
     /**
+     * Standardized default forensic identifiers (Nov4.0).
+     */
+    const val DEFAULT_TRACKER_ID = "T"
+    const val DEFAULT_MONITOR_ID = "V"
+
+    /**
+     * Returns the default identifier for the given role prefix.
+     */
+    fun getDefaultId(rolePrefix: String): String {
+        return if (rolePrefix == PREFIX_SENSOR) DEFAULT_TRACKER_ID else DEFAULT_MONITOR_ID
+    }
+
+    /**
      * Generates a stable identity from a raw hardware ID and a persistent salt.
      */
     fun create(rawId: String, salt: String): String {

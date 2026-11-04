@@ -2,7 +2,6 @@ package com.jd.core.network
 
 import android.content.Context
 import android.os.Build
-import android.provider.Settings
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
@@ -69,12 +68,11 @@ class ForensicIdentityManager @Inject constructor(private val context: Context) 
     }
 
     private suspend fun generate(rolePrefix: String) {
-        val androidId = Settings.Secure.getString(protectedContext.contentResolver, Settings.Secure.ANDROID_ID)
         val salt = ForensicIdentity.generateSalt()
-        val id = ForensicIdentity.create("$rolePrefix:$androidId", salt)
+        val defaultId = ForensicIdentity.getDefaultId(rolePrefix)
         
         dataStore.edit { settings ->
-            settings[selfIdKey] = id
+            settings[selfIdKey] = defaultId
             settings[saltKey] = salt
         }
     }

@@ -39,8 +39,9 @@ class IdentityPersistenceTest {
         identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_MONITOR)
         val firstId = identityManager.selfId.first()
         
-        // 2. Verify it is a valid hex hash
-        assertTrue("Identity must be a 64-char hex hash", ForensicIdentity.isValid(firstId))
+        // 2. Verify it is a valid default ID ("V")
+        assertTrue("Identity must be valid", ForensicIdentity.isValid(firstId))
+        assertEquals("Default Monitor ID must be 'V'", ForensicIdentity.DEFAULT_MONITOR_ID, firstId)
         
         // 3. Verify it persists (simulated by re-fetching from the manager)
         val reFetchedId = identityManager.selfId.first()
@@ -49,7 +50,7 @@ class IdentityPersistenceTest {
 
     @Test
     fun verifyTargetIdPersistence() = runBlocking {
-        val customTargetId = "a".repeat(64)
+        val customTargetId = ForensicIdentity.DEFAULT_TRACKER_ID
         
         identityManager.setTargetId(customTargetId)
         val savedId = identityManager.targetId.first()
@@ -60,7 +61,7 @@ class IdentityPersistenceTest {
     @Test
     fun verifyResetToFactoryDefaults() = runBlocking {
         identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_MONITOR)
-        val originalId = identityManager.selfId.first()
+        identityManager.setSelfId("custom_id_before_reset")
         
         // Set a target to verify it gets cleared
         identityManager.setTargetId("b".repeat(64))
@@ -71,7 +72,7 @@ class IdentityPersistenceTest {
         val newId = identityManager.selfId.first()
         val targetIdAfterReset = identityManager.targetId.first()
         
-        assertNotEquals("Self ID must be fresh after reset", originalId, newId)
+        assertEquals("Self ID must be default Monitor ID 'V' after reset", ForensicIdentity.DEFAULT_MONITOR_ID, newId)
         assertNull("Target ID must be cleared after factory reset", targetIdAfterReset)
     }
 }

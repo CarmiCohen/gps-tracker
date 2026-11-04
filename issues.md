@@ -17,3 +17,9 @@
 - **Severity**: Enhancement / Requirement Change
 - **Description**: Relax strict 64-character SHA-256 hex hash validation on the "Enter Tracker ID" field to allow any sequence of characters (including a single character).
 - **Status**: Implemented. `ForensicIdentity.isValid` updated to accept any non-blank character sequence.
+
+### 3. Default Tracker ID and Monitor ID Specification
+- **Component**: `com.jd.core.shared.ForensicIdentity`, `com.jd.core.network.ForensicIdentityManager`, `MonitorActivity`
+- **Severity**: Requirement / Specification (Nov4.0)
+- **Description**: Configure Default Tracker ID to `"T"` and Default Monitor ID to `"V"`. Pre-fill the pairing wizard text field in `MonitorActivity` with `"T"`.
+- **Status**: Implemented & Passed. `ForensicIdentity.DEFAULT_TRACKER_ID = "T"`, `ForensicIdentity.DEFAULT_MONITOR_ID = "V"`.

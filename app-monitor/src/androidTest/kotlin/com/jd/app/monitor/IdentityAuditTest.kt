@@ -64,13 +64,15 @@ class IdentityAuditTest {
 
     /**
      * verifyResetToDefaultsR615: Ensures that resetIdentity clears 
-     * all tracking state and generates a fresh ID.
+     * all tracking state and resets to default Monitor ID ("V").
      */
     @Test
     fun verifyResetToDefaultsR615() = runBlocking {
         identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_MONITOR)
-        val originalId = identityManager.selfId.first()
+        val defaultId = identityManager.selfId.first()
+        assertEquals("Default Monitor ID must be 'V'", ForensicIdentity.DEFAULT_MONITOR_ID, defaultId)
         
+        identityManager.setSelfId("custom_monitor_id")
         identityManager.setTargetId("b".repeat(64))
         
         // Trigger Reset
@@ -79,7 +81,7 @@ class IdentityAuditTest {
         val newId = identityManager.selfId.first()
         val targetIdAfterReset = identityManager.targetId.first()
         
-        assertNotEquals("Self ID must be regenerated after reset", originalId, newId)
+        assertEquals("Self ID must be reset to default Monitor ID 'V'", ForensicIdentity.DEFAULT_MONITOR_ID, newId)
         assertNull("Target ID must be cleared after factory reset", targetIdAfterReset)
     }
 }

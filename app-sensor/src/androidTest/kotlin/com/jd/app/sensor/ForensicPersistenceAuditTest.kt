@@ -42,15 +42,15 @@ class ForensicPersistenceAuditTest {
     }
 
     /**
-     * Verifies R-ID 765: Salted Identity Persistence.
+     * Verifies R-ID 765: Default Tracker Identity Persistence (Nov4.0).
      */
     @Test
     fun verifySaltedIdentityPersistence() = runBlocking {
-        identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_SENSOR)
+        identityManager.resetIdentity(ForensicIdentity.PREFIX_SENSOR)
         val firstId = identityManager.selfId.first()
         
         assertNotEquals("PENDING_IDENTITY", firstId)
-        assertEquals("Identity should be a SHA-256 hash (64 hex chars)", 64, firstId.length)
+        assertEquals("Default Tracker ID should be 'T'", ForensicIdentity.DEFAULT_TRACKER_ID, firstId)
     }
 
     /**

@@ -81,7 +81,7 @@ class MonitorActivity : ComponentActivity() {
 
 @Composable
 fun PairingWizard(onPair: (String) -> Unit) {
-    var text by remember { mutableStateOf("") }
+    var text by remember { mutableStateOf(ForensicIdentity.DEFAULT_TRACKER_ID) }
     var isError by remember { mutableStateOf(false) }
 
     Column(
@@ -124,9 +124,9 @@ fun PairingWizard(onPair: (String) -> Unit) {
 fun getAppVersionName(context: android.content.Context): String {
     return try {
         val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        pInfo.versionName ?: "Nov3.21_PLATINUM"
+        pInfo.versionName ?: "Nov4.0_PLATINUM"
     } catch (_: Exception) {
-        "Nov3.21_PLATINUM"
+        "Nov4.0_PLATINUM"
     }
 }
 

@@ -342,6 +342,10 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **102.1 Telemetry Session Initialization:** Verify that pairing a Tracker ID in the Monitor app automatically initiates `MonitorSessionService` and connects to the signaling relay, transitioning from "Waiting for Telemetry..." to live trail rendering.
 *   **102.2 Parameter & ID Configuration:** Verify setting Viewer/Tracker IDs in the Pairing Wizard and configuring Custom IDs / Factory Defaults via the Sensor Settings Gear overlay.
 
+## Chapter 103 - Default Tracker & Monitor ID Verification (Nov4.0)
+*   **103.1 Default Tracker ID ("T"):** Verify that the Sensor generates Default Tracker ID `"T"` upon identity generation/reset, and that the Monitor pairing wizard pre-fills `"T"` in the Tracker ID text field.
+*   **103.2 Default Monitor ID ("V"):** Verify that the Monitor generates Default Monitor ID `"V"` upon identity generation/reset.
+
 ---
-**Total Testing Chapters: 102**
+**Total Testing Chapters: 103**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

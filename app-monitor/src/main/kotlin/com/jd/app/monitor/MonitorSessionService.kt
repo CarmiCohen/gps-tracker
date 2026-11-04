@@ -27,6 +27,25 @@ class MonitorSessionService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+    }
+
+    private fun createNotificationChannel() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                MonitorApp.ALARM_CHANNEL_ID,
+                "Critical Theft Alerts",
+                android.app.NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Used for high-priority theft and sensor violation alerts."
+            }
+            val manager = getSystemService(android.app.NotificationManager::class.java)
+            manager?.createNotificationChannel(channel)
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = NotificationCompat.Builder(this, MonitorApp.ALARM_CHANNEL_ID)
             .setContentTitle("Active Tracking Session")

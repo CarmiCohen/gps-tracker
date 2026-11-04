@@ -11,6 +11,14 @@ import org.junit.Test
 class ForensicIdentityTest {
 
     @Test
+    fun verifyDefaultIdentityConstants() {
+        assertEquals("Default Tracker ID must be 'T'", "T", ForensicIdentity.DEFAULT_TRACKER_ID)
+        assertEquals("Default Monitor ID must be 'V'", "V", ForensicIdentity.DEFAULT_MONITOR_ID)
+        assertEquals("Default Tracker ID for PREFIX_SENSOR must be 'T'", "T", ForensicIdentity.getDefaultId(ForensicIdentity.PREFIX_SENSOR))
+        assertEquals("Default Monitor ID for PREFIX_MONITOR must be 'V'", "V", ForensicIdentity.getDefaultId(ForensicIdentity.PREFIX_MONITOR))
+    }
+
+    @Test
     fun verifyIdentityGenerationFormat() {
         val rawId = "device-123"
         val salt = ForensicIdentity.generateSalt()
