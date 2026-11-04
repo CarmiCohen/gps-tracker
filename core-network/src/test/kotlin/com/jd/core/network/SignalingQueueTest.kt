@@ -2,6 +2,7 @@ package com.jd.core.network
 
 import com.jd.core.shared.LocationUpdate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SignalingQueueTest {
@@ -37,5 +38,23 @@ class SignalingQueueTest {
         assertEquals(15, batch2.size)
         assertEquals(11L, batch2.first().sequenceId)
         assertEquals(25L, batch2.last().sequenceId)
+    }
+
+    @Test
+    fun testPartitionDeduplicationAndBufferFlag() {
+        val queue = SignalingQueue(maxCapacity = 100)
+        
+        // Offer duplicate sequence IDs during partition
+        queue.offer(LocationUpdate(sequenceId = 10L))
+        queue.offer(LocationUpdate(sequenceId = 10L)) // duplicate should be ignored
+        queue.offer(LocationUpdate(sequenceId = 11L))
+        
+        assertEquals(2, queue.size())
+        val batch = queue.pollBatch(10)
+        assertEquals(2, batch.size)
+        assertTrue(batch[0].isBuffered)
+        assertEquals(10L, batch[0].sequenceId)
+        assertTrue(batch[1].isBuffered)
+        assertEquals(11L, batch[1].sequenceId)
     }
 }

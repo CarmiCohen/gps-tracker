@@ -1,5 +1,11 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov4.3)
+- **Advanced Relay Partition Tolerance & Telemetry Edge Synchronization (GAP-REVOL49.0-G1)**: Implemented partition-tolerance sequence deduplication and automatic `isBuffered = true` state flagging in `SignalingQueue` to prevent telemetry duplication and ensure zero data loss during network disruptions and flapping. Executed and verified all unit tests (`:core-network`) with 100% pass rate. **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.3` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.2)
 - **Multi-Device Telemetry Sync & Expansion (GAP-REVOL47.0-G1)**: Verified and expanded multi-device telemetry synchronization, range-based backfill deduplication in `MonitorRepository`, connection resiliency in `SignalingClient`, and automatic foreground session lifecycle management in `MonitorSessionService` and `MonitorActivity`. Executed and verified all unit tests (`core-shared`, `core-network`) and instrumented test suites (`app-sensor`, `app-monitor`) with 100% pass rate. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.2` established as the new forensic stabilization baseline.

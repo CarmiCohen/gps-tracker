@@ -7,23 +7,33 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * SignalingQueue: Handles 10Hz telemetry backpressure (Point 2).
  * Refactored Revol31.9: Atomic size tracking and critical event protection (ISSUE-REVOL31.9-F1).
- * Ensures zero telemetry loss during flapping by maintaining a robust in-memory buffer.
+ * Enhanced Nov4.3: Partition tolerance deduplication and isBuffered flag setting.
  */
-class SignalingQueue(private val maxCapacity: Int = 100) {
+class SignalingQueue(private val maxCapacity: Int = 5000) {
     private val queue = ConcurrentLinkedDeque<LocationUpdate>()
     private val currentSize = AtomicInteger(0)
+    private val seenSequenceIds = HashSet<Long>()
 
     /**
      * Offers a new update to the queue. If full, drops the oldest non-critical update.
      */
     fun offer(update: LocationUpdate) {
+        // Partition tolerance: Mark as buffered
+        update.isBuffered = true
+
+        // Sequence deduplication for normal valid updates
+        if (update.sequenceId > 0 && update.status == "VALID") {
+            if (seenSequenceIds.contains(update.sequenceId)) {
+                return // Ignore duplicate during partition buffering
+            }
+            seenSequenceIds.add(update.sequenceId)
+        }
+
         if (currentSize.get() >= maxCapacity) {
-            // Drop logic: try to find an older update that isn't a critical violation/transition
             val removed = dropOldestNonCritical()
             if (removed) currentSize.decrementAndGet()
         }
         
-        // Final check to prevent overflow
         if (currentSize.get() < maxCapacity) {
             queue.offerLast(update)
             currentSize.incrementAndGet()
@@ -34,25 +44,28 @@ class SignalingQueue(private val maxCapacity: Int = 100) {
         val it = queue.iterator()
         while (it.hasNext()) {
             val next = it.next()
-            // "VALID" updates are candidates for dropping. 
-            // Geofence or Jump statuses are preserved.
             if (next.status == "VALID") {
+                seenSequenceIds.remove(next.sequenceId)
                 it.remove()
                 return true
             }
         }
-        // Fallback: If everything is critical, we must drop the oldest to make room
-        return queue.pollFirst() != null
+        val polled = queue.pollFirst()
+        if (polled != null) {
+            seenSequenceIds.remove(polled.sequenceId)
+        }
+        return polled != null
     }
 
     /**
      * Returns a batch of updates for transmission.
      */
-    fun pollBatch(batchSize: Int = 10): List<LocationUpdate> {
+    fun pollBatch(batchSize: Int = 50): List<LocationUpdate> {
         val batch = mutableListOf<LocationUpdate>()
         repeat(batchSize) {
-            queue.pollFirst()?.let { 
-                batch.add(it)
+            queue.pollFirst()?.let { update ->
+                seenSequenceIds.remove(update.sequenceId)
+                batch.add(update)
                 currentSize.decrementAndGet()
             }
         }
@@ -63,6 +76,7 @@ class SignalingQueue(private val maxCapacity: Int = 100) {
     
     fun clear() {
         queue.clear()
+        seenSequenceIds.clear()
         currentSize.set(0)
     }
 }
