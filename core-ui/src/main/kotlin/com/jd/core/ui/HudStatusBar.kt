@@ -42,24 +42,23 @@ fun HudStatusBar(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Color.Black.copy(alpha = 0.85f),
+        color = Color.Black.copy(alpha = 0.90f),
         contentColor = Color.White
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .padding(horizontal = 4.dp, vertical = 2.dp)
         ) {
-            // Row 1: Status LEDs & Peer Movement State
+            // Row 1: Status LEDs & Speed/Movement
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // LED Badges Group
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     StatusBadge(label = "INT", active = hudState.isInternet, activeColor = localColor)
                     StatusBadge(label = "SRV", active = hudState.isRelayConnected, activeColor = localColor)
@@ -69,64 +68,64 @@ fun HudStatusBar(
                     StatusBadge(label = "WDG", active = hudState.watchdogOk, activeColor = localColor)
                 }
 
-                // Movement & Speed
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val isMoving = hudState.trackerState == "MOVING"
                     Text(
-                        text = if (isMoving) "»\u2009${hudState.trackerState}\u2009«" else hudState.trackerState,
+                        text = if (isMoving) "»${hudState.trackerState}«" else hudState.trackerState,
                         color = if (hudState.isPeerActive || !isMonitor) {
                             if (isMoving) Color(0xFF10B981).copy(alpha = movingAlpha) else Color(0xFF10B981)
                         } else Color.Gray,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
                     )
 
                     Text(
                         text = String.format(Locale.US, "%.1f km/h", hudState.speedKmh),
                         color = if (hudState.isPeerActive || !isMonitor) Color.White else Color.Gray,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
-            // Row 2: Diagnostic Metadata Bar
+            // Row 2: Metadata / Telemetry
+            val idDisplay = if (isMonitor) {
+                "TRK:${hudState.targetId.take(6).uppercase()} | SELF:${hudState.selfId.take(6).uppercase()}"
+            } else {
+                "SELF:${hudState.selfId.take(6).uppercase()}"
+            }
+            val ageStr = if (hudState.telemetryAgeSec >= 0) "${hudState.telemetryAgeSec}s" else "--"
+            val battStr = "${hudState.batteryLevel}%${if (hudState.isCharging) "⚡" else ""}"
+            val tempStr = String.format(Locale.US, "%.0f°C", hudState.tempCelsius)
+            val accStr = if (hudState.accuracyMeters > 0) String.format(Locale.US, "±%.1fm", hudState.accuracyMeters) else "--"
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Left side: IDs
-                val idDisplay = if (isMonitor) {
-                    "TRK: ${hudState.targetId.take(6).uppercase()} | SELF: ${hudState.selfId.take(6).uppercase()}"
-                } else {
-                    "SELF: ${hudState.selfId.take(6).uppercase()}"
-                }
                 Text(
                     text = idDisplay,
                     color = Color.Gray,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1
                 )
-
-                // Right side: Telemetry details (Battery, Temp, Acc, Age, Seq)
-                val ageStr = if (hudState.telemetryAgeSec >= 0) "${hudState.telemetryAgeSec}s" else "--"
-                val battStr = "${hudState.batteryLevel}%${if (hudState.isCharging) "⚡" else ""}"
-                val tempStr = String.format(Locale.US, "%.0f°C", hudState.tempCelsius)
-                val accStr = if (hudState.accuracyMeters > 0) String.format(Locale.US, "±%.1fm", hudState.accuracyMeters) else "--"
-
                 Text(
-                    text = "BAT: $battStr | TEMP: $tempStr | ACC: $accStr | AGE: $ageStr",
+                    text = "B:$battStr|T:$tempStr|A:$accStr|AGE:$ageStr",
                     color = Color.LightGray,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1
                 )
             }
         }
@@ -146,15 +145,16 @@ fun StatusBadge(
 
     Box(
         modifier = modifier
-            .background(bgColor, shape = RoundedCornerShape(3.dp))
-            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .background(bgColor, shape = RoundedCornerShape(2.dp))
+            .padding(horizontal = 3.dp, vertical = 1.dp)
     ) {
         Text(
             text = label,
             color = textColor,
-            fontSize = 9.sp,
+            fontSize = 8.sp,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1
         )
     }
 }

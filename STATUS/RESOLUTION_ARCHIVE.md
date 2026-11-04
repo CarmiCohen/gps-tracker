@@ -1,5 +1,11 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov4.24)
+- **HUD Status Bar Compact Layout Hardening & UI Refinement (GAP-REVOL53.0-G1)**: Diagnosed and resolved text wrapping and overflow defects in `HudStatusBar` (`:core-ui`) on physical mobile devices (S21FE). Optimized layout to use compact 8.sp/9.sp monospaced status badges and a 2-row fixed structure preventing overflow and misalignment. Rebuilt, deployed, and verified with 100% test pass rate. **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.24` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.22-addHUD)
 - **Post-Revolution HUD Integration & LED Status Verification (GAP-REVOL52.0-G1)**: Implemented `HudState` and `HudStatusBar` in `:core-ui` adhering to requirement R960 and HUD LED specifications. Wired `MonitorViewModel` and `MonitorScreen` in `:app-monitor` and `SensorViewModel` and `SensorAdminConsole` in `:app-sensor` to monitor SRV relay connection status, local GPS fix, peer connection link (TRK/VWR), internet access, data integrity (DAT), and service watchdog (WDG). Added Chapter 106 to `TESTS/TEST_PROCEDURE.md` and unit tests in `HudStateTest`. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.22-addHUD` established as the new forensic stabilization baseline.
@@ -21,27 +27,3 @@
 ## ✅ Resolved Issues (Nov4.3)
 - **Advanced Relay Partition Tolerance & Telemetry Edge Synchronization (GAP-REVOL49.0-G1)**: Implemented partition-tolerance sequence deduplication and automatic `isBuffered = true` state flagging in `SignalingQueue` to prevent telemetry duplication and ensure zero data loss during network disruptions and flapping. Executed and verified all unit tests (`:core-network`) with 100% pass rate. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.3` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov4.2)
-- **Multi-Device Telemetry Sync & Expansion (GAP-REVOL47.0-G1)**: Verified and expanded multi-device telemetry synchronization, range-based backfill deduplication in `MonitorRepository`, connection resiliency in `SignalingClient`, and automated foreground session lifecycle management in `MonitorSessionService` and `MonitorActivity`. Executed and verified all unit tests (`core-shared`, `core-network`) and instrumented test suites (`app-sensor`, `app-monitor`) with 100% pass rate. **PASSED.**
-- **Baseline Synchronization**: Version `Nov4.2` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov4.0)
-- **Default Tracker and Monitor ID Specification (GAP-REVOL48.0-G1)**: Configured default Tracker ID to `"T"` and default Monitor ID to `"V"` in `ForensicIdentity` (`DEFAULT_TRACKER_ID = "T"`, `DEFAULT_MONITOR_ID = "V"`) and `ForensicIdentityManager`. Pre-filled the pairing wizard text field in `MonitorActivity` with default Tracker ID `"T"`. Updated unit tests (`ForensicIdentityTest`) and instrumented tests (`ForensicPersistenceAuditTest`, `IdentityAuditTest`, `IdentityPersistenceTest`). Hardened `MonitorSessionService` channel creation in `onCreate()` for API 34+ foreground service reliability. **PASSED.**
-- **Baseline Synchronization**: Version `Nov4.0` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov3.22)
-- **Telemetry Ingestion Service Activation & Parameter Configuration (GAP-REVOL47.0-G1)**: Fixed the "Waiting for Telemetry..." idle state by ensuring `MonitorSessionService` starts automatically upon target pairing in `MonitorActivity`, with API 34+ `dataSync` foreground service compliance. Documented parameter configuration (Pairing Wizard in Monitor, Settings Overlay in Sensor). **PASSED.**
-- **Baseline Synchronization**: Version `Nov3.22` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov3.21)
-- **Manual Tracker/Device ID Customization & Version Display (GAP-REVOL46.0-G1)**: Enabled manual selection and configuration of device / tracker ID (any non-blank sequence of characters, including single-character IDs) via `ForensicIdentityManager#setSelfId` and the Settings Overlay in `AdminActivity`. Added application version name display to the first screen of both the Sensor (`AdminActivity`) and Monitor (`MonitorActivity`). **PASSED.**
-- **Baseline Synchronization**: Version `Nov3.21` established as the new forensic stabilization baseline.
