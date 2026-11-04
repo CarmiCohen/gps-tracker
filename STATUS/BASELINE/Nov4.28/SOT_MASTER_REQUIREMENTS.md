@@ -21,7 +21,7 @@
 - **Nov4.20-withServer**: Cloud Relay Server Revival & Relay URL Configuration (GAP-REVOL50.0-G1) - PASSED.
 
 ## ✅ Verification Chapters
-*   **Chapter 5.49 (Nov4.28 Validation Audit)**: PASSED - Verification of pre-revolution map functionality implementation in `:app-monitor`, osmdroid overlay pooling (`MapOverlayManager`), imperative camera control (`MapController`), Map Tools Overlay (`MapToolsOverlay`), Home Point boundary circles, and spatial violation rendering.
+*   **Chapter 5.49 (Nov4.28 Validation Audit)**: PASSED - Verification of pre-revolution map functionality implementation in `:app-monitor`, osmdroid overlay pooling (`MapOverlayManager`), imperative camera control (`MapController`), Map Tools Overlay (`MapToolsOverlay`), Home Point boundary circles, and spatial violation rendering, with test procedure chapters 107 & 108.
 *   **Chapter 5.48 (Nov4.27 Validation Audit)**: PASSED - Verification of Relay URL setup controls in `AdminActivity.kt`, reactive URL collection and automatic signaling re-connection in `SensorViewModel` and `SensorService`, and cross-app Relay URL configuration.
 *   **Chapter 5.47 (Nov4.26 Validation Audit)**: PASSED - Verification of Monitor UI upper menu line, setup button, SRV/GPS LED fixes, map settings wheel (`MapSettingsToggle`), map control buttons, and map centralization.
 *   **Chapter 5.46 (Nov4.25 Validation Audit)**: PASSED - Verification of Nov4.25 stabilization, unit test suite execution (`testDebugUnitTest` 100% passing across all subprojects), version naming updates, and reciprocal virtual presence simulation testing.

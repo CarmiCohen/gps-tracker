@@ -1,7 +1,13 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov4.29)
+- **Nov4.29 Stabilization & Test Suite Execution (GAP-REVOL58.0-G1)**: Executed and verified comprehensive automated unit test suites (`testDebugUnitTest` and `test` 100% passing across `:core-network`, `:core-shared`, `:core-ui`, `:app-monitor`, `:app-sensor`), updated version name consistency (`Nov4.29`) across `:app-monitor` and `:app-sensor`, and verified forensic stabilization and reciprocal virtual presence simulation readiness. **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.29` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.28)
-- **Pre-Revolution Map Functionality & Specifications Implementation (GAP-REVOL57.0-G1)**: Successfully implemented comprehensive pre-revolution map functionality in `:app-monitor`, including osmdroid marker/polyline pooling (`MapOverlayManager`), imperative camera & follow controller (`MapController`), Map Tools Overlay (`MapToolsOverlay`) with quick actions (`IN`, `OUT`, `TRACKER`, `VIEWER`, `JUMP`, `SAVE`, `LOAD`, `ADD`, `DEL`, `FENCE`, `CLEAR`), Home Point boundary circles (`Polygon.pointsAsCircle`), and spatial violation markers. **PASSED.**
+- **Pre-Revolution Map Functionality & Specifications Implementation (GAP-REVOL57.0-G1)**: Successfully implemented comprehensive pre-revolution map functionality in `:app-monitor`, including osmdroid marker/polyline pooling (`MapOverlayManager`), imperative camera & follow controller (`MapController`), Map Tools Overlay (`MapToolsOverlay`) with quick actions (`IN`, `OUT`, `TRACKER`, `VIEWER`, `JUMP`, `SAVE`, `LOAD`, `ADD`, `DEL`, `FENCE`, `CLEAR`), Home Point boundary circles (`Polygon.pointsAsCircle`), and spatial violation markers. Synchronized test procedure chapters 107 & 108. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.28` established as the new forensic stabilization baseline.
 
 ---

@@ -360,6 +360,16 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **106.3 Peer Activity & Device Link LED (TRK / VWR):** Verify that the Monitor app displays active green TRK badge when target telemetry is received within 35s, and the Sensor app displays active green VWR badge when signaling link to viewer is active.
 *   **106.4 Data Integrity & Watchdog LEDs (DAT / WDG):** Verify that the DAT badge displays active green when INT, SRV, and Peer links are all active, and WDG badge reflects active background service health.
 
+## Chapter 107 - Relay Server URL Setup & Configuration Option (Nov4.27)
+*   **107.1 Sensor Relay URL Configuration:** Verify that users can view and edit the Relay Server URL in `SettingsOverlay` (`AdminActivity.kt` / `:app-sensor`), apply custom URLs, and reset to default (`https://gps-relay-server.onrender.com`), and that `SensorViewModel` and `SensorService` reactively reconnect `SignalingClient` upon changes.
+*   **107.2 Monitor Relay URL Configuration:** Verify that Monitor app users can view and configure the Relay Server URL during pairing (`PairingWizard`) and via the Setup & Info dialog (`MonitorScreen`).
+
+## Chapter 108 - Pre-Revolution Map Functionality & Specifications (Nov4.28)
+*   **108.1 Map Tools Overlay & Settings Wheel:** Verify `MapSettingsToggle` toggle button and `MapToolsOverlay` quick action tools (`IN`/`OUT`, `TRACKER`/`VIEWER`, `JUMP`/`OUT`, `SAVE`/`LOAD`, `ADD`/`DEL`/`FENCE`, `CLEAR`).
+*   **108.2 Dual Trail Management & Export/Import:** Verify independent polyline rendering for Tracker and Viewer trails, trail clearing, and manual JSON trail export (`SAVE`) / import (`LOAD`).
+*   **108.3 Home Points & Geofence Boundary Circles:** Verify Home Point marker display, tap-to-add (`ADD`), marker-tap-to-remove (`DEL`), async geofence boundary circles (`Polygon.pointsAsCircle`), and fence visibility toggle (`FENCE`).
+*   **108.4 Spatial Violation Markers & Accuracy Buffers:** Verify purple/pink Jump alert markers (`JUMP`), red Out-of-Range geofence breach markers (`OUT`), independent visibility toggles, and uncertainty accuracy circles.
+
 ---
-**Total Testing Chapters: 106**
+**Total Testing Chapters: 108**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

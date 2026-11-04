@@ -13,8 +13,8 @@ android {
         applicationId = "com.jd.app.monitor"
         minSdk = 26
         targetSdk = 34
-        versionCode = 23
-        versionName = "Nov4.28"
+        versionCode = 24
+        versionName = "Nov4.29"
 
         testInstrumentationRunner = "com.jd.app.monitor.HiltTestRunner"
         vectorDrawables {

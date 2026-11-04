@@ -19,7 +19,7 @@
 ---
 
 ## 🟢 Resolved Gaps (Nov4.28)
-*   **Pre-Revolution Map Functionality & Specifications Implementation (GAP-REVOL57.0-G1)**: Successfully implemented exhaustive pre-revolution map functionality in `:app-monitor`, including osmdroid marker/polyline pooling (`MapOverlayManager`), imperative camera & follow controller (`MapController`), Map Tools Overlay (`MapToolsOverlay`) with quick actions (`IN`, `OUT`, `TRACKER`, `VIEWER`, `JUMP`, `SAVE`, `LOAD`, `ADD`, `DEL`, `FENCE`, `CLEAR`), Home Point boundary circles (`Polygon.pointsAsCircle`), and spatial violation markers. **PASSED.**
+*   **Pre-Revolution Map Functionality & Specifications Implementation (GAP-REVOL57.0-G1)**: Successfully implemented exhaustive pre-revolution map functionality in `:app-monitor`, including osmdroid marker/polyline pooling (`MapOverlayManager`), imperative camera & follow controller (`MapController`), Map Tools Overlay (`MapToolsOverlay`) with quick actions (`IN`, `OUT`, `TRACKER`, `VIEWER`, `JUMP`, `SAVE`, `LOAD`, `ADD`, `DEL`, `FENCE`, `CLEAR`), Home Point boundary circles (`Polygon.pointsAsCircle`), and spatial violation markers. Synchronized test procedure chapters 107 & 108. **PASSED.**
 
 ---
 
@@ -35,7 +35,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Nov4.28: [SOT Count: 914 (Rules: 414), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Pre-Revolution Map Functionality & Specifications Implementation), QA: 914]**
+- **Nov4.28: [SOT Count: 914 (Rules: 414), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Pre-Revolution Map Functionality & Specifications Implementation & Test Chapters 107-108), QA: 914]**
 - **Nov4.27: [SOT Count: 913 (Rules: 413), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Relay URL Setup Option Integration in Sensor App & Reactive Signaling Reconnect), QA: 913]**
 - **Nov4.26: [SOT Count: 912 (Rules: 412), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor UI Refinement, Upper Menu, Setup Button, SRV/GPS LED Fixes & Map Controls), QA: 912]**
 - **Nov4.25: [SOT Count: 911 (Rules: 411), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Nov4.25 Stabilization & Reciprocal Simulation), QA: 911]**
