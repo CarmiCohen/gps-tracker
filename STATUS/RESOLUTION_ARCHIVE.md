@@ -1,5 +1,11 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov4.25)
+- **Nov4.25 Stabilization & Reciprocal Simulation (GAP-REVOL54.0-G1)**: Executed comprehensive unit test suite (`testDebugUnitTest` 100% passing across all subprojects), verified version name updates (`Nov4.25`) across `:app-monitor` and `:app-sensor`, and conducted reciprocal virtual presence simulation testing. **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.25` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.24)
 - **HUD Status Bar Compact Layout Hardening & UI Refinement (GAP-REVOL53.0-G1)**: Diagnosed and resolved text wrapping and overflow defects in `HudStatusBar` (`:core-ui`) on physical mobile devices (S21FE). Optimized layout to use compact 8.sp/9.sp monospaced status badges and a 2-row fixed structure preventing overflow and misalignment. Rebuilt, deployed, and verified with 100% test pass rate. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.24` established as the new forensic stabilization baseline.
