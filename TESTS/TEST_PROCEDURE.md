@@ -409,8 +409,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **114.2 Upper Menu Header Single-Line Fitting:** Verify that the upper menu header bar (`Surface` / `Row`) across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications fits title text (`MONITOR: ...` / `SENSOR: ...`) and all 7 action buttons (Setup, Settings, Tools, Map, Events, Graphs, Info) and Disconnect button without text wrapping or layout distortion.
 *   **114.3 HUD Telemetry Formatting & Text Ellipsization:** Verify that `HudStatusBar` row 2 metadata formatting correctly preserves telemetry status text (`B:100%|T:30°C|A:...|AGE:0s`) without truncating the age parameter, and applies single-line ellipsization (`TextOverflow.Ellipsis`) to device identity strings.
 
+## Chapter 115 - Dual Device Hardware Deployment & Telemetry Logcat Audit (Nov4.36)
+*   **115.1 Dual Device Simultaneous Deployment:** Verify concurrent deployment of `:app-monitor` to Samsung S21FE (`R5CRC14PG4F`) and `:app-sensor` to Samsung A155 (`R58X40GV2AR`).
+*   **115.2 Sensor Service Telemetry Generation:** Verify that `SensorService` on A155 continuously generates and queues telemetry updates (`REV_SensorService: Telemetry sent. Seq: ... | Interval: 10000ms`) without memory leaks or thread exhaustion.
+*   **115.3 Monitor UI & Event Log Verification:** Verify that `MonitorActivity` on S21FE maintains stable UI rendering, handles back navigation events cleanly, and logs telemetry events to system logcat.
+
 ---
-**Total Testing Chapters: 114**
+**Total Testing Chapters: 115**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
 
 
