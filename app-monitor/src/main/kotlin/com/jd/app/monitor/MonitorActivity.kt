@@ -233,6 +233,8 @@ fun MonitorScreen(
     var showSetupDialog by remember { mutableStateOf(false) }
     var showAlertsOverlay by remember { mutableStateOf(false) }
     var showSoundOverlay by remember { mutableStateOf(false) }
+    var showPhoneSetupOverlay by remember { mutableStateOf(false) }
+    var showCleanSetupOverlay by remember { mutableStateOf(false) }
     var showToolsOverlay by remember { mutableStateOf(false) }
     var isEditingRelayUrl by remember { mutableStateOf(false) }
     var relayUrlInput by remember { mutableStateOf(relayUrl) }
@@ -259,6 +261,47 @@ fun MonitorScreen(
             onUpdateAlarmVolume = onUpdateAlarmVolume,
             onTestSiren = onTestSiren,
             onClose = { showSoundOverlay = false }
+        )
+        return
+    }
+
+    if (showPhoneSetupOverlay) {
+        com.jd.core.ui.PhoneSetupOverlay(
+            isTracker = false,
+            homePointsCount = 0,
+            onOpenAppInfo = {
+                val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = android.net.Uri.parse("package:${context.packageName}")
+                }
+                context.startActivity(intent)
+            },
+            onOpenBatterySettings = {
+                val intent = android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                context.startActivity(intent)
+            },
+            onOpenOverlayPermission = {
+                val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                    data = android.net.Uri.parse("package:${context.packageName}")
+                }
+                context.startActivity(intent)
+            },
+            onOpenExactAlarmPermission = { },
+            onOpenDiagnostics = { showToolsOverlay = true },
+            onTestAlarm = onTestSiren,
+            onRefreshPermissions = { },
+            onOpenMap = { showPhoneSetupOverlay = false },
+            onClose = { showPhoneSetupOverlay = false }
+        )
+        return
+    }
+
+    if (showCleanSetupOverlay) {
+        com.jd.core.ui.CleanSetupOverlay(
+            isTracker = false,
+            onClearHomePoints = onReset,
+            onResetStats = onReset,
+            onFullInit = onReset,
+            onClose = { showCleanSetupOverlay = false }
         )
         return
     }
@@ -464,7 +507,7 @@ fun MonitorScreen(
                             },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("ALERTS SETUP", fontSize = 11.sp)
+                            Text("ALERTS", fontSize = 10.sp)
                         }
                         Button(
                             onClick = {
@@ -473,7 +516,31 @@ fun MonitorScreen(
                             },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("SIREN SETUP", fontSize = 11.sp)
+                            Text("SIREN", fontSize = 10.sp)
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                showSetupDialog = false
+                                showPhoneSetupOverlay = true
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("PHONE", fontSize = 10.sp)
+                        }
+                        Button(
+                            onClick = {
+                                showSetupDialog = false
+                                showCleanSetupOverlay = true
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = com.jd.core.ui.StatusRed)
+                        ) {
+                            Text("CLEAN", fontSize = 10.sp)
                         }
                     }
 

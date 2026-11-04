@@ -86,6 +86,8 @@ class AdminActivity : ComponentActivity() {
                     var showSettings by remember { mutableStateOf(false) }
                     var showAlertsOverlay by remember { mutableStateOf(false) }
                     var showSoundOverlay by remember { mutableStateOf(false) }
+                    var showPhoneSetupOverlay by remember { mutableStateOf(false) }
+                    var showCleanSetupOverlay by remember { mutableStateOf(false) }
 
                     val alertSettings by viewModel.alertSettings.collectAsStateWithLifecycle()
                     val sirenType by viewModel.sirenType.collectAsStateWithLifecycle()
@@ -121,11 +123,35 @@ class AdminActivity : ComponentActivity() {
                                     onTestSiren = { viewModel.testSirenAudio() },
                                     onClose = { showSoundOverlay = false }
                                 )
+                            } else if (showPhoneSetupOverlay) {
+                                com.jd.core.ui.PhoneSetupOverlay(
+                                    isTracker = true,
+                                    homePointsCount = 0,
+                                    onOpenAppInfo = { requestAppInfo() },
+                                    onOpenBatterySettings = { requestIgnoreBatteryOptimization() },
+                                    onOpenOverlayPermission = { requestOverlayPermission() },
+                                    onOpenExactAlarmPermission = { },
+                                    onOpenDiagnostics = { },
+                                    onTestAlarm = { },
+                                    onRefreshPermissions = { },
+                                    onOpenMap = { },
+                                    onClose = { showPhoneSetupOverlay = false }
+                                )
+                            } else if (showCleanSetupOverlay) {
+                                com.jd.core.ui.CleanSetupOverlay(
+                                    isTracker = true,
+                                    onClearHomePoints = { },
+                                    onResetStats = { },
+                                    onFullInit = { },
+                                    onClose = { showCleanSetupOverlay = false }
+                                )
                             } else if (showSettings) {
                                 SettingsOverlay(
                                     currentRelayUrl = relayUrl,
                                     onOpenAlertsSetup = { showAlertsOverlay = true },
                                     onOpenSoundSetup = { showSoundOverlay = true },
+                                    onOpenPhoneSetup = { showPhoneSetupOverlay = true },
+                                    onOpenCleanSetup = { showCleanSetupOverlay = true },
                                     onClose = { showSettings = false },
                                     onLoadDefaults = { 
                                         scope.launch {
@@ -160,6 +186,20 @@ class AdminActivity : ComponentActivity() {
 
     private fun requestIgnoreBatteryOptimization() {
         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        startActivity(intent)
+    }
+
+    private fun requestAppInfo() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        startActivity(intent)
+    }
+
+    private fun requestOverlayPermission() {
+        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
             data = Uri.parse("package:$packageName")
         }
         startActivity(intent)
@@ -223,6 +263,8 @@ fun SettingsOverlay(
     currentRelayUrl: String,
     onOpenAlertsSetup: () -> Unit,
     onOpenSoundSetup: () -> Unit,
+    onOpenPhoneSetup: () -> Unit,
+    onOpenCleanSetup: () -> Unit,
     onClose: () -> Unit,
     onLoadDefaults: () -> Unit,
     onSetCustomId: (String) -> Unit,
@@ -263,6 +305,28 @@ fun SettingsOverlay(
                 modifier = Modifier.weight(1f)
             ) {
                 Text("SIREN SETUP")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Device & Maintenance Setup", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onOpenPhoneSetup,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("PHONE SETUP")
+            }
+            Button(
+                onClick = onOpenCleanSetup,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = com.jd.core.ui.StatusRed)
+            ) {
+                Text("CLEAN SETUP")
             }
         }
 

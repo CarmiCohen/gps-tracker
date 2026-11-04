@@ -395,8 +395,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     - **Reset Service Watchdog**
 *   **111.3 Action Dispatch & Response:** Verify that activating any tool action dispatches the appropriate logging/maintenance event and can be successfully closed via the `CLOSE (X)` button.
 
+## Chapter 112 - Revived Sound & Setup Options Audit (Nov4.33)
+*   **112.1 Clean Setup Overlay & Maintenance Actions:** Verify that users can open `CleanSetupOverlay` from settings in both Sensor and Monitor apps, and perform maintenance actions including clearing home points/geofence, resetting operational statistics, and triggering full system re-initialization.
+*   **112.2 Phone Setup & Capabilities Guide Overlay:** Verify that users can open `PhoneSetupOverlay` to inspect device manufacturer/model profiling, guided permission check steps (Location, Battery Optimization, Overlay permission, Exact Alarms, Notifications, Home Points), and launch app info, battery settings, permission dialogs, diagnostics, and remote alarm test.
+*   **112.3 Sound & Alert Setup Integration:** Verify full integration and accessibility of `AlarmSoundOverlay` and `AlertManagementOverlay` from configuration menus in both Sensor and Monitor applications.
+
 ---
-**Total Testing Chapters: 111**
+**Total Testing Chapters: 112**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
 
 
