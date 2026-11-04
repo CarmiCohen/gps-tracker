@@ -1,13 +1,15 @@
-# SOT Master Requirements & Hardening Status (Nov4.3)
+# SOT Master Requirements & Hardening Status (Nov4.20-withServer)
 
-## 🏗️ Architectural Master Rules (406 Rules)
+## 🏗️ Architectural Master Rules (407 Rules)
 
 ### 1. Lifecycle & Resource Management
-*   ... (Rules 1.1 to 1.330 preserved)
+*   ... (Rules 1.1 to 1.331 preserved)
 *   **1.330 Multi-Device Telemetry Sync & Expansion (R-ID 101)**: The system MUST support multi-device telemetry synchronization with range-based backfill deduplication in `MonitorRepository`, connection recovery in `SignalingClient`, and automated foreground service lifecycle management in `MonitorSessionService` under simulated network partitions (GAP-REVOL47.0-G1).
 *   **1.331 Advanced Relay Partition Tolerance & Telemetry Edge Synchronization (R-ID 102)**: The system MUST enforce partition tolerance sequence deduplication and automatic `isBuffered = true` state flagging in `SignalingQueue` to prevent telemetry duplication and ensure zero data loss during network disruptions and flapping (GAP-REVOL49.0-G1).
+*   **1.332 Cloud Relay Server Revival & Relay URL Configuration (R-ID 103)**: The system MUST support cloud-hosted Relay server instances (Node.js Socket.io) and configurable Relay URLs in application DataStore and `MonitorSessionService` to enable remote cross-network device testing (GAP-REVOL50.0-G1).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov4.20-withServer**: Cloud Relay Server Revival & Relay URL Configuration (GAP-REVOL50.0-G1) - PASSED.
 - **Nov4.3**: Advanced Relay Partition Tolerance & Telemetry Edge Synchronization (GAP-REVOL49.0-G1) - PASSED.
 - **Nov4.2**: Multi-Device Telemetry Sync & Expansion (GAP-REVOL47.0-G1) - PASSED.
 - **Nov4.0**: Default Tracker ("T") & Monitor ("V") ID Specification (GAP-REVOL48.0-G1) - PASSED.
@@ -17,6 +19,7 @@
 - **Nov3.14**: Physical Device Verification (A15 for Sensor, S21FW for Monitor), Reciprocal Simulation, Full-Project Verification, & Stabilization - PASSED.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.42 (Nov4.20-withServer Validation Audit)**: PASSED - Verification of cloud-hosted Relay server revival (Node.js Socket.io) and configurable application Relay URLs for cross-network device testing.
 *   **Chapter 5.41 (Nov4.3 Validation Audit)**: PASSED - Verification of advanced relay partition tolerance, sequence deduplication in `SignalingQueue`, automatic `isBuffered = true` state management, and robust edge telemetry buffering under simulated network flapping.
 *   **Chapter 5.40 (Nov4.2 Validation Audit)**: PASSED - Verification of multi-device telemetry synchronization, range-based backfill deduplication in `MonitorRepository`, signaling resilience, and automated foreground session service lifecycle in `MonitorSessionService` and `MonitorActivity`.
 *   **Chapter 5.39 (Nov4.0 Validation Audit)**: PASSED - Verification of Default Tracker ID "T" and Default Monitor ID "V" in `ForensicIdentity`, `ForensicIdentityManager`, pairing wizard pre-fill, unit test suite, and connected Android test suites on A15 and S21FW.

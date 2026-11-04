@@ -26,6 +26,8 @@ The following rules **MUST** be followed strictly for every task:
 12. **Strict Termination**: Once a termination sequence is finished, do not implement anything else. **STOP ALL PROCESSING.**
 13. **Traceability Rule**: Remember to add the issue # to the git and to the relevant doc files.
 14. **Stealth Authority**: For all siren and alarm triggers, role-based suppression (Tracker vs Viewer) MUST be enforced at the engine level to ensure absolute operational stealth (R872).
+15. **Testing & Test Procedure Synchronization**: Every implemented feature, hardening update, or bug fix **MUST** be accompanied by automated unit or instrumented tests and explicitly documented as a new test chapter in `TESTS/TEST_PROCEDURE.md` (incrementing total testing chapters accordingly).
+16. **Build Warning Auditing**: During build verification phases, run Gradle builds with `--warning-mode all` (e.g., `./gradlew assembleDebug --warning-mode all`) to inspect deprecation warnings and ensure no new deprecations or configuration warnings are introduced by project code or scripts.
 
 ---
 

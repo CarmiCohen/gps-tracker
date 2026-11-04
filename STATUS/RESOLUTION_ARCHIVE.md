@@ -1,5 +1,11 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov4.20-withServer)
+- **Cloud Relay Server Revival & Relay URL Configuration (GAP-REVOL50.0-G1)**: Revived Node.js Socket.io signaling relay server in `relay-server/index.js` with persistent disk caching and health check endpoints. Configured application DataStore and `MonitorSessionService` to support cloud-hosted Relay URLs (OnRender / custom endpoints) for seamless cross-network device testing (A15 and S21FE) without local workstation dependency. **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.20-withServer` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.3)
 - **Advanced Relay Partition Tolerance & Telemetry Edge Synchronization (GAP-REVOL49.0-G1)**: Implemented partition-tolerance sequence deduplication and automatic `isBuffered = true` state flagging in `SignalingQueue` to prevent telemetry duplication and ensure zero data loss during network disruptions and flapping. Executed and verified all unit tests (`:core-network`) with 100% pass rate. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.3` established as the new forensic stabilization baseline.

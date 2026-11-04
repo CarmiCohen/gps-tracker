@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.3)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.20-withServer)
 
-## 🎯 Next Resumption Focus: Advanced Relay Partition Tolerance & Telemetry Edge Synchronization (GAP-REVOL49.0-G1) - COMPLETED
+## 🎯 Next Resumption Focus: Cloud Relay Server Revival & Relay URL Configuration (GAP-REVOL50.0-G1)
 
 ---
 
@@ -30,8 +30,8 @@
 
 ---
 
-## 🔴 Open Gaps (Nov4.3)
-*   *None. All gaps resolved in Nov4.3 baseline.*
+## 🔴 Open Gaps (Nov4.20-withServer)
+*   **Cloud Relay Server Revival & Relay URL Configuration (GAP-REVOL50.0-G1)**: Revive cloud relay server deployment (OnRender / Node.js Socket.io) and configure application Relay URL to enable seamless cross-network device testing (A15 and S21FE) without local workstation dependency. **IN PROGRESS.**
 
 ---
 
@@ -45,16 +45,6 @@
 
 ---
 
-## 🟢 Resolved Gaps (Nov4.0)
-*   **Default Tracker and Monitor ID Specification (Nov4.0)**: Configured default Tracker ID to `"T"` and default Monitor ID to `"V"` in `ForensicIdentity` (`DEFAULT_TRACKER_ID = "T"`, `DEFAULT_MONITOR_ID = "V"`) and `ForensicIdentityManager`. Pre-filled the pairing wizard text field in `MonitorActivity` with default Tracker ID `"T"`. Updated unit and instrumented tests (`ForensicIdentityTest`, `ForensicPersistenceAuditTest`, `IdentityAuditTest`, `IdentityPersistenceTest`). **PASSED.**
-
----
-
-## 🟢 Resolved Gaps (Nov3.22)
-*   **Telemetry Ingestion Service Activation (Nov3.22)**: Fixed the "Waiting for Telemetry..." idle state where `MonitorSessionService` was not initiated upon pairing. Integrated automatic starting and stopping of `MonitorSessionService` in `MonitorActivity` upon target pairing and resetting, with full API 34+ `dataSync` foreground service compliance. **RESOLVED.**
-
----
-
 ## 🚀 Strategic Simplification Ideas
 *   **SIMP-REVOL39.0-S1**: Integrated Kinetic State Observer. Consolidate acceleration, velocity, and thermal status evaluation into a single unified observer in `core-shared`.
 *   **SIMP-REVOL38.3-S1**: Dynamic Buffer Auto-tuner. Consolidate bitrate detection and buffer resizing into an adaptive native manager.
@@ -63,9 +53,8 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov4.20-withServer: [SOT Count: 907 (Rules: 407), Open: H:1, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: IN PROGRESS (Cloud Relay & URL Configuration), QA: 907]**
 - **Nov4.3: [SOT Count: 906 (Rules: 406), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Advanced Relay Partition Tolerance & Telemetry Edge Synchronization), QA: 906]**
 - **Nov4.2: [SOT Count: 905 (Rules: 405), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Multi-Device Telemetry Sync & Expansion), QA: 905]**
 - **Nov4.0: [SOT Count: 904 (Rules: 404), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Default Tracker ID "T" & Monitor ID "V"), QA: 904]**
 - **Nov3.22: [SOT Count: 903 (Rules: 403), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Telemetry Session Activation & Parameter Configuration), QA: 903]**
-- **Nov3.21: [SOT Count: 902 (Rules: 402), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Manual ID Customization & Version Display), QA: 902]**
-- **Nov3.20: [SOT Count: 901 (Rules: 401), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Flexible Device ID Entry & Unit Suites), QA: 901]**

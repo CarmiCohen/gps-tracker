@@ -346,6 +346,10 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **103.1 Default Tracker ID ("T"):** Verify that the Sensor generates Default Tracker ID `"T"` upon identity generation/reset, and that the Monitor pairing wizard pre-fills `"T"` in the Tracker ID text field.
 *   **103.2 Default Monitor ID ("V"):** Verify that the Monitor generates Default Monitor ID `"V"` upon identity generation/reset.
 
+## Chapter 104 - Advanced Relay Partition Tolerance & Telemetry Edge Synchronization (Nov4.3)
+*   **104.1 Partition Tolerance Sequence Deduplication:** Verify that `SignalingQueue` correctly deduplicates incoming sequence IDs and tags partitioned/buffered updates with `isBuffered = true` during network disconnection and flapping.
+*   **104.2 Edge Telemetry Buffering & Batch Polling:** Verify robust backpressure handling, batch polling, and re-queueing of pending telemetry batches upon reconnection without data loss or duplication.
+
 ---
-**Total Testing Chapters: 103**
+**Total Testing Chapters: 104**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
