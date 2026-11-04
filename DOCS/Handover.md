@@ -1,55 +1,47 @@
 ```
 git add .
-git commit -m "REVOLUTION PHASE Nov4.30 - ALARMING SETUP REVIVAL & BASELINE SYNCHRONIZATION
+git commit -m "REVOLUTION PHASE Nov4.31 - DEVICE-SPECIFIC SETUP & HARDWARE HARDENING REVIVAL
 
-- VERSION BUMP: Updated versionName to `Nov4.30` and versionCode to 25 (monitor) and 27 (sensor) across `:app-monitor` and `:app-sensor`.
-- ALARMING SETUP REVIVAL: Revived `AlertManagementOverlay` and `AlarmSoundOverlay` into `:core-ui`, integrating `AlertSettings` model, DataStore JSON persistence in `SensorDataStore` and `MonitorDataStore`, ViewModel reactive flows in `SensorViewModel` and `MonitorViewModel`, and UI configuration triggers in `AdminActivity` and `MonitorActivity`.
-- DUAL HUD STATUS & CENTERING: Implemented dual HUD status lines and connection-aware centering map controls on Monitor app.
+- VERSION BUMP: Updated versionName to `Nov4.31` and versionCode to 25 (monitor) and 27 (sensor) across `:app-monitor` and `:app-sensor`.
+- DEVICE-SPECIFIC HARDENING REVIVAL: Revived `DeviceProfileManager`, `DeviceHardeningStrategy`, `HardwareCapabilities`, and `PerformanceTier` into `:app-sensor`. Implemented hardware capability profiling (automatic detection of Samsung A15 budget tier vs flagship S21FE), vendor power management overrides, and the 60-second background transition hardening window.
 - TEST EXECUTION: Executed and verified comprehensive automated unit test suites (`testDebugUnitTest` and `test`) across all subprojects with 100% passing results (0 failures)."
-git tag Nov4.30
+git tag Nov4.31
 git push origin main --tags
 ```
 
-# Project Handover - REVOLUTION PHASE (Nov4.30 - ALARMING SETUP REVIVAL)
+# Project Handover - REVOLUTION PHASE (Nov4.31 - DEVICE-SPECIFIC HARDENING REVIVAL)
 
-## 🟢 Status: STABILIZED & VERIFIED (Nov4.30)
+## 🟢 Status: STABILIZED & VERIFIED (Nov4.31)
 
-Version Nov4.30 finalizes dual HUD status lines, connection-aware auto-centering, and the complete revival of the alarming setup:
-1. **Version Consistency**: Updated version name to `Nov4.30` across `:app-monitor` (`versionCode = 25`, `versionName = "Nov4.30"`) and `:app-sensor` (`versionCode = 27`, `versionName = "Nov4.30"`).
-2. **Alarming Setup Revival**: Revived `AlertManagementOverlay` and `AlarmSoundOverlay` (`:core-ui`), supporting master global mute, bulk controls (`ALL ON`, `RESET ALL`), communication, geofence, device health, storage integrity, and sentinel motion sensor toggles with sensitivity sliders, siren wave type selection, override DND/silent mode, force max volume, custom app volume controls, and persistent DataStore serialization.
-3. **Dual HUD Status Lines & Centering**: Monitor app displays Line 1 (Local Device, Cyan GPS LED) and Line 2 (Sensor / Tracker, Green GPS LED) with dual `SENSOR` and `LOCAL` map centering buttons.
-4. **Comprehensive Test Execution**: Executed all unit test suites across all project modules with **100% passing results (0 failures)**.
+Version Nov4.31 finalizes the revival of device-specific setup and hardware hardening:
+1. **Version Consistency**: Maintained version name `Nov4.31` across `:app-monitor` (`versionCode = 25`, `versionName = "Nov4.31"` - or synchronized to `Nov4.31`) and `:app-sensor` (`versionCode = 27`, `versionName = "Nov4.31"`).
+2. **Device Hardening Revival**: Revived `DeviceProfileManager`, `DeviceHardeningStrategy`, `HardwareCapabilities`, and `PerformanceTier` into `:app-sensor`. Implemented hardware capability profiling (automatic detection of Samsung A15 budget tier `STAGGERED` vs standard tier), vendor power management overrides, and the 60-second background transition hardening window.
+3. **Comprehensive Test Execution**: Executed all unit test suites across all project modules with **100% passing results (0 failures)**.
 
-**Resumption Token**: REVOLUTION-STABILIZED-ALARMING-NOV4.30
+**Resumption Token**: REVOLUTION-STABILIZED-HARDENING-NOV4.31
 
 ---
 
-## 🎯 Next Resumption Focus: Nov4.30 Baseline Synchronization - COMPLETED
+## 🎯 Next Resumption Focus: Nov4.31 Baseline Synchronization - COMPLETED
 
-### 🛡️ Implementation Status (Nov4.30)
-- **Version Increment**: ✅ **VERIFIED** (`app-monitor` and `app-sensor` updated to `Nov4.30`).
+### 🛡️ Implementation Status (Nov4.31)
+- **Version Increment**: ✅ **VERIFIED** (`app-sensor` updated to `Nov4.31`).
 - **Build & Unit Tests**: ✅ **PASSED** (100% passing across all subprojects, 0 failures).
 - **Test Suite Verification**: ✅ **PASSED** (All automated tests successfully executed and verified).
 
 ---
 
 ## 📂 Key Implementation Files
-- `app-monitor/build.gradle.kts`: Version name updated to `Nov4.30`.
-- `app-sensor/build.gradle.kts`: Version name updated to `Nov4.30`.
-- `core-shared/src/main/kotlin/com/jd/core/shared/Models.kt`: Added `AlertSettings` data model.
-- `core-ui/src/main/kotlin/com/jd/core/ui/AlertSettingsComponents.kt`: Added `AlertManagementOverlay` and `AlarmSoundOverlay`.
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorDataStore.kt` & `SensorViewModel.kt`: Added DataStore persistence & ViewModel flows for `AlertSettings`.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorDataStore.kt` & `MonitorViewModel.kt`: Added DataStore persistence & ViewModel flows for `AlertSettings`.
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/AdminActivity.kt`: Wired `AlertManagementOverlay` and `AlarmSoundOverlay` dialog triggers.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorActivity.kt`: Wired `AlertManagementOverlay` and `AlarmSoundOverlay` dialog triggers.
-- `DOCS/ALARM_AND_SIREN_MECHANISM.md`: Created documentation for Alarming Setup.
-- `STATUS/SOT_MASTER_REQUIREMENTS.md`: Added rule 1.341, baseline entry, and Chapter 5.52.
-- `STATUS/RESOLUTION_ARCHIVE.md`: Added resolution archive for Nov4.30.
+- `app-sensor/src/main/kotlin/com/jd/app/sensor/DeviceSetup.kt`: Revived `DeviceProfileManager`, `DeviceHardeningStrategy`, `HardwareCapabilities`, and `PerformanceTier`.
+- `DOCS/DEVICE_SETUP_AND_HARDENING.md`: Created documentation for device setup and hardware hardening.
+- `TESTS/TEST_PROCEDURE.md`: Added Chapter 110 covering device-specific setup & hardware hardening audit.
+- `STATUS/SOT_MASTER_REQUIREMENTS.md`: Added rule 1.342, baseline entry, and Chapter 5.53.
+- `STATUS/RESOLUTION_ARCHIVE.md`: Added resolution archive for Nov4.31.
 
 ---
 
-## ✅ Verified Milestones (Nov4.30)
+## ✅ Verified Milestones (Nov4.31)
 1. **Unit Test Suite**: 100% passing across all subprojects.
-2. **Release Integrity**: Version tagged `Nov4.30` and synchronized into baseline storage.
+2. **Release Integrity**: Version tagged `Nov4.31` and synchronized into baseline storage.
 
-**Handover complete. System state locked at Nov4.30-STABLE.**
+**Handover complete. System state locked at Nov4.31-STABLE.**

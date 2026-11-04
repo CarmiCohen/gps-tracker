@@ -381,7 +381,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **109.2 Siren Sound & Audio Setup Overlay:** Verify that users can open `AlarmSoundOverlay`, test siren audio output (`TEST SIREN AUDIO` / `STOP`), select siren sound wave types (`Siren`, `Chimes`, `Pulse`), configure audio behaviors (haptic vibration, override Silent/DND, force max volume), and adjust custom app volume mode and volume slider levels.
 *   **109.3 DataStore Persistence:** Verify that `AlertSettings` and siren type selections persist across app restarts and reboots via DataStore.
 
+## Chapter 110 - Device-Specific Setup & Hardware Hardening Audit (Nov4.31)
+*   **110.1 Hardware Capabilities & Performance Profiling:** Verify `HardwareCapabilities` correctly profiles device manufacturer and model characteristics, automatically assigning `PerformanceTier.STAGGERED` for budget tier hardware (such as Samsung A15 SM-A155F) and `PerformanceTier.STANDARD` for flagship/standard hardware (such as Samsung S21FE).
+*   **110.2 Vendor Power Management & WakeLock Escalation:** Verify `DeviceHardeningStrategy` enforces vendor-specific power management policies, wake lock renewals, and watchdog scheduling for Samsung and Huawei devices.
+*   **110.3 Background Transition Hardening Window:** Verify that `DeviceHardeningStrategy` detects app background transitions and applies the 60-second background escalation window to eliminate jitter spikes on staggered tier devices.
+
 ---
-**Total Testing Chapters: 109**
+**Total Testing Chapters: 110**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
+
 
