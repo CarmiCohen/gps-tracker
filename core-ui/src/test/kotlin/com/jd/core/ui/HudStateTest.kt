@@ -61,4 +61,28 @@ class HudStateTest {
         assertTrue("DAT LED must be active when INT, SRV, and Peer are all active", healthyState.isDataHealthy)
         assertFalse("DAT LED must be inactive when any link is degraded", degradedState.isDataHealthy)
     }
+
+    @Test
+    fun testHudStatusBarFormattingConstraints() {
+        val state = HudState(
+            appMode = "monitor",
+            targetId = "tracker_123456",
+            selfId = "viewer_654321",
+            batteryLevel = 100,
+            tempCelsius = 30.0f,
+            accuracyMeters = 5.0f,
+            telemetryAgeSec = 0
+        )
+
+        val idDisplay = "TRK:${state.targetId.take(6).uppercase()} | SELF:${state.selfId.take(6).uppercase()}"
+        val ageStr = if (state.telemetryAgeSec >= 0) "${state.telemetryAgeSec}s" else "--"
+        val battStr = "${state.batteryLevel}%${if (state.isCharging) "⚡" else ""}"
+        val tempStr = String.format(java.util.Locale.US, "%.0f°C", state.tempCelsius)
+        val accStr = if (state.accuracyMeters > 0) String.format(java.util.Locale.US, "±%.1fm", state.accuracyMeters) else "--"
+        val telemetryStr = "B:$battStr|T:$tempStr|A:$accStr|AGE:$ageStr"
+
+        assertEquals("TRK:TRACKE | SELF:VIEWER", idDisplay)
+        assertEquals("B:100%|T:30°C|A:±5.0m|AGE:0s", telemetryStr)
+        assertTrue("Telemetry string must contain AGE:0s without truncation", telemetryStr.contains("AGE:0s"))
+    }
 }

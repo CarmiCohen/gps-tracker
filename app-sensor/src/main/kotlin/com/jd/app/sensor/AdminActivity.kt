@@ -457,41 +457,47 @@ fun SensorAdminConsole(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(16.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.spacedBy(0.dp),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(15.dp))
                     }
-                    IconButton(onClick = onSettingsClick, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(16.dp))
+                    IconButton(onClick = onSettingsClick, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(15.dp))
                     }
-                    IconButton(onClick = { showToolsOverlay = true }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Tools", tint = Color(0xFFF59E0B), modifier = Modifier.size(16.dp))
+                    IconButton(onClick = { showToolsOverlay = true }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Tools", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
                     }
-                    IconButton(onClick = { SystemLogger.i("UI", "Map view requested from upper menu.") }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Place, contentDescription = "Map", tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
+                    IconButton(onClick = { SystemLogger.i("UI", "Map view requested from upper menu.") }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Place, contentDescription = "Map", tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
                     }
-                    IconButton(onClick = { SystemLogger.i("UI", "Events log requested from upper menu.") }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Menu, contentDescription = "Events", tint = Color(0xFFF43F5E), modifier = Modifier.size(16.dp))
+                    IconButton(onClick = { SystemLogger.i("UI", "Events log requested from upper menu.") }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Menu, contentDescription = "Events", tint = Color(0xFFF43F5E), modifier = Modifier.size(15.dp))
                     }
-                    IconButton(onClick = { SystemLogger.i("UI", "Graphs analytics requested from upper menu.") }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Star, contentDescription = "Graphs", tint = Color(0xFF8B5CF6), modifier = Modifier.size(16.dp))
+                    IconButton(onClick = { SystemLogger.i("UI", "Graphs analytics requested from upper menu.") }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Star, contentDescription = "Graphs", tint = Color(0xFF8B5CF6), modifier = Modifier.size(15.dp))
                     }
-                    IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(16.dp))
+                    IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
                     }
                 }
                 Text(
                     text = "SENSOR: ${trackerId.take(6).uppercase()}",
                     color = Color(0xFF06B6D4),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
-                IconButton(onClick = onSettingsClick, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFF43F5E), modifier = Modifier.size(20.dp))
+                IconButton(onClick = onSettingsClick, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFF43F5E), modifier = Modifier.size(18.dp))
                 }
             }
         }

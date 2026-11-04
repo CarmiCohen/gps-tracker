@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.34)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.35)
 
-## 🎯 Next Resumption Focus: Nov4.34 Baseline Synchronization - COMPLETED
+## 🎯 Next Resumption Focus: Nov4.35 Baseline Synchronization - COMPLETED
 
 ---
 
@@ -15,6 +15,11 @@
   ```
 - **Impact**: Non-blocking performance warning during Compose state updates on Android runtime.
 - **Status**: Monitored. No crashes or functional failures observed.
+
+---
+
+## 🟢 Resolved Gaps (Nov4.35)
+*   **Monitor Hardware Deployment & Single-Line Fitting Audit (GAP-REVOL65.0-G1)**: Successfully deployed `:app-monitor` to target hardware (S21FE / R58X40GV2AR), inspected logcat and UI snapshot, remediated upper menu header title line wrapping and HUD status bar `idDisplay` / telemetry age formatting, updated `TESTS/TEST_PROCEDURE.md` (Chapter 114), and verified 100% passing test execution across all modules. **PASSED.**
 
 ---
 
@@ -40,6 +45,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov4.35: [SOT Count: 922 (Rules: 422), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor Hardware Deployment & Single-Line Fitting Audit), QA: 922]**
 - **Nov4.34: [SOT Count: 921 (Rules: 421), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Upper Menu Line Expansion), QA: 921]**
 - **Nov4.33: [SOT Count: 920 (Rules: 420), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Revived Sound & Setup Options Integration), QA: 920]**
 - **Nov4.32: [SOT Count: 919 (Rules: 419), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (System Tools & Diagnostics Menu Integration), QA: 919]**

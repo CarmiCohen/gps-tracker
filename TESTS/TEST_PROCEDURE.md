@@ -404,8 +404,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **113.1 Expanded Quick Navigation Icons:** Verify that the upper menu line across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications includes direct one-tap navigation buttons for Setup (`Build`), Settings (`Settings`), Tools (`Refresh`), Map (`Place`), Events (`Menu`), Graphs (`Star`), and Info (`Info`).
 *   **113.2 Action Dispatch:** Verify that tapping each upper menu action correctly dispatches the intended navigation event, opens the corresponding overlay/dialog, or logs telemetry feedback.
 
+## Chapter 114 - Monitor Hardware Deployment, UI Single-Line Fitting & HUD Telemetry Formatting Audit (Nov4.35)
+*   **114.1 Hardware Deployment & Live Telemetry Monitoring:** Verify deployment of `:app-monitor` to target hardware (Samsung S21FE / connected device R58X40GV2AR) and verify live logcat monitoring and telemetry status handling.
+*   **114.2 Upper Menu Header Single-Line Fitting:** Verify that the upper menu header bar (`Surface` / `Row`) across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications fits title text (`MONITOR: ...` / `SENSOR: ...`) and all 7 action buttons (Setup, Settings, Tools, Map, Events, Graphs, Info) and Disconnect button without text wrapping or layout distortion.
+*   **114.3 HUD Telemetry Formatting & Text Ellipsization:** Verify that `HudStatusBar` row 2 metadata formatting correctly preserves telemetry status text (`B:100%|T:30°C|A:...|AGE:0s`) without truncating the age parameter, and applies single-line ellipsization (`TextOverflow.Ellipsis`) to device identity strings.
+
 ---
-**Total Testing Chapters: 113**
+**Total Testing Chapters: 114**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
 
 

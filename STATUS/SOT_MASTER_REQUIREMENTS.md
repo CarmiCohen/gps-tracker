@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov4.34)
+# SOT Master Requirements & Hardening Status (Nov4.35)
 
-## 🏗️ Architectural Master Rules (421 Rules)
+## 🏗️ Architectural Master Rules (422 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -9,8 +9,10 @@
 *   **1.343 System Tools & Diagnostics Menu Integration (R-ID 114)**: The system MUST provide a dedicated **Tools** menu option (refresh/tools icon button) positioned in the top menu bar alongside Setup and Settings gear icons in both Sensor and Monitor applications, opening `ToolsOverlay` (`:core-ui`) for 100Hz burst simulation, database pruning, test violation triggering, and watchdog resetting (R-ID 114).
 *   **1.344 Revived Sound & Setup Options Integration (R-ID 115)**: The system MUST provide fully integrated `CleanSetupOverlay` and `PhoneSetupOverlay` components in `:core-ui`, wired into configuration menus in both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications to support system maintenance (clearing home points, resetting stats, triggering full initialization) and comprehensive device capabilities & permissions guides (R-ID 115).
 *   **1.345 Upper Menu Line Expansion (R-ID 116)**: The system MUST provide an expanded upper menu line (top control bar) across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications incorporating direct one-tap navigation for Setup (`Build`), Settings (`Settings`), Tools (`Refresh`), Map (`Place`), Events (`Menu`), Graphs (`Star`), and Info (`Info`) (R-ID 116).
+*   **1.346 Monitor Hardware Deployment & Single-Line Fitting Audit (R-ID 117)**: The system MUST maintain single-line text layout constraints (`maxLines = 1`, `TextOverflow.Ellipsis`, compact button sizing of 28dp) across the upper menu bar (`AdminActivity` and `MonitorActivity`) and HUD status bars (`HudStatusBar`), ensuring zero line-wrapping distortion, full visibility of telemetry age metadata (`AGE:$ageStr`), and stable hardware deployment performance on S21FE and staggered tier devices (R-ID 117).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov4.35**: Monitor Hardware Deployment & Single-Line Fitting Audit (GAP-REVOL65.0-G1) - PASSED.
 - **Nov4.34**: Upper Menu Line Expansion (GAP-REVOL64.0-G1) - PASSED.
 - **Nov4.33**: Revived Sound & Setup Options Integration (GAP-REVOL63.0-G1) - PASSED.
 - **Nov4.32**: System Tools & Diagnostics Menu Integration (GAP-REVOL62.0-G1) - PASSED.
@@ -25,6 +27,7 @@
 - **Nov4.22-addHUD**: Post-Revolution HUD Integration & LED Status Verification (GAP-REVOL52.0-G1) - PASSED.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.57 (Nov4.35 Monitor Hardware Deployment & Single-Line Fitting Audit)**: PASSED - Verification of hardware deployment on S21FE / R58X40GV2AR, upper header bar single-line fitting, HUD telemetry age metadata visibility, and 100% test execution across all subprojects.
 *   **Chapter 5.56 (Nov4.34 Upper Menu Line Audit)**: PASSED - Verification of expanded upper menu line quick navigation buttons (Map, Events, Graphs, Info, Setup, Settings, Tools) in Sensor and Monitor applications, and comprehensive unit test execution.
 *   **Chapter 5.55 (Nov4.33 Sound & Setup Options Audit)**: PASSED - Verification of revived `CleanSetupOverlay` and `PhoneSetupOverlay` in `:core-ui`, wiring in `AdminActivity` and `MonitorActivity`, and comprehensive test execution.
 *   **Chapter 5.54 (Nov4.32 System Tools Audit)**: PASSED - Verification of dedicated Tools menu option under top menu bar, `ToolsOverlay` component, 100% test execution, and action dispatch.
