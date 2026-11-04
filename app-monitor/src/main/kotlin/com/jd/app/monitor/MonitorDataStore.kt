@@ -20,6 +20,10 @@ class MonitorDataStore(private val context: Context) {
     val relayUrl: Flow<String?> = context.monitorDataStore.data.map { it[relayUrlKey] }
     val isDndBypassEnabled: Flow<Boolean> = context.monitorDataStore.data.map { it[isDndBypassEnabledKey] ?: false }
 
+    suspend fun saveRelayUrl(url: String) {
+        context.monitorDataStore.edit { it[relayUrlKey] = url }
+    }
+
     suspend fun setDndBypass(enabled: Boolean) {
         context.monitorDataStore.edit { it[isDndBypassEnabledKey] = enabled }
     }

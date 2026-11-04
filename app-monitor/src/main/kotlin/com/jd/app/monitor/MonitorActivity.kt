@@ -54,6 +54,7 @@ class MonitorActivity : ComponentActivity() {
             RevolutionTheme {
                 val trackerId by viewModel.targetId.collectAsStateWithLifecycle(initialValue = null)
                 val monitorId by viewModel.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
+                val relayUrl by viewModel.relayUrl.collectAsStateWithLifecycle()
                 val trail by viewModel.trail.collectAsStateWithLifecycle()
                 val hudState by viewModel.hudState.collectAsStateWithLifecycle()
                 val context = LocalContext.current
@@ -72,17 +73,23 @@ class MonitorActivity : ComponentActivity() {
                 }
 
                 if (trackerId == null) {
-                    PairingWizard(onPair = { id -> viewModel.setTargetId(id) })
+                    PairingWizard(
+                        relayUrl = relayUrl,
+                        onPair = { id -> viewModel.setTargetId(id) },
+                        onUpdateRelayUrl = { url -> viewModel.updateRelayUrl(url) }
+                    )
                 } else {
                     MonitorScreen(
                         hudState = hudState,
                         trackerId = trackerId!!,
                         monitorId = monitorId,
+                        relayUrl = relayUrl,
                         trail = trail,
                         onReset = { 
                             viewModel.clearTargetId()
                             context.stopService(Intent(context, MonitorSessionService::class.java))
-                        }
+                        },
+                        onUpdateRelayUrl = { url -> viewModel.updateRelayUrl(url) }
                     )
                 }
             }
@@ -91,9 +98,15 @@ class MonitorActivity : ComponentActivity() {
 }
 
 @Composable
-fun PairingWizard(onPair: (String) -> Unit) {
+fun PairingWizard(
+    relayUrl: String,
+    onPair: (String) -> Unit,
+    onUpdateRelayUrl: (String) -> Unit
+) {
     var text by remember { mutableStateOf(ForensicIdentity.DEFAULT_TRACKER_ID) }
     var isError by remember { mutableStateOf(false) }
+    var relayUrlInput by remember { mutableStateOf(relayUrl) }
+    var showRelayConfig by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
@@ -122,9 +135,51 @@ fun PairingWizard(onPair: (String) -> Unit) {
         Button(
             onClick = { if (!isError && text.isNotEmpty()) onPair(text) },
             enabled = !isError && text.isNotEmpty(),
-            modifier = Modifier.padding(top = 16.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
         ) {
             Text("Pair Device")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        TextButton(onClick = { showRelayConfig = !showRelayConfig }) {
+            Text(if (showRelayConfig) "Hide Relay Settings" else "Relay URL: $relayUrl")
+        }
+
+        if (showRelayConfig) {
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                TextField(
+                    value = relayUrlInput,
+                    onValueChange = { relayUrlInput = it },
+                    label = { Text("Relay Server URL") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            if (relayUrlInput.isNotBlank()) {
+                                onUpdateRelayUrl(relayUrlInput.trim())
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Save URL")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val defaultUrl = "https://gps-relay-server.onrender.com"
+                            relayUrlInput = defaultUrl
+                            onUpdateRelayUrl(defaultUrl)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Reset Default")
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -135,9 +190,9 @@ fun PairingWizard(onPair: (String) -> Unit) {
 fun getAppVersionName(context: android.content.Context): String {
     return try {
         val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        pInfo.versionName ?: "Nov4.26"
+        pInfo.versionName ?: "Nov4.27"
     } catch (_: Exception) {
-        "Nov4.26"
+        "Nov4.27"
     }
 }
 
@@ -146,12 +201,16 @@ fun MonitorScreen(
     hudState: HudState,
     trackerId: String,
     monitorId: String, 
+    relayUrl: String,
     trail: List<TrailEntity>,
-    onReset: () -> Unit
+    onReset: () -> Unit,
+    onUpdateRelayUrl: (String) -> Unit
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by remember { mutableStateOf(true) }
     var showSetupDialog by remember { mutableStateOf(false) }
+    var isEditingRelayUrl by remember { mutableStateOf(false) }
+    var relayUrlInput by remember { mutableStateOf(relayUrl) }
 
     val mapView = remember {
         MapView(context).apply {
@@ -279,19 +338,49 @@ fun MonitorScreen(
 
     if (showSetupDialog) {
         AlertDialog(
-            onDismissRequest = { showSetupDialog = false },
+            onDismissRequest = { 
+                showSetupDialog = false 
+                isEditingRelayUrl = false
+            },
             title = { Text("Monitor Setup & Info") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Connected Tracker ID: $trackerId")
                     Text("Monitor ID: $monitorId")
+                    Text("Relay URL: $relayUrl")
                     Text("App Version: ${getAppVersionName(LocalContext.current)}")
                     Text("Relay Status: Connected / Active")
+
+                    if (isEditingRelayUrl) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextField(
+                            value = relayUrlInput,
+                            onValueChange = { relayUrlInput = it },
+                            label = { Text("Edit Relay URL") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             },
             confirmButton = {
-                Button(onClick = { showSetupDialog = false }) {
-                    Text("Close")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (isEditingRelayUrl) {
+                        Button(onClick = {
+                            if (relayUrlInput.isNotBlank()) {
+                                onUpdateRelayUrl(relayUrlInput.trim())
+                            }
+                            isEditingRelayUrl = false
+                        }) {
+                            Text("Save")
+                        }
+                    } else {
+                        TextButton(onClick = { isEditingRelayUrl = true }) {
+                            Text("Edit Relay URL")
+                        }
+                        Button(onClick = { showSetupDialog = false }) {
+                            Text("Close")
+                        }
+                    }
                 }
             }
         )

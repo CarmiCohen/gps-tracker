@@ -1,50 +1,56 @@
 ```
 git add .
-git commit -m "REVOLUTION PHASE Nov4.26 - MONITOR UI REFINEMENT, UPPER MENU, SETUP BUTTON, SRV/GPS LED FIXES & MAP CONTROLS
+git commit -m "REVOLUTION PHASE Nov4.27 - RELAY URL SETUP OPTION INTEGRATION IN SENSOR APP & REACTIVE SIGNALING RECONNECT
 
-- MONITOR: Added upper menu line including setup button and settings controls in `MonitorActivity`.
-- LEDs: Fixed SRV and GPS LED evaluation in `MonitorViewModel` and `SensorViewModel` to reflect online/active connectivity.
-- MAP: Integrated map settings wheel (`MapSettingsToggle`) and map control buttons (`MapToolsOverlay`-style zoom and center) to the monitor map, with automatic monitor location centralization.
-- TESTING: Executed and passed all project unit tests (`testDebugUnitTest`) across all subprojects.
-- BASELINE: Established Nov4.26 baseline."
-git tag Nov4.26
+- SENSOR SETUP: Added Relay Server URL Setup section to `SettingsOverlay` in `AdminActivity.kt` (`:app-sensor`) with edit field, APPLY RELAY URL, and RESET DEFAULT actions.
+- SENSOR INFO DIALOG: Displayed active Relay URL in `Sensor Setup & Info` dialog in `AdminActivity.kt` and added a CHANGE RELAY URL shortcut button.
+- SENSOR RECONNECT: Made `SensorViewModel` and `SensorService` reactively collect `sensorDataStore.relayUrl` and dynamically reconnect `SignalingClient` upon Relay URL changes.
+- MONITOR SETUP: Updated `MonitorDataStore`, `MonitorViewModel`, `MonitorSessionService`, and `MonitorActivity` so Monitor app users can configure Relay URL during pairing or in the Setup dialog.
+- VERSION BUMP: Updated versionName to `Nov4.27` across `:app-monitor` and `:app-sensor`.
+- TESTING: Executed and passed all project unit tests (`testDebugUnitTest`) across all subprojects and conducted reciprocal virtual presence simulation testing."
+git tag Nov4.27
 git push origin main --tags
 ```
 
-# Project Handover - REVOLUTION PHASE (Nov4.26 - MONITOR UI REFINEMENT, UPPER MENU, SETUP BUTTON, SRV/GPS LED FIXES & MAP CONTROLS)
+# Project Handover - REVOLUTION PHASE (Nov4.27 - RELAY URL SETUP OPTION INTEGRATION IN SENSOR APP & REACTIVE SIGNALING RECONNECT)
 
-## 🟢 Status: STABILIZED & VERIFIED (Nov4.26)
+## 🟢 Status: STABILIZED & VERIFIED (Nov4.27)
 
-Version Nov4.26 implements the requested monitor UI enhancements:
-1. **Upper Menu Line & Setup Button**: Added top header bar in `MonitorActivity` containing Setup, Settings, and disconnect/reset controls.
-2. **SRV & GPS LED Fixes**: Hardened `isRelayConnected` and `isGpsActive` in `MonitorViewModel` and `SensorViewModel` so LEDs correctly reflect online/active state.
-3. **Map Centralization & Controls**: Added map settings wheel (`MapSettingsToggle`) and map control buttons (Zoom In, Zoom Out, Center) to the monitor map, with automatic centralization on the monitor/tracker location.
-4. **Unit Tests**: All unit tests (`testDebugUnitTest`) pass successfully across all subprojects.
+Version Nov4.27 implements user-accessible Relay Server URL setup controls and reactive signaling re-connection:
+1. **Sensor Relay URL Setup & Settings Overlay**: Added Relay Server URL Setup section to `SettingsOverlay` in `AdminActivity.kt` (`:app-sensor`) with input field, **APPLY RELAY URL**, and **RESET DEFAULT** buttons.
+2. **Sensor Setup & Info Dialog**: Displayed active `Relay URL` in the `Sensor Setup & Info` dialog in `AdminActivity.kt` and added a **CHANGE RELAY URL** shortcut button.
+3. **Reactive Signaling Connection**: Updated `SensorViewModel` and `SensorService` to reactively collect `sensorDataStore.relayUrl` and dynamically re-establish `SignalingClient` connections when the Relay URL is modified.
+4. **Monitor Relay URL Configuration**: Added `saveRelayUrl` to `MonitorDataStore.kt` and updated `MonitorViewModel`, `MonitorSessionService`, and `MonitorActivity` to permit viewing and editing the Relay URL on the Monitor app.
+5. **Unit Tests & Reciprocal Simulation**: Executed all unit test suites (`testDebugUnitTest` 100% passing across all subprojects) and conducted reciprocal virtual presence simulation testing.
 
-**Resumption Token**: REVOLUTION-STABILIZED-NOV4.26
+**Resumption Token**: REVOLUTION-STABILIZED-NOV4.27
 
 ---
 
-## 🎯 Next Resumption Focus: Nov4.26 Baseline Synchronization - COMPLETED
+## 🎯 Next Resumption Focus: Nov4.27 Baseline Synchronization - COMPLETED
 
-### 🛡️ Implementation Status (Nov4.26)
-- **Version Increment**: ✅ **VERIFIED** (`app-monitor` and `app-sensor` updated to `Nov4.26`).
-- **Build & Unit Tests**: ✅ **PASSED** (`testDebugUnitTest` 100% passing).
-- **UI Enhancements**: ✅ **VERIFIED** (Menu upper line, setup button, SRV/GPS LEDs, map settings wheel, map control buttons, and map centralization).
+### 🛡️ Implementation Status (Nov4.27)
+- **Version Increment**: ✅ **VERIFIED** (`app-monitor` and `app-sensor` updated to `Nov4.27`).
+- **Build & Unit Tests**: ✅ **PASSED** (`testDebugUnitTest` 100% passing across all subprojects).
+- **UI & Relay URL Enhancements**: ✅ **VERIFIED** (Relay URL setup section, APPLY/RESET actions, Setup & Info dialog shortcut, reactive signaling reconnect in Sensor and Monitor apps).
 
 ---
 
 ## 📂 Key Implementation Files
-- `app-monitor/build.gradle.kts`: Version name updated to `Nov4.26`.
-- `app-sensor/build.gradle.kts`: Version name updated to `Nov4.26`.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorActivity.kt`: Upper menu line, setup button, map settings wheel, map control buttons, and map centralization.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorViewModel.kt`: Hardened `isRelayConnected` and `isGpsActive`.
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorViewModel.kt`: Hardened `isRelayConnected`.
+- `app-sensor/build.gradle.kts`: Version name updated to `Nov4.27`.
+- `app-monitor/build.gradle.kts`: Version name updated to `Nov4.27`.
+- `app-sensor/src/main/kotlin/com/jd/app/sensor/AdminActivity.kt`: Relay URL setup section in `SettingsOverlay`, updated `Sensor Setup & Info` dialog with Relay URL display & change action, added scrolling.
+- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorViewModel.kt`: Exposed `relayUrl` state flow, `updateRelayUrl()`, and reactive `SignalingClient` connection.
+- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorService.kt`: Updated `connectSignaling()` to reactively collect `sensorDataStore.relayUrl`.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorDataStore.kt`: Added `saveRelayUrl()` method.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorViewModel.kt`: Exposed `relayUrl` StateFlow and added `updateRelayUrl()`.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorSessionService.kt`: Updated `startSignaling()` to reactively collect `dataStore.relayUrl`.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorActivity.kt`: Added Relay URL configuration to `PairingWizard` and `Monitor Setup & Info` dialog.
 
 ---
 
-## ✅ Verified Milestones (Nov4.26)
+## ✅ Verified Milestones (Nov4.27)
 1. **Unit Test Suite**: 100% passing (`testDebugUnitTest`).
 2. **Release Integrity**: Version tagged and prepared for baseline synchronization.
 
-**Handover complete. System state locked at Nov4.26-STABLE.**
+**Handover complete. System state locked at Nov4.27-STABLE.**

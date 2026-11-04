@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.26)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.27)
 
-## 🎯 Next Resumption Focus: Nov4.26 Baseline Synchronization - COMPLETED
+## 🎯 Next Resumption Focus: Nov4.27 Baseline Synchronization - COMPLETED
 
 ---
 
@@ -15,6 +15,11 @@
   ```
 - **Impact**: Non-blocking performance warning during Compose state updates on Android runtime.
 - **Status**: Monitored. No crashes or functional failures observed.
+
+---
+
+## 🟢 Resolved Gaps (Nov4.27)
+*   **Relay URL Setup Option Integration in Sensor App (GAP-REVOL56.0-G1)**: Integrated Relay URL setup section into `SettingsOverlay` in `AdminActivity.kt`, updated Sensor Setup & Info dialog with Relay URL display & change shortcut, made `SensorViewModel` and `SensorService` reactively observe Relay URL changes and dynamically reconnect `SignalingClient`, and updated Monitor app with Relay URL configuration support. **PASSED.**
 
 ---
 
@@ -35,6 +40,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov4.27: [SOT Count: 913 (Rules: 413), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Relay URL Setup Option Integration in Sensor App & Reactive Signaling Reconnect), QA: 913]**
 - **Nov4.26: [SOT Count: 912 (Rules: 412), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor UI Refinement, Upper Menu, Setup Button, SRV/GPS LED Fixes & Map Controls), QA: 912]**
 - **Nov4.25: [SOT Count: 911 (Rules: 411), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Nov4.25 Stabilization & Reciprocal Simulation), QA: 911]**
 - **Nov4.24: [SOT Count: 910 (Rules: 410), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (HUD Status Bar Compact Layout Hardening & UI Refinement), QA: 910]**

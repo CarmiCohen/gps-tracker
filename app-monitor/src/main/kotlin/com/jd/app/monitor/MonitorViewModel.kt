@@ -23,8 +23,19 @@ class MonitorViewModel @Inject constructor(
     private val repository: MonitorRepository,
     private val identityManager: ForensicIdentityManager,
     private val signalingClient: SignalingClient,
+    private val dataStore: MonitorDataStore,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
+
+    val relayUrl: StateFlow<String> = dataStore.relayUrl
+        .map { it.takeIf { url -> !url.isNullOrBlank() } ?: "https://gps-relay-server.onrender.com" }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "https://gps-relay-server.onrender.com")
+
+    fun updateRelayUrl(url: String) {
+        viewModelScope.launch {
+            dataStore.saveRelayUrl(url.trim())
+        }
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val trail: StateFlow<List<TrailEntity>> = identityManager.targetId

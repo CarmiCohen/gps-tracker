@@ -18,7 +18,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,8 +49,7 @@ import javax.inject.Inject
 
 /**
  * AdminActivity: The "Admin Console" for the Sensor.
- * Hardened for Revol37.3: Restored mandatory Settings Gear (R797) and Factory Defaults (R-ID 615).
- * Updated Nov4.22-addHUD: Added HUD status bar integration.
+ * Updated Nov4.26: Added menu upper line with setup button and settings controls.
  */
 @AndroidEntryPoint
 class AdminActivity : ComponentActivity() {
@@ -61,6 +64,7 @@ class AdminActivity : ComponentActivity() {
         setContent {
             RevolutionTheme {
                 val trackerId by identityManager.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
+                val relayUrl by viewModel.relayUrl.collectAsStateWithLifecycle()
                 val hudState by viewModel.hudState.collectAsStateWithLifecycle()
                 val logs by SystemLogger.logs.collectAsStateWithLifecycle()
                 val scope = rememberCoroutineScope()
@@ -93,6 +97,7 @@ class AdminActivity : ComponentActivity() {
                         PermissionGuard {
                             if (showSettings) {
                                 SettingsOverlay(
+                                    currentRelayUrl = relayUrl,
                                     onClose = { showSettings = false },
                                     onLoadDefaults = { 
                                         scope.launch {
@@ -103,12 +108,16 @@ class AdminActivity : ComponentActivity() {
                                         scope.launch {
                                             identityManager.setSelfId(customId)
                                         }
+                                    },
+                                    onUpdateRelayUrl = { newUrl ->
+                                        viewModel.updateRelayUrl(newUrl)
                                     }
                                 )
                             } else {
                                 SensorAdminConsole(
                                     hudState = hudState,
                                     trackerId = trackerId,
+                                    relayUrl = relayUrl,
                                     logs = logs,
                                     onSettingsClick = { showSettings = true },
                                     onIgnoreBatteryOptimization = { requestIgnoreBatteryOptimization() }
@@ -175,22 +184,84 @@ fun PermissionGuard(content: @Composable () -> Unit) {
 fun getAppVersionName(context: android.content.Context): String {
     return try {
         val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        pInfo.versionName ?: "Nov4.22-addHUD"
-    } catch (e: Exception) {
-        "Nov4.22-addHUD"
+        pInfo.versionName ?: "Nov4.27"
+    } catch (_: Exception) {
+        "Nov4.27"
     }
 }
 
 @Composable
-fun SettingsOverlay(onClose: () -> Unit, onLoadDefaults: () -> Unit, onSetCustomId: (String) -> Unit) {
+fun SettingsOverlay(
+    currentRelayUrl: String,
+    onClose: () -> Unit,
+    onLoadDefaults: () -> Unit,
+    onSetCustomId: (String) -> Unit,
+    onUpdateRelayUrl: (String) -> Unit
+) {
     var customId by remember { mutableStateOf("") }
     var isError by remember { mutableStateOf(false) }
+    var relayUrlInput by remember { mutableStateOf(currentRelayUrl) }
+    var isRelayUrlError by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp)
+    ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("CONFIGURATION", style = MaterialTheme.typography.headlineSmall)
             TextButton(onClick = onClose) { Text("CLOSE (X)") }
         }
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text("Relay Server URL Setup", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(
+            value = relayUrlInput,
+            onValueChange = {
+                relayUrlInput = it
+                isRelayUrlError = it.isNotBlank() && !it.startsWith("http://") && !it.startsWith("https://") && !it.startsWith("ws://") && !it.startsWith("wss://")
+            },
+            label = { Text("Relay URL") },
+            isError = isRelayUrlError,
+            supportingText = {
+                if (isRelayUrlError) {
+                    Text("URL must start with http://, https://, ws://, or wss://")
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = {
+                    if (!isRelayUrlError && relayUrlInput.isNotBlank()) {
+                        onUpdateRelayUrl(relayUrlInput.trim())
+                    }
+                },
+                enabled = relayUrlInput.isNotBlank() && !isRelayUrlError,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("APPLY RELAY URL")
+            }
+            OutlinedButton(
+                onClick = {
+                    val defaultUrl = "https://gps-relay-server.onrender.com"
+                    relayUrlInput = defaultUrl
+                    onUpdateRelayUrl(defaultUrl)
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("RESET DEFAULT")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider()
         Spacer(modifier = Modifier.height(24.dp))
         
         Text("Manual Device ID Setup", style = MaterialTheme.typography.titleMedium)
@@ -241,14 +312,48 @@ fun SettingsOverlay(onClose: () -> Unit, onLoadDefaults: () -> Unit, onSetCustom
 fun SensorAdminConsole(
     hudState: HudState,
     trackerId: String,
+    relayUrl: String,
     logs: List<SystemLogger.LogEntry>, 
     onSettingsClick: () -> Unit,
     onIgnoreBatteryOptimization: () -> Unit
 ) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
+    var showSetupDialog by remember { mutableStateOf(false) }
 
     Column {
+        // Menu Upper Line (Top Menu Bar with Setup, Settings, and Info)
+        Surface(
+            color = Color.Black.copy(alpha = 0.85f),
+            contentColor = Color.White
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(onClick = onSettingsClick, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                }
+                Text(
+                    text = "SENSOR: ${trackerId.take(6).uppercase()}",
+                    color = Color(0xFF06B6D4),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onSettingsClick, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFF43F5E), modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+
         HudStatusBar(hudState = hudState)
         
         Column(modifier = Modifier.padding(16.dp)) {
@@ -264,6 +369,7 @@ fun SensorAdminConsole(
             }
 
             Text(text = "ID: ${trackerId.take(12)}...", fontSize = 12.sp, color = Color.Gray)
+            Text(text = "Relay URL: $relayUrl", fontSize = 12.sp, color = Color.Gray)
             Text(text = "Version: ${getAppVersionName(context)}", fontSize = 12.sp, color = Color.Gray)
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -307,5 +413,33 @@ fun SensorAdminConsole(
                 }
             }
         }
+    }
+
+    if (showSetupDialog) {
+        AlertDialog(
+            onDismissRequest = { showSetupDialog = false },
+            title = { Text("Sensor Setup & Info") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Sensor Device ID: $trackerId")
+                    Text("Relay URL: $relayUrl")
+                    Text("App Version: ${getAppVersionName(context)}")
+                    Text("Sensor Service Status: Active / Ready")
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        showSetupDialog = false
+                        onSettingsClick()
+                    }) {
+                        Text("CHANGE RELAY URL")
+                    }
+                    Button(onClick = { showSetupDialog = false }) {
+                        Text("Close")
+                    }
+                }
+            }
+        )
     }
 }

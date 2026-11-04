@@ -27,14 +27,35 @@ class SensorViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
+    companion object {
+        const val DEFAULT_RELAY_URL = "https://gps-relay-server.onrender.com"
+    }
+
     val selfId = identityManager.selfId
+
+    val relayUrl: StateFlow<String> = sensorDataStore.relayUrl
+        .map { it.takeIf { url -> !url.isNullOrBlank() } ?: DEFAULT_RELAY_URL }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DEFAULT_RELAY_URL)
 
     init {
         // Automatically initiate signaling connection when SensorViewModel is initialized
         viewModelScope.launch {
+            combine(identityManager.selfId, sensorDataStore.relayUrl) { id, rawUrl ->
+                val url = if (!rawUrl.isNullOrBlank()) rawUrl else DEFAULT_RELAY_URL
+                id to url
+            }.collect { (id, url) ->
+                signalingClient.connect(url, id, id)
+            }
+        }
+    }
+
+    fun updateRelayUrl(url: String) {
+        viewModelScope.launch {
+            val formattedUrl = url.trim()
+            sensorDataStore.saveRelayUrl(formattedUrl)
             val id = identityManager.selfId.first()
-            val url = sensorDataStore.relayUrl.first() ?: "https://gps-relay-server.onrender.com"
-            signalingClient.connect(url, id, id)
+            val targetUrl = if (formattedUrl.isNotBlank()) formattedUrl else DEFAULT_RELAY_URL
+            signalingClient.connect(targetUrl, id, id)
         }
     }
 

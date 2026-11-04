@@ -69,18 +69,20 @@ class MonitorSessionService : Service() {
         serviceScope.launch {
             val targetId = identityManager.targetId.first() ?: return@launch
             val selfId = identityManager.selfId.first()
-            val url = dataStore.relayUrl.first() ?: "https://gps-relay-server.onrender.com"
             
             // Get last sequence ID for initial backfill handshake (R-ID 768)
             val lastSeq = trailDao.getLastSequenceId(targetId) ?: 0L
-            
-            SystemLogger.i("MonitorService", "Connecting to relay for target $targetId (Last Seq: $lastSeq)")
-            signalingClient.connect(
-                url = url,
-                deviceId = selfId,
-                secret = targetId, // Monitor joins the target's forensic room
-                lastSequenceId = lastSeq
-            )
+
+            dataStore.relayUrl.collect { rawUrl ->
+                val url = if (!rawUrl.isNullOrBlank()) rawUrl else "https://gps-relay-server.onrender.com"
+                SystemLogger.i("MonitorService", "Connecting to relay $url for target $targetId (Last Seq: $lastSeq)")
+                signalingClient.connect(
+                    url = url,
+                    deviceId = selfId,
+                    secret = targetId, // Monitor joins the target's forensic room
+                    lastSequenceId = lastSeq
+                )
+            }
         }
     }
 

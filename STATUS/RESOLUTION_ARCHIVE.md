@@ -1,5 +1,17 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov4.27)
+- **Relay URL Setup Option Integration in Sensor App (GAP-REVOL56.0-G1)**: Added `Relay Server URL Setup` section to `SettingsOverlay` in `AdminActivity.kt` (`:app-sensor`) with input field, **APPLY RELAY URL**, and **RESET DEFAULT** buttons. Updated `Sensor Setup & Info` dialog in `AdminActivity.kt` to display active `Relay URL` and added a **CHANGE RELAY URL** shortcut button. Updated `SensorViewModel`, `SensorService`, `MonitorDataStore`, `MonitorViewModel`, `MonitorSessionService`, and `MonitorActivity` to reactively observe Relay URL changes and dynamically reconnect `SignalingClient`. **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.27` established as the new forensic stabilization baseline.
+
+---
+
+## ✅ Resolved Issues (Nov4.26)
+- **Monitor UI Refinement & Map Controls (GAP-REVOL55.0-G1)**: Added menu upper line with setup and settings buttons in `MonitorActivity.kt`, fixed SRV and GPS LEDs in `MonitorViewModel` and `SensorViewModel`, integrated map settings wheel (`MapSettingsToggle`) and map control buttons (`MapToolsOverlay`-style zoom and center) to the monitor map with automatic monitor/tracker location centralization. **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.26` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.25)
 - **Nov4.25 Stabilization & Reciprocal Simulation (GAP-REVOL54.0-G1)**: Executed comprehensive unit test suite (`testDebugUnitTest` 100% passing across all subprojects), verified version name updates (`Nov4.25`) across `:app-monitor` and `:app-sensor`, and conducted reciprocal virtual presence simulation testing. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.25` established as the new forensic stabilization baseline.

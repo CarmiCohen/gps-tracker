@@ -137,14 +137,17 @@ class SensorService : Service(), SensorEventListener {
 
     private fun connectSignaling() {
         serviceScope.launch {
-            val selfId = identityManager.selfId.first()
-            val url = sensorDataStore.relayUrl.first() ?: "https://gps-relay-server.onrender.com"
-            SystemLogger.i("SensorService", "Connecting to relay $url as $selfId")
-            signalingClient.connect(
-                url = url,
-                deviceId = selfId,
-                secret = selfId
-            )
+            kotlinx.coroutines.flow.combine(identityManager.selfId, sensorDataStore.relayUrl) { selfId, rawUrl ->
+                val url = if (!rawUrl.isNullOrBlank()) rawUrl else "https://gps-relay-server.onrender.com"
+                selfId to url
+            }.collect { (selfId, url) ->
+                SystemLogger.i("SensorService", "Connecting to relay $url as $selfId")
+                signalingClient.connect(
+                    url = url,
+                    deviceId = selfId,
+                    secret = selfId
+                )
+            }
         }
     }
 
