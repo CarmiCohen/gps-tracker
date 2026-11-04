@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -373,9 +374,21 @@ fun SensorAdminConsole(
     val context = LocalContext.current
     val listState = rememberLazyListState()
     var showSetupDialog by remember { mutableStateOf(false) }
+    var showToolsOverlay by remember { mutableStateOf(false) }
+
+    if (showToolsOverlay) {
+        com.jd.core.ui.ToolsOverlay(
+            onTriggerBurst = { SystemLogger.i("TOOLS", "Triggered high-frequency IMU/GNSS burst (100Hz).") },
+            onPruneDatabase = { SystemLogger.i("TOOLS", "Executed manual database pruning.") },
+            onTriggerTestAlarm = { SystemLogger.i("TOOLS", "Simulated test violation event.") },
+            onResetWatchdog = { SystemLogger.i("TOOLS", "Reset service watchdog timer.") },
+            onClose = { showToolsOverlay = false }
+        )
+        return
+    }
 
     Column {
-        // Menu Upper Line (Top Menu Bar with Setup, Settings, and Info)
+        // Menu Upper Line (Top Menu Bar with Setup, Settings, Tools, and Info)
         Surface(
             color = Color.Black.copy(alpha = 0.85f),
             contentColor = Color.White
@@ -393,6 +406,9 @@ fun SensorAdminConsole(
                     }
                     IconButton(onClick = onSettingsClick, modifier = Modifier.size(36.dp)) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(onClick = { showToolsOverlay = true }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Tools", tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
                     }
                 }
                 Text(

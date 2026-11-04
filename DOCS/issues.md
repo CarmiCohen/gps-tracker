@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.31)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.32)
 
-## 🎯 Next Resumption Focus: Nov4.31 Baseline Synchronization - COMPLETED
+## 🎯 Next Resumption Focus: Nov4.32 Baseline Synchronization - COMPLETED
 
 ---
 
@@ -18,14 +18,13 @@
 
 ---
 
-## 🟢 Resolved Gaps (Nov4.31)
-*   **Device-Specific Setup & Hardware Hardening Revival (GAP-REVOL61.0-G1)**: Revived `DeviceProfileManager`, `DeviceHardeningStrategy`, `HardwareCapabilities`, and `PerformanceTier` in `:app-sensor`. Implemented hardware capability profiling (Samsung A15 staggered tier vs S21FE standard tier), vendor power management overrides, and the 60-second background transition hardening window. **PASSED.**
+## 🟢 Resolved Gaps (Nov4.32)
+*   **System Tools & Diagnostics Menu Integration (GAP-REVOL62.0-G1)**: Integrated dedicated **Tools** menu option in top header bar of both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications, opening `ToolsOverlay` (`:core-ui`) for 100Hz telemetry burst simulation, database pruning, test violation triggering, and watchdog resetting. **PASSED.**
 
 ---
 
-## 🟢 Resolved Gaps (Nov4.30)
-*   **Alarming Setup & Alert Management Revival (GAP-REVOL60.0-G1)**: Revived `AlertManagementOverlay` and `AlarmSoundOverlay` (`:core-ui`), `AlertSettings` persistence via DataStore, and UI integration. **PASSED.**
-*   **Monitor Dual HUD Status Lines, GPS Colors & Connection-Aware Centering (GAP-REVOL59.0-G1)**: Implemented dual HUD status lines and connection-aware auto-centering logic on Monitor app. **PASSED.**
+## 🟢 Resolved Gaps (Nov4.31)
+*   **Device-Specific Setup & Hardware Hardening Revival (GAP-REVOL61.0-G1)**: Revived `DeviceProfileManager`, `DeviceHardeningStrategy`, `HardwareCapabilities`, and `PerformanceTier` in `:app-sensor`. **PASSED.**
 
 ---
 
@@ -36,10 +35,10 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov4.32: [SOT Count: 919 (Rules: 419), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (System Tools & Diagnostics Menu Integration), QA: 919]**
 - **Nov4.31: [SOT Count: 918 (Rules: 418), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Device-Specific Setup & Hardware Hardening Revival), QA: 918]**
 - **Nov4.30: [SOT Count: 917 (Rules: 417), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor Dual HUD, Centering & Alarming Setup Revival), QA: 917]**
 - **Nov4.29: [SOT Count: 915 (Rules: 415), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Nov4.29 Stabilization & Comprehensive Test Execution Across All Subprojects), QA: 915]**
 - **Nov4.28: [SOT Count: 914 (Rules: 414), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Pre-Revolution Map Functionality & Specifications Implementation & Test Chapters 107-108), QA: 914]**
 - **Nov4.27: [SOT Count: 913 (Rules: 413), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Relay URL Setup Option Integration in Sensor App & Reactive Signaling Reconnect), QA: 913]**
 - **Nov4.26: [SOT Count: 912 (Rules: 412), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor UI Refinement, Upper Menu, Setup Button, SRV/GPS LED Fixes & Map Controls), QA: 912]**
-- **Nov4.25: [SOT Count: 911 (Rules: 411), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Nov4.25 Stabilization & Reciprocal Simulation), QA: 911]**

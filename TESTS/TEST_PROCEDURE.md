@@ -386,8 +386,18 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **110.2 Vendor Power Management & WakeLock Escalation:** Verify `DeviceHardeningStrategy` enforces vendor-specific power management policies, wake lock renewals, and watchdog scheduling for Samsung and Huawei devices.
 *   **110.3 Background Transition Hardening Window:** Verify that `DeviceHardeningStrategy` detects app background transitions and applies the 60-second background escalation window to eliminate jitter spikes on staggered tier devices.
 
+## Chapter 111 - System Tools & Diagnostics Menu Audit (Nov4.32)
+*   **111.1 Tools Option Under Top Menu Bar:** Verify that a dedicated **Tools** option (refresh/tools icon button) is positioned directly under the top menu bar alongside the Setup (`Build`) and Settings (`Settings`) gear icons in both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications.
+*   **111.2 System Tools & Diagnostics Overlay:** Verify that tapping the Tools option opens `ToolsOverlay` with quick action buttons:
+    - **Trigger High-Frequency Burst (100Hz)**
+    - **Prune Database & Reclaim Cache**
+    - **Trigger Test Alarm / Violation**
+    - **Reset Service Watchdog**
+*   **111.3 Action Dispatch & Response:** Verify that activating any tool action dispatches the appropriate logging/maintenance event and can be successfully closed via the `CLOSE (X)` button.
+
 ---
-**Total Testing Chapters: 110**
+**Total Testing Chapters: 111**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
+
 
 

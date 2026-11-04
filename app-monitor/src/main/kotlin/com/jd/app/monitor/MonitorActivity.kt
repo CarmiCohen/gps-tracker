@@ -233,6 +233,7 @@ fun MonitorScreen(
     var showSetupDialog by remember { mutableStateOf(false) }
     var showAlertsOverlay by remember { mutableStateOf(false) }
     var showSoundOverlay by remember { mutableStateOf(false) }
+    var showToolsOverlay by remember { mutableStateOf(false) }
     var isEditingRelayUrl by remember { mutableStateOf(false) }
     var relayUrlInput by remember { mutableStateOf(relayUrl) }
     var followMode by remember { mutableStateOf("AUTO") } // "TRACKER", "VIEWER", "AUTO"
@@ -258,6 +259,17 @@ fun MonitorScreen(
             onUpdateAlarmVolume = onUpdateAlarmVolume,
             onTestSiren = onTestSiren,
             onClose = { showSoundOverlay = false }
+        )
+        return
+    }
+
+    if (showToolsOverlay) {
+        com.jd.core.ui.ToolsOverlay(
+            onTriggerBurst = { },
+            onPruneDatabase = { },
+            onTriggerTestAlarm = { },
+            onResetWatchdog = { },
+            onClose = { showToolsOverlay = false }
         )
         return
     }
@@ -344,6 +356,9 @@ fun MonitorScreen(
                             }
                             IconButton(onClick = { onReset() }, modifier = Modifier.size(36.dp)) {
                                 Icon(Icons.Default.Settings, contentDescription = "Settings / Re-pair", tint = Color.White, modifier = Modifier.size(20.dp))
+                            }
+                            IconButton(onClick = { showToolsOverlay = true }, modifier = Modifier.size(36.dp)) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Tools", tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
                             }
                         }
                         Text(
