@@ -14,7 +14,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 23
-        versionName = "Nov4.25"
+        versionName = "Nov4.26"
 
         testInstrumentationRunner = "com.jd.app.sensor.HiltTestRunner"
     }

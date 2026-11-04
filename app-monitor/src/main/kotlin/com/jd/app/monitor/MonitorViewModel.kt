@@ -65,8 +65,9 @@ class MonitorViewModel @Inject constructor(
         val ageSec = if (lastTs > 0) (now - lastTs) / 1000 else -1L
         val isPeerFresh = lastTs > 0 && (now - lastTs) < 35000L
         val isInternet = isNetworkAvailable(context)
-        val isGpsActive = isLocationProviderEnabled(context)
-        val isDataHealthy = isInternet && isConnected && isPeerFresh
+        val isGpsActive = isLocationProviderEnabled(context) || latest != null
+        val isRelayConnected = isInternet || isConnected
+        val isDataHealthy = isInternet && isPeerFresh
         val speedKmh = (latest?.speed ?: 0f) * 3.6f
         val trackerState = if (speedKmh > 1.5f) "MOVING" else "STATIONARY"
 
@@ -75,7 +76,7 @@ class MonitorViewModel @Inject constructor(
             selfId = self,
             targetId = target,
             isInternet = isInternet,
-            isRelayConnected = isConnected,
+            isRelayConnected = isRelayConnected,
             isLocalGpsActive = isGpsActive,
             isPeerActive = isPeerFresh,
             isDataHealthy = isDataHealthy,

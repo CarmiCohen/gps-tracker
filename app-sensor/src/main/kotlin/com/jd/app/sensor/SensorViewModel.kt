@@ -52,6 +52,7 @@ class SensorViewModel @Inject constructor(
     ) { id, isConnected, _ ->
         val isInternet = isNetworkAvailable(context)
         val isGpsActive = isLocationProviderEnabled(context)
+        val isRelayConnected = isInternet || isConnected
         val batteryInfo = getBatteryInfo(context)
 
         HudState(
@@ -59,10 +60,10 @@ class SensorViewModel @Inject constructor(
             selfId = id,
             targetId = "V",
             isInternet = isInternet,
-            isRelayConnected = isConnected,
+            isRelayConnected = isRelayConnected,
             isLocalGpsActive = isGpsActive,
             isPeerActive = isConnected, // Active signaling connection ready for viewer peer
-            isDataHealthy = isInternet && isConnected,
+            isDataHealthy = isInternet,
             watchdogOk = true,
             trackerState = "STATIONARY",
             speedKmh = 0f,

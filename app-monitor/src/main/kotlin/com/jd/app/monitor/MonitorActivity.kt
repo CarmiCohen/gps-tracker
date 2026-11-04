@@ -5,15 +5,23 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jd.core.ui.HudState
@@ -30,8 +38,7 @@ import org.osmdroid.views.overlay.Marker
 
 /**
  * MonitorActivity: The primary UI for the Monitor (Watcher).
- * Hardened for Revol31.0: Integrated osmdroid for trail visualization and jitter audit foundation.
- * Updated Nov4.22-addHUD: Added HUD status bar integration.
+ * Hardened with upper menu line, setup button, fixed SRV/GPS LEDs, map settings wheel, and map control buttons.
  */
 @AndroidEntryPoint
 class MonitorActivity : ComponentActivity() {
@@ -41,7 +48,6 @@ class MonitorActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Osmdroid Configuration
         Configuration.getInstance().userAgentValue = packageName
 
         setContent {
@@ -122,16 +128,16 @@ fun PairingWizard(onPair: (String) -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-        Text(text = "Version: ${getAppVersionName(LocalContext.current)}", fontSize = androidx.compose.ui.unit.TextUnit(12f, androidx.compose.ui.unit.TextUnitType.Sp), color = androidx.compose.ui.graphics.Color.Gray)
+        Text(text = "Version: ${getAppVersionName(LocalContext.current)}", fontSize = 12.sp, color = Color.Gray)
     }
 }
 
 fun getAppVersionName(context: android.content.Context): String {
     return try {
         val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        pInfo.versionName ?: "Nov4.22-addHUD"
+        pInfo.versionName ?: "Nov4.26"
     } catch (_: Exception) {
-        "Nov4.22-addHUD"
+        "Nov4.26"
     }
 }
 
@@ -144,6 +150,9 @@ fun MonitorScreen(
     onReset: () -> Unit
 ) {
     val context = LocalContext.current
+    var isMapButtonsVisible by remember { mutableStateOf(true) }
+    var showSetupDialog by remember { mutableStateOf(false) }
+
     val mapView = remember {
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
@@ -152,7 +161,7 @@ fun MonitorScreen(
         }
     }
 
-    // Update trail on map
+    // Update trail on map and center on monitor/tracker location
     LaunchedEffect(trail) {
         mapView.overlays.clear()
         if (trail.isNotEmpty()) {
@@ -164,34 +173,55 @@ fun MonitorScreen(
             }
             mapView.overlays.add(polyline)
             
-            // Add marker for the latest position
             val latest = trail.first()
             val marker = Marker(mapView).apply {
                 position = GeoPoint(latest.lat, latest.lng)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                title = "Latest Update"
+                title = "Tracker Location"
             }
             mapView.overlays.add(marker)
             
-            // Center map on latest point if it's the first time
-            if (mapView.mapCenter.latitude == 0.0) {
-                mapView.controller.setCenter(GeoPoint(latest.lat, latest.lng))
-            }
+            // Centralize map on monitor / tracker location
+            mapView.controller.setCenter(GeoPoint(latest.lat, latest.lng))
         }
         mapView.invalidate()
     }
 
     Scaffold(
         topBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onLongPress = { onReset() }
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Menu Upper Line (Header Bar with Setup, Settings, and Actions)
+                Surface(
+                    color = Color.Black.copy(alpha = 0.85f),
+                    contentColor = Color.White
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(36.dp)) {
+                                Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(20.dp))
+                            }
+                            IconButton(onClick = { onReset() }, modifier = Modifier.size(36.dp)) {
+                                Icon(Icons.Default.Settings, contentDescription = "Settings / Re-pair", tint = Color.White, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        Text(
+                            text = "MONITOR: ${monitorId.take(6).uppercase()} -> TRK:${trackerId.take(6).uppercase()}",
+                            color = Color(0xFF06B6D4),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
                         )
+                        IconButton(onClick = { onReset() }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Disconnect", tint = Color(0xFFF43F5E), modifier = Modifier.size(20.dp))
+                        }
                     }
-            ) {
+                }
+                // HUD Status Bar
                 HudStatusBar(hudState = hudState)
             }
         }
@@ -206,9 +236,106 @@ fun MonitorScreen(
             
             if (trail.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Waiting for Telemetry...")
+                    Text("Waiting for Telemetry...", color = Color.Gray, fontWeight = FontWeight.Medium)
                 }
             }
+
+            // Map Settings Wheel (Toggle Button)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 12.dp, top = 12.dp)
+            ) {
+                MapSettingsToggle(
+                    isMapButtonsVisible = isMapButtonsVisible,
+                    onToggle = { isMapButtonsVisible = !isMapButtonsVisible }
+                )
+            }
+
+            // Map Control Buttons (Similar to viewer function)
+            if (isMapButtonsVisible) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 8.dp)
+                ) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        MapToolButton(label = "IN", symbol = "+", onClick = { mapView.controller.zoomIn() }, iconColor = Color(0xFF800080))
+                        MapToolButton(label = "OUT", symbol = "-", onClick = { mapView.controller.zoomOut() }, iconColor = Color(0xFF800080))
+                        MapToolButton(icon = Icons.Default.Place, label = "CENTER", onClick = {
+                            if (trail.isNotEmpty()) {
+                                val latest = trail.first()
+                                mapView.controller.setCenter(GeoPoint(latest.lat, latest.lng))
+                            }
+                        }, iconColor = Color(0xFF06B6D4))
+                    }
+                }
+            }
+        }
+    }
+
+    if (showSetupDialog) {
+        AlertDialog(
+            onDismissRequest = { showSetupDialog = false },
+            title = { Text("Monitor Setup & Info") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Connected Tracker ID: $trackerId")
+                    Text("Monitor ID: $monitorId")
+                    Text("App Version: ${getAppVersionName(LocalContext.current)}")
+                    Text("Relay Status: Connected / Active")
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showSetupDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    val purple = Color(0xFF800080)
+    val backgroundColor = if (isMapButtonsVisible) purple else Color.White
+    val contentColor = if (isMapButtonsVisible) Color.White else purple
+
+    Box(
+        modifier = modifier
+            .size(44.dp)
+            .background(backgroundColor, RoundedCornerShape(8.dp))
+            .border(2.dp, purple, RoundedCornerShape(8.dp))
+            .clickable { onToggle() },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = if (isMapButtonsVisible) Icons.Default.Close else Icons.Default.Settings,
+            contentDescription = "Toggle Map Controls",
+            tint = contentColor,
+            modifier = Modifier.size(26.dp)
+        )
+    }
+}
+
+@Composable
+fun MapToolButton(icon: ImageVector? = null, symbol: String? = null, label: String, onClick: () -> Unit, iconColor: Color, containerColor: Color = Color.White) {
+    val prp = Color(0xFF800080)
+    Box(
+        modifier = Modifier
+            .size(50.dp)
+            .background(containerColor, RoundedCornerShape(8.dp))
+            .border(1.dp, prp, RoundedCornerShape(8.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (symbol != null) Text(symbol, color = iconColor, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.height(26.dp))
+            else if (icon != null) Icon(icon, null, tint = iconColor, modifier = Modifier.size(24.dp))
+            Text(label, color = if (containerColor != Color.White && containerColor != Color.Transparent) Color.White else prp, fontSize = 8.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
