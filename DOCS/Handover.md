@@ -1,56 +1,52 @@
 ```
 git add .
-git commit -m "REVOLUTION PHASE Nov4.27 - RELAY URL SETUP OPTION INTEGRATION IN SENSOR APP & REACTIVE SIGNALING RECONNECT
+git commit -m "REVOLUTION PHASE Nov4.28 - PRE-REVOLUTION MAP FUNCTIONALITY & SPECIFICATIONS IMPLEMENTATION
 
-- SENSOR SETUP: Added Relay Server URL Setup section to `SettingsOverlay` in `AdminActivity.kt` (`:app-sensor`) with edit field, APPLY RELAY URL, and RESET DEFAULT actions.
-- SENSOR INFO DIALOG: Displayed active Relay URL in `Sensor Setup & Info` dialog in `AdminActivity.kt` and added a CHANGE RELAY URL shortcut button.
-- SENSOR RECONNECT: Made `SensorViewModel` and `SensorService` reactively collect `sensorDataStore.relayUrl` and dynamically reconnect `SignalingClient` upon Relay URL changes.
-- MONITOR SETUP: Updated `MonitorDataStore`, `MonitorViewModel`, `MonitorSessionService`, and `MonitorActivity` so Monitor app users can configure Relay URL during pairing or in the Setup dialog.
-- VERSION BUMP: Updated versionName to `Nov4.27` across `:app-monitor` and `:app-sensor`.
-- TESTING: Executed and passed all project unit tests (`testDebugUnitTest`) across all subprojects and conducted reciprocal virtual presence simulation testing."
-git tag Nov4.27
+- MAP ENGINE: Ported and integrated robust osmdroid map components (`MapOverlayManager.kt`, `MapController.kt`, `MapComponents.kt`, `MapModels.kt`, `MapViewState`, `MapFollowMode`, `GeofenceMode`, `CameraAction`, `MapTrailSegment`, `ViolationPoint`) into `:app-monitor`.
+- MAP TOOLS OVERLAY: Implemented `MapToolsOverlay` and `MapSettingsToggle` supporting zoom controls (`IN`/`OUT`), centering (`TRACKER`/`VIEWER`), violation toggles (`OUT`/`JUMP`), trail I/O (`LOAD`/`SAVE`), geofencing home points (`ADD`/`DEL`/`FENCE`), and trail clearing (`CLEAR`).
+- HOME POINTS & VIOLATIONS: Implemented Home Point markers, async metric boundary circles (`Polygon.pointsAsCircle`), and spatial violation markers with accuracy buffers.
+- VERSION BUMP: Updated versionName to `Nov4.28` across `:app-monitor` and `:app-sensor`.
+- TESTING: Executed and passed all project unit tests (`testDebugUnitTest`) across all subprojects."
+git tag Nov4.28
 git push origin main --tags
 ```
 
-# Project Handover - REVOLUTION PHASE (Nov4.27 - RELAY URL SETUP OPTION INTEGRATION IN SENSOR APP & REACTIVE SIGNALING RECONNECT)
+# Project Handover - REVOLUTION PHASE (Nov4.28 - PRE-REVOLUTION MAP FUNCTIONALITY & SPECIFICATIONS IMPLEMENTATION)
 
-## 🟢 Status: STABILIZED & VERIFIED (Nov4.27)
+## 🟢 Status: STABILIZED & VERIFIED (Nov4.28)
 
-Version Nov4.27 implements user-accessible Relay Server URL setup controls and reactive signaling re-connection:
-1. **Sensor Relay URL Setup & Settings Overlay**: Added Relay Server URL Setup section to `SettingsOverlay` in `AdminActivity.kt` (`:app-sensor`) with input field, **APPLY RELAY URL**, and **RESET DEFAULT** buttons.
-2. **Sensor Setup & Info Dialog**: Displayed active `Relay URL` in the `Sensor Setup & Info` dialog in `AdminActivity.kt` and added a **CHANGE RELAY URL** shortcut button.
-3. **Reactive Signaling Connection**: Updated `SensorViewModel` and `SensorService` to reactively collect `sensorDataStore.relayUrl` and dynamically re-establish `SignalingClient` connections when the Relay URL is modified.
-4. **Monitor Relay URL Configuration**: Added `saveRelayUrl` to `MonitorDataStore.kt` and updated `MonitorViewModel`, `MonitorSessionService`, and `MonitorActivity` to permit viewing and editing the Relay URL on the Monitor app.
-5. **Unit Tests & Reciprocal Simulation**: Executed all unit test suites (`testDebugUnitTest` 100% passing across all subprojects) and conducted reciprocal virtual presence simulation testing.
+Version Nov4.28 implements the full suite of pre-revolution map functionality and specifications in `:app-monitor`:
+1. **osmdroid Overlay Management & Pooling**: Integrated `MapOverlayManager` for high-performance marker and polyline pooling with SnapshotStateList and background circle caching (`ShadowCache`).
+2. **Imperative Camera & Follow Controller**: Integrated `MapController` handling follow modes, bounding box zooms, and reactive camera actions.
+3. **Map Tools Overlay (`MapToolsOverlay`)**: Fully functional map tools panel providing Zoom (`IN`/`OUT`), Centering (`TRACKER`/`VIEWER`), Violation Toggles (`OUT`/`JUMP`), Trail I/O (`LOAD`/`SAVE`), Geofence Management (`ADD`/`DEL`/`FENCE`), and Trail Clearing (`CLEAR`).
+4. **Home Points & Spatial Violations**: Added Home Point boundary circles (`Polygon.pointsAsCircle`) and jump/out-of-range breach markers with accuracy buffers.
+5. **Unit Tests**: Executed all unit test suites (`testDebugUnitTest` 100% passing across all subprojects).
 
-**Resumption Token**: REVOLUTION-STABILIZED-NOV4.27
+**Resumption Token**: REVOLUTION-STABILIZED-NOV4.28
 
 ---
 
-## 🎯 Next Resumption Focus: Nov4.27 Baseline Synchronization - COMPLETED
+## 🎯 Next Resumption Focus: Nov4.28 Baseline Synchronization - COMPLETED
 
-### 🛡️ Implementation Status (Nov4.27)
-- **Version Increment**: ✅ **VERIFIED** (`app-monitor` and `app-sensor` updated to `Nov4.27`).
+### 🛡️ Implementation Status (Nov4.28)
+- **Version Increment**: ✅ **VERIFIED** (`app-monitor` and `app-sensor` updated to `Nov4.28`).
 - **Build & Unit Tests**: ✅ **PASSED** (`testDebugUnitTest` 100% passing across all subprojects).
-- **UI & Relay URL Enhancements**: ✅ **VERIFIED** (Relay URL setup section, APPLY/RESET actions, Setup & Info dialog shortcut, reactive signaling reconnect in Sensor and Monitor apps).
+- **Map Functionality**: ✅ **VERIFIED** (Map Tools Overlay, osmdroid overlay manager, MapController, Home Points, geofence circles, and violation markers).
 
 ---
 
 ## 📂 Key Implementation Files
-- `app-sensor/build.gradle.kts`: Version name updated to `Nov4.27`.
-- `app-monitor/build.gradle.kts`: Version name updated to `Nov4.27`.
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/AdminActivity.kt`: Relay URL setup section in `SettingsOverlay`, updated `Sensor Setup & Info` dialog with Relay URL display & change action, added scrolling.
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorViewModel.kt`: Exposed `relayUrl` state flow, `updateRelayUrl()`, and reactive `SignalingClient` connection.
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorService.kt`: Updated `connectSignaling()` to reactively collect `sensorDataStore.relayUrl`.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorDataStore.kt`: Added `saveRelayUrl()` method.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorViewModel.kt`: Exposed `relayUrl` StateFlow and added `updateRelayUrl()`.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorSessionService.kt`: Updated `startSignaling()` to reactively collect `dataStore.relayUrl`.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorActivity.kt`: Added Relay URL configuration to `PairingWizard` and `Monitor Setup & Info` dialog.
+- `app-monitor/build.gradle.kts`: Version name updated to `Nov4.28`.
+- `app-sensor/build.gradle.kts`: Version name updated to `Nov4.28`.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MapModels.kt`: Map state, actions, models, and enums.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MapOverlayManager.kt`: osmdroid overlay manager, pooling, and async circle caching.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MapController.kt`: Imperative osmdroid controller and follow logic.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MapComponents.kt`: `OsmMap`, `MapToolsOverlay`, `AnchorLockedBadge`.
 
 ---
 
-## ✅ Verified Milestones (Nov4.27)
+## ✅ Verified Milestones (Nov4.28)
 1. **Unit Test Suite**: 100% passing (`testDebugUnitTest`).
 2. **Release Integrity**: Version tagged and prepared for baseline synchronization.
 
-**Handover complete. System state locked at Nov4.27-STABLE.**
+**Handover complete. System state locked at Nov4.28-STABLE.**

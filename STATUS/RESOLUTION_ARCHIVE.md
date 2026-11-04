@@ -1,5 +1,11 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov4.28)
+- **Pre-Revolution Map Functionality & Specifications Implementation (GAP-REVOL57.0-G1)**: Successfully implemented comprehensive pre-revolution map functionality in `:app-monitor`, including osmdroid marker/polyline pooling (`MapOverlayManager`), imperative camera & follow controller (`MapController`), Map Tools Overlay (`MapToolsOverlay`) with quick actions (`IN`, `OUT`, `TRACKER`, `VIEWER`, `JUMP`, `SAVE`, `LOAD`, `ADD`, `DEL`, `FENCE`, `CLEAR`), Home Point boundary circles (`Polygon.pointsAsCircle`), and spatial violation markers. **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.28` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.27)
 - **Relay URL Setup Option Integration in Sensor App (GAP-REVOL56.0-G1)**: Added `Relay Server URL Setup` section to `SettingsOverlay` in `AdminActivity.kt` (`:app-sensor`) with input field, **APPLY RELAY URL**, and **RESET DEFAULT** buttons. Updated `Sensor Setup & Info` dialog in `AdminActivity.kt` to display active `Relay URL` and added a **CHANGE RELAY URL** shortcut button. Updated `SensorViewModel`, `SensorService`, `MonitorDataStore`, `MonitorViewModel`, `MonitorSessionService`, and `MonitorActivity` to reactively observe Relay URL changes and dynamically reconnect `SignalingClient`. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.27` established as the new forensic stabilization baseline.

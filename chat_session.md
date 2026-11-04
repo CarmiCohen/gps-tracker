@@ -1,33 +1,24 @@
-# Chat Session State - Nov4.27
+# Chat Session State - Nov4.28
 
 ## 🎯 Current Focus & Tasks Completed
-1. **Relay Server URL Setup Option in Sensor App (GAP-REVOL56.0-G1)**:
-   - Added `Relay Server URL Setup` section to `SettingsOverlay` in `AdminActivity.kt` (`:app-sensor`) with input field, **APPLY RELAY URL**, and **RESET DEFAULT** buttons.
-   - Updated `Sensor Setup & Info` dialog in `AdminActivity.kt` to display active `Relay URL` and added a **CHANGE RELAY URL** shortcut button.
-   - Made `SensorViewModel` and `SensorService` reactively collect `sensorDataStore.relayUrl` and dynamically reconnect `SignalingClient` upon Relay URL changes.
-2. **Relay Server URL Setup Option in Monitor App**:
-   - Added `saveRelayUrl` to `MonitorDataStore.kt` and exposed `relayUrl` state flow and `updateRelayUrl` function in `MonitorViewModel.kt`.
-   - Updated `MonitorSessionService.kt` to reactively collect `dataStore.relayUrl`.
-   - Updated `MonitorActivity.kt` to allow setting/editing the Relay URL in the `PairingWizard` and `Monitor Setup & Info` dialog.
-3. **Version Bump**:
-   - Updated `versionName` to `Nov4.27` across `app-monitor/build.gradle.kts` and `app-sensor/build.gradle.kts`.
-   - Updated version fallback strings to `Nov4.27` in `AdminActivity.kt` and `MonitorActivity.kt`.
-4. **Test Suite Execution & Single-Device Reciprocal Simulation**:
-   - Executed full unit test suite (`:app-monitor:testDebugUnitTest`, `:app-sensor:testDebugUnitTest`, `:core-network:test`, `:core-shared:test`, `:core-ui:test`) — 100% passing results.
-   - Verified single device connected (`SM-A155F` / Samsung A15).
-   - Executed reciprocal virtual presence testing protocol for Tracker and Viewer roles.
+1. **Pre-Revolution Map Functionality & Specifications Implementation (GAP-REVOL57.0-G1)**:
+   - Ported and integrated robust osmdroid map components (`MapOverlayManager.kt`, `MapController.kt`, `MapComponents.kt`, `MapModels.kt`, `MapViewState`, `MapFollowMode`, `GeofenceMode`, `CameraAction`, `MapTrailSegment`, `ViolationPoint`) into `:app-monitor`.
+   - Implemented Map Tools Overlay (`MapToolsOverlay`) with quick actions: Zoom In/Out (`IN`/`OUT`), Center Tracker/Viewer (`TRACKER`/`VIEWER`), Geofence Out-of-Range toggle (`OUT`), Jump Alert toggle (`JUMP`), Trail Import/Export (`LOAD`/`SAVE`), Geofence Home Point addition/deletion (`ADD`/`DEL`), Fence boundary circle visibility toggle (`FENCE`), and Trail Clearing (`CLEAR`).
+   - Implemented Home Point markers and async metric boundary circles (`Polygon.pointsAsCircle`).
+   - Implemented Jump and Geofence Out-of-Range violation markers with accuracy buffers.
+2. **Version Bump**:
+   - Updated `versionName` to `Nov4.28` across `app-monitor/build.gradle.kts` and `app-sensor/build.gradle.kts`.
+3. **Test Suite Execution**:
+   - Executed full unit test suite across all subprojects (`:app-monitor:testDebugUnitTest`, `:app-sensor:testDebugUnitTest`, `:core-network:test`, `:core-shared:test`, `:core-ui:test`) — 100% passing results.
 
 ## 📂 Modified Files
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/AdminActivity.kt`: Integrated Relay URL setup section into `SettingsOverlay`, updated `Sensor Setup & Info` dialog with Relay URL display & change action, added scrolling.
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorViewModel.kt`: Exposed `relayUrl` state flow, added `updateRelayUrl()`, and reactively connected `SignalingClient` on URL changes.
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorService.kt`: Updated `connectSignaling()` to reactively collect `sensorDataStore.relayUrl`.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorDataStore.kt`: Added `saveRelayUrl()` method.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorViewModel.kt`: Injected `MonitorDataStore`, exposed `relayUrl` StateFlow, and added `updateRelayUrl()`.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorSessionService.kt`: Updated `startSignaling()` to reactively collect `dataStore.relayUrl`.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorActivity.kt`: Added Relay URL configuration to `PairingWizard` and `Monitor Setup & Info` dialog.
-- `app-sensor/build.gradle.kts`: Bumped `versionName` to `Nov4.27` (code 24).
-- `app-monitor/build.gradle.kts`: Bumped `versionName` to `Nov4.27` (code 22).
-- `chat_session.md`: Updated forensic chat session state for Nov4.27.
+- `app-monitor/build.gradle.kts`: Version name bumped to `Nov4.28`.
+- `app-sensor/build.gradle.kts`: Version name bumped to `Nov4.28`.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MapModels.kt`: Map state, actions, models, and enums.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MapOverlayManager.kt`: osmdroid overlay manager, pooling, and async circle caching.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MapController.kt`: Imperative osmdroid controller and follow logic.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MapComponents.kt`: `OsmMap`, `MapToolsOverlay`, `AnchorLockedBadge`.
+- `chat_session.md`: Updated forensic chat session state for Nov4.28.
 
 ## 🚀 Resumption & Next Steps
-- Baseline synchronization and completion sequence for `Nov4.27`.
+- Baseline synchronization and completion sequence for `Nov4.28`.
