@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,8 +31,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jd.core.ui.HudState
+import com.jd.core.ui.HudStatusBar
 import com.jd.core.ui.RevolutionTheme
-import com.jd.core.ui.StatusGreen
 import com.jd.core.ui.StatusRed
 import com.jd.core.shared.SystemLogger
 import com.jd.core.shared.ForensicIdentity
@@ -44,6 +46,7 @@ import javax.inject.Inject
 /**
  * AdminActivity: The "Admin Console" for the Sensor.
  * Hardened for Revol37.3: Restored mandatory Settings Gear (R797) and Factory Defaults (R-ID 615).
+ * Updated Nov4.22-addHUD: Added HUD status bar integration.
  */
 @AndroidEntryPoint
 class AdminActivity : ComponentActivity() {
@@ -51,11 +54,14 @@ class AdminActivity : ComponentActivity() {
     @Inject
     lateinit var identityManager: ForensicIdentityManager
 
+    private val viewModel: SensorViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             RevolutionTheme {
                 val trackerId by identityManager.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
+                val hudState by viewModel.hudState.collectAsStateWithLifecycle()
                 val logs by SystemLogger.logs.collectAsStateWithLifecycle()
                 val scope = rememberCoroutineScope()
                 
@@ -101,6 +107,7 @@ class AdminActivity : ComponentActivity() {
                                 )
                             } else {
                                 SensorAdminConsole(
+                                    hudState = hudState,
                                     trackerId = trackerId,
                                     logs = logs,
                                     onSettingsClick = { showSettings = true },
@@ -168,9 +175,9 @@ fun PermissionGuard(content: @Composable () -> Unit) {
 fun getAppVersionName(context: android.content.Context): String {
     return try {
         val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        pInfo.versionName ?: "Nov3.21_PLATINUM"
+        pInfo.versionName ?: "Nov4.22-addHUD"
     } catch (e: Exception) {
-        "Nov3.21_PLATINUM"
+        "Nov4.22-addHUD"
     }
 }
 
@@ -232,7 +239,8 @@ fun SettingsOverlay(onClose: () -> Unit, onLoadDefaults: () -> Unit, onSetCustom
 
 @Composable
 fun SensorAdminConsole(
-    trackerId: String, 
+    hudState: HudState,
+    trackerId: String,
     logs: List<SystemLogger.LogEntry>, 
     onSettingsClick: () -> Unit,
     onIgnoreBatteryOptimization: () -> Unit
@@ -240,58 +248,62 @@ fun SensorAdminConsole(
     val context = LocalContext.current
     val listState = rememberLazyListState()
 
-    Column(modifier = Modifier.padding(16.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "SENSOR ADMIN",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            IconButton(onClick = onSettingsClick) {
-                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.Gray)
-            }
-        }
+    Column {
+        HudStatusBar(hudState = hudState)
         
-        Text(text = "ID: ${trackerId.take(12)}...", fontSize = 12.sp, color = Color.Gray)
-        Text(text = "Version: ${getAppVersionName(context)}", fontSize = 12.sp, color = Color.Gray)
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Button(onClick = onIgnoreBatteryOptimization, modifier = Modifier.fillMaxWidth()) {
-            Text("WHITELIST BATTERY")
-        }
-
-        Button(
-            onClick = {
-                val intent = Intent(context, SensorService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
-                    context.startService(intent)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "SENSOR ADMIN",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onSettingsClick) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.Gray)
                 }
-            },
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-        ) {
-            Text("START SENSOR SERVICE")
-        }
+            }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(text = "LIVE EVENT LOG", style = MaterialTheme.typography.labelLarge)
-        
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.05f))
-        ) {
-            LazyColumn(state = listState) {
-                items(logs) { entry ->
-                    Text(
-                        text = entry.toString(),
-                        fontSize = 10.sp,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                    )
+            Text(text = "ID: ${trackerId.take(12)}...", fontSize = 12.sp, color = Color.Gray)
+            Text(text = "Version: ${getAppVersionName(context)}", fontSize = 12.sp, color = Color.Gray)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(onClick = onIgnoreBatteryOptimization, modifier = Modifier.fillMaxWidth()) {
+                Text("WHITELIST BATTERY")
+            }
+
+            Button(
+                onClick = {
+                    val intent = Intent(context, SensorService::class.java)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(intent)
+                    } else {
+                        context.startService(intent)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            ) {
+                Text("START SENSOR SERVICE")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(text = "LIVE EVENT LOG", style = MaterialTheme.typography.labelLarge)
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.05f))
+            ) {
+                LazyColumn(state = listState) {
+                    items(logs) { entry ->
+                        Text(
+                            text = entry.toString(),
+                            fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
                 }
             }
         }

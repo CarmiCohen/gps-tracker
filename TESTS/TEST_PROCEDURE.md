@@ -350,6 +350,16 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **104.1 Partition Tolerance Sequence Deduplication:** Verify that `SignalingQueue` correctly deduplicates incoming sequence IDs and tags partitioned/buffered updates with `isBuffered = true` during network disconnection and flapping.
 *   **104.2 Edge Telemetry Buffering & Batch Polling:** Verify robust backpressure handling, batch polling, and re-queueing of pending telemetry batches upon reconnection without data loss or duplication.
 
+## Chapter 105 - Cloud Relay Server Revival & Default OnRender Relay URL Configuration (Nov4.21)
+*   **105.1 Cloud Relay Server Health & Persistence:** Verify that `relay-server/index.js` responds successfully to HTTP health checks (`200 OK`) and maintains persistent device state caching via `device_cache.json`.
+*   **105.2 Default OnRender Relay URL Fallback:** Verify that `MonitorSessionService` defaults to `https://gps-relay-server.onrender.com` when no custom relay URL is configured in DataStore, enabling seamless out-of-the-box cross-network communication between physical devices (`A15` and `S21FE`).
+
+## Chapter 106 - HUD Integration & Status LED Verification (Nov4.22-addHUD)
+*   **106.1 Relay Server Connection LED (SRV):** Verify that the SRV status badge displays active green when connected to the signaling relay server (`SignalingClient.isConnected = true`) and inactive red when disconnected, across both Monitor and Sensor applications.
+*   **106.2 Local GPS Fix LED (GPS):** Verify that the GPS status badge displays active green when local device location fix is active and fresh (<35s) and inactive red when stale or unavailable, on both devices.
+*   **106.3 Peer Activity & Device Link LED (TRK / VWR):** Verify that the Monitor app displays active green TRK badge when target telemetry is received within 35s, and the Sensor app displays active green VWR badge when signaling link to viewer is active.
+*   **106.4 Data Integrity & Watchdog LEDs (DAT / WDG):** Verify that the DAT badge displays active green when INT, SRV, and Peer links are all active, and WDG badge reflects active background service health.
+
 ---
-**Total Testing Chapters: 104**
+**Total Testing Chapters: 106**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

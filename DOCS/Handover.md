@@ -1,45 +1,51 @@
 ```
 git add .
-git commit -m "REVOLUTION PHASE Nov4.21 - DEFAULT ONRENDER CLOUD RELAY URL CONFIGURATION
+git commit -m "REVOLUTION PHASE Nov4.22-addHUD - POST-REVOLUTION HUD INTEGRATION & LED STATUS VERIFICATION
 
-- DEFAULT RELAY URL: Configured MonitorSessionService default relay URL fallback to https://gps-relay-server.onrender.com for out-of-the-box OnRender cloud connectivity.
-- VERSIONING: Established Nov4.21 baseline across app-sensor and app-monitor.
-- STABILIZATION: Verified full project build and test suites."
-git tag Nov4.21
+- HUD UI: Implemented HudState and HudStatusBar in :core-ui adhering to R960 and HUD LED specifications.
+- APP MONITOR & SENSOR: Wired MonitorViewModel, MonitorScreen, SensorViewModel, and SensorAdminConsole for live SRV, GPS, TRK/VWR, INT, DAT, and WDG status reporting.
+- TESTING: Added Chapter 106 to TESTS/TEST_PROCEDURE.md and HudStateTest unit tests.
+- STABILIZATION: Established Nov4.22-addHUD baseline with full build verification."
+git tag Nov4.22-addHUD
 git push origin main --tags
 ```
 
-# Project Handover - REVOLUTION PHASE (Nov4.21 - DEFAULT ONRENDER CLOUD RELAY URL CONFIGURATION)
+# Project Handover - REVOLUTION PHASE (Nov4.22-addHUD - POST-REVOLUTION HUD INTEGRATION & LED STATUS VERIFICATION)
 
-## 🟢 Status: STABILIZED & VERIFIED (Nov4.21)
+## 🟢 Status: STABILIZED & VERIFIED (Nov4.22-addHUD)
 
-Version Nov4.21 has successfully configured the default fallback Relay URL in `MonitorSessionService` to point to `https://gps-relay-server.onrender.com`, enabling out-of-the-box cross-network telemetry synchronization for physical devices (A15 and S21FE) without manual configuration.
+Version Nov4.22-addHUD has successfully implemented and integrated the post-revolution HUD status bar across both `:app-monitor` and `:app-sensor` applications. It provides real-time status reporting for SRV relay connection LEDs, local GPS fixes, peer link connection (TRK/VWR), internet access (INT), data integrity (DAT), and service watchdog (WDG).
 
-**Resumption Token**: REVOLUTION-STABILIZED-NOV4.21
+**Resumption Token**: REVOLUTION-STABILIZED-NOV4.22-ADDHUD
 
 ---
 
-## 🎯 Next Resumption Focus: Default OnRender Cloud Relay URL Configuration - COMPLETED (GAP-REVOL51.0-G1)
+## 🎯 Next Resumption Focus: Post-Revolution HUD Integration & LED Status Verification - COMPLETED (GAP-REVOL52.0-G1)
 
-The focus has successfully updated the default signaling client connection URL to the OnRender cloud relay instance.
+The focus has successfully added the HUD status bar to both apps, adapted it to the post-revolution modular UI/UX, and verified SRV LEDs, GPS, and device-to-device connection.
 
-### 🛡️ Implementation Status (Nov4.21)
-- **OnRender Default URL**: ✅ **VERIFIED** (`MonitorSessionService` default fallback set to `https://gps-relay-server.onrender.com`).
+### 🛡️ Implementation Status (Nov4.22-addHUD)
+- **HUD Composable & State**: ✅ **VERIFIED** (`HudState` and `HudStatusBar` in `:core-ui`).
+- **Monitor & Sensor Integration**: ✅ **VERIFIED** (`MonitorViewModel`, `MonitorScreen`, `SensorViewModel`, `SensorAdminConsole`).
+- **Testing & Test Procedure**: ✅ **VERIFIED** (`HudStateTest` & Chapter 106 in `TESTS/TEST_PROCEDURE.md`).
 - **Project Build**: ✅ **PASSED** (Full project build and verification).
-- **Forensic Silence**: ✅ **VERIFIED**. Zero Davey events > 500ms and zero StackLog leaks.
 
 ---
 
 ## 📂 Key Implementation Files
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorSessionService.kt`: Default Relay URL fallback updated to OnRender cloud endpoint.
-- `DOCS/issues.md`: Documented Nov4.21 gap resolution and dashboard.
-- `STATUS/SOT_MASTER_REQUIREMENTS.md`: Added rule 1.333 and verification chapter 5.43.
-- `STATUS/RESOLUTION_ARCHIVE.md`: Added resolution archive for Nov4.21.
+- `core-ui/src/main/kotlin/com/jd/core/ui/HudState.kt`: Master HUD state data model.
+- `core-ui/src/main/kotlin/com/jd/core/ui/HudStatusBar.kt`: Standardized status bar composable with upper row LEDs and telemetry metrics.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorViewModel.kt`: Exposed live `hudState` flow combining signaling connection, internet, GPS, and telemetry.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorActivity.kt`: Integrated `HudStatusBar` into `MonitorScreen`.
+- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorViewModel.kt`: Exposed live `hudState` flow for Sensor console.
+- `app-sensor/src/main/kotlin/com/jd/app/sensor/AdminActivity.kt`: Integrated `HudStatusBar` into `SensorAdminConsole`.
+- `TESTS/TEST_PROCEDURE.md`: Added Chapter 106 for HUD Status Bar & LED verification.
 
 ---
 
-## ✅ Verified Milestones (Nov4.21)
-1. **Default OnRender Relay URL**: Out-of-the-box cloud relay connection configuration.
-2. **Release Integrity**: Version tagged and prepared for baseline synchronization.
+## ✅ Verified Milestones (Nov4.22-addHUD)
+1. **Unified HUD Components**: Reusable composable in `:core-ui`.
+2. **SRV, GPS & Peer Connection LEDs**: Checked and verified across both Monitor and Sensor apps.
+3. **Release Integrity**: Version tagged and prepared for baseline synchronization.
 
-**Handover complete. System state locked at Nov4.21-STABLE.**
+**Handover complete. System state locked at Nov4.22-addHUD-STABLE.**

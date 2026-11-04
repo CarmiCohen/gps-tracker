@@ -26,6 +26,7 @@ import com.jd.core.network.SignalingClient
 import com.jd.core.shared.*
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
@@ -43,6 +44,8 @@ class SensorService : Service(), SensorEventListener {
 
     @Inject lateinit var orchestrator: TickOrchestrator
     @Inject lateinit var signalingClient: SignalingClient
+    @Inject lateinit var identityManager: com.jd.core.network.ForensicIdentityManager
+    @Inject lateinit var sensorDataStore: SensorDataStore
     private lateinit var forensicBuffer: ForensicBuffer
     private lateinit var sensorManager: SensorManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -127,8 +130,22 @@ class SensorService : Service(), SensorEventListener {
         setupBackfillListener()
         registerSensors()
         startLocationUpdates()
+        connectSignaling()
         
         isInitialized = true
+    }
+
+    private fun connectSignaling() {
+        serviceScope.launch {
+            val selfId = identityManager.selfId.first()
+            val url = sensorDataStore.relayUrl.first() ?: "https://gps-relay-server.onrender.com"
+            SystemLogger.i("SensorService", "Connecting to relay $url as $selfId")
+            signalingClient.connect(
+                url = url,
+                deviceId = selfId,
+                secret = selfId
+            )
+        }
     }
 
     private fun registerBatteryReceiver() {

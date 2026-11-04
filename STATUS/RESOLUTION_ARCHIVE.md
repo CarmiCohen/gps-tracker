@@ -1,7 +1,13 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov4.22-addHUD)
+- **Post-Revolution HUD Integration & LED Status Verification (GAP-REVOL52.0-G1)**: Implemented `HudState` and `HudStatusBar` in `:core-ui` adhering to requirement R960 and HUD LED specifications. Wired `MonitorViewModel` and `MonitorScreen` in `:app-monitor` and `SensorViewModel` and `SensorAdminConsole` in `:app-sensor` to monitor SRV relay connection status, local GPS fix, peer connection link (TRK/VWR), internet access, data integrity (DAT), and service watchdog (WDG). Added Chapter 106 to `TESTS/TEST_PROCEDURE.md` and unit tests in `HudStateTest`. **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.22-addHUD` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.21)
-- **Default OnRender Cloud Relay URL Configuration (GAP-REVOL51.0-G1)**: Configured default fallback Relay URL in `MonitorSessionService` to point to `https://gps-relay-server.onrender.com` for out-of-the-box OnRender cloud connectivity and remote cross-network device testing (A15 and S21FE). **PASSED.**
+- **Default OnRender Cloud Relay URL & Test Procedure Synchronization (GAP-REVOL51.0-G1)**: Configured default fallback Relay URL in `MonitorSessionService` to point to `https://gps-relay-server.onrender.com` for out-of-the-box OnRender cloud connectivity and remote cross-network device testing (A15 and S21FE). Added Chapter 105 to `TESTS/TEST_PROCEDURE.md` covering cloud relay server health checks, persistent caching, and default OnRender URL fallback. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.21` established as the new forensic stabilization baseline.
 
 ---
@@ -19,7 +25,7 @@
 ---
 
 ## ✅ Resolved Issues (Nov4.2)
-- **Multi-Device Telemetry Sync & Expansion (GAP-REVOL47.0-G1)**: Verified and expanded multi-device telemetry synchronization, range-based backfill deduplication in `MonitorRepository`, connection resiliency in `SignalingClient`, and automatic foreground session lifecycle management in `MonitorSessionService` and `MonitorActivity`. Executed and verified all unit tests (`core-shared`, `core-network`) and instrumented test suites (`app-sensor`, `app-monitor`) with 100% pass rate. **PASSED.**
+- **Multi-Device Telemetry Sync & Expansion (GAP-REVOL47.0-G1)**: Verified and expanded multi-device telemetry synchronization, range-based backfill deduplication in `MonitorRepository`, connection resiliency in `SignalingClient`, and automated foreground session lifecycle management in `MonitorSessionService` and `MonitorActivity`. Executed and verified all unit tests (`core-shared`, `core-network`) and instrumented test suites (`app-sensor`, `app-monitor`) with 100% pass rate. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.2` established as the new forensic stabilization baseline.
 
 ---

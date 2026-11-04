@@ -1,15 +1,17 @@
-# SOT Master Requirements & Hardening Status (Nov4.21)
+# SOT Master Requirements & Hardening Status (Nov4.22-addHUD)
 
-## 🏗️ Architectural Master Rules (408 Rules)
+## 🏗️ Architectural Master Rules (409 Rules)
 
 ### 1. Lifecycle & Resource Management
-*   ... (Rules 1.1 to 1.332 preserved)
+*   ... (Rules 1.1 to 1.333 preserved)
 *   **1.330 Multi-Device Telemetry Sync & Expansion (R-ID 101)**: The system MUST support multi-device telemetry synchronization with range-based backfill deduplication in `MonitorRepository`, connection recovery in `SignalingClient`, and automated foreground service lifecycle management in `MonitorSessionService` under simulated network partitions (GAP-REVOL47.0-G1).
 *   **1.331 Advanced Relay Partition Tolerance & Telemetry Edge Synchronization (R-ID 102)**: The system MUST enforce partition tolerance sequence deduplication and automatic `isBuffered = true` state flagging in `SignalingQueue` to prevent telemetry duplication and ensure zero data loss during network disruptions and flapping (GAP-REVOL49.0-G1).
 *   **1.332 Cloud Relay Server Revival & Relay URL Configuration (R-ID 103)**: The system MUST support cloud-hosted Relay server instances (Node.js Socket.io) and configurable Relay URLs in application DataStore and `MonitorSessionService` to enable remote cross-network device testing (GAP-REVOL50.0-G1).
 *   **1.333 Default OnRender Cloud Relay URL Configuration (R-ID 104)**: The system MUST configure the default fallback Relay URL in `MonitorSessionService` to `https://gps-relay-server.onrender.com` for out-of-the-box cloud connectivity and device testing (GAP-REVOL51.0-G1).
+*   **1.334 Post-Revolution HUD Integration & LED Status Verification (R-ID 105)**: The system MUST provide standardized HUD status bars (`HudStatusBar`) and reactive state flows (`HudState`) across both Monitor and Sensor applications to monitor SRV relay connection status, local GPS fixes, peer connection links (TRK/VWR), internet connectivity, data integrity (DAT), and service watchdog (WDG) in alignment with Requirement R960 (GAP-REVOL52.0-G1).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov4.22-addHUD**: Post-Revolution HUD Integration & LED Status Verification (GAP-REVOL52.0-G1) - PASSED.
 - **Nov4.21**: Default OnRender Cloud Relay URL Configuration (GAP-REVOL51.0-G1) - PASSED.
 - **Nov4.20-withServer**: Cloud Relay Server Revival & Relay URL Configuration (GAP-REVOL50.0-G1) - PASSED.
 - **Nov4.3**: Advanced Relay Partition Tolerance & Telemetry Edge Synchronization (GAP-REVOL49.0-G1) - PASSED.
@@ -20,6 +22,7 @@
 - **Nov3.20**: Flexible Device ID Entry & UI/Test Adaptation (GAP-REVOL45.0-G1) - PASSED.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.44 (Nov4.22-addHUD Validation Audit)**: PASSED - Verification of `HudState` and `HudStatusBar` integration across Monitor and Sensor applications, checking SRV relay connection status LEDs, local GPS fix LEDs, peer connection link LEDs (TRK/VWR), internet status, data integrity (DAT), and service watchdog (WDG).
 *   **Chapter 5.43 (Nov4.21 Validation Audit)**: PASSED - Verification of default fallback Relay URL set to `https://gps-relay-server.onrender.com` in `MonitorSessionService` for out-of-the-box cloud connectivity.
 *   **Chapter 5.42 (Nov4.20-withServer Validation Audit)**: PASSED - Verification of cloud-hosted Relay server revival (Node.js Socket.io) and configurable application Relay URLs for cross-network device testing.
 *   **Chapter 5.41 (Nov4.3 Validation Audit)**: PASSED - Verification of advanced relay partition tolerance, sequence deduplication in `SignalingQueue`, automatic `isBuffered = true` state management, and robust edge telemetry buffering under simulated network flapping.

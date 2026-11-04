@@ -22,8 +22,15 @@ class SensorDataStore(context: Context) {
     )
 
     private val simHashKey = stringPreferencesKey("sim_iccid_hash")
+    private val relayUrlKey = stringPreferencesKey("relay_url")
+
+    val relayUrl: Flow<String?> = dataStore.data.map { it[relayUrlKey] }
 
     suspend fun saveSimHash(hash: String) {
         dataStore.edit { it[simHashKey] = hash }
+    }
+
+    suspend fun saveRelayUrl(url: String) {
+        dataStore.edit { it[relayUrlKey] = url }
     }
 }

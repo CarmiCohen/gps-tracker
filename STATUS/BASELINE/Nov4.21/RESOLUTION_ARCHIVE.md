@@ -1,7 +1,7 @@
 # Resolution Archive
 
 ## ✅ Resolved Issues (Nov4.21)
-- **Default OnRender Cloud Relay URL Configuration (GAP-REVOL51.0-G1)**: Configured default fallback Relay URL in `MonitorSessionService` to point to `https://gps-relay-server.onrender.com` for out-of-the-box OnRender cloud connectivity and remote cross-network device testing (A15 and S21FE). **PASSED.**
+- **Default OnRender Cloud Relay URL & Test Procedure Synchronization (GAP-REVOL51.0-G1)**: Configured default fallback Relay URL in `MonitorSessionService` to point to `https://gps-relay-server.onrender.com` for out-of-the-box OnRender cloud connectivity and remote cross-network device testing (A15 and S21FE). Added Chapter 105 to `TESTS/TEST_PROCEDURE.md` covering cloud relay server health checks, persistent caching, and default OnRender URL fallback. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.21` established as the new forensic stabilization baseline.
 
 ---

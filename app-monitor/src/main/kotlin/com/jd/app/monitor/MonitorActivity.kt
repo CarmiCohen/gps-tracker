@@ -16,6 +16,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jd.core.ui.HudState
+import com.jd.core.ui.HudStatusBar
 import com.jd.core.ui.RevolutionTheme
 import com.jd.core.shared.ForensicIdentity
 import dagger.hilt.android.AndroidEntryPoint
@@ -29,6 +31,7 @@ import org.osmdroid.views.overlay.Marker
 /**
  * MonitorActivity: The primary UI for the Monitor (Watcher).
  * Hardened for Revol31.0: Integrated osmdroid for trail visualization and jitter audit foundation.
+ * Updated Nov4.22-addHUD: Added HUD status bar integration.
  */
 @AndroidEntryPoint
 class MonitorActivity : ComponentActivity() {
@@ -46,6 +49,7 @@ class MonitorActivity : ComponentActivity() {
                 val trackerId by viewModel.targetId.collectAsStateWithLifecycle(initialValue = null)
                 val monitorId by viewModel.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
                 val trail by viewModel.trail.collectAsStateWithLifecycle()
+                val hudState by viewModel.hudState.collectAsStateWithLifecycle()
                 val context = LocalContext.current
 
                 LaunchedEffect(trackerId) {
@@ -65,6 +69,7 @@ class MonitorActivity : ComponentActivity() {
                     PairingWizard(onPair = { id -> viewModel.setTargetId(id) })
                 } else {
                     MonitorScreen(
+                        hudState = hudState,
                         trackerId = trackerId!!,
                         monitorId = monitorId,
                         trail = trail,
@@ -124,15 +129,16 @@ fun PairingWizard(onPair: (String) -> Unit) {
 fun getAppVersionName(context: android.content.Context): String {
     return try {
         val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        pInfo.versionName ?: "Nov4.0_PLATINUM"
+        pInfo.versionName ?: "Nov4.22-addHUD"
     } catch (_: Exception) {
-        "Nov4.0_PLATINUM"
+        "Nov4.22-addHUD"
     }
 }
 
 @Composable
 fun MonitorScreen(
-    trackerId: String, 
+    hudState: HudState,
+    trackerId: String,
     monitorId: String, 
     trail: List<TrailEntity>,
     onReset: () -> Unit
@@ -177,19 +183,16 @@ fun MonitorScreen(
 
     Scaffold(
         topBar = {
-            Box(
+            Column(
                 modifier = Modifier
-                    .padding(16.dp)
+                    .fillMaxWidth()
                     .pointerInput(Unit) {
                         detectTapGestures(
                             onLongPress = { onReset() }
                         )
                     }
             ) {
-                Column {
-                    Text(text = "Tracking: ${trackerId.take(8)}...", style = MaterialTheme.typography.headlineMedium)
-                    Text(text = "My ID: ${monitorId.take(8)}... | Version: ${getAppVersionName(LocalContext.current)}", style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.Gray)
-                }
+                HudStatusBar(hudState = hudState)
             }
         }
     ) { padding ->
