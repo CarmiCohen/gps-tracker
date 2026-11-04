@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.33)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.34)
 
-## 🎯 Next Resumption Focus: Nov4.33 Baseline Synchronization - COMPLETED
+## 🎯 Next Resumption Focus: Nov4.34 Baseline Synchronization - COMPLETED
 
 ---
 
@@ -18,6 +18,11 @@
 
 ---
 
+## 🟢 Resolved Gaps (Nov4.34)
+*   **Upper Menu Line Expansion (GAP-REVOL64.0-G1)**: Added direct one-tap quick navigation buttons for Map (`Place`), Events (`Menu`), Graphs (`Star`), and Info (`Info`) alongside Setup, Settings, and Tools in the upper menu line of both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications. **PASSED.**
+
+---
+
 ## 🟢 Resolved Gaps (Nov4.33)
 *   **Revived Sound & Setup Options Integration (GAP-REVOL63.0-G1)**: Revived and integrated `CleanSetupOverlay` and `PhoneSetupOverlay` in `:core-ui`, wiring them into configuration settings across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications. **PASSED.**
 
@@ -28,11 +33,6 @@
 
 ---
 
-## 🟢 Resolved Gaps (Nov4.31)
-*   **Device-Specific Setup & Hardware Hardening Revival (GAP-REVOL61.0-G1)**: Revived `DeviceProfileManager`, `DeviceHardeningStrategy`, `HardwareCapabilities`, and `PerformanceTier` in `:app-sensor`. **PASSED.**
-
----
-
 ## 🚀 Strategic Simplification Ideas
 *   **SIMP-REVOL39.0-S1**: Integrated Kinetic State Observer. Consolidate acceleration, velocity, and thermal status evaluation into a single unified observer in `core-shared`.
 *   **SIMP-REVOL38.3-S1**: Dynamic Buffer Auto-tuner. Consolidate bitrate detection and buffer resizing into an adaptive native manager.
@@ -40,6 +40,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov4.34: [SOT Count: 921 (Rules: 421), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Upper Menu Line Expansion), QA: 921]**
 - **Nov4.33: [SOT Count: 920 (Rules: 420), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Revived Sound & Setup Options Integration), QA: 920]**
 - **Nov4.32: [SOT Count: 919 (Rules: 419), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (System Tools & Diagnostics Menu Integration), QA: 919]**
 - **Nov4.31: [SOT Count: 918 (Rules: 418), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Device-Specific Setup & Hardware Hardening Revival), QA: 918]**

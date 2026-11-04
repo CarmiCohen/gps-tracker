@@ -400,8 +400,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **112.2 Phone Setup & Capabilities Guide Overlay:** Verify that users can open `PhoneSetupOverlay` to inspect device manufacturer/model profiling, guided permission check steps (Location, Battery Optimization, Overlay permission, Exact Alarms, Notifications, Home Points), and launch app info, battery settings, permission dialogs, diagnostics, and remote alarm test.
 *   **112.3 Sound & Alert Setup Integration:** Verify full integration and accessibility of `AlarmSoundOverlay` and `AlertManagementOverlay` from configuration menus in both Sensor and Monitor applications.
 
+## Chapter 113 - Upper Menu Line Expansion Audit (Nov4.34)
+*   **113.1 Expanded Quick Navigation Icons:** Verify that the upper menu line across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications includes direct one-tap navigation buttons for Setup (`Build`), Settings (`Settings`), Tools (`Refresh`), Map (`Place`), Events (`Menu`), Graphs (`Star`), and Info (`Info`).
+*   **113.2 Action Dispatch:** Verify that tapping each upper menu action correctly dispatches the intended navigation event, opens the corresponding overlay/dialog, or logs telemetry feedback.
+
 ---
-**Total Testing Chapters: 112**
+**Total Testing Chapters: 113**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
 
 

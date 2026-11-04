@@ -21,10 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -464,15 +461,27 @@ fun SensorAdminConsole(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(20.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(16.dp))
                     }
-                    IconButton(onClick = onSettingsClick, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(20.dp))
+                    IconButton(onClick = onSettingsClick, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(16.dp))
                     }
-                    IconButton(onClick = { showToolsOverlay = true }, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Tools", tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
+                    IconButton(onClick = { showToolsOverlay = true }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Tools", tint = Color(0xFFF59E0B), modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = { SystemLogger.i("UI", "Map view requested from upper menu.") }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Place, contentDescription = "Map", tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = { SystemLogger.i("UI", "Events log requested from upper menu.") }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Menu, contentDescription = "Events", tint = Color(0xFFF43F5E), modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = { SystemLogger.i("UI", "Graphs analytics requested from upper menu.") }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Star, contentDescription = "Graphs", tint = Color(0xFF8B5CF6), modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(16.dp))
                     }
                 }
                 Text(
