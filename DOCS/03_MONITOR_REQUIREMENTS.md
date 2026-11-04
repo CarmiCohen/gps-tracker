@@ -23,9 +23,15 @@ The Monitor is a user-centric application designed for visualization, alert mana
     - **Follow Mode**: Automatically centers map on Sensor telemetry updates.
     - **Map Settings Wheel**: Toggle button (`MapSettingsToggle`) for map control overlay.
     - **Map Tools**: Dedicated **Zoom In ("+")**, **Zoom Out ("-")**, **Center Tracker ("TRACKER")**, **Center Viewer ("VIEWER")**, **Out-of-Range Toggle ("OUT")**, **Jump Alert Toggle ("JUMP")**, **Import ("LOAD")**, **Export ("SAVE")**, **Add Home Point ("ADD")**, **Delete Home Point ("DEL")**, **Geofence Toggle ("FENCE")**, and **Clear Trails ("CLEAR")**.
-- **Standardized HUD Status Bar**:
-    - Compact 2-row monospaced status bar (`HudStatusBar`) with 8.sp/9.sp status badges (`:core-ui`).
+- **Standardized HUD Status Bar & Dual Lines**:
+    - Compact 2-line monospaced status bars (`HudStatusBar`) reflecting dual data sources:
+      - **Line 1 (Local Device)**: Reflects local device data (`SELF`), with local GPS status LED in **Cyan (`#06B6D4`)**.
+      - **Line 2 (Sensor / Tracker)**: Reflects remote sensor data (`TRK`), with sensor GPS status LED in **Green (`#10B981`)** when connected.
     - Hardened LED evaluation logic (`isRelayConnected = isInternet || isConnected`) for accurate SRV, GPS, TRK/VWR, DAT, and WDG indicators.
+- **Dual Centering Map Buttons & Auto-Centering Logic**:
+    - **`SENSOR` Button**: Centers map on the remote Tracker/Sensor location (Green icon).
+    - **`LOCAL` Button**: Centers map on the local Monitor device location (Cyan icon).
+    - **Connection-Aware Centering**: When disconnected, local line reflects local GPS status and map auto-centers around the monitor. When connected, each GPS LED represents the relevant device, and the map auto-centers around the known device (prioritizing the Sensor if both are known, unless overridden by user via `SENSOR` or `LOCAL` buttons).
 - **Status Dashboard**: Sensor health metrics (Battery %, Temp, Signal).
 - **Local Connection Awareness**: Monitor distinguishes between Relay failure and local device internet loss.
 

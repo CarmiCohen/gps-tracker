@@ -42,9 +42,12 @@ This document provides the definitive specification of all map capabilities, ren
 ---
 
 ## 5. Camera Navigation & Centering
-- **Center on Tracker (`TRACKER` / `CENTER`)**: Camera action (`CameraAction.CenterTracker`) that immediately zooms and re-centers the map view on the Sensor's latest location.
-- **Center on Viewer (`VIEWER`)**: Camera action (`CameraAction.CenterViewer`) that re-centers the map view on the user's local Monitor location.
-- **Map Lock / Follow Mode**: Automatically follows the Tracker, Viewer, or Auto-fits both when enabled. Manually dragging/panning the map automatically unlocks follow mode (`SetMapLocked(false)`).
+- **Center on Sensor (`SENSOR`)**: Dedicated map button (Green icon) that immediately zooms and re-centers the map view on the remote Sensor's latest location.
+- **Center on Local Device (`LOCAL`)**: Dedicated map button (Cyan icon) that re-centers the map view on the user's local Monitor location (`DEFAULT_LAT, DEFAULT_LNG`).
+- **Connection-Aware Auto-Centering**: 
+  - When there is **no connection** between devices, the map automatically centers around the monitor (local device).
+  - When connected, the map automatically centers around the device whose GPS location is known (prioritizing the Sensor if both are known), unless overridden by the user via `SENSOR` or `LOCAL` buttons.
+- **Map Lock / Follow Mode**: Automatically follows the Sensor, Local device, or Auto-fits both when enabled. Manually dragging/panning the map automatically unlocks follow mode (`SetMapLocked(false)`).
 - **Zoom Controls (`IN` / `OUT`)**: Dedicated **Zoom In ("+")** and **Zoom Out ("-")** buttons for fast, single-tap zoom adjustments.
 
 ---

@@ -56,7 +56,8 @@ class MonitorActivity : ComponentActivity() {
                 val monitorId by viewModel.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
                 val relayUrl by viewModel.relayUrl.collectAsStateWithLifecycle()
                 val trail by viewModel.trail.collectAsStateWithLifecycle()
-                val hudState by viewModel.hudState.collectAsStateWithLifecycle()
+                val localHudState by viewModel.localHudState.collectAsStateWithLifecycle()
+                val remoteHudState by viewModel.remoteHudState.collectAsStateWithLifecycle()
                 val context = LocalContext.current
 
                 LaunchedEffect(trackerId) {
@@ -80,7 +81,8 @@ class MonitorActivity : ComponentActivity() {
                     )
                 } else {
                     MonitorScreen(
-                        hudState = hudState,
+                        localHudState = localHudState,
+                        remoteHudState = remoteHudState,
                         trackerId = trackerId!!,
                         monitorId = monitorId,
                         relayUrl = relayUrl,
@@ -198,7 +200,8 @@ fun getAppVersionName(context: android.content.Context): String {
 
 @Composable
 fun MonitorScreen(
-    hudState: HudState,
+    localHudState: HudState,
+    remoteHudState: HudState,
     trackerId: String,
     monitorId: String, 
     relayUrl: String,
@@ -211,17 +214,19 @@ fun MonitorScreen(
     var showSetupDialog by remember { mutableStateOf(false) }
     var isEditingRelayUrl by remember { mutableStateOf(false) }
     var relayUrlInput by remember { mutableStateOf(relayUrl) }
+    var followMode by remember { mutableStateOf("AUTO") } // "TRACKER", "VIEWER", "AUTO"
 
     val mapView = remember {
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             controller.setZoom(18.0)
+            controller.setCenter(GeoPoint(DEFAULT_LAT, DEFAULT_LNG))
         }
     }
 
-    // Update trail on map and center on monitor/tracker location
-    LaunchedEffect(trail) {
+    // Automatic Centering & Connection Logic
+    LaunchedEffect(remoteHudState.isPeerActive, trail, followMode) {
         mapView.overlays.clear()
         if (trail.isNotEmpty()) {
             val points = trail.map { GeoPoint(it.lat, it.lng) }
@@ -239,9 +244,35 @@ fun MonitorScreen(
                 title = "Tracker Location"
             }
             mapView.overlays.add(marker)
-            
-            // Centralize map on monitor / tracker location
-            mapView.controller.setCenter(GeoPoint(latest.lat, latest.lng))
+        }
+
+        if (!remoteHudState.isPeerActive || trail.isEmpty()) {
+            // No connection between devices -> automatically center around monitor (local device)
+            mapView.controller.setCenter(GeoPoint(DEFAULT_LAT, DEFAULT_LNG))
+        } else {
+            // Connection exists
+            if (followMode == "TRACKER") {
+                if (trail.isNotEmpty()) {
+                    val latest = trail.first()
+                    if (latest.lat != 0.0 || latest.lng != 0.0) {
+                        mapView.controller.setCenter(GeoPoint(latest.lat, latest.lng))
+                    }
+                }
+            } else if (followMode == "VIEWER") {
+                mapView.controller.setCenter(GeoPoint(DEFAULT_LAT, DEFAULT_LNG))
+            } else {
+                // AUTO: both known or sensor known -> around sensor
+                if (trail.isNotEmpty()) {
+                    val latest = trail.first()
+                    if (latest.lat != 0.0 || latest.lng != 0.0) {
+                        mapView.controller.setCenter(GeoPoint(latest.lat, latest.lng))
+                    } else {
+                        mapView.controller.setCenter(GeoPoint(DEFAULT_LAT, DEFAULT_LNG))
+                    }
+                } else {
+                    mapView.controller.setCenter(GeoPoint(DEFAULT_LAT, DEFAULT_LNG))
+                }
+            }
         }
         mapView.invalidate()
     }
@@ -280,8 +311,10 @@ fun MonitorScreen(
                         }
                     }
                 }
-                // HUD Status Bar
-                HudStatusBar(hudState = hudState)
+                // Line 1: Local Device Status
+                HudStatusBar(hudState = localHudState)
+                // Line 2: Sensor / Tracker Status
+                HudStatusBar(hudState = remoteHudState)
             }
         }
     ) { padding ->
@@ -311,7 +344,7 @@ fun MonitorScreen(
                 )
             }
 
-            // Map Control Buttons (Similar to viewer function)
+            // Map Control Buttons (Two Centering Buttons: SENSOR and LOCAL)
             if (isMapButtonsVisible) {
                 Box(
                     modifier = Modifier
@@ -324,11 +357,18 @@ fun MonitorScreen(
                     ) {
                         MapToolButton(label = "IN", symbol = "+", onClick = { mapView.controller.zoomIn() }, iconColor = Color(0xFF800080))
                         MapToolButton(label = "OUT", symbol = "-", onClick = { mapView.controller.zoomOut() }, iconColor = Color(0xFF800080))
-                        MapToolButton(icon = Icons.Default.Place, label = "CENTER", onClick = {
+                        MapToolButton(icon = Icons.Default.Place, label = "SENSOR", onClick = {
+                            followMode = "TRACKER"
                             if (trail.isNotEmpty()) {
                                 val latest = trail.first()
-                                mapView.controller.setCenter(GeoPoint(latest.lat, latest.lng))
+                                if (latest.lat != 0.0 || latest.lng != 0.0) {
+                                    mapView.controller.setCenter(GeoPoint(latest.lat, latest.lng))
+                                }
                             }
+                        }, iconColor = Color(0xFF10B981))
+                        MapToolButton(icon = Icons.Default.Person, label = "LOCAL", onClick = {
+                            followMode = "VIEWER"
+                            mapView.controller.setCenter(GeoPoint(DEFAULT_LAT, DEFAULT_LNG))
                         }, iconColor = Color(0xFF06B6D4))
                     }
                 }

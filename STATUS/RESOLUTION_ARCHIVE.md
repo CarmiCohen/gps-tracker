@@ -1,5 +1,11 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov4.30)
+- **Monitor Dual HUD Status Lines, GPS Colors & Connection-Aware Centering (GAP-REVOL59.0-G1)**: Implemented dual HUD status lines on the Monitor app (Line 1: Local Device with Cyan GPS LED `#06B6D4`; Line 2: Sensor / Tracker with Green GPS LED `#10B981`), dual centering map buttons (`SENSOR` and `LOCAL`), and connection-aware auto-centering logic (auto-centering around local device when disconnected, and around known device / sensor when connected). Updated test procedures and all documentation. **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.30` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.29)
 - **Nov4.29 Stabilization & Test Suite Execution (GAP-REVOL58.0-G1)**: Executed and verified comprehensive automated unit test suites (`testDebugUnitTest` and `test` 100% passing across `:core-network`, `:core-shared`, `:core-ui`, `:app-monitor`, `:app-sensor`), updated version name consistency (`Nov4.29`) across `:app-monitor` and `:app-sensor`, and verified forensic stabilization and reciprocal virtual presence simulation readiness. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.29` established as the new forensic stabilization baseline.
@@ -51,9 +57,3 @@
 ## ✅ Resolved Issues (Nov4.20-withServer)
 - **Cloud Relay Server Revival & Relay URL Configuration (GAP-REVOL50.0-G1)**: Revived Node.js Socket.io signaling relay server in `relay-server/index.js` with persistent disk caching and health check endpoints. Configured application DataStore and `MonitorSessionService` to support cloud-hosted Relay URLs (OnRender / custom endpoints) for seamless cross-network device testing (A15 and S21FE) without local workstation dependency. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.20-withServer` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov4.3)
-- **Advanced Relay Partition Tolerance & Telemetry Edge Synchronization (GAP-REVOL49.0-G1)**: Implemented partition-tolerance sequence deduplication and automatic `isBuffered = true` state flagging in `SignalingQueue` to prevent telemetry duplication and ensure zero data loss during network disruptions and flapping. Executed and verified all unit tests (`:core-network`) with 100% pass rate. **PASSED.**
-- **Baseline Synchronization**: Version `Nov4.3` established as the new forensic stabilization baseline.

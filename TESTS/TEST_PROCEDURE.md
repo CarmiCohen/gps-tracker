@@ -29,6 +29,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 4 - Viewer Mode & Remote Sync
 *   **4.2 Remote HUD Sync:** Verify Alarm manifest ONLY appears on Viewer.
 *   **4.3 State Sync:** Confirm Tracker and Viewer HUD transition between states simultaneously.
+*   **4.4 Dual HUD Status Lines Audit:** Verify the Monitor displays two distinct status lines: Line 1 (Local Device) with a local GPS LED in **Cyan (`#06B6D4`)**, and Line 2 (Sensor / Tracker) with a sensor GPS LED in **Green (`#10B981`)** when connected.
+*   **4.5 Dual Centering Buttons Audit:** Verify map controls feature two distinct centering buttons: **`SENSOR`** (Green icon) and **`LOCAL`** (Cyan icon).
+*   **4.6 Connection-Aware Auto-Centering Audit:** 
+    *   *Disconnected State:* Confirm that when devices are not connected, the local line reflects local GPS status and the map automatically centers around the monitor device.
+    *   *Connected State:* Confirm that when connected, each GPS LED reflects its device correctly and the map auto-centers around the known device (Sensor if both known).
+    *   *User Override:* Confirm that tapping `SENSOR` or `LOCAL` buttons immediately centers the camera on the respective device and locks/follows that target.
 
 ## Chapter 5 - GNSS & Persistence Gap (Physical)
 *   **5.1 GNSS Zombie:** Shield in metal box (60s). Verify `SIGNAL LOSS` and recovery.

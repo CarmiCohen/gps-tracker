@@ -48,8 +48,14 @@ Once the service has been started (either manually by tapping the button or auto
 
 ---
 
-## 5. What Happens on Device Reboot? (`BootReceiver`)
+## 6. Monitor Dual HUD Status Lines & Centering Logic
 
-If the phone is completely restarted (rebooted):
-* The project includes a dedicated `BootReceiver` listening for `Intent.ACTION_BOOT_COMPLETED`.
-* Upon device reboot, `BootReceiver` intercepts the system broadcast, verifies that required runtime permissions (Location, Notifications) are already granted, and automatically starts `SensorService` in the foreground immediately—without requiring the user to unlock the phone, open the app, or tap "START SENSOR SERVICE".
+* **Dual Status Lines**: The Monitor app displays two distinct HUD status lines:
+  * **Line 1 (Local Device)**: Reflects local device data (`SELF`), showing its local GPS status LED in **Cyan (`#06B6D4`)**.
+  * **Line 2 (Sensor / Tracker)**: Reflects remote sensor data (`TRK`), showing its sensor GPS status LED in **Green (`#10B981`)** when connected.
+* **Dual Centering Buttons (`SENSOR` & `LOCAL`)**:
+  * **`SENSOR` Button**: Centers the map on the remote Sensor's location (Green icon).
+  * **`LOCAL` Button**: Centers the map on the local Monitor device location (Cyan icon).
+* **Connection-Aware Auto-Centering**:
+  * **Disconnected**: When there is no connection between devices, the local line reflects local GPS status, and the map automatically centers around the monitor device.
+  * **Connected**: When connected, each GPS LED is colored appropriately (Cyan local, Green sensor), and the map automatically centers around the device whose GPS location is known (prioritizing the Sensor if both are known), unless overridden by the user via `SENSOR` or `LOCAL` buttons.

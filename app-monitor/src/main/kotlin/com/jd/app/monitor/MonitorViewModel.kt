@@ -1,7 +1,6 @@
 package com.jd.app.monitor
 
 import android.content.Context
-import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import androidx.lifecycle.ViewModel
@@ -65,7 +64,33 @@ class MonitorViewModel @Inject constructor(
         }
     }
 
-    val hudState: StateFlow<HudState> = combine(
+    val localHudState: StateFlow<HudState> = combine(
+        selfId,
+        _ticker
+    ) { self, _ ->
+        val isInternet = isNetworkAvailable(context)
+        val isLocalGps = isLocationProviderEnabled(context)
+        HudState(
+            appMode = "monitor", // Cyan local GPS LED
+            selfId = self,
+            targetId = "LOCAL",
+            isInternet = isInternet,
+            isRelayConnected = isInternet,
+            isLocalGpsActive = isLocalGps,
+            isPeerActive = false,
+            isDataHealthy = isInternet,
+            watchdogOk = true,
+            trackerState = "STATIONARY",
+            speedKmh = 0f,
+            batteryLevel = 100,
+            isCharging = false,
+            tempCelsius = 30f,
+            accuracyMeters = 5.0f,
+            telemetryAgeSec = 0L
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "monitor"))
+
+    val remoteHudState: StateFlow<HudState> = combine(
         selfId,
         targetId.filterNotNull(),
         signalingClient.isConnected,
@@ -74,18 +99,19 @@ class MonitorViewModel @Inject constructor(
     ) { self, target, isConnected, latest, now ->
         val lastTs = latest?.timestamp ?: 0L
         val ageSec = if (lastTs > 0) (now - lastTs) / 1000 else -1L
-        val isPeerFresh = lastTs > 0 && (now - lastTs) < 35000L
+        val hasValidCoords = latest != null && (latest.lat != 0.0 || latest.lng != 0.0)
+        val isPeerFresh = lastTs > 0 && (now - lastTs) < 35000L && hasValidCoords
         val isInternet = isNetworkAvailable(context)
-        val isGpsActive = isLocationProviderEnabled(context) || latest != null
+        val isGpsActive = isPeerFresh
         val isRelayConnected = isInternet || isConnected
         val isDataHealthy = isInternet && isPeerFresh
         val speedKmh = (latest?.speed ?: 0f) * 3.6f
         val trackerState = if (speedKmh > 1.5f) "MOVING" else "STATIONARY"
 
         HudState(
-            appMode = "monitor",
-            selfId = self,
-            targetId = target,
+            appMode = "sensor", // Green remote sensor GPS LED
+            selfId = target,
+            targetId = self,
             isInternet = isInternet,
             isRelayConnected = isRelayConnected,
             isLocalGpsActive = isGpsActive,
@@ -101,7 +127,9 @@ class MonitorViewModel @Inject constructor(
             telemetryAgeSec = ageSec,
             sequenceId = latest?.sequenceId ?: 0L
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "monitor"))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "sensor"))
+
+    val hudState: StateFlow<HudState> = remoteHudState
 
     fun setTargetId(id: String) {
         viewModelScope.launch {
@@ -128,9 +156,9 @@ class MonitorViewModel @Inject constructor(
 
     private fun isLocationProviderEnabled(ctx: Context): Boolean {
         return try {
-            val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-            lm?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true ||
-                    lm?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true
+            val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            lm?.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) == true ||
+                    lm?.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) == true
         } catch (_: Exception) {
             false
         }
