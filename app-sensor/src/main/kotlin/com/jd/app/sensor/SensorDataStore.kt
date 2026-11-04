@@ -7,6 +7,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.io.File
 
+import com.jd.core.shared.AlertSettings
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
 /**
  * SensorDataStore: Hardened for Direct Boot (Point 77).
  * Refactored Revol30.1: Identity management moved to ForensicIdentityManager.
@@ -23,8 +27,23 @@ class SensorDataStore(context: Context) {
 
     private val simHashKey = stringPreferencesKey("sim_iccid_hash")
     private val relayUrlKey = stringPreferencesKey("relay_url")
+    private val alertSettingsKey = stringPreferencesKey("alert_settings_json")
+    private val sirenTypeKey = stringPreferencesKey("siren_type")
 
     val relayUrl: Flow<String?> = dataStore.data.map { it[relayUrlKey] }
+
+    val alertSettings: Flow<AlertSettings> = dataStore.data.map { prefs ->
+        val jsonStr = prefs[alertSettingsKey]
+        if (!jsonStr.isNullOrBlank()) {
+            runCatching { Json.decodeFromString<AlertSettings>(jsonStr) }.getOrDefault(AlertSettings())
+        } else {
+            AlertSettings()
+        }
+    }
+
+    val sirenType: Flow<String> = dataStore.data.map { prefs ->
+        prefs[sirenTypeKey] ?: "Siren"
+    }
 
     suspend fun saveSimHash(hash: String) {
         dataStore.edit { it[simHashKey] = hash }
@@ -33,4 +52,17 @@ class SensorDataStore(context: Context) {
     suspend fun saveRelayUrl(url: String) {
         dataStore.edit { it[relayUrlKey] = url }
     }
+
+    suspend fun saveAlertSettings(settings: AlertSettings) {
+        dataStore.edit { prefs ->
+            prefs[alertSettingsKey] = Json.encodeToString(settings)
+        }
+    }
+
+    suspend fun saveSirenType(type: String) {
+        dataStore.edit { prefs ->
+            prefs[sirenTypeKey] = type
+        }
+    }
 }
+

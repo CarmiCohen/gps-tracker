@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
+import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.ui.HudState
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,11 +31,44 @@ class MonitorViewModel @Inject constructor(
         .map { it.takeIf { url -> !url.isNullOrBlank() } ?: "https://gps-relay-server.onrender.com" }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "https://gps-relay-server.onrender.com")
 
+    val alertSettings: StateFlow<AlertSettings> = dataStore.alertSettings
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AlertSettings())
+
+    val sirenType: StateFlow<String> = dataStore.sirenType
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Siren")
+
+    private val _isSirenPlaying = MutableStateFlow(false)
+    val isSirenPlaying: StateFlow<Boolean> = _isSirenPlaying.asStateFlow()
+
+    fun updateAlertSettings(settings: AlertSettings) {
+        viewModelScope.launch {
+            dataStore.saveAlertSettings(settings)
+        }
+    }
+
+    fun updateSirenType(type: String) {
+        viewModelScope.launch {
+            dataStore.saveSirenType(type)
+        }
+    }
+
+    fun updateAlarmVolume(volume: Float) {
+        viewModelScope.launch {
+            val current = alertSettings.value
+            dataStore.saveAlertSettings(current.copy(alarmVolume = volume, useCustomVolume = true))
+        }
+    }
+
+    fun testSirenAudio() {
+        _isSirenPlaying.value = !_isSirenPlaying.value
+    }
+
     fun updateRelayUrl(url: String) {
         viewModelScope.launch {
             dataStore.saveRelayUrl(url.trim())
         }
     }
+
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val trail: StateFlow<List<TrailEntity>> = identityManager.targetId

@@ -28,6 +28,7 @@ import com.jd.core.ui.HudState
 import com.jd.core.ui.HudStatusBar
 import com.jd.core.ui.RevolutionTheme
 import com.jd.core.shared.ForensicIdentity
+import com.jd.core.shared.AlertSettings
 import dagger.hilt.android.AndroidEntryPoint
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -60,6 +61,10 @@ class MonitorActivity : ComponentActivity() {
                 val remoteHudState by viewModel.remoteHudState.collectAsStateWithLifecycle()
                 val context = LocalContext.current
 
+                val alertSettings by viewModel.alertSettings.collectAsStateWithLifecycle()
+                val sirenType by viewModel.sirenType.collectAsStateWithLifecycle()
+                val isSirenPlaying by viewModel.isSirenPlaying.collectAsStateWithLifecycle()
+
                 LaunchedEffect(trackerId) {
                     val serviceIntent = Intent(context, MonitorSessionService::class.java)
                     if (trackerId != null) {
@@ -87,6 +92,13 @@ class MonitorActivity : ComponentActivity() {
                         monitorId = monitorId,
                         relayUrl = relayUrl,
                         trail = trail,
+                        alertSettings = alertSettings,
+                        sirenType = sirenType,
+                        isSirenPlaying = isSirenPlaying,
+                        onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
+                        onUpdateSirenType = { viewModel.updateSirenType(it) },
+                        onUpdateAlarmVolume = { viewModel.updateAlarmVolume(it) },
+                        onTestSiren = { viewModel.testSirenAudio() },
                         onReset = { 
                             viewModel.clearTargetId()
                             context.stopService(Intent(context, MonitorSessionService::class.java))
@@ -206,15 +218,49 @@ fun MonitorScreen(
     monitorId: String, 
     relayUrl: String,
     trail: List<TrailEntity>,
+    alertSettings: AlertSettings,
+    sirenType: String,
+    isSirenPlaying: Boolean,
+    onUpdateAlertSettings: (AlertSettings) -> Unit,
+    onUpdateSirenType: (String) -> Unit,
+    onUpdateAlarmVolume: (Float) -> Unit,
+    onTestSiren: () -> Unit,
     onReset: () -> Unit,
     onUpdateRelayUrl: (String) -> Unit
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by remember { mutableStateOf(true) }
     var showSetupDialog by remember { mutableStateOf(false) }
+    var showAlertsOverlay by remember { mutableStateOf(false) }
+    var showSoundOverlay by remember { mutableStateOf(false) }
     var isEditingRelayUrl by remember { mutableStateOf(false) }
     var relayUrlInput by remember { mutableStateOf(relayUrl) }
     var followMode by remember { mutableStateOf("AUTO") } // "TRACKER", "VIEWER", "AUTO"
+
+    if (showAlertsOverlay) {
+        com.jd.core.ui.AlertManagementOverlay(
+            isTracker = false,
+            draftAlertSettings = alertSettings,
+            onUpdateAlertSettings = onUpdateAlertSettings,
+            onClose = { showAlertsOverlay = false }
+        )
+        return
+    }
+
+    if (showSoundOverlay) {
+        com.jd.core.ui.AlarmSoundOverlay(
+            isTracker = false,
+            draftAlertSettings = alertSettings,
+            selectedSirenType = sirenType,
+            isSirenPlaying = isSirenPlaying,
+            onUpdateAlertSettings = onUpdateAlertSettings,
+            onUpdateSirenType = onUpdateSirenType,
+            onUpdateAlarmVolume = onUpdateAlarmVolume,
+            onTestSiren = onTestSiren,
+            onClose = { showSoundOverlay = false }
+        )
+        return
+    }
 
     val mapView = remember {
         MapView(context).apply {
@@ -390,6 +436,31 @@ fun MonitorScreen(
                     Text("Relay URL: $relayUrl")
                     Text("App Version: ${getAppVersionName(LocalContext.current)}")
                     Text("Relay Status: Connected / Active")
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                showSetupDialog = false
+                                showAlertsOverlay = true
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("ALERTS SETUP", fontSize = 11.sp)
+                        }
+                        Button(
+                            onClick = {
+                                showSetupDialog = false
+                                showSoundOverlay = true
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("SIREN SETUP", fontSize = 11.sp)
+                        }
+                    }
 
                     if (isEditingRelayUrl) {
                         Spacer(modifier = Modifier.height(8.dp))

@@ -2,6 +2,7 @@
     id("com.android.application")
     id("kotlin-android")
     id("kotlin-kapt")
+    id("kotlinx-serialization")
     id("dagger.hilt.android.plugin")
 }
 
@@ -44,6 +45,7 @@ dependencies {
     implementation(project(":core-network"))
     implementation(project(":core-ui"))
     implementation(project(":core-shared"))
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
     
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")

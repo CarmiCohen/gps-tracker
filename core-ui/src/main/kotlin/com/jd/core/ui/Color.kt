@@ -14,6 +14,15 @@ val Pink40 = Color(0xFF7D5260)
 val StatusGreen = Color(0xFF4CAF50)
 val StatusRed = Color(0xFFF44336)
 val StatusYellow = Color(0xFFFFEB3B)
+val StatusOrange = Color(0xFFFF9800)
 val StatusGrey = Color(0xFF9E9E9E)
 val BackgroundDark = Color(0xFF121212)
 val SurfaceDark = Color(0xFF1E1E1E)
+
+// Revolution Brand Palette
+val Slate900 = Color(0xFF0F172A)
+val Slate500 = Color(0xFF64748B)
+val ViewerCyan = Color(0xFF06B6D4)
+val BrandGold = Color(0xFFF59E0B)
+val Rose500 = Color(0xFFF43F5E)
+

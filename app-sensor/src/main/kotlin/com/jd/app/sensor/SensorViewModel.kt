@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
+import com.jd.core.shared.AlertSettings
 import com.jd.core.ui.HudState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -36,6 +37,39 @@ class SensorViewModel @Inject constructor(
     val relayUrl: StateFlow<String> = sensorDataStore.relayUrl
         .map { it.takeIf { url -> !url.isNullOrBlank() } ?: DEFAULT_RELAY_URL }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DEFAULT_RELAY_URL)
+
+    val alertSettings: StateFlow<AlertSettings> = sensorDataStore.alertSettings
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AlertSettings())
+
+    val sirenType: StateFlow<String> = sensorDataStore.sirenType
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Siren")
+
+    private val _isSirenPlaying = MutableStateFlow(false)
+    val isSirenPlaying: StateFlow<Boolean> = _isSirenPlaying.asStateFlow()
+
+    fun updateAlertSettings(settings: AlertSettings) {
+        viewModelScope.launch {
+            sensorDataStore.saveAlertSettings(settings)
+        }
+    }
+
+    fun updateSirenType(type: String) {
+        viewModelScope.launch {
+            sensorDataStore.saveSirenType(type)
+        }
+    }
+
+    fun updateAlarmVolume(volume: Float) {
+        viewModelScope.launch {
+            val current = alertSettings.value
+            sensorDataStore.saveAlertSettings(current.copy(alarmVolume = volume, useCustomVolume = true))
+        }
+    }
+
+    fun testSirenAudio() {
+        _isSirenPlaying.value = !_isSirenPlaying.value
+    }
+
 
     init {
         // Automatically initiate signaling connection when SensorViewModel is initialized

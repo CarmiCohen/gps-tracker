@@ -106,3 +106,37 @@ data class BackfillResponse(
     val updates: List<LocationUpdate>,
     val isComplete: Boolean
 )
+
+/**
+ * Master Alarming & Alert Setup Configuration (R747 Locality Authority & R872 Stealth)
+ */
+@Serializable
+data class AlertSettings(
+    val localInternet: Boolean = true,
+    val serverConnection: Boolean = true,
+    val relayConnection: Boolean = true,
+    val jammerDetection: Boolean = true,
+    val signalLoss: Boolean = true,
+    val gpsStalling: Boolean = true,
+    val distance: Boolean = true,
+    val power: Boolean = true,
+    val lowBattery: Boolean = true,
+    val batteryHealth: Boolean = true,
+    val longTimeGap: Boolean = true,
+    val highTemperature: Boolean = true,
+    val overrideSilence: Boolean = true,
+    val useMaxVolume: Boolean = true,
+    val vibrationEnabled: Boolean = true,
+    val alarmVolume: Float = 0.8f,
+    val useCustomVolume: Boolean = false,
+    val tiltAlert: Boolean = true,
+    val acousticAlert: Boolean = true,
+    val liftAlert: Boolean = true,
+    val tamperAlert: Boolean = true,
+    val globalMute: Boolean = false,
+    val systemStorageLow: Boolean = true,
+    val vibrationSensitivity: Float = 0.5f,
+    val tiltSensitivity: Float = 0.5f,
+    val sirenType: String = "Siren"
+)
+

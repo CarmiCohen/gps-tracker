@@ -376,6 +376,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **108.3 Home Points & Geofence Boundary Circles:** Verify Home Point marker display, tap-to-add (`ADD`), marker-tap-to-remove (`DEL`), async geofence boundary circles (`Polygon.pointsAsCircle`), and fence visibility toggle (`FENCE`).
 *   **108.4 Spatial Violation Markers & Accuracy Buffers:** Verify purple/pink Jump alert markers (`JUMP`), red Out-of-Range geofence breach markers (`OUT`), independent visibility toggles, and uncertainty accuracy circles.
 
+## Chapter 109 - Alarming Setup & Alert Management Audit (Nov4.30)
+*   **109.1 Alert Management Overlay & Bulk Controls:** Verify that users can open `AlertManagementOverlay` from Sensor settings or Monitor setup, toggle master Global Mute, configure individual alert categories (Communication, Geofence/Location, Power/Device Health, Storage Integrity, and Sentinel Motion Sensors such as Tamper, Tilt, Acoustic, and Lift with vibration/tilt sensitivity sliders), and use `ALL ON` / `RESET ALL` bulk actions.
+*   **109.2 Siren Sound & Audio Setup Overlay:** Verify that users can open `AlarmSoundOverlay`, test siren audio output (`TEST SIREN AUDIO` / `STOP`), select siren sound wave types (`Siren`, `Chimes`, `Pulse`), configure audio behaviors (haptic vibration, override Silent/DND, force max volume), and adjust custom app volume mode and volume slider levels.
+*   **109.3 DataStore Persistence:** Verify that `AlertSettings` and siren type selections persist across app restarts and reboots via DataStore.
+
 ---
-**Total Testing Chapters: 108**
+**Total Testing Chapters: 109**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
+

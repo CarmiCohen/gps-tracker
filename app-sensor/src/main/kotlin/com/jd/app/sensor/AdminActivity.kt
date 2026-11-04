@@ -83,6 +83,12 @@ class AdminActivity : ComponentActivity() {
                 ) {
                     var isLocked by remember { mutableStateOf(true) }
                     var showSettings by remember { mutableStateOf(false) }
+                    var showAlertsOverlay by remember { mutableStateOf(false) }
+                    var showSoundOverlay by remember { mutableStateOf(false) }
+
+                    val alertSettings by viewModel.alertSettings.collectAsStateWithLifecycle()
+                    val sirenType by viewModel.sirenType.collectAsStateWithLifecycle()
+                    val isSirenPlaying by viewModel.isSirenPlaying.collectAsStateWithLifecycle()
 
                     if (isLocked) {
                         Box(
@@ -95,9 +101,30 @@ class AdminActivity : ComponentActivity() {
                         }
                     } else {
                         PermissionGuard {
-                            if (showSettings) {
+                            if (showAlertsOverlay) {
+                                com.jd.core.ui.AlertManagementOverlay(
+                                    isTracker = true,
+                                    draftAlertSettings = alertSettings,
+                                    onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
+                                    onClose = { showAlertsOverlay = false }
+                                )
+                            } else if (showSoundOverlay) {
+                                com.jd.core.ui.AlarmSoundOverlay(
+                                    isTracker = true,
+                                    draftAlertSettings = alertSettings,
+                                    selectedSirenType = sirenType,
+                                    isSirenPlaying = isSirenPlaying,
+                                    onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
+                                    onUpdateSirenType = { viewModel.updateSirenType(it) },
+                                    onUpdateAlarmVolume = { viewModel.updateAlarmVolume(it) },
+                                    onTestSiren = { viewModel.testSirenAudio() },
+                                    onClose = { showSoundOverlay = false }
+                                )
+                            } else if (showSettings) {
                                 SettingsOverlay(
                                     currentRelayUrl = relayUrl,
+                                    onOpenAlertsSetup = { showAlertsOverlay = true },
+                                    onOpenSoundSetup = { showSoundOverlay = true },
                                     onClose = { showSettings = false },
                                     onLoadDefaults = { 
                                         scope.launch {
@@ -193,6 +220,8 @@ fun getAppVersionName(context: android.content.Context): String {
 @Composable
 fun SettingsOverlay(
     currentRelayUrl: String,
+    onOpenAlertsSetup: () -> Unit,
+    onOpenSoundSetup: () -> Unit,
     onClose: () -> Unit,
     onLoadDefaults: () -> Unit,
     onSetCustomId: (String) -> Unit,
@@ -214,7 +243,31 @@ fun SettingsOverlay(
             Text("CONFIGURATION", style = MaterialTheme.typography.headlineSmall)
             TextButton(onClick = onClose) { Text("CLOSE (X)") }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Alarming & Audio Setup", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onOpenAlertsSetup,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("ALERTS SETUP")
+            }
+            Button(
+                onClick = onOpenSoundSetup,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("SIREN SETUP")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+        HorizontalDivider()
+        Spacer(modifier = Modifier.height(20.dp))
 
         Text("Relay Server URL Setup", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
