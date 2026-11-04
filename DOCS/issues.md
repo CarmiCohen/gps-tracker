@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.20-withServer)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.21)
 
-## 🎯 Next Resumption Focus: Cloud Relay Server Revival & Relay URL Configuration (GAP-REVOL50.0-G1)
+## 🎯 Next Resumption Focus: Default OnRender Cloud Relay URL Configuration (GAP-REVOL51.0-G1) - COMPLETED
 
 ---
 
@@ -30,18 +30,18 @@
 
 ---
 
-## 🔴 Open Gaps (Nov4.20-withServer)
-*   **Cloud Relay Server Revival & Relay URL Configuration (GAP-REVOL50.0-G1)**: Revive cloud relay server deployment (OnRender / Node.js Socket.io) and configure application Relay URL to enable seamless cross-network device testing (A15 and S21FE) without local workstation dependency. **IN PROGRESS.**
+## 🔴 Open Gaps (Nov4.21)
+*   *None. All gaps resolved in Nov4.21 baseline.*
 
 ---
 
-## 🟢 Resolved Gaps (Nov4.3)
-*   **Advanced Relay Partition Tolerance & Telemetry Edge Synchronization (GAP-REVOL49.0-G1)**: Implemented partition-tolerance sequence deduplication and automatic `isBuffered = true` state flagging in `SignalingQueue` to prevent telemetry duplication and ensure zero data loss during network disruptions and flapping. Executed and verified all unit tests (`:core-network`) with 100% pass rate. **PASSED.**
+## 🟢 Resolved Gaps (Nov4.21)
+*   **Default OnRender Cloud Relay URL Configuration (GAP-REVOL51.0-G1)**: Configured default fallback Relay URL in `MonitorSessionService` to point to `https://gps-relay-server.onrender.com` for out-of-the-box OnRender cloud connectivity and remote cross-network device testing (A15 and S21FE). **PASSED.**
 
 ---
 
-## 🟢 Resolved Gaps (Nov4.2)
-*   **Multi-Device Telemetry Sync & Expansion (GAP-REVOL47.0-G1)**: Verified and expanded multi-device telemetry synchronization, range-based backfill deduplication in `MonitorRepository`, connection resiliency in `SignalingClient`, and automatic foreground service lifecycle management in `MonitorSessionService` and `MonitorActivity`. Executed and verified all unit tests (`core-shared`, `core-network`) and instrumented test suites (`app-sensor`, `app-monitor`) with 100% pass rate. **PASSED.**
+## 🟢 Resolved Gaps (Nov4.20-withServer)
+*   **Cloud Relay Server Revival & Relay URL Configuration (GAP-REVOL50.0-G1)**: Revived Node.js Socket.io signaling relay server in `relay-server/index.js` with persistent disk caching and health check endpoints. Configured application DataStore and `MonitorSessionService` to support cloud-hosted Relay URLs for seamless cross-network device testing. **PASSED.**
 
 ---
 
@@ -53,8 +53,8 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Nov4.20-withServer: [SOT Count: 907 (Rules: 407), Open: H:1, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: IN PROGRESS (Cloud Relay & URL Configuration), QA: 907]**
+- **Nov4.21: [SOT Count: 908 (Rules: 408), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Default OnRender Cloud Relay URL Configuration), QA: 908]**
+- **Nov4.20-withServer: [SOT Count: 907 (Rules: 407), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Cloud Relay Server Revival & Relay URL Configuration), QA: 907]**
 - **Nov4.3: [SOT Count: 906 (Rules: 406), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Advanced Relay Partition Tolerance & Telemetry Edge Synchronization), QA: 906]**
 - **Nov4.2: [SOT Count: 905 (Rules: 405), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Multi-Device Telemetry Sync & Expansion), QA: 905]**
 - **Nov4.0: [SOT Count: 904 (Rules: 404), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Default Tracker ID "T" & Monitor ID "V"), QA: 904]**
-- **Nov3.22: [SOT Count: 903 (Rules: 403), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Telemetry Session Activation & Parameter Configuration), QA: 903]**

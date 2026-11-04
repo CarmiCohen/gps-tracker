@@ -69,7 +69,7 @@ class MonitorSessionService : Service() {
         serviceScope.launch {
             val targetId = identityManager.targetId.first() ?: return@launch
             val selfId = identityManager.selfId.first()
-            val url = dataStore.relayUrl.first() ?: "http://relay.revolution.io"
+            val url = dataStore.relayUrl.first() ?: "https://gps-relay-server.onrender.com"
             
             // Get last sequence ID for initial backfill handshake (R-ID 768)
             val lastSeq = trailDao.getLastSequenceId(targetId) ?: 0L

@@ -1,48 +1,45 @@
 ```
 git add .
-git commit -m "REVOLUTION PHASE Nov4.20-withServer - CLOUD RELAY SERVER REVIVAL & URL CONFIGURATION SETUP
+git commit -m "REVOLUTION PHASE Nov4.21 - DEFAULT ONRENDER CLOUD RELAY URL CONFIGURATION
 
-- RELAY SERVER: Revived Node.js Socket.io signaling relay server with persistent cache and health check.
-- APP CONFIGURATION: Configured Relay URL support for cloud/OnRender deployment and local/remote testing across physical devices (A15 & S21FE).
-- STABILIZATION: Established Nov4.20-withServer baseline."
-git tag Nov4.20-withServer
+- DEFAULT RELAY URL: Configured MonitorSessionService default relay URL fallback to https://gps-relay-server.onrender.com for out-of-the-box OnRender cloud connectivity.
+- VERSIONING: Established Nov4.21 baseline across app-sensor and app-monitor.
+- STABILIZATION: Verified full project build and test suites."
+git tag Nov4.21
 git push origin main --tags
 ```
 
-# Project Handover - REVOLUTION PHASE (Nov4.20-withServer - CLOUD RELAY SERVER REVIVAL & URL CONFIGURATION SETUP)
+# Project Handover - REVOLUTION PHASE (Nov4.21 - DEFAULT ONRENDER CLOUD RELAY URL CONFIGURATION)
 
-## 🟢 Status: STABILIZED & VERIFIED (Nov4.20-withServer)
+## 🟢 Status: STABILIZED & VERIFIED (Nov4.21)
 
-Version Nov4.20-withServer has successfully revived the cloud-hosted relay server solution (OnRender / Node.js Socket.io signaling server) and configured application Relay URL support for seamless cross-network device testing (A15 and S21FE).
+Version Nov4.21 has successfully configured the default fallback Relay URL in `MonitorSessionService` to point to `https://gps-relay-server.onrender.com`, enabling out-of-the-box cross-network telemetry synchronization for physical devices (A15 and S21FE) without manual configuration.
 
-**Resumption Token**: REVOLUTION-STABILIZED-NOV4.20-WITH-SERVER
+**Resumption Token**: REVOLUTION-STABILIZED-NOV4.21
 
 ---
 
-## 🎯 Next Resumption Focus: Cloud Relay Server Revival & Relay URL Configuration - COMPLETED (GAP-REVOL50.0-G1)
+## 🎯 Next Resumption Focus: Default OnRender Cloud Relay URL Configuration - COMPLETED (GAP-REVOL51.0-G1)
 
-The focus has successfully completed cloud relay server deployment preparation and client-side Relay URL wiring.
+The focus has successfully updated the default signaling client connection URL to the OnRender cloud relay instance.
 
-### 🛡️ Implementation Status (Nov4.20-withServer)
-- **Cloud Relay Server Backend**: ✅ **VERIFIED** (`relay-server/index.js` with persistent cache and health check).
-- **Relay URL Configuration**: ✅ **VERIFIED** (`MonitorSessionService` and DataStore supporting cloud endpoints).
+### 🛡️ Implementation Status (Nov4.21)
+- **OnRender Default URL**: ✅ **VERIFIED** (`MonitorSessionService` default fallback set to `https://gps-relay-server.onrender.com`).
 - **Project Build**: ✅ **PASSED** (Full project build and verification).
 - **Forensic Silence**: ✅ **VERIFIED**. Zero Davey events > 500ms and zero StackLog leaks.
 
 ---
 
 ## 📂 Key Implementation Files
-- `relay-server/index.js`: Node.js Socket.io signaling server.
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorSessionService.kt`: Relay connection URL configuration.
-- `DOCS/issues.md`: Documented Nov4.20-withServer gap resolution and dashboard.
-- `STATUS/SOT_MASTER_REQUIREMENTS.md`: Added rule 1.332 and verification chapter 5.42.
-- `STATUS/RESOLUTION_ARCHIVE.md`: Added resolution archive for Nov4.20-withServer.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorSessionService.kt`: Default Relay URL fallback updated to OnRender cloud endpoint.
+- `DOCS/issues.md`: Documented Nov4.21 gap resolution and dashboard.
+- `STATUS/SOT_MASTER_REQUIREMENTS.md`: Added rule 1.333 and verification chapter 5.43.
+- `STATUS/RESOLUTION_ARCHIVE.md`: Added resolution archive for Nov4.21.
 
 ---
 
-## ✅ Verified Milestones (Nov4.20-withServer)
-1. **Cloud Relay Server Revival**: Node.js Socket.io relay server ready for OnRender cloud deployment.
-2. **App Configuration**: Relay URL wiring for remote cross-network testing.
-3. **Release Integrity**: Version tagged and prepared for baseline synchronization.
+## ✅ Verified Milestones (Nov4.21)
+1. **Default OnRender Relay URL**: Out-of-the-box cloud relay connection configuration.
+2. **Release Integrity**: Version tagged and prepared for baseline synchronization.
 
-**Handover complete. System state locked at Nov4.20-withServer-STABLE.**
+**Handover complete. System state locked at Nov4.21-STABLE.**

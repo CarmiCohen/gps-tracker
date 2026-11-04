@@ -1,5 +1,11 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov4.21)
+- **Default OnRender Cloud Relay URL Configuration (GAP-REVOL51.0-G1)**: Configured default fallback Relay URL in `MonitorSessionService` to point to `https://gps-relay-server.onrender.com` for out-of-the-box OnRender cloud connectivity and remote cross-network device testing (A15 and S21FE). **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.21` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.20-withServer)
 - **Cloud Relay Server Revival & Relay URL Configuration (GAP-REVOL50.0-G1)**: Revived Node.js Socket.io signaling relay server in `relay-server/index.js` with persistent disk caching and health check endpoints. Configured application DataStore and `MonitorSessionService` to support cloud-hosted Relay URLs (OnRender / custom endpoints) for seamless cross-network device testing (A15 and S21FE) without local workstation dependency. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.20-withServer` established as the new forensic stabilization baseline.
