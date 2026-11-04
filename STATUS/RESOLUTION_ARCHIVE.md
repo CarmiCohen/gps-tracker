@@ -1,5 +1,11 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov4.2)
+- **Multi-Device Telemetry Sync & Expansion (GAP-REVOL47.0-G1)**: Verified and expanded multi-device telemetry synchronization, range-based backfill deduplication in `MonitorRepository`, connection resiliency in `SignalingClient`, and automatic foreground session lifecycle management in `MonitorSessionService` and `MonitorActivity`. Executed and verified all unit tests (`core-shared`, `core-network`) and instrumented test suites (`app-sensor`, `app-monitor`) with 100% pass rate. **PASSED.**
+- **Baseline Synchronization**: Version `Nov4.2` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.0)
 - **Default Tracker and Monitor ID Specification (GAP-REVOL48.0-G1)**: Configured default Tracker ID to `"T"` and default Monitor ID to `"V"` in `ForensicIdentity` (`DEFAULT_TRACKER_ID = "T"`, `DEFAULT_MONITOR_ID = "V"`) and `ForensicIdentityManager`. Pre-filled the pairing wizard text field in `MonitorActivity` with default Tracker ID `"T"`. Updated unit tests (`ForensicIdentityTest`) and instrumented tests (`ForensicPersistenceAuditTest`, `IdentityAuditTest`, `IdentityPersistenceTest`). Hardened `MonitorSessionService` channel creation in `onCreate()` for API 34+ foreground service reliability. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.0` established as the new forensic stabilization baseline.
@@ -15,18 +21,3 @@
 ## ✅ Resolved Issues (Nov3.21)
 - **Manual Tracker/Device ID Customization & Version Display (GAP-REVOL46.0-G1)**: Enabled manual selection and configuration of device / tracker ID (any non-blank sequence of characters, including single-character IDs) via `ForensicIdentityManager#setSelfId` and the Settings Overlay in `AdminActivity`. Added application version name display to the first screen of both the Sensor (`AdminActivity`) and Monitor (`MonitorActivity`). **PASSED.**
 - **Baseline Synchronization**: Version `Nov3.21` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov3.20)
-- **Flexible Device ID Entry (GAP-REVOL45.0-G1)**: Enabled entering any sequence of characters, even a single character, for device ID / tracker ID in the pairing wizard and identity validation logic. Updated unit tests (`ForensicIdentityTest`) and instrumented tests (`IdentityAuditTest`) to verify flexible ID acceptance and non-blank validation. **PASSED.**
-- **Baseline Synchronization**: Version `Nov3.20` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov3.14)
-- **Physical Device Instrumented Verification**: Executed and verified instrumented test suites (`connectedDebugAndroidTest`) using A15 (`R58X40GV2AR`) for sensor and S21FW (`R5CRC14PG4F`) for monitor (35/35 on app-sensor, 10/10 on app-monitor). **PASSED.**
-- **Reciprocal Virtual Presence Simulation**: Conducted reciprocal virtual presence testing (simulating viewer device to validate tracker behavior, and simulating tracker device to validate viewer behavior). **PASSED.**
-- **Exhaustive Verification**: 100% pass rate for all Project Unit Tests across all modules (`:core-shared`, `:core-network`, `:core-ui`, `:app-sensor`, `:app-monitor`).
-- **Forensic Stabilization & Versioning**: Updated version name to `Nov4.0_PLATINUM` and synchronized all SOT master requirements, issues tracking, test results, and baseline documentation.
-- **Baseline Synchronization**: Version `Nov3.14` established as the new forensic stabilization baseline.

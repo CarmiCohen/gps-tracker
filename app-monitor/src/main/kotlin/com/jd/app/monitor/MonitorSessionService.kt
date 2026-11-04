@@ -62,7 +62,7 @@ class MonitorSessionService : Service() {
         
         startSignaling()
         
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun startSignaling() {
