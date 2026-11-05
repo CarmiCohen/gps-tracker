@@ -1,4 +1,22 @@
-# Test Results - Nov5.0 (HUD Direction, Real-Position Centering & Telemetry Integrity)
+# Test Results - Nov5.1 (Default Relay Correction & Production Verification)
+
+## Nov5.1 Summary
+Executed Nov 5, 2026 on the final build, with Sensor on A15 and Monitor on S21FE through the production relay `https://gps-survival-relay.onrender.com` (v6.043).
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **Automated suite** | 🟢 **103/103** | `:core-shared` 27, `:core-network` 15, `:core-ui` 5, `:app-monitor` unit 9, `:app-monitor` on A15 12, `:app-sensor` on A15 35. |
+| **119.1 Single default relay** | 🟢 **PASSED** | Automated by `RelayConfigTest`; both apps show the new default. |
+| **119.2 Production relay link** | 🟡 **PARTIAL** | `SRV` green on both phones, and they reconnected about 4s after the relay restart. Recovery from an idle cold start over 20s was not observed (ISSUE-NOV5.1-O9). |
+| **119.3 Production telemetry** | 🟢 **PASSED** | `TRK` and `VWR` active, `B:79%` matching the A15, live `AGE`, sensor marker at the real position. |
+| **118.8 Relay hot switch** | 🟢 **PASSED** | S21FE moved from the old URL to the new one without an app restart; the timeouts stopped. |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | Zero Davey, StackLog, or fatal entries from either app process, and no relay timeouts after the URL change. |
+
+The first Nov5.1 live attempt showed `TRK` and `VWR` red because the deployed relay predated the apps' protocol. Publishing relay v6.043 resolved it. Section 3 below still applies: manual physical chapters were not executed in Nov5.1 either.
+
+---
+
+# Nov5.0 Results (HUD Direction, Real-Position Centering & Telemetry Integrity)
 
 Executed Nov 5, 2026. Sensor on A15 (`R58X40GV2AR`), Monitor on S21FE (`R5CRC14PG4F`), both on system language `he-IL`.
 
@@ -28,7 +46,7 @@ All instrumented tests were pinned to the A15. Unit results cover debug and rele
 | 5 | 🟢 Passed | Final code |
 
 ## 2. Two-Device Live Run (Sensor A15, Monitor S21FE)
-**Constraint:** the production relay was unresponsive (ISSUE-NOV5.0-O1), so this run used the same `relay-server/index.js` on the workstation through `adb reverse`. Real internet relay traffic was not tested. The live run used the build before the final `connect()` change (Run 4 code); that change has automated coverage only.
+**Constraint:** the configured relay did not respond because the apps used the wrong host (ISSUE-NOV5.0-O1, corrected in Nov5.1), so this run used the same `relay-server/index.js` on the workstation through `adb reverse`. Real internet relay traffic was not tested. The live run used the build before the final `connect()` change (Run 4 code); that change has automated coverage only.
 
 | Check | Status | Notes |
 | :--- | :--- | :--- |
@@ -53,4 +71,4 @@ The reciprocal simulation did not run, because the S21FE was connected and the t
 **Chapter 0:** 0.2, 0.4, 0.5, 0.7, 0.8, and 0.9 were not individually verified. Under 0.6, only the `VWR` badge was verified, not geofence sync.
 
 ---
-*Verified on physical devices R58X40GV2AR (A15) and R5CRC14PG4F (S21FE) - Baseline Nov5.0*
+*Verified on physical devices R58X40GV2AR (A15) and R5CRC14PG4F (S21FE) - Baseline Nov5.1*

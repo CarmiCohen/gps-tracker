@@ -6,6 +6,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
+import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.SystemLogger
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
@@ -74,7 +75,7 @@ class MonitorSessionService : Service() {
             val lastSeq = trailDao.getLastSequenceId(targetId) ?: 0L
 
             dataStore.relayUrl.collect { rawUrl ->
-                val url = if (!rawUrl.isNullOrBlank()) rawUrl else "https://gps-relay-server.onrender.com"
+                val url = RelayConfig.resolve(rawUrl)
                 SystemLogger.i("MonitorService", "Connecting to relay $url for target $targetId (Last Seq: $lastSeq)")
                 signalingClient.connect(
                     url = url,

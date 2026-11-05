@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov5.0)
+# SOT Master Requirements & Hardening Status (Nov5.1)
 
-## 🏗️ Architectural Master Rules (428 Rules)
+## 🏗️ Architectural Master Rules (429 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -17,8 +17,10 @@
 *   **1.351 Real-Position Map Centering (R-ID 122)**: The Monitor map MUST center only on real device positions and MUST NOT use a hardcoded location: the local device when disconnected, the sensor when connected, and the locked device after `SENSOR` or `LOCAL` is tapped. With no position it shows the world view, and `(0,0)` rows are never drawn (R-ID 122).
 *   **1.352 Telemetry Payload Integrity (R-ID 123)**: The signaling client MUST own a copy of every update it holds beyond `sendTelemetry`, and the wire format MUST carry position, timestamp, sequence, accuracy, speed, battery, charging, and temperature (R-ID 123).
 *   **1.353 Viewer Presence & Relay Switching (R-ID 124)**: The client MUST consume `viewer_status_relay` to drive the `VWR` LED, and a relay URL change MUST close the old socket and connect to the new relay without an app restart (R-ID 124).
+*   **1.354 Single Default Relay & Deployed Relay Parity (R-ID 125)**: Both applications MUST take the default relay address from `RelayConfig.DEFAULT_URL` (`https://gps-survival-relay.onrender.com`), and relay protocol changes in `relay-server` MUST be committed and deployed before a version that depends on them is verified (R-ID 125).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov5.1**: Single Default Relay & Deployed Relay Parity (GAP-REVOL70.0-G1, G2) - PASSED (automated suite and two-device live run through the production relay; manual physical chapters not executed).
 - **Nov5.0**: HUD Direction, Real-Position Centering, Telemetry Payload Integrity, Viewer Presence & Relay Switching (GAP-REVOL69.0-G1 to G7) - PASSED (automated suite and two-device live run through a local relay; manual physical chapters not executed).
 - **Nov4.44**: Nov4.44 Release Candidate Verification & Reciprocal Virtual Presence Simulation (GAP-REVOL68.0-G1) - PASSED.
 - **Nov4.37**: Decoupled Peer LED Signaling & Strict Relay-Independent Status Rules (GAP-REVOL67.0-G1) - PASSED.
@@ -38,6 +40,7 @@
 - **Nov4.22-addHUD**: Post-Revolution HUD Integration & LED Status Verification (GAP-REVOL52.0-G1) - PASSED.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.62 (Nov5.1 Audit)**: PASSED - 103 automated tests and a two-device live run with Sensor on A15 and Monitor on S21FE through the production relay on the final build: all LEDs active, real battery, live `AGE`, real map position, relay URL hot switch without restart, and zero Davey or StackLog from either app process. Manual physical chapters were not executed (see `TESTS/test_results.md`).
 *   **Chapter 5.61 (Nov5.0 Audit)**: PASSED - 100 automated tests on the final code (unit and on-device on A15) and a two-device live run with Sensor on A15 and Monitor on S21FE through a local relay: all LEDs active, real battery, live `AGE`, real map position, and zero Davey or StackLog from either app process. The production relay was unavailable, and manual physical chapters were not executed (see `TESTS/test_results.md`).
 *   **Chapter 5.60 (Nov4.44 Release Candidate Verification Audit)**: PASSED - Verification of Nov4.44 release candidate: 100% automated test execution passing across all subprojects, reciprocal virtual presence simulation testing, and baseline lock in `STATUS/BASELINE/Nov4.44/`.
 *   **Chapter 5.59 (Nov4.37 Decoupled Peer LED Signaling Audit)**: PASSED - Verification of decoupled peer LED signaling: `SRV` turns GREEN ONLY when connected to Relay Server (otherwise RED); `TRK` on Monitor turns GREEN ONLY when connected to Tracker `T` (otherwise RED); `VWR` on Sensor turns GREEN ONLY when connected to Viewer `V` (otherwise RED). Verified test pass rule (Connection active -> PASSED; Alarm/event present -> PASSED OK; Else -> FAILED).

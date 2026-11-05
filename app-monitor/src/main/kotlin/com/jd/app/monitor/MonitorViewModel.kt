@@ -9,6 +9,7 @@ import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.LocationUpdate
+import com.jd.core.shared.RelayConfig
 import com.jd.core.ui.HudState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,8 +30,8 @@ class MonitorViewModel @Inject constructor(
 ) : ViewModel() {
 
     val relayUrl: StateFlow<String> = dataStore.relayUrl
-        .map { it.takeIf { url -> !url.isNullOrBlank() } ?: "https://gps-relay-server.onrender.com" }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "https://gps-relay-server.onrender.com")
+        .map { RelayConfig.resolve(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RelayConfig.DEFAULT_URL)
 
     val alertSettings: StateFlow<AlertSettings> = dataStore.alertSettings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AlertSettings())

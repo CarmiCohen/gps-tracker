@@ -358,7 +358,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ## Chapter 105 - Cloud Relay Server Revival & Default OnRender Relay URL Configuration (Nov4.21)
 *   **105.1 Cloud Relay Server Health & Persistence:** Verify that `relay-server/index.js` responds successfully to HTTP health checks (`200 OK`) and maintains persistent device state caching via `device_cache.json`.
-*   **105.2 Default OnRender Relay URL Fallback:** Verify that `MonitorSessionService` defaults to `https://gps-relay-server.onrender.com` when no custom relay URL is configured in DataStore, enabling seamless out-of-the-box cross-network communication between physical devices (`A15` and `S21FE`).
+*   **105.2 Default OnRender Relay URL Fallback:** Verify that `MonitorSessionService` defaults to `https://gps-survival-relay.onrender.com` when no custom relay URL is configured in DataStore, enabling seamless out-of-the-box cross-network communication between physical devices (`A15` and `S21FE`).
 
 ## Chapter 106 - HUD Integration & Status LED Verification (Nov4.22-addHUD)
 *   **106.1 Relay Server Connection LED (SRV):** Verify that the SRV status badge displays active green when connected to the signaling relay server (`SignalingClient.isConnected = true`) and inactive red when disconnected, across both Monitor and Sensor applications.
@@ -367,7 +367,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **106.4 Data Integrity & Watchdog LEDs (DAT / WDG):** Verify that the DAT badge displays active green when INT, SRV, and Peer links are all active, and WDG badge reflects active background service health.
 
 ## Chapter 107 - Relay Server URL Setup & Configuration Option (Nov4.27)
-*   **107.1 Sensor Relay URL Configuration:** Verify that users can view and edit the Relay Server URL in `SettingsOverlay` (`AdminActivity.kt` / `:app-sensor`), apply custom URLs, and reset to default (`https://gps-relay-server.onrender.com`), and that `SensorViewModel` and `SensorService` reactively reconnect `SignalingClient` upon changes.
+*   **107.1 Sensor Relay URL Configuration:** Verify that users can view and edit the Relay Server URL in `SettingsOverlay` (`AdminActivity.kt` / `:app-sensor`), apply custom URLs, and reset to default (`https://gps-survival-relay.onrender.com`), and that `SensorViewModel` and `SensorService` reactively reconnect `SignalingClient` upon changes.
 *   **107.2 Monitor Relay URL Configuration:** Verify that Monitor app users can view and configure the Relay Server URL during pairing (`PairingWizard`) and via the Setup & Info dialog (`MonitorScreen`).
 
 ## Chapter 108 - Pre-Revolution Map Functionality & Specifications (Nov4.28)
@@ -438,8 +438,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **118.7 No-Fix Trail Filtering:** Verify that `(0,0)` trail rows are never drawn, so the polyline, marker, and map center use real positions only, while points on the equator or prime meridian are kept. Automated by `MapCenterResolverTest`.
 *   **118.8 Relay URL Hot Switch:** Verify that changing the relay URL while connected closes the old socket and connects to the new relay without an app restart, and that reconnecting to the same relay keeps the existing socket. Automated by `SignalingBatchTest.testRelayUrlChangeReplacesTheSocket`.
 
+## Chapter 119 - Default Relay Address & Production Relay Verification (Nov5.1)
+*   **119.1 Single Default Relay Address:** Verify that both apps take the default relay address from `RelayConfig.DEFAULT_URL` (`https://gps-survival-relay.onrender.com`), keep a saved custom URL, and use the default when the saved URL is missing or blank. Automated by `RelayConfigTest`.
+*   **119.2 Production Relay Link:** With Sensor on A15 and Monitor on S21FE using the default relay, verify that `SRV` turns GREEN on both devices, including recovery after a relay cold start longer than the 20s connection timeout.
+*   **119.3 Production Telemetry:** Verify that the Monitor shows `TRK` GREEN, the Sensor's real battery, and a live `AGE`, and that the Sensor shows `VWR` active.
+
 ---
-**Total Testing Chapters: 118**
+**Total Testing Chapters: 119**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
 
 

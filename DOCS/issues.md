@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov5.0)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov5.1)
 
-## 🎯 Next Resumption Focus: Restore the production relay (ISSUE-NOV5.0-O1), then re-run the two-device test against it
+## 🎯 Next Resumption Focus: Execute the manual physical chapters and stress protocol (ISSUE-NOV5.0-O4)
 
 ---
 
@@ -16,18 +16,24 @@
 - **Impact**: Non-blocking performance warning during Compose state updates on Android runtime.
 - **Status**: Monitored. No crashes or functional failures observed.
 
-### 2. Open Gaps Identified in Nov5.0
-- **ISSUE-NOV5.0-O1 (High) - Production relay unresponsive**: `https://gps-relay-server.onrender.com` timed out over HTTPS (`curl` exit 28 at 45s and 60s) and both phones logged `SocketIOException: timeout` every 25s from about 10:46 to 11:00 on Nov 5, while its edge answered plain HTTP. The cause is outside this repository. Until it is restored, devices on the default URL cannot connect.
+### 2. Open Gaps
 - **ISSUE-NOV5.0-O2 (Medium) - Monitor local HUD line is hardcoded**: `MonitorViewModel.localHudState` always reports battery 100, temperature 30, accuracy 5.0, age 0, speed 0, and STATIONARY instead of real device values.
-- **ISSUE-NOV5.0-O3 (Medium) - Telemetry interval differs from the documented value**: the A15 logged `Interval: 100ms` while charging, whereas Chapter 115.2 documents 10000ms. Confirm whether this is the intended charging acceleration (Chapter 49); it affects relay load and data use.
+- **ISSUE-NOV5.0-O3 (Medium) - Telemetry interval differs from the documented value**: the A15 logged `Interval: 100ms` while charging, whereas Chapter 115.2 documents 10000ms. Confirm whether this is the intended charging acceleration (Chapter 49); it affects relay load and data use. Nov5.1 logged `Interval: 10000ms` in a later run, so the rate does change, but the trigger is not confirmed.
 - **ISSUE-NOV5.0-O4 (Medium) - Test coverage gap**: most physical chapters of `TEST_PROCEDURE.md` and all five manual sections of `TEST_FORENSIC_STRESS_PROTOCOL.md` were not executed in Nov5.0 (see `TESTS/test_results.md`). `ProductionReadinessAuditTest` holds three math checks and does not measure Davey or StackLog. Earlier "100% passing" entries covered unit tests only: the Monitor instrumented suite did not compile from Nov4.37 until Nov5.0, and the zeroed telemetry defect passed every earlier audit.
 - **ISSUE-NOV5.0-O5 (Low) - False relay status text**: the Monitor Setup dialog hardcodes `Relay Status: Connected / Active`, even while `SRV` is red.
 - **ISSUE-NOV5.0-O6 (Low) - Stale version strings**: `SensorService` logs `Version: Nov1.7 (Final)`, and `getAppVersionName` falls back to `Nov4.27` in both apps.
 - **ISSUE-NOV5.0-O7 (Low) - Zero-position rows are still stored and sent**: the sensor sends `(0,0)` until its first fix and the Monitor stores those rows. They are now filtered at display time only.
-- **ISSUE-NOV5.0-O8 (Medium) - Final build not verified live**: the two-device run used the Run 4 code, before the final `connect()` change. The relay URL hot switch (Chapter 118.8) therefore has unit test coverage only. Re-run the two-device test on the final build, including a URL change while connected, once the production relay is restored.
+- **ISSUE-NOV5.1-O9 (Low) - Relay cold start exceeds the app connection timeout**: the relay took 21-22s to answer after idling, longer than the 20s `setTimeout`. Retries are expected to recover, but recovery after a real cold start was not observed; a relay restart recovered in about 4s.
+- **ISSUE-NOV5.1-O10 (Low) - Relay writes its cache synchronously per update**: `saveCache()` runs `writeFileSync` for each item in `location_batch`, which may limit throughput at high telemetry rates. The cache may also be lost on redeploy unless Render uses a persistent disk.
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov5.1)
+*   **Wrong Default Relay & Undeployed Relay Code (ISSUE-NOV5.0-O1, GAP-REVOL70.0-G1)**: **Correction:** Nov5.0 recorded this as an external production outage. It was not. Both apps defaulted to `gps-relay-server.onrender.com`, while the live relay is `gps-survival-relay.onrender.com`. All defaults now come from `RelayConfig`. In addition, `relay-server/index.js` held uncommitted changes that were never deployed (secret rooms, `location_batch`, viewer status, violation relay). Relay v6.043 was pushed as `9a20990` and auto-deployed by Render, and `device_cache.json` is now ignored. **PASSED.**
+*   **Final Build Verified Live (ISSUE-NOV5.0-O8, GAP-REVOL70.0-G2)**: Sensor on A15 and Monitor on S21FE ran Nov5.1 through the production relay with all LEDs active, real battery, live `AGE`, and a real map position. The relay URL hot switch (Chapter 118.8) was verified on hardware without an app restart. **PASSED.**
 
 ---
 
@@ -85,6 +91,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov5.1: [SOT Count: 929 (Rules: 429), Open: H:0, M:3, L:5, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 103), QA: 929]** - Audit Baseline: 103 automated tests passing and a two-device live run through the production relay on the final build; manual physical chapters not executed. **QA caveat**: `QA: 929` follows the convention of matching the SOT count; those items were not individually re-verified.
 - **Nov5.0: [SOT Count: 928 (Rules: 428), Open: H:1, M:4, L:3, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 100), QA: 928]** - Audit Baseline: 100 automated tests passing on the final code; two-device live run through a local relay because the production relay was down; manual physical chapters not executed. **QA caveat**: `QA: 928` follows the convention of matching the SOT count; those 928 items were not individually re-verified in Nov5.0.
 - **Nov4.44: [SOT Count: 924 (Rules: 424), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Release Candidate & Reciprocal Simulation Audit), QA: 924]**
 - **Nov4.37: [SOT Count: 924 (Rules: 424), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Decoupled Peer LED Signaling Audit), QA: 924]**

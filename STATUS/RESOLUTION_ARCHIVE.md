@@ -1,5 +1,12 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov5.1)
+- **Wrong Default Relay & Undeployed Relay Code (ISSUE-NOV5.0-O1, GAP-REVOL70.0-G1)**: Corrected the Nov5.0 outage finding: the apps used the wrong host, and relay fixes had never been deployed. Added `RelayConfig` and deployed relay v6.043 (`9a20990`). **PASSED.**
+- **Final Build Verified Live (ISSUE-NOV5.0-O8, GAP-REVOL70.0-G2)**: Two-device run on the final build through the production relay, including the relay URL hot switch. **PASSED.**
+- **Baseline Synchronization**: Version `Nov5.1` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov5.0)
 - **Compact Left-To-Right HUD (GAP-REVOL69.0-G1)**: `HudStatusBar` `compact` mode and forced left-to-right layout and text direction. **PASSED.**
 - **Real-Position Map Centering (GAP-REVOL69.0-G2)**: Removed the hardcoded San Francisco fallback; added `MonitorLocationSource`, the runtime location permission, and `resolveMapCenter`. **PASSED.**

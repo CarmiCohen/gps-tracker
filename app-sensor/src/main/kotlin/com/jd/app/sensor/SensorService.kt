@@ -138,7 +138,7 @@ class SensorService : Service(), SensorEventListener {
     private fun connectSignaling() {
         serviceScope.launch {
             kotlinx.coroutines.flow.combine(identityManager.selfId, sensorDataStore.relayUrl) { selfId, rawUrl ->
-                val url = if (!rawUrl.isNullOrBlank()) rawUrl else "https://gps-relay-server.onrender.com"
+                val url = RelayConfig.resolve(rawUrl)
                 selfId to url
             }.collect { (selfId, url) ->
                 SystemLogger.i("SensorService", "Connecting to relay $url as $selfId")

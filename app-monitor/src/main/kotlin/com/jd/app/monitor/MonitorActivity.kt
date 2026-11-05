@@ -31,6 +31,7 @@ import com.jd.core.ui.HudStatusBar
 import com.jd.core.ui.RevolutionTheme
 import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.RelayConfig
 import com.jd.core.network.ForensicIdentityManager
 import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
@@ -208,7 +209,7 @@ fun PairingWizard(
                     }
                     OutlinedButton(
                         onClick = {
-                            val defaultUrl = "https://gps-relay-server.onrender.com"
+                            val defaultUrl = RelayConfig.DEFAULT_URL
                             relayUrlInput = defaultUrl
                             onUpdateRelayUrl(defaultUrl)
                         },

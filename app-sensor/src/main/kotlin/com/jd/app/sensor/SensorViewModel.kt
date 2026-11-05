@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.RelayConfig
 import com.jd.core.ui.HudState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -28,15 +29,11 @@ class SensorViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    companion object {
-        const val DEFAULT_RELAY_URL = "https://gps-relay-server.onrender.com"
-    }
-
     val selfId = identityManager.selfId
 
     val relayUrl: StateFlow<String> = sensorDataStore.relayUrl
-        .map { it.takeIf { url -> !url.isNullOrBlank() } ?: DEFAULT_RELAY_URL }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DEFAULT_RELAY_URL)
+        .map { RelayConfig.resolve(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RelayConfig.DEFAULT_URL)
 
     val alertSettings: StateFlow<AlertSettings> = sensorDataStore.alertSettings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AlertSettings())
