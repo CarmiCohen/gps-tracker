@@ -34,8 +34,10 @@ fun HudStatusBar(
 ) {
     // Telemetry is positional, so it must not mirror or bidi-reorder under RTL system languages.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        ProvideTextStyle(if (compact) CompactHudTextStyle else HudTextStyle) {
-            HudStatusBarContent(hudState, modifier, verticalGap = if (compact) 1.dp else 2.dp)
+        CappedFontScale {
+            ProvideTextStyle(if (compact) CompactHudTextStyle else HudTextStyle) {
+                HudStatusBarContent(hudState, modifier, verticalGap = if (compact) 1.dp else 2.dp)
+            }
         }
     }
 }

@@ -1,5 +1,16 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov5.2)
+- **Telemetry Interval Explained (ISSUE-NOV5.0-O3)**: 100ms is the designed charging rate; verified live. **PASSED.**
+- **Runtime Resilience (GAP-REVOL71.0-G1, G2)**: Sequence continuity across crashes and wake lock renewal. **PASSED.**
+- **Display Limits (GAP-REVOL71.0-G3, G5, G6, G8)**: 1000-point cap, 2Hz trail, visible menu actions, font cap, paired-device isolation. **PASSED.**
+- **Relay URL Validation (GAP-REVOL71.0-G4)**: Malformed URLs rejected in both apps. **PASSED.**
+- **Backfill Routing (GAP-REVOL71.0-G7)**: Client fix released; relay v6.044 verified locally, production deployment pending (ISSUE-NOV5.2-O12).
+- **Chapter Triage (ISSUE-NOV5.0-O4, reduced)**: Every chapter classified in `TESTS/CHAPTER_TRIAGE.md`; real audit tool `TESTS/device_audit.cmd` added.
+- **Baseline Synchronization**: Version `Nov5.2` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov5.1)
 - **Wrong Default Relay & Undeployed Relay Code (ISSUE-NOV5.0-O1, GAP-REVOL70.0-G1)**: Corrected the Nov5.0 outage finding: the apps used the wrong host, and relay fixes had never been deployed. Added `RelayConfig` and deployed relay v6.043 (`9a20990`). **PASSED.**
 - **Final Build Verified Live (ISSUE-NOV5.0-O8, GAP-REVOL70.0-G2)**: Two-device run on the final build through the production relay, including the relay URL hot switch. **PASSED.**

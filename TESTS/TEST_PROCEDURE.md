@@ -443,8 +443,19 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **119.2 Production Relay Link:** With Sensor on A15 and Monitor on S21FE using the default relay, verify that `SRV` turns GREEN on both devices, including recovery after a relay cold start longer than the 20s connection timeout.
 *   **119.3 Production Telemetry:** Verify that the Monitor shows `TRK` GREEN, the Sensor's real battery, and a live `AGE`, and that the Sensor shows `VWR` active.
 
+## Chapter 120 - Runtime Resilience & Display Limits (Nov5.2)
+*   **120.1 Sequence Continuity:** Verify that the Sensor continues its sequence numbers after a crash or reboot instead of restarting at 0. Automated by `SequenceContinuityTest`; on hardware, crash the Sensor and compare the sequence before and after.
+*   **120.2 Wake Lock Renewal:** Verify that the Sensor still holds its wake lock after the original 10 minutes, and that telemetry continues during forced Doze.
+*   **120.3 Trail Cap:** Verify that the map receives at most the newest 1000 trail points. Automated by `TrailCapTest`.
+*   **120.4 UI Update Rate:** Verify that a 10Hz telemetry stream updates the Monitor trail at no more than 2Hz. Automated by `UiRateTest`.
+*   **120.5 Relay URL Validation:** Verify that malformed relay URLs cannot be saved in either app, and that a stored malformed URL falls back to the default without a crash. Automated by `RelayConfigTest`.
+*   **120.6 Monitor Menu Visibility:** Verify that all eight Monitor menu actions stay visible with long IDs. Automated by `HudLayoutAuditTest.menuBarKeepsEveryActionVisibleWithLongIds`.
+*   **120.7 Backfill Round Trip:** After a network outage, verify that a Monitor gap request reaches the Sensor through the relay and that a response returns (`Received request`, then `Received backfill chunk`). Payload routing is automated by `SignalingBatchTest.testBackfillResponseIsRoutableAndKeepsItsOwner`.
+*   **120.8 Instrument Font Cap:** With the system font at its largest, verify that HUD speed and map button labels stay visible. Automated by `HudLayoutAuditTest.speedStaysVisibleAtTheLargestSystemFont`.
+*   **120.9 Paired Device Isolation:** After re-pairing the Monitor to a different ID, verify that the sensor HUD line shows no values from the previous device. Automated by `PairedTelemetryTest`.
+
 ---
-**Total Testing Chapters: 119**
+**Total Testing Chapters: 120**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
 
 

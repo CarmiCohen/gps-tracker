@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
  * MonitorDatabase: Stores telemetry for both the local user and the remote tracker.
  * Hardened for Revol30.6: Enforces unique sequenceId to prevent backfill duplicates (R-ID 770).
  */
+const val MAX_TRAIL_POINTS = 1000
+
 @Entity(
     tableName = "trails",
     primaryKeys = ["trackerId", "timestamp"],
@@ -31,7 +33,7 @@ interface TrailDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(trails: List<TrailEntity>)
 
-    @Query("SELECT * FROM trails WHERE trackerId = :id ORDER BY timestamp DESC")
+    @Query("SELECT * FROM trails WHERE trackerId = :id ORDER BY timestamp DESC LIMIT $MAX_TRAIL_POINTS")
     fun getTrail(id: String): Flow<List<TrailEntity>>
 
     @Query("SELECT sequenceId FROM trails WHERE trackerId = :id AND isLocalUser = 0 ORDER BY sequenceId DESC LIMIT 1")

@@ -143,6 +143,9 @@ class ForensicBuffer(
         return readRange(0, Long.MAX_VALUE)
     }
 
+    /** Next sequence number after everything stored, so numbering continues across restarts. */
+    fun nextSequenceId(): Long = (readTraces().maxOfOrNull { it.sequenceId } ?: -1L) + 1
+
     fun readRange(startSeq: Long, endSeq: Long): List<LocationUpdate> {
         if (!verifyFileIntegrity()) return emptyList()
         val buffer = mappedBuffer ?: return emptyList()

@@ -338,13 +338,13 @@ fun SettingsOverlay(
             value = relayUrlInput,
             onValueChange = {
                 relayUrlInput = it
-                isRelayUrlError = it.isNotBlank() && !it.startsWith("http://") && !it.startsWith("https://") && !it.startsWith("ws://") && !it.startsWith("wss://")
+                isRelayUrlError = it.isNotBlank() && !RelayConfig.isValid(it)
             },
             label = { Text("Relay URL") },
             isError = isRelayUrlError,
             supportingText = {
                 if (isRelayUrlError) {
-                    Text("URL must start with http://, https://, ws://, or wss://")
+                    Text("Enter a full address starting with http://, https://, ws://, or wss://")
                 }
             },
             modifier = Modifier.fillMaxWidth()

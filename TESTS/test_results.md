@@ -1,4 +1,35 @@
-# Test Results - Nov5.1 (Default Relay Correction & Production Verification)
+# Test Results - Nov5.2 (Chapter Triage & Runtime Resilience)
+
+## Nov5.2 Summary
+Executed Nov 5, 2026 on the A15 (`R58X40GV2AR`), running both Sensor and Monitor on the production relay unless noted. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **Automated suite** | 🟢 **118/118** | `:core-shared` 34, `:core-network` 16, `:core-ui` 5, `:app-monitor` unit 13, `:app-monitor` on A15 15, `:app-sensor` on A15 35. |
+| **54.1, 65.1, 120.1 Crash recovery** | 🟢 **PASSED** | Restarted in under 10s; sequence continued (518 to 600). |
+| **70.1 Monitor crash** | 🟢 **PASSED** | Restarted and reconnected. |
+| **16.1 Network loss** | 🟢 **PASSED** | 40s outage; reconnected in about 7s. |
+| **23.1, 120.2 Doze** | 🟢 **PASSED** | 12m47s forced deep idle; wake lock held, telemetry continued every 10s. |
+| **49.1 Charging rate** | 🟢 **PASSED** | 100ms charging, 10000ms on battery. |
+| **73.1 Permission revoke** | 🟢 **PASSED** | Sensor stopped cleanly, no crash loop. |
+| **0.4 Back button** | 🟢 **PASSED** | Service kept running. |
+| **14.1, 42.1 Rotation** | 🟢 **PASSED** | No overlap in landscape. |
+| **41.1 Dark mode** | 🟢 **PASSED** | App stayed up; legibility not separately measured. |
+| **32.1, 120.8 Largest font** | 🟢 **PASSED** | Failed first; speed and labels now visible at 200%. |
+| **38.1, 120.5 Bad relay URL** | 🟢 **PASSED** | Could not be saved; no crash. |
+| **0.8, 120.9 ID isolation** | 🟢 **PASSED** | Failed first; no values carry over to a new pairing. |
+| **5.2 Trail persistence** | 🟢 **PASSED** | Trail present immediately after force stop. |
+| **113, 120.6 Menu** | 🟢 **PASSED** | All eight actions positioned on screen. |
+| **118.8 Relay hot switch** | 🟢 **PASSED** | Sensor switched while connected in under 40ms. |
+| **120.7 Backfill** | 🟡 **LOCAL RELAY ONLY** | 1 request, 7 chunks through local v6.044. Production relay is still v6.043. |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | `device_audit.cmd`: 0 Davey over 500ms, 0 StackLog, 0 fatal on both processes. |
+| **20.1 Reboot** | 🟢 **PASSED** | Sensor restarted by itself after boot, within about 3 minutes; sequence continued (about 2646 to 3054). |
+
+**Run history:** Run 1 passed; font and backfill failures found live, fixed; Run 2 passed; isolation failure found live, fixed; Run 3 passed on the final code.
+
+---
+
+# Nov5.1 Results (Default Relay Correction & Production Verification)
 
 ## Nov5.1 Summary
 Executed Nov 5, 2026 on the final build, with Sensor on A15 and Monitor on S21FE through the production relay `https://gps-survival-relay.onrender.com` (v6.043).

@@ -128,6 +128,27 @@ class SignalingBatchTest {
     }
 
     @Test
+    fun testBackfillResponseIsRoutableAndKeepsItsOwner() = runTest {
+        val fakeSocket = FakeSocket()
+        val client = SocketioSignalingClient(FakeSocketFactory(fakeSocket), StandardTestDispatcher(testScheduler))
+
+        try {
+            client.connect("http://localhost", "T", "T")
+            fakeSocket.simulateConnect()
+            runCurrent()
+
+            val stored = LocationUpdate(lat = 32.5, lng = 35.25, timestamp = 5L, sequenceId = 7L)
+            client.sendBackfillResponse(com.jd.core.shared.BackfillResponse("req", listOf(stored), true))
+
+            val payload = fakeSocket.emittedEvents.first { it.first == "backfill_response" }.second as JSONObject
+            assertEquals("The relay routes on id", "T", payload.getString("id"))
+            assertEquals("T", payload.getJSONArray("updates").getJSONObject(0).getString("id"))
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
     fun testRelayUrlChangeReplacesTheSocket() = runTest {
         val sockets = mutableListOf<FakeSocket>()
         val factory = object : SocketFactory {

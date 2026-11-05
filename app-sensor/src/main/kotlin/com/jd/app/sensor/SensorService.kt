@@ -113,6 +113,7 @@ class SensorService : Service(), SensorEventListener {
         val capacity = ForensicBuffer.calculateAdaptiveCapacity(sampleRateHz = 100, retentionSeconds = 100)
         forensicBuffer = ForensicBuffer(protectedContext.filesDir, capacity = capacity)
         forensicBuffer.initialize()
+        sequenceIdCounter = forensicBuffer.nextSequenceId()
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
@@ -337,6 +338,7 @@ class SensorService : Service(), SensorEventListener {
             scope = serviceScope,
             intervalProvider = { 5000L }
         ) {
+            renewWakeLock()
             val elapsedNanos = orchestrator.getNanosecondsSinceLastTick("sensing_loop")
             if (elapsedNanos == -1L) return@launchPeriodicLoop
             
@@ -352,12 +354,18 @@ class SensorService : Service(), SensorEventListener {
 
     private fun acquireWakeLock() {
         val pm = getSystemService(POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Sensor:SensingLock").apply { 
-            try {
-                acquire(10*60*1000L) 
-            } catch (e: Exception) {
-                SystemLogger.e("Power", "Failed to acquire WakeLock: ${e.message}")
-            }
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Sensor:SensingLock").apply {
+            setReferenceCounted(false)
+        }
+        renewWakeLock()
+    }
+
+    /** The timed lock expires if the watchdog stops, so a dead service cannot hold the CPU awake. */
+    private fun renewWakeLock() {
+        try {
+            wakeLock?.acquire(WAKE_LOCK_TIMEOUT_MS)
+        } catch (e: Exception) {
+            SystemLogger.e("Power", "Failed to acquire WakeLock: ${e.message}")
         }
     }
 
@@ -396,6 +404,10 @@ class SensorService : Service(), SensorEventListener {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private companion object {
+        const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L
+    }
 
     override fun onDestroy() {
         SystemLogger.i("SensorService", "onDestroy called. Cleaning up...")

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jd.core.ui.CappedFontScale
 import com.jd.core.ui.HudState
 import com.jd.core.ui.HudStatusBar
 import com.jd.core.ui.RevolutionTheme
@@ -144,8 +145,9 @@ fun PairingWizard(
 ) {
     var text by remember { mutableStateOf(ForensicIdentity.DEFAULT_TRACKER_ID) }
     var isError by remember { mutableStateOf(false) }
-    var relayUrlInput by remember { mutableStateOf(relayUrl) }
+    var relayUrlInput by remember(relayUrl) { mutableStateOf(relayUrl) }
     var showRelayConfig by remember { mutableStateOf(false) }
+    val isRelayUrlValid = RelayConfig.isValid(relayUrlInput)
 
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
@@ -191,6 +193,7 @@ fun PairingWizard(
                     value = relayUrlInput,
                     onValueChange = { relayUrlInput = it },
                     label = { Text("Relay Server URL") },
+                    isError = !isRelayUrlValid,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Row(
@@ -198,11 +201,8 @@ fun PairingWizard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
-                        onClick = {
-                            if (relayUrlInput.isNotBlank()) {
-                                onUpdateRelayUrl(relayUrlInput.trim())
-                            }
-                        },
+                        onClick = { onUpdateRelayUrl(relayUrlInput.trim()) },
+                        enabled = isRelayUrlValid,
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Save URL")
@@ -263,7 +263,7 @@ fun MonitorScreen(
     var showCleanSetupOverlay by remember { mutableStateOf(false) }
     var showToolsOverlay by remember { mutableStateOf(false) }
     var isEditingRelayUrl by remember { mutableStateOf(false) }
-    var relayUrlInput by remember { mutableStateOf(relayUrl) }
+    var relayUrlInput by remember(relayUrl) { mutableStateOf(relayUrl) }
     var followMode by remember { mutableStateOf(MapFollowMode.AUTO) }
 
     if (showAlertsOverlay) {
@@ -389,57 +389,14 @@ fun MonitorScreen(
         topBar = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 // Menu Upper Line (Header Bar with Setup, Settings, and Actions)
-                Surface(
-                    color = Color.Black.copy(alpha = 0.85f),
-                    contentColor = Color.White
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically, 
-                            horizontalArrangement = Arrangement.spacedBy(0.dp),
-                            modifier = Modifier.weight(1f, fill = false)
-                        ) {
-                            IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(15.dp))
-                            }
-                            IconButton(onClick = { onReset() }, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Settings, contentDescription = "Settings / Re-pair", tint = Color.White, modifier = Modifier.size(15.dp))
-                            }
-                            IconButton(onClick = { showToolsOverlay = true }, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Refresh, contentDescription = "Tools", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
-                            }
-                            IconButton(onClick = { followMode = MapFollowMode.AUTO }, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Place, contentDescription = "Map", tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
-                            }
-                            IconButton(onClick = { }, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Menu, contentDescription = "Events", tint = Color(0xFFF43F5E), modifier = Modifier.size(15.dp))
-                            }
-                            IconButton(onClick = { }, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Star, contentDescription = "Graphs", tint = Color(0xFF8B5CF6), modifier = Modifier.size(15.dp))
-                            }
-                            IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
-                            }
-                        }
-                        Text(
-                            text = "MONITOR: ${monitorId.take(6).uppercase()} -> TRK:${trackerId.take(6).uppercase()}",
-                            color = Color(0xFF06B6D4),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                        )
-                        IconButton(onClick = { onReset() }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Disconnect", tint = Color(0xFFF43F5E), modifier = Modifier.size(18.dp))
-                        }
-                    }
-                }
+                MonitorMenuBar(
+                    monitorId = monitorId,
+                    trackerId = trackerId,
+                    onSetup = { showSetupDialog = true },
+                    onReset = onReset,
+                    onTools = { showToolsOverlay = true },
+                    onMap = { followMode = MapFollowMode.AUTO }
+                )
                 // Line 1: Local Device Status
                 HudStatusBar(hudState = localHudState, compact = true)
                 // Line 2: Sensor / Tracker Status
@@ -570,6 +527,7 @@ fun MonitorScreen(
                             value = relayUrlInput,
                             onValueChange = { relayUrlInput = it },
                             label = { Text("Edit Relay URL") },
+                            isError = !RelayConfig.isValid(relayUrlInput),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -578,12 +536,13 @@ fun MonitorScreen(
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (isEditingRelayUrl) {
-                        Button(onClick = {
-                            if (relayUrlInput.isNotBlank()) {
+                        Button(
+                            onClick = {
                                 onUpdateRelayUrl(relayUrlInput.trim())
-                            }
-                            isEditingRelayUrl = false
-                        }) {
+                                isEditingRelayUrl = false
+                            },
+                            enabled = RelayConfig.isValid(relayUrlInput)
+                        ) {
                             Text("Save")
                         }
                     } else {
@@ -597,6 +556,67 @@ fun MonitorScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+fun MonitorMenuBar(
+    monitorId: String,
+    trackerId: String,
+    onSetup: () -> Unit,
+    onReset: () -> Unit,
+    onTools: () -> Unit,
+    onMap: () -> Unit
+) {
+    Surface(
+        color = Color.Black.copy(alpha = 0.85f),
+        contentColor = Color.White
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                IconButton(onClick = onSetup, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(15.dp))
+                }
+                IconButton(onClick = onReset, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings / Re-pair", tint = Color.White, modifier = Modifier.size(15.dp))
+                }
+                IconButton(onClick = onTools, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Tools", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
+                }
+                IconButton(onClick = onMap, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Place, contentDescription = "Map", tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
+                }
+                IconButton(onClick = { }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Menu, contentDescription = "Events", tint = Color(0xFFF43F5E), modifier = Modifier.size(15.dp))
+                }
+                IconButton(onClick = { }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Star, contentDescription = "Graphs", tint = Color(0xFF8B5CF6), modifier = Modifier.size(15.dp))
+                }
+                IconButton(onClick = onSetup, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
+                }
+            }
+            Text(
+                text = "MONITOR: ${monitorId.take(6).uppercase()} -> TRK:${trackerId.take(6).uppercase()}",
+                color = Color(0xFF06B6D4),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onReset, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Disconnect", tint = Color(0xFFF43F5E), modifier = Modifier.size(18.dp))
+            }
+        }
     }
 }
 
@@ -626,18 +646,20 @@ fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifi
 @Composable
 fun MapToolButton(icon: ImageVector? = null, symbol: String? = null, label: String, onClick: () -> Unit, iconColor: Color, containerColor: Color = Color.White) {
     val prp = Color(0xFF800080)
-    Box(
-        modifier = Modifier
-            .size(50.dp)
-            .background(containerColor, RoundedCornerShape(8.dp))
-            .border(1.dp, prp, RoundedCornerShape(8.dp))
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (symbol != null) Text(symbol, color = iconColor, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.height(26.dp))
-            else if (icon != null) Icon(icon, null, tint = iconColor, modifier = Modifier.size(24.dp))
-            Text(label, color = if (containerColor != Color.White && containerColor != Color.Transparent) Color.White else prp, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+    CappedFontScale {
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .background(containerColor, RoundedCornerShape(8.dp))
+                .border(1.dp, prp, RoundedCornerShape(8.dp))
+                .clickable { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (symbol != null) Text(symbol, color = iconColor, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.height(26.dp))
+                else if (icon != null) Icon(icon, null, tint = iconColor, modifier = Modifier.size(24.dp))
+                Text(label, color = if (containerColor != Color.White && containerColor != Color.Transparent) Color.White else prp, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

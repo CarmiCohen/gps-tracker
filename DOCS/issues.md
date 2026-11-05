@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov5.1)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov5.2)
 
-## 🎯 Next Resumption Focus: Execute the manual physical chapters and stress protocol (ISSUE-NOV5.0-O4)
+## 🎯 Next Resumption Focus: Decide the future of unwired features (ISSUE-NOV5.2-O11), then deploy relay v6.044 (ISSUE-NOV5.2-O12)
 
 ---
 
@@ -17,9 +17,14 @@
 - **Status**: Monitored. No crashes or functional failures observed.
 
 ### 2. Open Gaps
-- **ISSUE-NOV5.0-O2 (Medium) - Monitor local HUD line is hardcoded**: `MonitorViewModel.localHudState` always reports battery 100, temperature 30, accuracy 5.0, age 0, speed 0, and STATIONARY instead of real device values.
-- **ISSUE-NOV5.0-O3 (Medium) - Telemetry interval differs from the documented value**: the A15 logged `Interval: 100ms` while charging, whereas Chapter 115.2 documents 10000ms. Confirm whether this is the intended charging acceleration (Chapter 49); it affects relay load and data use. Nov5.1 logged `Interval: 10000ms` in a later run, so the rate does change, but the trigger is not confirmed.
-- **ISSUE-NOV5.0-O4 (Medium) - Test coverage gap**: most physical chapters of `TEST_PROCEDURE.md` and all five manual sections of `TEST_FORENSIC_STRESS_PROTOCOL.md` were not executed in Nov5.0 (see `TESTS/test_results.md`). `ProductionReadinessAuditTest` holds three math checks and does not measure Davey or StackLog. Earlier "100% passing" entries covered unit tests only: the Monitor instrumented suite did not compile from Nov4.37 until Nov5.0, and the zeroed telemetry defect passed every earlier audit.
+- **ISSUE-NOV5.0-O2 (Medium) - Monitor local HUD line is hardcoded**: `MonitorViewModel.localHudState` always reports battery 100, temperature 30, accuracy 5.0, age 0, speed 0, and STATIONARY instead of real device values. The sensor line also shows placeholder `B:100%|T:30°C` when no telemetry has arrived.
+- **ISSUE-NOV5.0-O4 (Medium) - Test coverage gap, reduced in Nov5.2**: every chapter now has a status in `TESTS/CHAPTER_TRIAGE.md`. Still outstanding are the chapters needing a person (H) or the S21FE or a second viewer (S). `ProductionReadinessAuditTest` holds three math checks only; `TESTS/device_audit.cmd` now performs the real Davey and StackLog audit. Earlier "100% passing" entries covered unit tests only.
+- **ISSUE-NOV5.2-O11 (High) - Documented features are not wired into the running apps**: many chapters and SOT rules marked PASSED describe behavior the apps cannot perform. Sirens, violations, geofencing, `SentinelLogic` on the Sensor, map tools, export, workers, extra sensors, device hardening, and most Tools actions are unwired (code D in `TESTS/CHAPTER_TRIAGE.md`). Each needs a decision: build it, or retire the chapter and rule. Until then the SOT and QA counts overstate what the product does.
+- **ISSUE-NOV5.2-O12 (Medium) - Relay v6.044 not deployed**: backfill needs the new relay routing in `relay-server/index.js`, which is uncommitted because the deployment needs the user's approval. The code was verified through a local relay. Until it is deployed, gaps after an outage are requested but never filled.
+- **ISSUE-NOV5.2-O13 (Medium) - False MOVING on GPS noise**: the Monitor derives MOVING from GPS speed above 1.5 km/h only, so a stationary Sensor showed `MOVING` at about 2 km/h. `SentinelLogic` and IMU data are not used.
+- **ISSUE-NOV5.2-O14 (Medium) - Monitor trail storage grows without limit**: `TrailPruningWorker` is never scheduled and only targets local rows, so remote trail rows are never deleted. Display is capped, storage is not.
+- **ISSUE-NOV5.2-O15 (Low) - Settings gear unpairs immediately**: the Monitor `Settings / Re-pair` button clears the pairing with no confirmation.
+- **ISSUE-NOV5.2-O16 (Low) - Sequence restarts after a fresh install**: reinstalling the Sensor clears its buffer and restarts at 0, and the Monitor unique index can then replace older rows with the same sequence.
 - **ISSUE-NOV5.0-O5 (Low) - False relay status text**: the Monitor Setup dialog hardcodes `Relay Status: Connected / Active`, even while `SRV` is red.
 - **ISSUE-NOV5.0-O6 (Low) - Stale version strings**: `SensorService` logs `Version: Nov1.7 (Final)`, and `getAppVersionName` falls back to `Nov4.27` in both apps.
 - **ISSUE-NOV5.0-O7 (Low) - Zero-position rows are still stored and sent**: the sensor sends `(0,0)` until its first fix and the Monitor stores those rows. They are now filtered at display time only.
@@ -28,6 +33,19 @@
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov5.2)
+*   **Telemetry Interval Explained (ISSUE-NOV5.0-O3)**: 100ms is the designed charging rate in `SensingEngine.getOptimalIntervalMs`; a stationary Sensor on battery uses 10000ms. Verified live: the rate changed as soon as charging stopped. **PASSED.** Data use while charging remains a product decision.
+*   **Sequence Restart (GAP-REVOL71.0-G1)**: Sequence numbers now continue from the forensic buffer after a crash instead of restarting at 0. **PASSED.**
+*   **Wake Lock Expiry (GAP-REVOL71.0-G2)**: The 10-minute wake lock is renewed by the watchdog. **PASSED.**
+*   **Unbounded Trail Display (GAP-REVOL71.0-G3)**: The map receives at most the newest 1000 points, updated at no more than 2Hz. **PASSED.**
+*   **Relay URL Validation (GAP-REVOL71.0-G4)**: Malformed URLs cannot be saved in either app, and a stored malformed URL falls back to the default. The edit field now shows the saved URL. **PASSED.**
+*   **Hidden Monitor Menu Actions (GAP-REVOL71.0-G5)**: All eight actions stay visible; the title now shrinks instead. **PASSED.**
+*   **Clipping At Largest Font (GAP-REVOL71.0-G6)**: HUD and map button text is capped at 130% so speed and labels stay visible. **PASSED.**
+*   **Backfill Could Not Complete (GAP-REVOL71.0-G7)**: Responses now carry a routable `id`, and relay v6.044 routes requests and responses. Verified through a local relay: 1 request and 7 chunks after an outage. Production deployment is pending (ISSUE-NOV5.2-O12).
+*   **Stale Data After Re-Pairing (GAP-REVOL71.0-G8)**: The Monitor HUD now shows only telemetry from the paired device, so values no longer carry over to a new pairing. **PASSED.**
 
 ---
 
@@ -91,6 +109,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov5.2: [SOT Count: 931 (Rules: 431), Open: H:1, M:5, L:7, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 118), QA: 48]** - Audit Baseline: 118 automated tests passing; A15 live pass including crash, reboot, network loss, Doze, rotation, font, and isolation; relay v6.044 undeployed. **QA is now measured**: chapters verified at least in part, out of 120 (`TESTS/CHAPTER_TRIAGE.md`). Earlier QA values matched the SOT count and were not measured.
 - **Nov5.1: [SOT Count: 929 (Rules: 429), Open: H:0, M:3, L:5, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 103), QA: 929]** - Audit Baseline: 103 automated tests passing and a two-device live run through the production relay on the final build; manual physical chapters not executed. **QA caveat**: `QA: 929` follows the convention of matching the SOT count; those items were not individually re-verified.
 - **Nov5.0: [SOT Count: 928 (Rules: 428), Open: H:1, M:4, L:3, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 100), QA: 928]** - Audit Baseline: 100 automated tests passing on the final code; two-device live run through a local relay because the production relay was down; manual physical chapters not executed. **QA caveat**: `QA: 928` follows the convention of matching the SOT count; those 928 items were not individually re-verified in Nov5.0.
 - **Nov4.44: [SOT Count: 924 (Rules: 424), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Release Candidate & Reciprocal Simulation Audit), QA: 924]**

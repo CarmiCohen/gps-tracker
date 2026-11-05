@@ -10,6 +10,7 @@ import com.jd.core.network.SignalingClient
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.RelayConfig
+import com.jd.core.shared.atUiRate
 import com.jd.core.ui.HudState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -18,6 +19,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+/** Returns this update only if it came from [deviceId], so another device's data is never displayed. */
+fun LocationUpdate?.ifFrom(deviceId: String?): LocationUpdate? = this?.takeIf { it.deviceId == deviceId }
 
 @HiltViewModel
 class MonitorViewModel @Inject constructor(
@@ -78,6 +82,7 @@ class MonitorViewModel @Inject constructor(
         .flatMapLatest { id ->
             repository.getTrail(id)
         }
+        .atUiRate()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val hasLocationPermission = MutableStateFlow(locationSource.hasPermission())
@@ -95,6 +100,7 @@ class MonitorViewModel @Inject constructor(
     val selfId = identityManager.selfId
 
     private val _latestTelemetry = MutableStateFlow<LocationUpdate?>(null)
+    private val pairedTelemetry = combine(_latestTelemetry, targetId) { latest, target -> latest.ifFrom(target) }
 
     init {
         signalingClient.telemetryFlow
@@ -114,7 +120,7 @@ class MonitorViewModel @Inject constructor(
     val localHudState: StateFlow<HudState> = combine(
         selfId,
         signalingClient.isConnected,
-        _latestTelemetry,
+        pairedTelemetry,
         _ticker
     ) { self, isConnected, latest, now ->
         val isInternet = isNetworkAvailable(context)
@@ -146,7 +152,7 @@ class MonitorViewModel @Inject constructor(
         selfId,
         targetId.filterNotNull(),
         signalingClient.isConnected,
-        _latestTelemetry,
+        pairedTelemetry,
         _ticker
     ) { self, target, isConnected, latest, now ->
         val lastTs = latest?.timestamp ?: 0L
