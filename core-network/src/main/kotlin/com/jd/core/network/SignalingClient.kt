@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 interface SignalingClient {
     
     val isConnected: Flow<Boolean>
+    val viewerStatusFlow: Flow<Boolean>
     val telemetryFlow: Flow<LocationUpdate>
     val violationFlow: Flow<ViolationEvent>
     

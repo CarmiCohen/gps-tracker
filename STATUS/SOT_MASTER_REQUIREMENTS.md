@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov4.36)
+# SOT Master Requirements & Hardening Status (Nov4.44)
 
-## 🏗️ Architectural Master Rules (423 Rules)
+## 🏗️ Architectural Master Rules (424 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -11,8 +11,12 @@
 *   **1.345 Upper Menu Line Expansion (R-ID 116)**: The system MUST provide an expanded upper menu line (top control bar) across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications incorporating direct one-tap navigation for Setup (`Build`), Settings (`Settings`), Tools (`Refresh`), Map (`Place`), Events (`Menu`), Graphs (`Star`), and Info (`Info`) (R-ID 116).
 *   **1.346 Monitor Hardware Deployment & Single-Line Fitting Audit (R-ID 117)**: The system MUST maintain single-line text layout constraints (`maxLines = 1`, `TextOverflow.Ellipsis`, compact button sizing of 28dp) across the upper menu bar (`AdminActivity` and `MonitorActivity`) and HUD status bars (`HudStatusBar`), ensuring zero line-wrapping distortion, full visibility of telemetry age metadata (`AGE:$ageStr`), and stable hardware deployment performance on S21FE and staggered tier devices (R-ID 117).
 *   **1.347 Dual Device Hardware Deployment & Telemetry Audit (R-ID 118)**: The system MUST support simultaneous deployment and execution of `:app-monitor` on flagship tier hardware (S21FE) and `:app-sensor` on budget/staggered tier hardware (A155), maintaining background telemetry sampling intervals (10,000ms), zero-crash service lifecycle execution, and clean logcat event logging across both endpoints (R-ID 118).
+*   **1.348 Decoupled Peer LED Signaling & Strict Relay-Independent Status Rules (R-ID 119)**: The system MUST strictly decouple peer connection LEDs from relay server connection LEDs across both Sensor and Monitor applications: `SRV` turns GREEN ONLY when actively connected to the Relay Server (otherwise RED); `TRK` on the Monitor side turns GREEN ONLY when connected to the TRACKER (`T`), independent of relay server state (otherwise RED); `VWR` on the Sensor side turns GREEN ONLY when connected to a VIEWER (`V`), independent of relay server state (otherwise RED) (R-ID 119).
+*   **1.349 Nov4.44 Release Candidate Verification & Reciprocal Virtual Presence Simulation (R-ID 120)**: The system MUST execute all automated unit tests, hardening procedures, and stress evaluations (`test --warning-mode all`) with 100% passing results, enforce reciprocal virtual presence simulation testing in single-device environments, and lock full forensic state in baseline `STATUS/BASELINE/Nov4.44/` (R-ID 120).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov4.44**: Nov4.44 Release Candidate Verification & Reciprocal Virtual Presence Simulation (GAP-REVOL68.0-G1) - PASSED.
+- **Nov4.37**: Decoupled Peer LED Signaling & Strict Relay-Independent Status Rules (GAP-REVOL67.0-G1) - PASSED.
 - **Nov4.36**: Dual Device Hardware Deployment & Telemetry Audit (GAP-REVOL66.0-G1) - PASSED.
 - **Nov4.35**: Monitor Hardware Deployment & Single-Line Fitting Audit (GAP-REVOL65.0-G1) - PASSED.
 - **Nov4.34**: Upper Menu Line Expansion (GAP-REVOL64.0-G1) - PASSED.
@@ -29,6 +33,8 @@
 - **Nov4.22-addHUD**: Post-Revolution HUD Integration & LED Status Verification (GAP-REVOL52.0-G1) - PASSED.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.60 (Nov4.44 Release Candidate Verification Audit)**: PASSED - Verification of Nov4.44 release candidate: 100% automated test execution passing across all subprojects, reciprocal virtual presence simulation testing, and baseline lock in `STATUS/BASELINE/Nov4.44/`.
+*   **Chapter 5.59 (Nov4.37 Decoupled Peer LED Signaling Audit)**: PASSED - Verification of decoupled peer LED signaling: `SRV` turns GREEN ONLY when connected to Relay Server (otherwise RED); `TRK` on Monitor turns GREEN ONLY when connected to Tracker `T` (otherwise RED); `VWR` on Sensor turns GREEN ONLY when connected to Viewer `V` (otherwise RED). Verified test pass rule (Connection active -> PASSED; Alarm/event present -> PASSED OK; Else -> FAILED).
 *   **Chapter 5.58 (Nov4.36 Dual Device Hardware Deployment Audit)**: PASSED - Verification of simultaneous deployment of Monitor on S21FE and Sensor on A155, active 10,000ms telemetry generation, logcat event logging, and 100% test execution across all subprojects.
 *   **Chapter 5.57 (Nov4.35 Monitor Hardware Deployment & Single-Line Fitting Audit)**: PASSED - Verification of hardware deployment on S21FE / R58X40GV2AR, upper header bar single-line fitting, HUD telemetry age metadata visibility, and 100% test execution across all subprojects.
 *   **Chapter 5.56 (Nov4.34 Upper Menu Line Audit)**: PASSED - Verification of expanded upper menu line quick navigation buttons (Map, Events, Graphs, Info, Setup, Settings, Tools) in Sensor and Monitor applications, and comprehensive unit test execution.

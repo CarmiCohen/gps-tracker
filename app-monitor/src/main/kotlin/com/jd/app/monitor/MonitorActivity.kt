@@ -29,6 +29,8 @@ import com.jd.core.ui.HudStatusBar
 import com.jd.core.ui.RevolutionTheme
 import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.AlertSettings
+import com.jd.core.network.ForensicIdentityManager
+import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -45,6 +47,7 @@ import org.osmdroid.views.overlay.Marker
 class MonitorActivity : ComponentActivity() {
 
     private val viewModel: MonitorViewModel by viewModels()
+    @Inject lateinit var identityManager: ForensicIdentityManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,6 +56,9 @@ class MonitorActivity : ComponentActivity() {
 
         setContent {
             RevolutionTheme {
+                LaunchedEffect(Unit) {
+                    identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_MONITOR)
+                }
                 val trackerId by viewModel.targetId.collectAsStateWithLifecycle(initialValue = null)
                 val monitorId by viewModel.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
                 val relayUrl by viewModel.relayUrl.collectAsStateWithLifecycle()

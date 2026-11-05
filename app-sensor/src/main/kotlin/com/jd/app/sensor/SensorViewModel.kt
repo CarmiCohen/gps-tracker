@@ -71,25 +71,10 @@ class SensorViewModel @Inject constructor(
     }
 
 
-    init {
-        // Automatically initiate signaling connection when SensorViewModel is initialized
-        viewModelScope.launch {
-            combine(identityManager.selfId, sensorDataStore.relayUrl) { id, rawUrl ->
-                val url = if (!rawUrl.isNullOrBlank()) rawUrl else DEFAULT_RELAY_URL
-                id to url
-            }.collect { (id, url) ->
-                signalingClient.connect(url, id, id)
-            }
-        }
-    }
-
     fun updateRelayUrl(url: String) {
         viewModelScope.launch {
             val formattedUrl = url.trim()
             sensorDataStore.saveRelayUrl(formattedUrl)
-            val id = identityManager.selfId.first()
-            val targetUrl = if (formattedUrl.isNotBlank()) formattedUrl else DEFAULT_RELAY_URL
-            signalingClient.connect(targetUrl, id, id)
         }
     }
 
@@ -103,11 +88,11 @@ class SensorViewModel @Inject constructor(
     val hudState: StateFlow<HudState> = combine(
         selfId,
         signalingClient.isConnected,
+        signalingClient.viewerStatusFlow,
         _ticker
-    ) { id, isConnected, _ ->
+    ) { id, isConnected, isViewerConnected, _ ->
         val isInternet = isNetworkAvailable(context)
         val isGpsActive = isLocationProviderEnabled(context)
-        val isRelayConnected = isInternet || isConnected
         val batteryInfo = getBatteryInfo(context)
 
         HudState(
@@ -115,9 +100,9 @@ class SensorViewModel @Inject constructor(
             selfId = id,
             targetId = "V",
             isInternet = isInternet,
-            isRelayConnected = isRelayConnected,
+            isRelayConnected = isConnected,
             isLocalGpsActive = isGpsActive,
-            isPeerActive = isConnected, // Active signaling connection ready for viewer peer
+            isPeerActive = isViewerConnected,
             isDataHealthy = isInternet,
             watchdogOk = true,
             trackerState = "STATIONARY",

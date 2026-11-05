@@ -43,6 +43,9 @@ class SocketioSignalingClient @Inject constructor(
     private val _isConnected = MutableStateFlow(false)
     override val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
+    private val _viewerStatusFlow = MutableStateFlow(false)
+    override val viewerStatusFlow: StateFlow<Boolean> = _viewerStatusFlow.asStateFlow()
+
     private val _telemetryFlow = MutableSharedFlow<LocationUpdate>(extraBufferCapacity = 64)
     override val telemetryFlow: SharedFlow<LocationUpdate> = _telemetryFlow.asSharedFlow()
 
@@ -95,6 +98,7 @@ class SocketioSignalingClient @Inject constructor(
 
             on(Socket.EVENT_DISCONNECT) {
                 _isConnected.value = false
+                _viewerStatusFlow.value = false
                 SystemLogger.w("Signaling", "Disconnected from relay")
                 stopBatchTimer()
                 clientScope.launch { movePendingToQueue() }
@@ -233,6 +237,7 @@ class SocketioSignalingClient @Inject constructor(
         socket?.disconnect()
         socket = null
         _isConnected.value = false
+        _viewerStatusFlow.value = false
         currentDeviceId = null
         stopBatchTimer()
     }

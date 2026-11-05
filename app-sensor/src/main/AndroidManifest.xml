@@ -18,6 +18,7 @@
     <application
         android:name=".SensorApp"
         android:allowBackup="true"
+        android:usesCleartextTraffic="true"
         android:icon="@android:drawable/ic_menu_mylocation"
         android:label="GPS Sensor"
         android:roundIcon="@android:drawable/ic_menu_mylocation"

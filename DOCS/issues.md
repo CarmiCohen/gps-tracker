@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.36)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov4.44)
 
-## 🎯 Next Resumption Focus: Nov4.36 Baseline Synchronization - COMPLETED
+## 🎯 Next Resumption Focus: Nov4.44 Baseline Synchronization - COMPLETED
 
 ---
 
@@ -15,6 +15,16 @@
   ```
 - **Impact**: Non-blocking performance warning during Compose state updates on Android runtime.
 - **Status**: Monitored. No crashes or functional failures observed.
+
+---
+
+## 🟢 Resolved Gaps (Nov4.44)
+*   **Release Candidate Verification & Reciprocal Virtual Presence Simulation Audit (GAP-REVOL68.0-G1)**: Executed all automated test suites (`test --warning-mode all`) across all subprojects with 100% passing results (0 failures), conducted reciprocal virtual presence simulation testing in single-device environment, updated `TESTS/TEST_PROCEDURE.md` (Chapter 117), and synchronized all forensic baseline documentation. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov4.37)
+*   **Decoupled Peer LED Signaling & Relay-Independent Status Audit (GAP-REVOL67.0-G1)**: Decoupled peer connection LEDs from relay server connection state. Updated `SRV` LED to reflect relay server connection only (GREEN when connected, RED otherwise), `TRK` LED to reflect tracker connection only, and `VWR` LED to reflect viewer connection only. Updated real-time room presence fan-out in `relay-server/index.js`, added Chapter 116 to `TESTS/TEST_PROCEDURE.md`, and updated test evaluation rules. **PASSED.**
 
 ---
 
@@ -50,6 +60,8 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov4.44: [SOT Count: 924 (Rules: 424), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Release Candidate & Reciprocal Simulation Audit), QA: 924]**
+- **Nov4.37: [SOT Count: 924 (Rules: 424), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Decoupled Peer LED Signaling Audit), QA: 924]**
 - **Nov4.36: [SOT Count: 923 (Rules: 423), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Dual Device Hardware Deployment & Telemetry Audit), QA: 923]**
 - **Nov4.35: [SOT Count: 922 (Rules: 422), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor Hardware Deployment & Single-Line Fitting Audit), QA: 922]**
 - **Nov4.34: [SOT Count: 921 (Rules: 421), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Upper Menu Line Expansion), QA: 921]**

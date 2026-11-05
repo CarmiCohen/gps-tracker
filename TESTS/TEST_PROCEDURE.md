@@ -414,8 +414,22 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **115.2 Sensor Service Telemetry Generation:** Verify that `SensorService` on A155 continuously generates and queues telemetry updates (`REV_SensorService: Telemetry sent. Seq: ... | Interval: 10000ms`) without memory leaks or thread exhaustion.
 *   **115.3 Monitor UI & Event Log Verification:** Verify that `MonitorActivity` on S21FE maintains stable UI rendering, handles back navigation events cleanly, and logs telemetry events to system logcat.
 
+## Chapter 116 - Decoupled Peer LED Signaling & Relay-Independent Status Audit (Nov4.37)
+*   **116.1 Server Connection LED (SRV):** Verify that the `SRV` status badge on both Monitor and Sensor applications displays active GREEN ONLY when connected to the Relay Server (`SignalingClient.isConnected = true`), and displays RED otherwise.
+*   **116.2 Tracker Peer Connection LED (TRK):** Verify that the `TRK` status badge on the Monitor application displays active GREEN ONLY when connected to the TRACKER (`T`), independent of relay server connection state, and displays RED otherwise.
+*   **116.3 Viewer Peer Connection LED (VWR):** Verify that the `VWR` status badge on the Sensor application displays active GREEN ONLY when connected to a VIEWER (`V`), independent of relay server connection state, and displays RED otherwise.
+*   **116.4 Peer Connection & Alarm Event Test Evaluation Rule:** Verify test evaluation criteria for peer connection tests:
+    - *Therefore, if there is an active connection — the test PASSED.*
+    - *Else if there is an alarm or at least an event logged — the test PASSED OK.*
+    - *Else — the test FAILED.*
+
+## Chapter 117 - Nov4.44 Release Candidate Verification & Reciprocal Virtual Presence Simulation (Nov4.44)
+*   **117.1 Automated Unit & Hardening Test Execution:** Verify execution of all project unit tests, hardening procedures, and stress evaluations (`test --warning-mode all`) across `:app-monitor`, `:app-sensor`, `:core-network`, `:core-shared`, and `:core-ui` with 100% passing results (0 failures).
+*   **117.2 Reciprocal Virtual Presence Simulation Audit:** Verify reciprocal virtual presence testing in single-device environment: simulate a viewer virtual presence to validate tracker behavior, followed by a tracker virtual presence to validate viewer behavior.
+*   **117.3 SOT Parity & Baseline Lock:** Verify parity with all 424 SOT Master Rules and lock baseline state in `STATUS/BASELINE/Nov4.44/`.
+
 ---
-**Total Testing Chapters: 115**
+**Total Testing Chapters: 117**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
 
 

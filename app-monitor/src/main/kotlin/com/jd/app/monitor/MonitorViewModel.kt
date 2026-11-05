@@ -100,19 +100,24 @@ class MonitorViewModel @Inject constructor(
 
     val localHudState: StateFlow<HudState> = combine(
         selfId,
+        signalingClient.isConnected,
+        _latestTelemetry,
         _ticker
-    ) { self, _ ->
+    ) { self, isConnected, latest, now ->
         val isInternet = isNetworkAvailable(context)
         val isLocalGps = isLocationProviderEnabled(context)
+        val lastTs = latest?.timestamp ?: 0L
+        val isTrackerPresent = lastTs > 0 && (now - lastTs) < 35000L
+
         HudState(
             appMode = "monitor", // Cyan local GPS LED
             selfId = self,
             targetId = "LOCAL",
             isInternet = isInternet,
-            isRelayConnected = isInternet,
+            isRelayConnected = isConnected,       // SRV: Green ONLY if connected to Relay
             isLocalGpsActive = isLocalGps,
-            isPeerActive = false,
-            isDataHealthy = isInternet,
+            isPeerActive = isTrackerPresent,       // TRK: Green ONLY if Tracker T is connected & active
+            isDataHealthy = isInternet && isConnected,
             watchdogOk = true,
             trackerState = "STATIONARY",
             speedKmh = 0f,
@@ -133,12 +138,9 @@ class MonitorViewModel @Inject constructor(
     ) { self, target, isConnected, latest, now ->
         val lastTs = latest?.timestamp ?: 0L
         val ageSec = if (lastTs > 0) (now - lastTs) / 1000 else -1L
-        val hasValidCoords = latest != null && (latest.lat != 0.0 || latest.lng != 0.0)
-        val isPeerFresh = lastTs > 0 && (now - lastTs) < 35000L && hasValidCoords
+        val isTrackerPresent = lastTs > 0 && (now - lastTs) < 35000L
         val isInternet = isNetworkAvailable(context)
-        val isGpsActive = isPeerFresh
-        val isRelayConnected = isInternet || isConnected
-        val isDataHealthy = isInternet && isPeerFresh
+        val isGpsActive = latest != null && (latest.lat != 0.0 || latest.lng != 0.0)
         val speedKmh = (latest?.speed ?: 0f) * 3.6f
         val trackerState = if (speedKmh > 1.5f) "MOVING" else "STATIONARY"
 
@@ -147,10 +149,10 @@ class MonitorViewModel @Inject constructor(
             selfId = target,
             targetId = self,
             isInternet = isInternet,
-            isRelayConnected = isRelayConnected,
+            isRelayConnected = isConnected,          // SRV: Green ONLY if connected to Relay
             isLocalGpsActive = isGpsActive,
-            isPeerActive = isPeerFresh,
-            isDataHealthy = isDataHealthy,
+            isPeerActive = isTrackerPresent,          // Green ONLY if remote Tracker T is present and active
+            isDataHealthy = isInternet && isTrackerPresent,
             watchdogOk = true,
             trackerState = trackerState,
             speedKmh = speedKmh,
