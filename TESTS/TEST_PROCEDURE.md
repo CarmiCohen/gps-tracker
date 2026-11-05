@@ -428,8 +428,18 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **117.2 Reciprocal Virtual Presence Simulation Audit:** Verify reciprocal virtual presence testing in single-device environment: simulate a viewer virtual presence to validate tracker behavior, followed by a tracker virtual presence to validate viewer behavior.
 *   **117.3 SOT Parity & Baseline Lock:** Verify parity with all 424 SOT Master Rules and lock baseline state in `STATUS/BASELINE/Nov4.44/`.
 
+## Chapter 118 - HUD Direction, Compact Spacing & Real-Position Map Centering (Nov5.0)
+*   **118.1 HUD Left-To-Right Authority:** Verify that `HudStatusBar` keeps left-to-right layout and text order in both Sensor and Monitor applications under an RTL system language (`INT` left of `WDG`, row 2 reads `B:...|T:...|A:...|AGE:...`). Automated by `HudLayoutAuditTest`.
+*   **118.2 Real-Position Map Centering:** Verify that the Monitor map centers only on real device positions: the local device when disconnected, the sensor when connected, and the locked device after `SENSOR` / `LOCAL` is tapped, including `SENSOR` while the peer is inactive. Automated by `MapCenterResolverTest`.
+*   **118.3 Compact HUD Line Spacing:** Verify that the Monitor HUD uses compact line spacing with no clipped text, and that compact height is under 60% of the standard height. Automated by `HudLayoutAuditTest`.
+*   **118.4 No-Position Behavior:** Verify that with location permission denied or no fix available, the map shows the world view and never a hardcoded city, then moves to device zoom on the first real position.
+*   **118.5 Viewer Presence Signaling (`VWR`):** Verify that `SocketioSignalingClient` consumes `viewer_status_relay`, so the Sensor `VWR` LED turns GREEN when a viewer shares the room and RED when it leaves. Automated by `SignalingBatchTest.testViewerStatusFollowsRelayPresence`.
+*   **118.6 Telemetry Payload Integrity:** Verify that a pooled `LocationUpdate` released immediately after `sendTelemetry` still reaches the relay intact, online and through the offline queue, and that position, timestamp, sequence, battery, charging, temperature, accuracy, and speed all survive the round trip. Automated by `SignalingBatchTest.testRecycledUpdateIsSentIntactAndRoundTrips` and `testRecycledUpdateSurvivesOfflineQueue`. On hardware, confirm that the Monitor shows the Sensor's real battery and a live `AGE`, with `TRK` GREEN.
+*   **118.7 No-Fix Trail Filtering:** Verify that `(0,0)` trail rows are never drawn, so the polyline, marker, and map center use real positions only, while points on the equator or prime meridian are kept. Automated by `MapCenterResolverTest`.
+*   **118.8 Relay URL Hot Switch:** Verify that changing the relay URL while connected closes the old socket and connects to the new relay without an app restart, and that reconnecting to the same relay keeps the existing socket. Automated by `SignalingBatchTest.testRelayUrlChangeReplacesTheSocket`.
+
 ---
-**Total Testing Chapters: 117**
+**Total Testing Chapters: 118**
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
 
 

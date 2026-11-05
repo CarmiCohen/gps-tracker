@@ -104,7 +104,7 @@ fun OsmMap(
         MapView(context).apply {
             mapViewRef.value = this; setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); isClickable = true
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-            val sp = initialCenter ?: GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
+            val sp = initialCenter ?: GeoPoint(0.0, 0.0)
             controller.setZoom(18.0); controller.setCenter(sp)
 
             val scaleBar = ScaleBarOverlay(this).apply {

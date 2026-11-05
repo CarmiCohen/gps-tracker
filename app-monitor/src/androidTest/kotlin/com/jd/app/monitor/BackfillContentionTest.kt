@@ -191,6 +191,8 @@ class FakeSignalingClient : SignalingClient {
     private val _telemetryFlow = MutableSharedFlow<LocationUpdate>(extraBufferCapacity = 64)
     override val telemetryFlow: Flow<LocationUpdate> = _telemetryFlow
 
+    override val viewerStatusFlow: Flow<Boolean> = MutableStateFlow(false)
+
     override val violationFlow: Flow<com.jd.core.shared.ViolationEvent> = MutableSharedFlow()
     
     private val _backfillRequestFlow = MutableSharedFlow<BackfillRequest>(extraBufferCapacity = 8)

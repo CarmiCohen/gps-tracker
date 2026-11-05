@@ -60,6 +60,7 @@ class SocketioSignalingClient @Inject constructor(
 
     private var bytesSent: Long = 0
     private var currentDeviceId: String? = null
+    private var currentUrl: String? = null
 
     // Batching logic (ISSUE-REVOL33.0-F1)
     private val pendingBatch = mutableListOf<LocationUpdate>()
@@ -69,9 +70,12 @@ class SocketioSignalingClient @Inject constructor(
     private val BATCH_SIZE_LIMIT = 10
 
     override suspend fun connect(url: String, deviceId: String, secret: String, lastSequenceId: Long) {
-        if (_isConnected.value && currentDeviceId == deviceId) return
-        
+        if (socket != null && currentDeviceId == deviceId && currentUrl == url) return
+
+        // A changed relay or identity replaces the session; a kept socket would retry forever.
+        disconnect()
         currentDeviceId = deviceId
+        currentUrl = url
         val opts = IO.Options.builder()
             .setTransports(arrayOf("websocket"))
             .setReconnection(true)
@@ -126,6 +130,11 @@ class SocketioSignalingClient @Inject constructor(
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to parse location_relay")
                 }
+            }
+
+            on("viewer_status_relay") { args ->
+                val data = args.getOrNull(0) as? JSONObject ?: return@on
+                _viewerStatusFlow.value = data.optBoolean("active", false)
             }
 
             on("backfill_request") { args ->
@@ -227,7 +236,12 @@ class SocketioSignalingClient @Inject constructor(
             lng = data.optDouble("lng"),
             timestamp = data.optLong("ts"),
             sequenceId = data.optLong("seq"),
-            status = data.optString("status", "VALID")
+            status = data.optString("status", "VALID"),
+            accuracy = data.optDouble("acc", 0.0).toFloat(),
+            speed = data.optDouble("spd", 0.0).toFloat(),
+            batteryLevel = data.optInt("batt", 0),
+            isCharging = data.optBoolean("chg", false),
+            tempCelsius = data.optDouble("temp", 0.0).toFloat()
         ).apply {
             sensorSnapshot.vibration = data.optDouble("vib", 0.0).toFloat()
         }
@@ -245,21 +259,24 @@ class SocketioSignalingClient @Inject constructor(
     override fun getMonthlyDataUsageBytes(): Long = bytesSent
 
     override suspend fun sendTelemetry(update: LocationUpdate): Boolean {
-        val deviceId = currentDeviceId ?: return false
-        
+        currentDeviceId ?: return false
+
+        // Callers recycle pooled updates on return, so anything held past this call must be a copy.
+        val owned = update.snapshot()
+
         if (!_isConnected.value) {
-            queue.offer(update)
+            queue.offer(owned)
             return false
         }
 
         // Critical status updates (Geofence transitions, etc.) bypass batching
-        if (update.status != "VALID") {
+        if (owned.status != "VALID") {
             flushPendingBatch() // Flush pending first to maintain order
-            return sendTelemetryBatch(listOf(update))
+            return sendTelemetryBatch(listOf(owned))
         }
 
         batchMutex.withLock {
-            pendingBatch.add(update)
+            pendingBatch.add(owned)
             if (pendingBatch.size >= BATCH_SIZE_LIMIT) {
                 clientScope.launch { flushPendingBatch() }
             }
@@ -283,6 +300,11 @@ class SocketioSignalingClient @Inject constructor(
                 put("seq", update.sequenceId)
                 put("status", update.status)
                 put("vib", update.sensorSnapshot.vibration)
+                put("acc", update.accuracy)
+                put("spd", update.speed)
+                put("batt", update.batteryLevel)
+                put("chg", update.isCharging)
+                put("temp", update.tempCelsius)
             })
         }
 
@@ -336,6 +358,11 @@ class SocketioSignalingClient @Inject constructor(
                     put("seq", update.sequenceId)
                     put("status", update.status)
                     put("vib", update.sensorSnapshot.vibration)
+                    put("acc", update.accuracy)
+                    put("spd", update.speed)
+                    put("batt", update.batteryLevel)
+                    put("chg", update.isCharging)
+                    put("temp", update.tempCelsius)
                 })
             }
             put("updates", updatesArr)

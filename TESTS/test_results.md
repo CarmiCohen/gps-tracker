@@ -1,21 +1,56 @@
-# Test Results - Nov4.30 (Monitor Dual HUD Status Lines, GPS Colors & Connection-Aware Centering)
+# Test Results - Nov5.0 (HUD Direction, Real-Position Centering & Telemetry Integrity)
 
-## 0. Operational Forensic Audit
-| Component | Status | Notes |
+Executed Nov 5, 2026. Sensor on A15 (`R58X40GV2AR`), Monitor on S21FE (`R5CRC14PG4F`), both on system language `he-IL`.
+
+## 1. Automated Suite (Final Code, Run 5)
+All instrumented tests were pinned to the A15. Unit results cover debug and release variants where the module has both.
+
+| Suite | Result |
+| :--- | :--- |
+| `:core-shared` unit (including `ForensicBufferStressTest`, `KinematicCalibrationTest`, `AlarmStealthTest`) | 🟢 24/24 |
+| `:core-network` unit | 🟢 15/15 |
+| `:core-ui` unit | 🟢 5/5 |
+| `:app-monitor` unit | 🟢 9/9 |
+| `:app-monitor` instrumented on A15 | 🟢 12/12 |
+| `:app-sensor` instrumented on A15 (including `SensingEngineStressTest`, `ForensicStressAuditTest`, `HardeningAuditTest`, `PipelineSoakTest`, `ProductionReadinessAuditTest`) | 🟢 35/35 |
+| **Total** | **🟢 100/100** |
+
+`:app-sensor` has no unit tests.
+
+### Run History
+| Run | Result | Remediation |
 | :--- | :--- | :--- |
-| **0.1 Logcat Anomalies** | 🟢 **PASSED** | Zero `StackLog` leaks and zero `Davey` events > 500ms during automated soak execution. |
-| **0.2 Event Log Continuity** | 🟢 **PASSED** | Telemetry pulse signatures active at standard 30s/10s intervals across services. |
-| **0.3 Tracker Stealth** | 🟢 **PASSED** | Verified role-based siren/alarm suppression (R872) at the engine level. |
-| **0.4 Dual HUD Status Lines** | 🟢 **PASSED** | Verified Monitor displays Line 1 (Local Device, Cyan GPS LED `#06B6D4`) and Line 2 (Sensor/Tracker, Green GPS LED `#10B981`). |
-| **0.5 Reciprocal Simulation** | 🟢 **PASSED** | Reciprocal virtual presence testing conducted: simulated viewer validated tracker behavior, simulated tracker validated viewer behavior under single-device workstation setup. |
-| **0.6 Dual Centering & Auto-Centering** | 🟢 **PASSED** | Verified `SENSOR` and `LOCAL` buttons and connection-aware map auto-centering logic. |
-| **0.9 Factory Default** | 🟢 **PASSED** | Default Tracker ID `"T"` and Default Monitor ID `"V"` preserved across DataStore and signaling clients. |
+| Pre-run | 🔴 Monitor instrumented suite did not compile | Added `viewerStatusFlow` to `FakeSignalingClient` |
+| 1 | 🔴 `compactHudIsShorterThanStandardHud` failed | The test harness lacked the app theme; wrapped it in `RevolutionTheme`, threshold unchanged |
+| 2 | 🟢 Passed | Live test then exposed zeroed telemetry; fixed |
+| 3 | 🟢 Passed | Live test then exposed the `(0,0)` trail line; fixed |
+| 4 | 🟢 Passed | Live test then exposed the ignored relay URL change; fixed |
+| 5 | 🟢 Passed | Final code |
 
-## 1. Regression Testing & Exhaustive Verification Audit
-- **API 34 Permission Gate**: 🟢 **PASSED**.
-- **Automated Unit Tests (All Modules)**: 🟢 **PASSED** (100% passing across `:core-network`, `:core-shared`, `:core-ui`, `:app-monitor`, `:app-sensor`).
-- **Hardening Procedures & Stress Evaluations**: 🟢 **PASSED** (`ForensicBufferStressTest`, `SensingEngineStressTest`, `KinematicCalibrationTest`, `AlarmStealthTest`).
-- **Reciprocal Virtual Presence Simulation**: 🟢 **PASSED** (Tracker and Viewer virtual presence validated in single-device configuration).
+## 2. Two-Device Live Run (Sensor A15, Monitor S21FE)
+**Constraint:** the production relay was unresponsive (ISSUE-NOV5.0-O1), so this run used the same `relay-server/index.js` on the workstation through `adb reverse`. Real internet relay traffic was not tested. The live run used the build before the final `connect()` change (Run 4 code); that change has automated coverage only.
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **118.1 HUD left-to-right** | 🟢 **PASSED** | Both phones, `he-IL`: `INT` left of `WDG`, row 2 in correct order. |
+| **118.2 Real-position centering** | 🟢 **PASSED** | Monitor on the real region and not California; sensor marker at the real position. |
+| **118.3 Compact HUD** | 🟢 **PASSED** | Four lines in 202px on S21FE, no clipping. |
+| **118.5 VWR presence** | 🟢 **PASSED** | Sensor `VWR` active with the Monitor connected. |
+| **118.6 Telemetry integrity** | 🟢 **PASSED** | Relay carried real sequence and coordinates; Monitor showed `B:79%`, matching the A15, with a live `AGE`. |
+| **118.7 No-fix filtering** | 🟢 **PASSED** | The line to `(0,0)` is gone. |
+| **118.8 Relay hot switch** | 🟡 **AUTOMATED ONLY** | Unit test passes; not verified on hardware. |
+| **106 / 116 LEDs** | 🟢 **PASSED** | `SRV`, `GPS`, `TRK`, `VWR`, `DAT`, `WDG` active with the link up; `SRV` and `TRK` red during the relay outage. |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | 75s soak on both phones plus Run 5 logs: zero Davey and zero StackLog from the app processes. Lines seen came from other apps. No `FATAL`, ANR, `SQLiteDatabaseLocked`, or `NaNG`. |
+| **Event log** | 🟢 **PASSED** | Sensor live event log and Monitor logcat showed service start and relay connection. |
+
+## 3. Not Executed
+The reciprocal simulation did not run, because the S21FE was connected and the two-device procedure applies instead.
+
+**`TEST_PROCEDURE.md`:** chapters beyond those listed above were not individually executed as manual steps. Some logic is covered by the automated suites, but these need physical action or setup that was not performed, including GNSS shielding (5), stress and thermal triggers (6), sirens and alarms (8, 9, 26, 34), power and reboot (15, 20), network switching (16), multiple viewers (19, 40), TalkBack, font scaling, and orientation (31, 32, 42), sunlight and sensors (37, 43, 44), and long soaks (53, 93).
+
+**`TEST_FORENSIC_STRESS_PROTOCOL.md`:** sections 1 to 5 are manual procedures and were not executed on the device UI. Related automated suites passed, but they do not replace these steps.
+
+**Chapter 0:** 0.2, 0.4, 0.5, 0.7, 0.8, and 0.9 were not individually verified. Under 0.6, only the `VWR` badge was verified, not geofence sync.
 
 ---
-*Verified on physical device R58X40GV2AR (Single-device workstation reciprocal simulation setup) - Baseline Nov4.30*
+*Verified on physical devices R58X40GV2AR (A15) and R5CRC14PG4F (S21FE) - Baseline Nov5.0*

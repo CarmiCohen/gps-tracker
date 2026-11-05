@@ -9,10 +9,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import java.util.Locale
 
@@ -24,6 +30,32 @@ import java.util.Locale
 fun HudStatusBar(
     hudState: HudState,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
+    // Telemetry is positional, so it must not mirror or bidi-reorder under RTL system languages.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        ProvideTextStyle(if (compact) CompactHudTextStyle else HudTextStyle) {
+            HudStatusBarContent(hudState, modifier, verticalGap = if (compact) 1.dp else 2.dp)
+        }
+    }
+}
+
+private val HudTextStyle = TextStyle(textDirection = TextDirection.Ltr)
+
+// Text otherwise inherits bodyLarge's 24.sp lineHeight, which dominates the row height at 8-10.sp.
+private val CompactHudTextStyle = HudTextStyle.copy(
+    lineHeight = 11.sp,
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Center,
+        trim = LineHeightStyle.Trim.Both
+    )
+)
+
+@Composable
+private fun HudStatusBarContent(
+    hudState: HudState,
+    modifier: Modifier,
+    verticalGap: Dp,
 ) {
     val isMonitor = hudState.appMode == "monitor"
     val peerBadgeLabel = if (isMonitor) "TRK" else "VWR"
@@ -49,7 +81,7 @@ fun HudStatusBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .padding(horizontal = 4.dp, vertical = verticalGap)
         ) {
             // Row 1: Status LEDs & Speed/Movement
             Row(
@@ -96,7 +128,7 @@ fun HudStatusBar(
                 }
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(verticalGap))
 
             // Row 2: Metadata / Telemetry
             val idDisplay = if (isMonitor) {

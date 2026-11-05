@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov4.44)
+# SOT Master Requirements & Hardening Status (Nov5.0)
 
-## 🏗️ Architectural Master Rules (424 Rules)
+## 🏗️ Architectural Master Rules (428 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -13,8 +13,13 @@
 *   **1.347 Dual Device Hardware Deployment & Telemetry Audit (R-ID 118)**: The system MUST support simultaneous deployment and execution of `:app-monitor` on flagship tier hardware (S21FE) and `:app-sensor` on budget/staggered tier hardware (A155), maintaining background telemetry sampling intervals (10,000ms), zero-crash service lifecycle execution, and clean logcat event logging across both endpoints (R-ID 118).
 *   **1.348 Decoupled Peer LED Signaling & Strict Relay-Independent Status Rules (R-ID 119)**: The system MUST strictly decouple peer connection LEDs from relay server connection LEDs across both Sensor and Monitor applications: `SRV` turns GREEN ONLY when actively connected to the Relay Server (otherwise RED); `TRK` on the Monitor side turns GREEN ONLY when connected to the TRACKER (`T`), independent of relay server state (otherwise RED); `VWR` on the Sensor side turns GREEN ONLY when connected to a VIEWER (`V`), independent of relay server state (otherwise RED) (R-ID 119).
 *   **1.349 Nov4.44 Release Candidate Verification & Reciprocal Virtual Presence Simulation (R-ID 120)**: The system MUST execute all automated unit tests, hardening procedures, and stress evaluations (`test --warning-mode all`) with 100% passing results, enforce reciprocal virtual presence simulation testing in single-device environments, and lock full forensic state in baseline `STATUS/BASELINE/Nov4.44/` (R-ID 120).
+*   **1.350 HUD Direction & Compact Spacing (R-ID 121)**: `HudStatusBar` MUST render left-to-right in layout and text order under every system language in both applications, and the Monitor MUST use its compact line spacing with no clipped text (R-ID 121).
+*   **1.351 Real-Position Map Centering (R-ID 122)**: The Monitor map MUST center only on real device positions and MUST NOT use a hardcoded location: the local device when disconnected, the sensor when connected, and the locked device after `SENSOR` or `LOCAL` is tapped. With no position it shows the world view, and `(0,0)` rows are never drawn (R-ID 122).
+*   **1.352 Telemetry Payload Integrity (R-ID 123)**: The signaling client MUST own a copy of every update it holds beyond `sendTelemetry`, and the wire format MUST carry position, timestamp, sequence, accuracy, speed, battery, charging, and temperature (R-ID 123).
+*   **1.353 Viewer Presence & Relay Switching (R-ID 124)**: The client MUST consume `viewer_status_relay` to drive the `VWR` LED, and a relay URL change MUST close the old socket and connect to the new relay without an app restart (R-ID 124).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov5.0**: HUD Direction, Real-Position Centering, Telemetry Payload Integrity, Viewer Presence & Relay Switching (GAP-REVOL69.0-G1 to G7) - PASSED (automated suite and two-device live run through a local relay; manual physical chapters not executed).
 - **Nov4.44**: Nov4.44 Release Candidate Verification & Reciprocal Virtual Presence Simulation (GAP-REVOL68.0-G1) - PASSED.
 - **Nov4.37**: Decoupled Peer LED Signaling & Strict Relay-Independent Status Rules (GAP-REVOL67.0-G1) - PASSED.
 - **Nov4.36**: Dual Device Hardware Deployment & Telemetry Audit (GAP-REVOL66.0-G1) - PASSED.
@@ -33,6 +38,7 @@
 - **Nov4.22-addHUD**: Post-Revolution HUD Integration & LED Status Verification (GAP-REVOL52.0-G1) - PASSED.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.61 (Nov5.0 Audit)**: PASSED - 100 automated tests on the final code (unit and on-device on A15) and a two-device live run with Sensor on A15 and Monitor on S21FE through a local relay: all LEDs active, real battery, live `AGE`, real map position, and zero Davey or StackLog from either app process. The production relay was unavailable, and manual physical chapters were not executed (see `TESTS/test_results.md`).
 *   **Chapter 5.60 (Nov4.44 Release Candidate Verification Audit)**: PASSED - Verification of Nov4.44 release candidate: 100% automated test execution passing across all subprojects, reciprocal virtual presence simulation testing, and baseline lock in `STATUS/BASELINE/Nov4.44/`.
 *   **Chapter 5.59 (Nov4.37 Decoupled Peer LED Signaling Audit)**: PASSED - Verification of decoupled peer LED signaling: `SRV` turns GREEN ONLY when connected to Relay Server (otherwise RED); `TRK` on Monitor turns GREEN ONLY when connected to Tracker `T` (otherwise RED); `VWR` on Sensor turns GREEN ONLY when connected to Viewer `V` (otherwise RED). Verified test pass rule (Connection active -> PASSED; Alarm/event present -> PASSED OK; Else -> FAILED).
 *   **Chapter 5.58 (Nov4.36 Dual Device Hardware Deployment Audit)**: PASSED - Verification of simultaneous deployment of Monitor on S21FE and Sensor on A155, active 10,000ms telemetry generation, logcat event logging, and 100% test execution across all subprojects.

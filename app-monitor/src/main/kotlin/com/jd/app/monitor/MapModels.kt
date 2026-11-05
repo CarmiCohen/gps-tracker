@@ -9,8 +9,6 @@ val Slate500 = Color(0xFF64748B)
 val Indigo500 = Color(0xFF6366F1)
 val Rose500 = Color(0xFFF43F5E)
 
-const val DEFAULT_LAT = 37.7749
-const val DEFAULT_LNG = -122.4194
 const val MARKER_POOL_PRUNE_THRESHOLD = 50
 
 const val ALERT_ID_JUMP_ALERT = "jump_alert"

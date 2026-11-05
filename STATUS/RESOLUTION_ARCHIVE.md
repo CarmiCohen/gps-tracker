@@ -1,5 +1,17 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov5.0)
+- **Compact Left-To-Right HUD (GAP-REVOL69.0-G1)**: `HudStatusBar` `compact` mode and forced left-to-right layout and text direction. **PASSED.**
+- **Real-Position Map Centering (GAP-REVOL69.0-G2)**: Removed the hardcoded San Francisco fallback; added `MonitorLocationSource`, the runtime location permission, and `resolveMapCenter`. **PASSED.**
+- **Zeroed Telemetry (GAP-REVOL69.0-G3, Critical)**: The client now owns `LocationUpdate.snapshot()` copies instead of pooled references, and the wire format carries accuracy, speed, battery, charging, and temperature. **PASSED.**
+- **VWR LED Never Activated (GAP-REVOL69.0-G4)**: Added the `viewer_status_relay` listener. **PASSED.**
+- **Relay URL Change Ignored (GAP-REVOL69.0-G5)**: `connect()` now replaces the session on a URL or identity change. **PASSED (automated).**
+- **Trail Drawn To (0,0) (GAP-REVOL69.0-G6)**: Added `knownPositions` filtering. **PASSED.**
+- **Monitor Instrumented Suite Did Not Compile (GAP-REVOL69.0-G7)**: Updated `FakeSignalingClient`. **PASSED.**
+- **Baseline Synchronization**: Version `Nov5.0` established as the new forensic stabilization baseline.
+
+---
+
 ## ✅ Resolved Issues (Nov4.44)
 - **Release Candidate Verification & Reciprocal Virtual Presence Simulation Audit (GAP-REVOL68.0-G1)**: Successfully executed all automated unit test suites (`test --warning-mode all`) across all subprojects with 100% passing results (0 failures), conducted reciprocal virtual presence simulation testing in single-device environment, updated `TESTS/TEST_PROCEDURE.md` (Chapter 117), and synchronized all forensic baseline documentation. **PASSED.**
 - **Baseline Synchronization**: Version `Nov4.44` established as the new forensic stabilization baseline.

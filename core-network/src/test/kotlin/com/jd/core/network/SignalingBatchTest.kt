@@ -5,7 +5,10 @@ import com.jd.core.shared.ViolationEvent
 import io.socket.client.IO
 import io.socket.client.Socket
 import io.socket.emitter.Emitter
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -48,10 +51,126 @@ class SignalingBatchTest {
             _connected = true
             listeners[EVENT_CONNECT]?.forEach { it.call() }
         }
+        fun relayViewerStatus(active: Boolean) {
+            val payload = JSONObject().put("id", "secret").put("active", active)
+            listeners["viewer_status_relay"]?.forEach { it.call(payload) }
+        }
     }
 
     class FakeSocketFactory(val socket: FakeSocket) : SocketFactory {
         override fun createSocket(url: String, options: IO.Options): Socket = socket
+    }
+
+    private fun pooledUpdate(sequence: Long) = LocationUpdate(
+        lat = 32.5, lng = 35.25, timestamp = 1_000L + sequence, sequenceId = sequence,
+        accuracy = 5f, speed = 2f, batteryLevel = 79, isCharging = true, tempCelsius = 31f
+    )
+
+    @Test
+    fun testRecycledUpdateIsSentIntactAndRoundTrips() = runTest {
+        val fakeSocket = FakeSocket()
+        val client = SocketioSignalingClient(FakeSocketFactory(fakeSocket), StandardTestDispatcher(testScheduler))
+
+        try {
+            client.connect("http://localhost", "test-device", "secret")
+            fakeSocket.simulateConnect()
+            runCurrent()
+
+            repeat(10) {
+                val update = pooledUpdate(it.toLong())
+                client.sendTelemetry(update)
+                update.reset() // What ObjectPool.release does immediately after sending
+            }
+            runCurrent()
+
+            val batch = fakeSocket.emittedEvents.first { it.first == "location_batch" }.second as JSONArray
+            val sent = batch.getJSONObject(9)
+            assertEquals(9L, sent.getLong("seq"))
+            assertEquals(1_009L, sent.getLong("ts"))
+            assertEquals(32.5, sent.getDouble("lat"), 0.0)
+
+            val received = async(start = CoroutineStart.UNDISPATCHED) { client.telemetryFlow.first() }
+            fakeSocket.listeners["location_relay"]!!.forEach { it.call(sent) }
+            val update = received.await()
+            assertEquals(35.25, update.lng, 0.0)
+            assertEquals(79, update.batteryLevel)
+            assertTrue(update.isCharging)
+            assertEquals(31f, update.tempCelsius, 0f)
+            assertEquals(5f, update.accuracy, 0f)
+            assertEquals(2f, update.speed, 0f)
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun testRecycledUpdateSurvivesOfflineQueue() = runTest {
+        val fakeSocket = FakeSocket()
+        val client = SocketioSignalingClient(FakeSocketFactory(fakeSocket), StandardTestDispatcher(testScheduler))
+
+        try {
+            client.connect("http://localhost", "test-device", "secret")
+            runCurrent()
+
+            val update = pooledUpdate(7L)
+            client.sendTelemetry(update)
+            update.reset()
+
+            fakeSocket.simulateConnect()
+            runCurrent()
+
+            val batch = fakeSocket.emittedEvents.first { it.first == "location_batch" }.second as JSONArray
+            assertEquals(7L, batch.getJSONObject(0).getLong("seq"))
+            assertEquals(32.5, batch.getJSONObject(0).getDouble("lat"), 0.0)
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun testRelayUrlChangeReplacesTheSocket() = runTest {
+        val sockets = mutableListOf<FakeSocket>()
+        val factory = object : SocketFactory {
+            override fun createSocket(url: String, options: IO.Options): Socket = FakeSocket().also { sockets += it }
+        }
+        val client = SocketioSignalingClient(factory, StandardTestDispatcher(testScheduler))
+
+        try {
+            client.connect("http://relay-a", "test-device", "secret")
+            sockets[0].simulateConnect()
+            runCurrent()
+
+            client.connect("http://relay-a", "test-device", "secret")
+            assertEquals("The same relay must keep its socket", 1, sockets.size)
+
+            client.connect("http://relay-b", "test-device", "secret")
+            runCurrent()
+            assertEquals("A new relay must open a new socket", 2, sockets.size)
+            assertFalse("The old socket must be closed", sockets[0].connected())
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun testViewerStatusFollowsRelayPresence() = runTest {
+        val fakeSocket = FakeSocket()
+        val client = SocketioSignalingClient(FakeSocketFactory(fakeSocket), StandardTestDispatcher(testScheduler))
+
+        try {
+            client.connect("http://localhost", "test-device", "secret")
+            fakeSocket.simulateConnect()
+            runCurrent()
+            assertFalse(client.viewerStatusFlow.value)
+
+            fakeSocket.relayViewerStatus(active = true)
+            assertTrue("VWR must activate when the relay reports a viewer", client.viewerStatusFlow.value)
+
+            fakeSocket.relayViewerStatus(active = false)
+            assertFalse("VWR must clear when the viewer leaves", client.viewerStatusFlow.value)
+        } finally {
+            client.disconnect()
+        }
     }
 
     @Test

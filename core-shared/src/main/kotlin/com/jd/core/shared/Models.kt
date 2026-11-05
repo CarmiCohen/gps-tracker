@@ -32,6 +32,9 @@ data class LocationUpdate(
     var status: String = "VALID", // Added for remote status visibility
     var sensorSnapshot: SensorSnapshot = SensorSnapshot()
 ) {
+    /** Deep copy for holders that outlive a pooled instance, which is zeroed on release. */
+    fun snapshot(): LocationUpdate = copy(sensorSnapshot = sensorSnapshot.copy())
+
     fun reset() {
         deviceId = ""; lat = 0.0; lng = 0.0; accuracy = 0f; speed = 0f; bearing = 0f; altitude = 0.0
         timestamp = 0L; monotonicNanos = 0L; serverArrivalTs = 0L; sequenceId = 0L

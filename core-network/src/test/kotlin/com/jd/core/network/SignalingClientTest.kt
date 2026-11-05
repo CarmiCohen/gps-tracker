@@ -36,6 +36,7 @@ class SignalingClientTest {
         // Ensuring the interface contract for connection tracking is stable.
         val mockClient = object : SignalingClient {
             override val isConnected = kotlinx.coroutines.flow.MutableStateFlow(false)
+            override val viewerStatusFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
             override val telemetryFlow = kotlinx.coroutines.flow.emptyFlow<LocationUpdate>()
             override val violationFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.ViolationEvent>()
             override val backfillRequestFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.BackfillRequest>()

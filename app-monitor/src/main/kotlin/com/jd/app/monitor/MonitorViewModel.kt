@@ -24,6 +24,7 @@ class MonitorViewModel @Inject constructor(
     private val identityManager: ForensicIdentityManager,
     private val signalingClient: SignalingClient,
     private val dataStore: MonitorDataStore,
+    private val locationSource: MonitorLocationSource,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -77,6 +78,17 @@ class MonitorViewModel @Inject constructor(
             repository.getTrail(id)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val hasLocationPermission = MutableStateFlow(locationSource.hasPermission())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val localPosition: StateFlow<MapPosition?> = hasLocationPermission
+        .flatMapLatest { granted -> if (granted) locationSource.positions() else emptyFlow() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun refreshLocationPermission() {
+        hasLocationPermission.value = locationSource.hasPermission()
+    }
 
     val targetId = identityManager.targetId
     val selfId = identityManager.selfId
