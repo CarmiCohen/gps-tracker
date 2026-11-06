@@ -1,4 +1,21 @@
-# Test Results - Nov5.2 (Chapter Triage & Runtime Resilience)
+# Test Results - Nov6.0 (Forensic Entry Integrity & Chapter Review)
+
+## Nov6.0 Summary
+Executed Nov 6, 2026 on the A15 (`R58X40GV2AR`, API 36). The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **Automated suite** | 🟢 **130/130** | `:core-shared` 46, `:core-network` 16, `:core-ui` 5, `:app-monitor` unit 13, `:app-monitor` on A15 15, `:app-sensor` on A15 35. |
+| **121.1 to 121.4 Entry integrity** | 🟢 **PASSED (automated)** | Interrupted states are simulated in the file. A deliberate break of the code failed 8 tests. Physical power loss was not run. |
+| **121.5 Upgrade** | 🟢 **PASSED** | Full version 2 file upgraded in place on the A15: 10000 entries kept, numbering continued from 638988. |
+| **121.6 Older Android** | 🟡 **AUTOMATED ONLY** | Compiled class checked; not run below API 35 (ISSUE-NOV6.0-O26). |
+| **121.7 Process kill** | 🟢 **PASSED** | Three `kill -9` during 10Hz writing; restarted by itself each time; no damaged entries. |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | `device_audit.cmd`, Sensor process: 0 Davey over 500ms, 0 StackLog, 0 fatal. |
+| **120.7 Backfill** | 🟡 **LOCAL RELAY ONLY** | Still not verified on production (ISSUE-NOV5.2-O12). |
+
+---
+
+# Nov5.2 Results (Chapter Triage & Runtime Resilience)
 
 ## Nov5.2 Summary
 Executed Nov 5, 2026 on the A15 (`R58X40GV2AR`), running both Sensor and Monitor on the production relay unless noted. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.

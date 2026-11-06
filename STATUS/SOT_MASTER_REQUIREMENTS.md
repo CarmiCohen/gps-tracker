@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov5.2)
+# SOT Master Requirements & Hardening Status (Nov6.0)
 
-## 🏗️ Architectural Master Rules (431 Rules)
+## 🏗️ Architectural Master Rules (432 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -20,6 +20,7 @@
 *   **1.354 Single Default Relay & Deployed Relay Parity (R-ID 125)**: Both applications MUST take the default relay address from `RelayConfig.DEFAULT_URL` (`https://gps-survival-relay.onrender.com`), and relay protocol changes in `relay-server` MUST be committed and deployed before a version that depends on them is verified (R-ID 125).
 *   **1.355 Runtime Resilience (R-ID 126)**: The Sensor MUST continue sequence numbers after a crash and keep its wake lock renewed while running, and backfill requests and responses MUST be routable end to end (R-ID 126).
 *   **1.356 Display Limits & Input Safety (R-ID 127)**: The Monitor MUST display at most the newest 1000 trail points at no more than 2Hz, show telemetry only from the paired device, keep all menu actions visible, and reject malformed relay URLs; instrument text MUST stay visible at the largest system font (R-ID 127).
+*   **1.357 Forensic Entry Integrity (R-ID 128)**: Each `ForensicBuffer` entry MUST carry a checksum and damaged entries MUST NOT be returned; a sent sequence number MUST NOT be reused after power loss; a file format upgrade MUST keep stored entries; and code in `core-shared` MUST call only methods available at the Sensor's `minSdk` (R-ID 128).
 
 ## 🛡️ Core Hardening Baseline
 - **Nov5.2**: Runtime Resilience, Display Limits & Chapter Triage (GAP-REVOL71.0-G1 to G8) - PASSED with open items (relay v6.044 undeployed).
@@ -44,6 +45,7 @@
 
 ## ✅ Verification Chapters
 *   **Chapter 5.63 (Nov5.2 Audit)**: PASSED with open items - 118 automated tests and an A15 live pass covering crash recovery, reboot, network loss, Doze, rotation, font scaling, isolation, and URL validation. Every chapter was triaged in `TESTS/CHAPTER_TRIAGE.md`; 48 of 120 are verified at least in part. Rules marked as implemented elsewhere in this file may describe unwired features (ISSUE-NOV5.2-O11).
+*   **Chapter 5.64 (Nov6.0 Audit)**: PASSED with open items - 130 automated tests, a real version 2 file upgrade and three `kill -9` recoveries on the A15, and zero Davey, StackLog, or fatal entries from the Sensor process. The chapter review supersedes the 5.63 count: 43 of 111 active chapters are verified at least in part (ISSUE-NOV5.4-O17, ISSUE-NOV6.0-O20). Interrupted writes are simulated, physical power loss was not run, and nothing was run below API 35 (ISSUE-NOV6.0-O26). See `TESTS/CHAPTER_TRIAGE.md`.
 *   **Chapter 5.62 (Nov5.1 Audit)**: PASSED - 103 automated tests and a two-device live run with Sensor on A15 and Monitor on S21FE through the production relay on the final build: all LEDs active, real battery, live `AGE`, real map position, relay URL hot switch without restart, and zero Davey or StackLog from either app process. Manual physical chapters were not executed (see `TESTS/test_results.md`).
 *   **Chapter 5.61 (Nov5.0 Audit)**: PASSED - 100 automated tests on the final code (unit and on-device on A15) and a two-device live run with Sensor on A15 and Monitor on S21FE through a local relay: all LEDs active, real battery, live `AGE`, real map position, and zero Davey or StackLog from either app process. The production relay was unavailable, and manual physical chapters were not executed (see `TESTS/test_results.md`).
 *   **Chapter 5.60 (Nov4.44 Release Candidate Verification Audit)**: PASSED - Verification of Nov4.44 release candidate: 100% automated test execution passing across all subprojects, reciprocal virtual presence simulation testing, and baseline lock in `STATUS/BASELINE/Nov4.44/`.

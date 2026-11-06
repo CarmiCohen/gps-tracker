@@ -27,15 +27,16 @@ class SequenceContinuityTest {
 
         val reopened = ForensicBuffer(dir, capacity = 10).apply { initialize() }
 
-        assertEquals(5L, reopened.nextSequenceId())
+        // Numbers up to the stored reservation are skipped (ISSUE-NOV6.0-O20).
+        assertEquals(100L, reopened.nextSequenceId())
     }
 
     @Test
     fun wrappedBufferStillFindsTheHighestSequence() {
         val buffer = ForensicBuffer(Files.createTempDirectory("seq").toFile(), capacity = 10)
         buffer.initialize()
-        (0L..24L).forEach { buffer.writeTrace(update(it)) }
+        (95L..124L).forEach { buffer.writeTrace(update(it)) }
 
-        assertEquals(25L, buffer.nextSequenceId())
+        assertEquals(195L, buffer.nextSequenceId())
     }
 }

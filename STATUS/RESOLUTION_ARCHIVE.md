@@ -1,5 +1,11 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov6.0)
+- **Chapter Retirement Released (ISSUE-NOV5.4-O18)**: The retirement of chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1 and 2.2 ships with Nov6.0. Their wording is preserved in `TESTS/RETIRED_CHAPTERS.md`. **PASSED.**
+- **Forensic Entry Integrity (ISSUE-NOV6.0-O20)**: Entries carry a CRC32 and damaged ones are skipped; the whole mapping is forced, not only the header; a broken header is rebuilt from entries; the header reserves sequence numbers so none are reused after power loss; version 2 files upgrade in place. The reset header is now written to the file. Verified by `ForensicEntryIntegrityTest` and on the A15: real upgrade, three `kill -9` recoveries, 35 of 35 instrumented tests, zero Davey, StackLog, or fatal entries. Interrupted states are simulated; physical power loss was not run. **PASSED.**
+- **Calls Missing On Older Android (ISSUE-NOV6.0-O25)**: `force(int, int)` and `position(int)` are gone from `ForensicBuffer`, and all 125 JDK methods called by `core-shared` exist at API 26 or lower. Guarded by `ForensicBufferApiLevelTest`. Never run below API 35 (ISSUE-NOV6.0-O26). **PASSED (automated).**
+- **Chapter Review (ISSUE-NOV5.4-O17)**: Each A chapter was compared with its named test and the production code. Chapters 53, 66, 67, 68, 83, 88, and 93 lost their verified status, and chapter 87 stays active as D. QA is 41 of 110 active chapters, down from 48 of 120. Documentation review only: no tests were run and no code changed. New gaps: ISSUE-NOV6.0-O20 to O24.
+
 ## ✅ Resolved Issues (Nov5.2)
 - **Telemetry Interval Explained (ISSUE-NOV5.0-O3)**: 100ms is the designed charging rate; verified live. **PASSED.**
 - **Runtime Resilience (GAP-REVOL71.0-G1, G2)**: Sequence continuity across crashes and wake lock renewal. **PASSED.**

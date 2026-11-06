@@ -17,8 +17,6 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **1.6 Branding Audit:** Verify the "Platinum" branding and JD logos are centered.
 
 ## Chapter 2 - Setup and Configuration (Bypass Active)
-*   **2.1 Enter Tracker Mode:** Tap "Tracker".
-*   **2.2 Verify Setup Bypass:** Confirm app lands directly on Dashboard (R-ID 615).
 *   **2.3 ID Persistence:** Modify IDs, close (X), and reopen. Confirm preservation.
 
 ## Chapter 3 - Tracker Mode & Sensor Telemetry
@@ -57,9 +55,6 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 9 - Acoustic & Tamper Escalation
 *   **9.1 Acoustic Breach:** Produce noise (>85dB). Verify `ACOUSTIC_ALERT` triggers.
 *   **9.2 Siren Override:** Silence active siren; verify `ACK` event is logged.
-
-## Chapter 10 - Native Resource Lifecycle (Issue #249)
-*   **10.1 Bridge Disposal:** Switch Tracker/Viewer modes 5 times. Monitor for `BaseEventQueue.dispose` failures.
 
 ## Chapter 11 - Geofence Predictive Breach (R71)
 *   **11.1 Predictive Breach:** Move device towards boundary at speed; verify alarm triggers 2.0s BEFORE breach.
@@ -178,9 +173,6 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 46 - WorkManager Expedited Execution (R31)
 *   **46.1 Android 14+ Policies:** Verify Maintenance workers execute as "Expedited".
 
-## Chapter 47 - JNI Thread Affinity & Block Audit (R32)
-*   **47.1 Non-blocking Audit:** Monitor native calls; verify they never block the Main UI loop.
-
 ## Chapter 48 - Activity Recognition Motion Stability (R36)
 *   **48.1 False-Positive Rejection:** Shake device while in a vehicle; verify status remains `MOVING`.
 
@@ -250,9 +242,6 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 70 - Hilt Lifecycle during Process Death
 *   **70.1 Restoration Audit:** Verify Hilt dependencies re-injected correctly after process death.
 
-## Chapter 71 - Tracker ID Entropy Audit
-*   **71.1 Security Audit:** Verify ID randomness across 100 generations.
-
 ## Chapter 72 - Local Log Encryption Performance
 *   **72.1 Overhead Audit:** measure latency with encryption. Overhead must be < 5ms.
 
@@ -271,14 +260,8 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 77 - A15 GNSS Hysteresis Cooling (R274)
 *   **77.1 Cooling Stability:** Rapid temp drop; verify 10s cooling window before signal re-acquisition.
 
-## Chapter 78 - Service Role Isolation (R975)
-*   **78.1 Mutual Exclusivity:** Attempt to start Tracker and Viewer services simultaneously; verify rejection.
-
 ## Chapter 79 - Forensic Trace Scrubbing (R779)
 *   **79.1 Metadata Sanitization:** Verify absolute removal of path/HW-ID metadata in forensic logs.
-
-## Chapter 80 - Snap-Isolation Throttling (R312)
-*   **80.1 100Hz Parity:** Audit JNI bridge for telemetry parity under 100Hz saturation.
 
 ## Chapter 81 - Signaling Tick-Loop Resumption (R314)
 *   **81.1 Tick-Loop Audit:** Verify proactive loop initiation on every peer pulse receipt.
@@ -288,9 +271,6 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ## Chapter 83 - Main-Thread Stall Watchdog (R33)
 *   **83.1 ANR Recovery:** Block main thread for 5s; verify automatic engine recovery.
-
-## Chapter 84 - Initialization Unification (R491)
-*   **84.1 Role-agnostic Restoration:** Verify state restoration logic is identical for both roles.
 
 ## Chapter 85 - Side-Effect Persistence Authority (R492)
 *   **85.1 Persistence Routing:** Verify role-agnostic routing for all telemetry side-effects.
@@ -304,23 +284,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 88 - Hydration Staggering Determinism (R495)
 *   **88.1 Startup Order:** Verify repository hydration order under CPU/IO saturation.
 
-## Chapter 89 - ViewModel Decommissioning Audit (R496)
-*   **89.1 Legacy Cleanup:** Confirm absolute removal of legacy feature ViewModels.
-
 ## Chapter 90 - Unified Doze-Emergency Override (R497)
 *   **90.1 Sleep Wakeup:** Verify priority geofence alarms wake the device from deep sleep.
 
 ## Chapter 91 - Hardware Poke Boundary Precision (R498)
 *   **91.1 Boundary Matching:** Audit inclusive matching logic for sensor polling thresholds.
 
-## Chapter 92 - Identity Collision Prevention (R499)
-*   **92.1 Unique Generation:** Verify uniqueness in alias-aware ID generation logic.
-
 ## Chapter 93 - Programmatic 24h Soak Simulation (R500)
 *   **93.1 Soak Stability:** Verify zero forensic loss over 24-hour simulation cycle.
-
-## Chapter 94 - JNI Alignment Drift Protection (Issue #16.9)
-*   **94.1 Stress Audit:** Monitor JNI bridge for 8-byte boundary alignment under 100% CPU lock.
 
 ## Chapter 95 - Foreground Notification Action Life (R41)
 *   **95.1 Action Persistence:** Verify "Stop" action works after process death/sticky restart.
@@ -423,11 +394,6 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     - *Else if there is an alarm or at least an event logged — the test PASSED OK.*
     - *Else — the test FAILED.*
 
-## Chapter 117 - Nov4.44 Release Candidate Verification & Reciprocal Virtual Presence Simulation (Nov4.44)
-*   **117.1 Automated Unit & Hardening Test Execution:** Verify execution of all project unit tests, hardening procedures, and stress evaluations (`test --warning-mode all`) across `:app-monitor`, `:app-sensor`, `:core-network`, `:core-shared`, and `:core-ui` with 100% passing results (0 failures).
-*   **117.2 Reciprocal Virtual Presence Simulation Audit:** Verify reciprocal virtual presence testing in single-device environment: simulate a viewer virtual presence to validate tracker behavior, followed by a tracker virtual presence to validate viewer behavior.
-*   **117.3 SOT Parity & Baseline Lock:** Verify parity with all 424 SOT Master Rules and lock baseline state in `STATUS/BASELINE/Nov4.44/`.
-
 ## Chapter 118 - HUD Direction, Compact Spacing & Real-Position Map Centering (Nov5.0)
 *   **118.1 HUD Left-To-Right Authority:** Verify that `HudStatusBar` keeps left-to-right layout and text order in both Sensor and Monitor applications under an RTL system language (`INT` left of `WDG`, row 2 reads `B:...|T:...|A:...|AGE:...`). Automated by `HudLayoutAuditTest`.
 *   **118.2 Real-Position Map Centering:** Verify that the Monitor map centers only on real device positions: the local device when disconnected, the sensor when connected, and the locked device after `SENSOR` / `LOCAL` is tapped, including `SENSOR` while the peer is inactive. Automated by `MapCenterResolverTest`.
@@ -444,7 +410,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **119.3 Production Telemetry:** Verify that the Monitor shows `TRK` GREEN, the Sensor's real battery, and a live `AGE`, and that the Sensor shows `VWR` active.
 
 ## Chapter 120 - Runtime Resilience & Display Limits (Nov5.2)
-*   **120.1 Sequence Continuity:** Verify that the Sensor continues its sequence numbers after a crash or reboot instead of restarting at 0. Automated by `SequenceContinuityTest`; on hardware, crash the Sensor and compare the sequence before and after.
+*   **120.1 Sequence Continuity:** Verify that the Sensor continues its sequence numbers after a crash or reboot instead of restarting at 0. Since Nov6.0 a restart can skip up to 100 numbers (see 121.3). Automated by `SequenceContinuityTest`; on hardware, crash the Sensor and compare the sequence before and after.
 *   **120.2 Wake Lock Renewal:** Verify that the Sensor still holds its wake lock after the original 10 minutes, and that telemetry continues during forced Doze.
 *   **120.3 Trail Cap:** Verify that the map receives at most the newest 1000 trail points. Automated by `TrailCapTest`.
 *   **120.4 UI Update Rate:** Verify that a 10Hz telemetry stream updates the Monitor trail at no more than 2Hz. Automated by `UiRateTest`.
@@ -454,8 +420,19 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **120.8 Instrument Font Cap:** With the system font at its largest, verify that HUD speed and map button labels stay visible. Automated by `HudLayoutAuditTest.speedStaysVisibleAtTheLargestSystemFont`.
 *   **120.9 Paired Device Isolation:** After re-pairing the Monitor to a different ID, verify that the sensor HUD line shows no values from the previous device. Automated by `PairedTelemetryTest`.
 
+## Chapter 121 - Forensic Entry Integrity (Nov6.0)
+*   **121.1 Interrupted Write:** Verify that an entry left half written or without its checksum is skipped, and that all other entries read correctly. Automated by `ForensicEntryIntegrityTest.interruptedWriteOverTheOldestEntryIsSkipped` and `checksumWrittenLastMeansAFullyCopiedButUncheckedEntryIsSkipped`.
+*   **121.2 Power Loss:** Verify that a header claiming entries that never reached storage does not produce invented entries. Automated by `ForensicEntryIntegrityTest.headerClaimingEntriesThatNeverReachedStorageIsHandled`.
+*   **121.3 No Sequence Reuse:** Verify that every sent number is below the reservation stored in the header, so a restart after power loss never reuses one. A restart can skip up to 100 numbers; the Monitor sends one backfill request for the gap and receives an empty reply. Automated by `sequenceNumbersAreNotReusedAfterPowerLoss` and `everyWrittenNumberIsBelowTheStoredReservation`.
+*   **121.4 Damaged Header:** Verify that an out-of-range or partly updated header is rebuilt from the entries, in order, and that writing continues. A reset after an unknown version must be stored in the file. Automated by `outOfRangeWriteIndexIsRebuiltAndWritingContinues`, `headerTornBetweenIndexAndCountIsRebuilt`, `headerTornAtTheWrapPointIsRebuiltInOrder`, and `resetAfterUnknownVersionIsStoredInTheFile`.
+*   **121.5 Upgrade From Version 2:** Install the new Sensor over an older one with `adb install -r`. Verify that the file reaches version 3, the entries remain, and numbering continues. Automated by `versionTwoFileKeepsItsEntriesAndSequenceAfterUpgrade` and `partlyFilledVersionTwoFileDoesNotAdoptUnusedSlots`.
+*   **121.6 Older Android Compatibility:** Verify that `ForensicBuffer` calls no method missing below API 35. Automated by `ForensicBufferApiLevelTest`, which reads the compiled class. On a device with API 34 or lower, verify that the Sensor starts and writes telemetry.
+*   **121.7 Process Kill:** While telemetry runs, kill the Sensor process with `kill -9`. Verify that it restarts by itself, logs no damaged entries, and that the stored reservation advances.
+
 ---
-**Total Testing Chapters: 120**
+**Active Testing Chapters: 111 of 121**
+*Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
+
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
 
 
