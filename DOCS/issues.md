@@ -1,11 +1,11 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov6.2)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov6.3)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov6.2, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov6.3, solved one by one in the order below
 
 ### Work Queue
-Nov6.2 is closed and followed Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3 or Nov5.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov6.3 is closed and followed Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3 or Nov5.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
-**Next item: ISSUE-NOV5.0-O5 (item 5).** Items 1, 2, 12, and 17 were released in Nov6.0, item 3 in Nov6.1, and item 4 in Nov6.2.
+**Next item: ISSUE-NOV5.0-O6 (item 6).** Items 1, 2, 12, and 17 were released in Nov6.0, item 3 in Nov6.1, item 4 in Nov6.2, and item 5 in Nov6.3.
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -13,7 +13,7 @@ Nov6.2 is closed and followed Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3 or
 | 2 | ISSUE-NOV5.4-O18 | **Done for Nov6.0**: chapter retirement released | Nothing |
 | 3 | ISSUE-NOV5.0-O2 | **Done for Nov6.1**: both Monitor HUD lines show only real values | Nothing |
 | 4 | ISSUE-NOV5.2-O14 | **Done for Nov6.2**: Monitor trail storage bounded per tracker | Nothing |
-| 5 | ISSUE-NOV5.0-O5 | Remove the false relay status text | Nothing |
+| 5 | ISSUE-NOV5.0-O5 | **Done for Nov6.3**: the Setup dialog shows the real relay state | Nothing |
 | 6 | ISSUE-NOV5.0-O6 | Remove the stale version strings | Nothing |
 | 7 | ISSUE-NOV5.2-O15 | Confirm before the gear unpairs | Nothing |
 | 8 | ISSUE-NOV5.2-O11 | Decide build or retire for each unwired feature, grouped by feature | User decisions |
@@ -65,7 +65,6 @@ Nov6.2 is closed and followed Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3 or
 - **ISSUE-NOV5.2-O13 (Medium) - False MOVING on GPS noise**: the Monitor derives MOVING from GPS speed above 1.5 km/h only, so a stationary Sensor showed `MOVING` at about 2 km/h. `SentinelLogic` and IMU data are not used.
 - **ISSUE-NOV5.2-O15 (Low) - Settings gear unpairs immediately**: the Monitor `Settings / Re-pair` button clears the pairing with no confirmation.
 - **ISSUE-NOV5.2-O16 (Low) - Sequence restarts after a fresh install**: reinstalling the Sensor clears its buffer and restarts at 0, and the Monitor unique index can then replace older rows with the same sequence. The Nov6.0 sequence reservation does not cover this: it lives in the buffer file, which an uninstall removes.
-- **ISSUE-NOV5.0-O5 (Low) - False relay status text**: the Monitor Setup dialog hardcodes `Relay Status: Connected / Active`, even while `SRV` is red.
 - **ISSUE-NOV5.0-O6 (Low) - Stale version strings**: `SensorService` logs `Version: Nov1.7 (Final)`, and `getAppVersionName` falls back to `Nov4.27` in both apps.
 - **ISSUE-NOV5.0-O7 (Low) - Zero-position rows are still stored and sent**: the sensor sends `(0,0)` until its first fix and the Monitor stores those rows. They are now filtered at display time only.
 - **ISSUE-NOV5.1-O9 (Low) - Relay cold start exceeds the app connection timeout**: the relay took 21-22s to answer after idling, longer than the 20s `setTimeout`. A relay restart recovered in about 4s. Nov6.2 saw recovery once on production: the Sensor logged a connection `timeout` at 14:40:54 and connected at 14:40:57 with no help. The relay's state before that timeout was not measured, so it is probably, not certainly, a cold start.
@@ -73,6 +72,11 @@ Nov6.2 is closed and followed Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3 or
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov6.3)
+*   **Real Relay Status Text (ISSUE-NOV5.0-O5)**: The Monitor Setup dialog always said `Relay Status: Connected / Active`, even with `SRV` red. It now shows `HudState.relayStatusText`, built from `isRelayConnected`, the field that drives `SRV`, so the two cannot disagree. The label `Connected Tracker ID:` also claimed a connection while showing only the stored pairing, and is now `Tracker ID:`. Verified by 156 of 156 automated tests. `RelayStatusDialogTest` renders the real `MonitorScreen`, and both of its tests failed when the old text was put back. On the A15 through the production relay, with the dialog open, the text changed to `Disconnected` within 5 seconds of cutting mobile data and back within 5 seconds of restoring it. The `SRV` LED colour was not read during that check. **PASSED.**
 
 ---
 
@@ -163,6 +167,7 @@ Nov6.2 is closed and followed Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3 or
 *   **SIMP-REVOL39.0-S1**: Integrated Kinetic State Observer. Consolidate acceleration, velocity, and thermal status evaluation into a single unified observer in `core-shared`.
 *   **SIMP-REVOL38.3-S1**: Dynamic Buffer Auto-tuner. Consolidate bitrate detection and buffer resizing into an adaptive native manager.
 *   **SIMP-NOV6.0-S1**: Lint For `core-shared`. Run Gradle lint on `core-shared`, or build it against `android.jar`. That would catch calls missing from older Android across the whole module and could replace the single-class check in `ForensicBufferApiLevelTest`.
+*   **SIMP-NOV6.3-S1**: Delete `HudViewState`. `core-ui/.../ViewState.kt` holds a second HUD model with its own `isRelayConnected`, and no code uses it. `HudState` is the only model in use, so the file can be removed.
 *   **SIMP-NOV6.2-S1**: Drop The Local Trail Column. If ISSUE-NOV6.2-O29 is decided against a local trail, remove `isLocalUser`, `pruneLocalTrail`, and the filter in `getLastSequenceId`, leaving the row cap as the only storage rule.
 *   **SIMP-NOV6.1-S1**: Shared Device Status. `isNetworkAvailable` and `isLocationProviderEnabled` are copied in `MonitorViewModel` and `SensorViewModel`. Move them next to `readBattery` in `core-ui`, as was done for the battery code.
 *   **SIMP-NOV5.0-S1**: Single Map Path. `OsmMap` in `MapComponents.kt` has no callers, while `MonitorScreen` drives its own `MapView`. Either adopt that stack or delete it, along with its unused models and controller.
@@ -170,6 +175,7 @@ Nov6.2 is closed and followed Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3 or
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov6.3: [SOT Count: 935 (Rules: 435), Open: H:1, M:6, L:14, Ideas: H:0, M:3, L:12, Testing: PASSED (Sub-items: 156), QA: 47]** - Audit Baseline: 156 automated tests passing, including 60 on the A15; Sensor and Monitor live on the A15 through the production relay, with the Setup dialog following a real network loss and recovery; 0 Davey, StackLog, or fatal entries from either process. QA counts chapters verified at least in part, out of 114 active chapters.
 - **Nov6.2: [SOT Count: 934 (Rules: 434), Open: H:1, M:6, L:15, Ideas: H:0, M:3, L:11, Testing: PASSED (Sub-items: 153), QA: 46]** - Audit Baseline: 153 automated tests passing, including 58 on the A15; reciprocal simulation on the A15 through a private relay in both directions; the installed Monitor pruned 9,799 of 59,799 rows on its own schedule; Sensor and Monitor live on the production relay with 0 Davey, StackLog, or fatal entries from either process. QA counts chapters verified at least in part, out of 113 active chapters.
 - **Nov6.1: [SOT Count: 933 (Rules: 433), Open: H:1, M:7, L:12, Ideas: H:0, M:3, L:10, Testing: PASSED (Sub-items: 145), QA: 44]** - Audit Baseline: 145 automated tests passing, including 50 on the A15; Sensor and Monitor live on the A15 through the production relay, with the local HUD line matching `dumpsys`; 0 Davey, StackLog, or fatal entries from either process. QA counts chapters verified at least in part, out of 112 active chapters.
 - **Nov6.0: [SOT Count: 932 (Rules: 432), Open: H:1, M:7, L:11, Ideas: H:0, M:3, L:9, Testing: PASSED (Sub-items: 130), QA: 43]** - Audit Baseline: 130 automated tests passing, including 50 on the A15; real version 2 file upgrade and three `kill -9` recoveries on the A15; 0 Davey, StackLog, or fatal entries from the Sensor process. Interrupted writes are simulated, and nothing was run below API 35. QA counts chapters verified at least in part, out of 111 active chapters.

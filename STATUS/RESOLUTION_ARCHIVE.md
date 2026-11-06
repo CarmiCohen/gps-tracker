@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov6.3)
+- **Real Relay Status Text (ISSUE-NOV5.0-O5)**: The Monitor Setup dialog always said `Relay Status: Connected / Active`, even with `SRV` red. It now shows `HudState.relayStatusText`, built from `isRelayConnected`, the field that drives `SRV`, so the two cannot disagree. The label `Connected Tracker ID:` also claimed a connection while showing only the stored pairing, and is now `Tracker ID:`. Verified by 156 of 156 automated tests. `RelayStatusDialogTest` renders the real `MonitorScreen`, and both of its tests failed when the old text was put back. On the A15 through the production relay, with the dialog open, the text changed to `Disconnected` within 5 seconds of cutting mobile data and back within 5 seconds of restoring it. **PASSED.**
+
 ## ✅ Resolved Issues (Nov6.2)
 - **Bounded Trail Storage (ISSUE-NOV5.2-O14)**: Each tracker now keeps its newest 50,000 trail rows, about 4.4MB, in place of unlimited growth. `TrailPruningWorker` runs about every 15 minutes, scheduled from `MonitorApp`, which now supplies the `HiltWorkerFactory` the worker needs; the default WorkManager start-up is removed. The limit is by count, not age, so pruning causes no false backfill. Verified by 153 of 153 automated tests and on the installed app on the A15: 59,799 rows through a private relay, the periodic job removed exactly 9,799, telemetry continued, and no new backfill followed. **PASSED.**
 

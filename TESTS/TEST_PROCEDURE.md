@@ -442,8 +442,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **123.4 Scheduling:** Verify that starting the Monitor registers one periodic job, and that repeated starts do not add another. Automated by `schedulingTwiceKeepsOnePeriodicJob`. On hardware, confirm the job in `dumpsys jobscheduler` and `Worker result SUCCESS` in logcat, which also proves that `HiltWorkerFactory` creates the worker.
 *   **123.5 Pruning On Hardware:** Load more than 50,000 rows into the installed Monitor through a private relay, never the production relay. Wait for the periodic run and verify `Trail cleanup finished. Rows removed: N` in logcat, then verify that live telemetry continues and requests no new backfill.
 
+## Chapter 124 - Real Relay Status Text (Nov6.3)
+*   **124.1 Status Follows The Relay:** Open the Monitor Setup dialog. Verify that it shows `Relay Status: Connected` while `SRV` is on and `Relay Status: Disconnected` while `SRV` is off, including a change while the dialog stays open. Automated by `HudStateTest.relayStatusTextFollowsTheSrvState` and `RelayStatusDialogTest`.
+*   **124.2 Relay Lost On Hardware:** With the dialog open on the A15, cut the network. Verify that the status changes to `Disconnected` together with `SRV`, and returns to `Connected` after the network returns.
+
 ---
-**Active Testing Chapters: 113 of 123**
+**Active Testing Chapters: 114 of 124**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

@@ -1,4 +1,22 @@
-# Test Results - Nov6.2 (Bounded Trail Storage)
+# Test Results - Nov6.3 (Real Relay Status Text)
+
+## Nov6.3 Summary
+Executed Nov 6, 2026 on the A15 (`R58X40GV2AR`, API 36), with Sensor and Monitor on the same phone through the production relay. The S21FE was connected to the PC from about 14:53 but was not used; every command named the A15. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **Automated suite** | 🟢 **156/156** | `:core-shared` 46, `:core-network` 16, `:core-ui` 14, `:app-monitor` unit 20, `:app-monitor` on A15 25, `:app-sensor` on A15 35. Unit tasks were forced with `--rerun`. |
+| **124.1 Status follows the relay** | 🟢 **PASSED (automated)** | `HudStateTest.relayStatusTextFollowsTheSrvState` and `RelayStatusDialogTest` on the A15, which renders the real `MonitorScreen` and opens the dialog. |
+| **Deliberate break** | 🟢 **PASSED** | With the old hardcoded text put back, both `RelayStatusDialogTest` tests failed on `assertExists`. The fix was then restored. |
+| **124.2 Relay lost on hardware** | 🟢 **PASSED** | Dialog open on the A15: `Connected`; mobile data off, `Disconnected` within 5s; mobile data on, `Connected` within 5s. Polled every 3s, so times are upper limits. The `SRV` LED colour was not read during this; both use the same field. |
+| **Dialog content** | 🟢 **PASSED** | `Tracker ID: T`, `Monitor ID: V`, `App Version: Nov6.3`, `Relay Status: Connected`. |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | `device_audit.cmd`, Sensor and Monitor processes: 0 Davey over 500ms, 0 StackLog, 0 fatal. |
+
+**Run history:** one intended failure, the deliberate break above. Every other run passed the first time.
+
+---
+
+# Nov6.2 Results (Bounded Trail Storage)
 
 ## Nov6.2 Summary
 Executed Nov 6, 2026 on the A15 (`R58X40GV2AR`, API 36), the only phone attached, so the reciprocal simulation applied. The simulation used a private copy of `relay-server/index.js` on the workstation through `adb reverse`; no simulated data reached the production relay. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.

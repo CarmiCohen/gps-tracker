@@ -466,11 +466,11 @@ fun MonitorScreen(
             title = { Text("Monitor Setup & Info") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Connected Tracker ID: $trackerId")
+                    Text("Tracker ID: $trackerId")
                     Text("Monitor ID: $monitorId")
                     Text("Relay URL: $relayUrl")
                     Text("App Version: ${getAppVersionName(LocalContext.current)}")
-                    Text("Relay Status: Connected / Active")
+                    Text(localHudState.relayStatusText)
 
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(

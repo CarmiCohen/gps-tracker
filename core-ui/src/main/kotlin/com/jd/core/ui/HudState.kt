@@ -36,6 +36,10 @@ data class HudState(
     val speedText: String
         get() = "${speedKmh?.let { String.format(Locale.US, "%.1f", it) } ?: NO_VALUE} km/h"
 
+    /** Uses the same state as the SRV LED, so the two can never disagree. */
+    val relayStatusText: String
+        get() = "Relay Status: ${if (isRelayConnected) "Connected" else "Disconnected"}"
+
     val telemetryText: String
         get() {
             val battery = batteryLevel?.let { "$it%${if (isCharging) "⚡" else ""}" } ?: NO_VALUE

@@ -19,6 +19,12 @@ class HudStateTest {
     }
 
     @Test
+    fun relayStatusTextFollowsTheSrvState() {
+        assertEquals("Relay Status: Connected", HudState(isRelayConnected = true).relayStatusText)
+        assertEquals("Relay Status: Disconnected", HudState(isRelayConnected = false).relayStatusText)
+    }
+
+    @Test
     fun testGpsLedState() {
         val gpsActiveState = HudState(isLocalGpsActive = true)
         val gpsInactiveState = HudState(isLocalGpsActive = false)
