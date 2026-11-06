@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov6.2)
+- **Bounded Trail Storage (ISSUE-NOV5.2-O14)**: Each tracker now keeps its newest 50,000 trail rows, about 4.4MB, in place of unlimited growth. `TrailPruningWorker` runs about every 15 minutes, scheduled from `MonitorApp`, which now supplies the `HiltWorkerFactory` the worker needs; the default WorkManager start-up is removed. The limit is by count, not age, so pruning causes no false backfill. Verified by 153 of 153 automated tests and on the installed app on the A15: 59,799 rows through a private relay, the periodic job removed exactly 9,799, telemetry continued, and no new backfill followed. **PASSED.**
+
 ## ✅ Resolved Issues (Nov6.1)
 - **Real HUD Values (ISSUE-NOV5.0-O2)**: The Monitor local line now uses the phone's own battery and position fix, and the sensor line no longer falls back to 100% and 30°C. Unknown values show `--`. Local speed is dropped once its fix is 35 seconds old, because the 10m update filter sends no fix after the Monitor stops. `BatteryReading` replaces the Sensor's private battery code, and `HudState` now owns the HUD text, so `HudStateTest` checks production formatting. Verified by 145 of 145 automated tests and on the A15 against `dumpsys`. The `--` states and the 35-second limit were not observed live. **PASSED.**
 

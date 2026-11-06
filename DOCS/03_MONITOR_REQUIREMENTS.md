@@ -38,7 +38,7 @@ The Monitor is a user-centric application designed for visualization, alert mana
 ## 4. Reliability & Storage
 - **Sticky Foreground Session**: `MonitorSessionService` operates as `START_STICKY` with reactive `dataStore.relayUrl` collection for continuous background telemetry ingestion.
 - **Safety Pulse**: 30m background check-in via WorkManager.
-- **Storage Health**: Monitor prunes local user trails after 48h. If storage < 100MB, it stops recording local paths.
+- **Storage Health**: Monitor keeps the newest 50,000 trail rows of each tracker and prunes local user trails after 48h. If storage < 100MB, it stops recording local paths.
 - **DND Bypass**: Optional capability to override Do Not Disturb for critical stolen vehicle sirens.
 
 ## 5. Permission Scope

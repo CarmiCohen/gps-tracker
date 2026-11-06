@@ -6,19 +6,28 @@ import android.app.NotificationManager
 import android.media.AudioAttributes
 import android.os.Build
 import android.util.Log
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import com.jd.core.shared.SystemLogger
 import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
 
 /**
  * MonitorApp: Hardened for Revol30.1.
  * Standardizes Alert Channels (Point 164) and initializes forensic logging.
+ * Supplies the Hilt worker factory, which @HiltWorker classes need to be created (ISSUE-NOV5.2-O14).
  */
 @HiltAndroidApp
-class MonitorApp : Application() {
+class MonitorApp : Application(), Configuration.Provider {
 
     companion object {
         const val ALARM_CHANNEL_ID = "critical_violation_channel"
     }
+
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
     override fun onCreate() {
         super.onCreate()
@@ -34,6 +43,7 @@ class MonitorApp : Application() {
         }
 
         createAlarmNotificationChannel()
+        TrailPruningWorker.schedule(this)
     }
 
     private fun createAlarmNotificationChannel() {

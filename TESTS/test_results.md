@@ -1,4 +1,27 @@
-# Test Results - Nov6.1 (Real HUD Values)
+# Test Results - Nov6.2 (Bounded Trail Storage)
+
+## Nov6.2 Summary
+Executed Nov 6, 2026 on the A15 (`R58X40GV2AR`, API 36), the only phone attached, so the reciprocal simulation applied. The simulation used a private copy of `relay-server/index.js` on the workstation through `adb reverse`; no simulated data reached the production relay. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **Automated suite** | 🟢 **153/153** | `:core-shared` 46, `:core-network` 16, `:core-ui` 13, `:app-monitor` unit 20, `:app-monitor` on A15 23, `:app-sensor` on A15 35. Unit tasks were forced with `--rerun`. |
+| **123.1 to 123.3 Row cap, sequence, local rows** | 🟢 **PASSED (automated)** | `TrailStorageBoundTest` on the A15, including 50,100 rows at the real limit. No code writes local rows yet (ISSUE-NOV6.2-O29). |
+| **123.4 Scheduling** | 🟢 **PASSED** | One job in `dumpsys jobscheduler`; `Worker result SUCCESS` from the installed app, including after `install -r` over a paired Nov6.1. |
+| **123.5 Pruning on hardware** | 🟢 **PASSED** | 59,799 rows; `Rows removed: 9799` at 14:39:03; `monitor_db` 5,185,536 to 4,440,064 bytes. No backfill request after pruning; sensor line stayed at `AGE:0s`. |
+| **50.1 Periodic cleanup** | 🟢 **PASSED** | Ran at 14:24:03 and 14:39:03, exactly 15 minutes apart. This covers the trail worker only. |
+| **Simulated viewer tests Sensor** | 🟢 **PASSED** | 286 real updates in 30s; `VWR` active while present and red after it left; backfill `243 to 262` answered with 20 rows in about 50ms. |
+| **Simulated tracker tests Monitor** | 🟢 **PASSED** | `TRK` active; sensor line `B:73%\|T:32°C\|A:±6.5m\|AGE:0s`, `1.4 km/h`, matching the values sent; gap request `622 to 59999` answered in 60 chunks. |
+| **Stress 4 Rapid rotation** | 🟢 **PASSED** | 10 rotations in about 10s on the Monitor with live telemetry and about 59,000 rows: same process, 0 ANR, 0 fatal. Run with a 0.5Hz simulated stream, not the 100Hz stream, which has no control. |
+| **Other stress sections** | ⚪ **NOT RUN** | Sections 1, 2, and 3 have no controls in the apps (D); section 5 needs physical shielding (H). |
+| **Live pair on production** | 🟢 **PASSED** | Sensor and Monitor on the A15 with real telemetry after the simulation was removed. |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | `device_audit.cmd`, Sensor and Monitor processes: 0 Davey over 500ms, 0 StackLog, 0 fatal. |
+
+**Run history:** Run 1 failed 1 of 23 Monitor instrumented tests: `schedulingTwiceKeepsOnePeriodicJob` assumed the state `ENQUEUED`, but a new periodic job starts at once. The test was wrong, not the product. It was corrected and the complete suite restarted; Run 2 passed 153 of 153. Only test code changed between the runs. `cleanTest` does not reset Android unit test tasks, so `--rerun` was used to force them.
+
+---
+
+# Nov6.1 Results (Real HUD Values)
 
 ## Nov6.1 Summary
 Executed Nov 6, 2026 on the A15 (`R58X40GV2AR`, API 36), with Sensor and Monitor on the same phone through the production relay. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.

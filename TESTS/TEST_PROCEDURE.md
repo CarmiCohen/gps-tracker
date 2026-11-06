@@ -435,8 +435,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **122.3 Unknown Values:** With no fix, or before any telemetry, verify that the affected HUD values show `--` and no number, and that a real 0 still shows as a number. Automated by `HudStateTest` and `MonitorHudValuesTest.noFixShowsNoPositionValues`.
 *   **122.4 Old Fix:** Stop moving with the Monitor. Verify that after 35 seconds without a new fix, speed and motion state show `--`, while accuracy and age stay. Automated by `MonitorHudValuesTest.oldFixKeepsItsAccuracyAndAgeButNotItsSpeed`.
 
+## Chapter 123 - Monitor Trail Storage Bound (Nov6.2)
+*   **123.1 Row Cap:** Verify that each tracker keeps only its newest 50,000 trail rows, that one row over the limit removes only the oldest row, and that a tracker at or under the limit loses nothing, even when another tracker is over it. Automated by `TrailStorageBoundTest.workerKeepsTheNewestRowsOfEachTrackerAtTheRealLimit`, `rowCountAtTheLimitIsLeftAlone`, and `oneRowOverTheLimitRemovesOnlyTheOldest`.
+*   **123.2 Sequence Safety:** Verify that pruning does not change the last sequence number, and that an idle tracker keeps old rows under the limit, so the next update requests no false backfill. Automated by `pruningDoesNotMoveTheLastSequence` and `oldRemoteRowsSurviveWhenUnderTheLimit`.
+*   **123.3 Local Rows:** Verify that local user rows older than 48 hours are deleted and newer ones stay. Automated by `localRowsExpireAfter48Hours`. No code writes local rows yet (ISSUE-NOV6.2-O29).
+*   **123.4 Scheduling:** Verify that starting the Monitor registers one periodic job, and that repeated starts do not add another. Automated by `schedulingTwiceKeepsOnePeriodicJob`. On hardware, confirm the job in `dumpsys jobscheduler` and `Worker result SUCCESS` in logcat, which also proves that `HiltWorkerFactory` creates the worker.
+*   **123.5 Pruning On Hardware:** Load more than 50,000 rows into the installed Monitor through a private relay, never the production relay. Wait for the periodic run and verify `Trail cleanup finished. Rows removed: N` in logcat, then verify that live telemetry continues and requests no new backfill.
+
 ---
-**Active Testing Chapters: 112 of 122**
+**Active Testing Chapters: 113 of 123**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

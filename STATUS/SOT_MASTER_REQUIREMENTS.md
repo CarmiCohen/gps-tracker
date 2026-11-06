@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov6.1)
+# SOT Master Requirements & Hardening Status (Nov6.2)
 
-## 🏗️ Architectural Master Rules (433 Rules)
+## 🏗️ Architectural Master Rules (434 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -22,8 +22,10 @@
 *   **1.356 Display Limits & Input Safety (R-ID 127)**: The Monitor MUST display at most the newest 1000 trail points at no more than 2Hz, show telemetry only from the paired device, keep all menu actions visible, and reject malformed relay URLs; instrument text MUST stay visible at the largest system font (R-ID 127).
 *   **1.357 Forensic Entry Integrity (R-ID 128)**: Each `ForensicBuffer` entry MUST carry a checksum and damaged entries MUST NOT be returned; a sent sequence number MUST NOT be reused after power loss; a file format upgrade MUST keep stored entries; and code in `core-shared` MUST call only methods available at the Sensor's `minSdk` (R-ID 128).
 *   **1.358 Real HUD Values (R-ID 129)**: Both Monitor HUD lines MUST show only real readings. The local line MUST use the Monitor device's own battery and position fix; a value that is not known MUST show as `--`, never as an invented number; and local speed MUST NOT be shown from a fix older than 35 seconds (R-ID 129).
+*   **1.359 Bounded Trail Storage (R-ID 130)**: The Monitor MUST keep at most the newest 50,000 stored trail rows of each tracker, enforced by a background job scheduled at app start. Remote rows MUST be limited by count, never by age, so a tracker always keeps its newest rows and pruning never causes a false backfill (R-ID 130).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov6.2**: Bounded Trail Storage (ISSUE-NOV5.2-O14) - PASSED with open items (ISSUE-NOV6.2-O29, O30).
 - **Nov6.1**: Real HUD Values (ISSUE-NOV5.0-O2) - PASSED with open items (ISSUE-NOV6.1-O27, O28).
 - **Nov5.2**: Runtime Resilience, Display Limits & Chapter Triage (GAP-REVOL71.0-G1 to G8) - PASSED with open items (relay v6.044 undeployed).
 - **Nov5.1**: Single Default Relay & Deployed Relay Parity (GAP-REVOL70.0-G1, G2) - PASSED (automated suite and two-device live run through the production relay; manual physical chapters not executed).
@@ -49,6 +51,7 @@
 *   **Chapter 5.63 (Nov5.2 Audit)**: PASSED with open items - 118 automated tests and an A15 live pass covering crash recovery, reboot, network loss, Doze, rotation, font scaling, isolation, and URL validation. Every chapter was triaged in `TESTS/CHAPTER_TRIAGE.md`; 48 of 120 are verified at least in part. Rules marked as implemented elsewhere in this file may describe unwired features (ISSUE-NOV5.2-O11).
 *   **Chapter 5.64 (Nov6.0 Audit)**: PASSED with open items - 130 automated tests, a real version 2 file upgrade and three `kill -9` recoveries on the A15, and zero Davey, StackLog, or fatal entries from the Sensor process. The chapter review supersedes the 5.63 count: 43 of 111 active chapters are verified at least in part (ISSUE-NOV5.4-O17, ISSUE-NOV6.0-O20). Interrupted writes are simulated, physical power loss was not run, and nothing was run below API 35 (ISSUE-NOV6.0-O26). See `TESTS/CHAPTER_TRIAGE.md`.
 *   **Chapter 5.65 (Nov6.1 Audit)**: PASSED with open items - 145 automated tests, and both apps on the A15 through the production relay: the local HUD line matched `dumpsys battery` and `dumpsys location`, with zero Davey, StackLog, or fatal entries from either process. 44 of 112 active chapters are verified at least in part. The `--` states and the 35-second speed limit have automated coverage only, and the S21FE was not used.
+*   **Chapter 5.66 (Nov6.2 Audit)**: PASSED with open items - 153 automated tests, and reciprocal simulation on the A15 through a private relay: a simulated viewer tested the Sensor, and a simulated tracker tested the Monitor. The installed Monitor pruned 9,799 of 59,799 rows on its own schedule, with no false backfill. Both apps then ran on the production relay with zero Davey, StackLog, or fatal entries. 46 of 113 active chapters are verified at least in part. The S21FE was not used.
 *   **Chapter 5.62 (Nov5.1 Audit)**: PASSED - 103 automated tests and a two-device live run with Sensor on A15 and Monitor on S21FE through the production relay on the final build: all LEDs active, real battery, live `AGE`, real map position, relay URL hot switch without restart, and zero Davey or StackLog from either app process. Manual physical chapters were not executed (see `TESTS/test_results.md`).
 *   **Chapter 5.61 (Nov5.0 Audit)**: PASSED - 100 automated tests on the final code (unit and on-device on A15) and a two-device live run with Sensor on A15 and Monitor on S21FE through a local relay: all LEDs active, real battery, live `AGE`, real map position, and zero Davey or StackLog from either app process. The production relay was unavailable, and manual physical chapters were not executed (see `TESTS/test_results.md`).
 *   **Chapter 5.60 (Nov4.44 Release Candidate Verification Audit)**: PASSED - Verification of Nov4.44 release candidate: 100% automated test execution passing across all subprojects, reciprocal virtual presence simulation testing, and baseline lock in `STATUS/BASELINE/Nov4.44/`.

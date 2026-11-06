@@ -1,4 +1,4 @@
-# Chapter Triage - Nov6.0
+# Chapter Triage - Nov6.2
 
 Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`, and `TEST_FORENSIC_STRESS_PROTOCOL.md`, based on the running code and on tests executed for Nov5.2 on the A15. The A chapters were reviewed for Nov6.0 by comparing each chapter with its named test and with the production code (ISSUE-NOV5.4-O17).
 
@@ -14,17 +14,17 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 
 **D does not mean the code is absent.** In several chapters logic exists and has unit tests, such as `SentinelLogic`, but nothing in the running apps calls it. The D findings come from reading the code.
 
-**Summary:** 44 of 112 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
+**Summary:** 46 of 113 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
 
-**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1.
+**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1, and Chapter 123 makes 113 in Nov6.2.
 
-**A chapter review:** the earlier count of 48 included seven chapters whose tests do not prove the chapter's claim: 53, 66, 67, 68, 83, 88, and 93. None of the 48 were retired, so 48 minus 7 gives 41. ISSUE-NOV6.0-O20 then added chapters 66 and 121, giving 43. ISSUE-NOV5.0-O2 added chapter 122, giving 44.
+**A chapter review:** the earlier count of 48 included seven chapters whose tests do not prove the chapter's claim: 53, 66, 67, 68, 83, 88, and 93. None of the 48 were retired, so 48 minus 7 gives 41. ISSUE-NOV6.0-O20 then added chapters 66 and 121, giving 43. ISSUE-NOV5.0-O2 added chapter 122, giving 44. ISSUE-NOV5.2-O14 added chapter 123 and verified chapter 50, giving 46.
 
 ## Chapter 0 - Operational Forensic Audit
 | Item | Code | Notes |
 | :--- | :--- | :--- |
 | 0.1 Logcat anomalies | L | Now checked by `TESTS/device_audit.cmd` |
-| 0.2 Pulses and pruning | D | No stay-alive pulse; pruning worker never scheduled |
+| 0.2 Pulses and pruning | D | No stay-alive pulse; the trail pruning worker is scheduled since Nov6.2 |
 | 0.3 Tracker stealth | L | Sensor HUD shows no alarm or siren indicators |
 | 0.4 Back button | L | Service keeps running after Back |
 | 0.5 UI alignment | D | No scale bar on the live map; version is on the first screen only |
@@ -46,7 +46,8 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 8, 9, 26, 27, 28, 29 Alarms | D | No siren playback; violations are never sent or received |
 | 10, 47, 80, 94 JNI | N | Retired: no native code in the project |
 | 11, 21, 61, 62, 98 Motion logic | D | `SentinelLogic` is tested but unused by the Sensor |
-| 12, 46, 50, 69 Workers | D | WorkManager is never scheduled |
+| 12, 46, 69 Workers | D | 12 has no pressure control; 46 periodic work cannot be expedited; 69 no `MaintenanceWorker` exists |
+| 50 Periodic cleanup | L | Trail worker ran 15 minutes apart on the A15; it is the only scheduled worker |
 | 13 Remote commands | D | No command channel |
 | 14 UI performance | L | Rotation verified |
 | 15 Power tamper | D | Not implemented |
@@ -106,12 +107,13 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 120 Nov5.2 resilience | L / A | See `test_results.md` |
 | 121 Forensic entry integrity | L / A | 121.1 to 121.6 automated; 121.5 and 121.7 verified on the A15. 121.6 was not run below API 35 (ISSUE-NOV6.0-O26) |
 | 122 Real HUD values | L / A | 122.1 to 122.4 automated; 122.1 verified on the A15 against `dumpsys`. 122.3 and 122.4 were not observed live |
+| 123 Trail storage bound | L / A | 123.1 to 123.4 automated; 123.4 and 123.5 verified on the A15: 9,799 of 59,799 rows pruned by the installed app |
 
 ## TEST_FORENSIC_STRESS_PROTOCOL.md
 | Section | Code | Notes |
 | :--- | :--- | :--- |
 | 1 High-frequency IMU | D | No burst control; no JNI layer |
-| 2 Database pressure | D | No pressure test control, export, or scheduled pruning |
+| 2 Database pressure | D | No pressure test control or export; trail pruning is scheduled since Nov6.2 |
 | 3 Forensic injection | D | No injection button or markers |
 | 4 UI saturation | L / D | Rotation verified; no 100Hz stream control |
 | 5 GNSS zombie | H | Needs shielding and a clock change |

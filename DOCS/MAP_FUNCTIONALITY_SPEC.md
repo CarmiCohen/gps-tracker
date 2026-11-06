@@ -17,7 +17,7 @@ This document provides the definitive specification of all map capabilities, ren
 - **Clear Trails (`CLEAR`)**: Instantly purges active local trail history from memory and local database storage (`UiEvent.ClearTrails`).
 - **Save Trails (Export - `SAVE`)**: Exports complete trail history to JSON format (`trails_backup_*.json`), saving `tracker_trail`, `viewer_trail`, `home_points`, timestamps, and spatial coordinates to `Documents/GPS-Tracker`.
 - **Load Trails (Import - `LOAD`)**: Imports historical `.json` trail files, deserializes coordinates, and reconstructs trail overlays on the map canvas.
-- **Trail Pruning**: Automatic background pruning maintains a max threshold of 2,000 trail points to ensure continuous rendering performance on budget hardware (A15).
+- **Trail Pruning**: The map receives at most the newest 1,000 trail points, to keep rendering smooth on budget hardware (A15). Separately, a background job runs about every 15 minutes and keeps the newest 50,000 stored rows of each tracker (ISSUE-NOV5.2-O14).
 
 ---
 
