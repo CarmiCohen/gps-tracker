@@ -1,4 +1,23 @@
-# Test Results - Nov6.0 (Forensic Entry Integrity & Chapter Review)
+# Test Results - Nov6.1 (Real HUD Values)
+
+## Nov6.1 Summary
+Executed Nov 6, 2026 on the A15 (`R58X40GV2AR`, API 36), with Sensor and Monitor on the same phone through the production relay. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **Automated suite** | 🟢 **145/145** | `:core-shared` 46, `:core-network` 16, `:core-ui` 13, `:app-monitor` unit 20, `:app-monitor` on A15 15, `:app-sensor` on A15 35. The A15 runs came before the version number change; no code changed after them. |
+| **122.1 Local HUD line** | 🟢 **PASSED** | Local line `B:100%⚡\|T:29°C\|A:±77.6m\|AGE:23s`, then `AGE:38s`. `dumpsys battery`: level 100, status 5 (full), 29.1 to 29.3°C. |
+| **122.2 Battery reading** | 🟢 **PASSED** | Automated; the Sensor's own HUD also showed the real `B:100%⚡\|T:29°C` on the A15. |
+| **122.3 Unknown values** | 🟡 **AUTOMATED, PARTLY LIVE** | Local speed and state showed `--` with a network fix. A missing fix and missing telemetry were not observed live. |
+| **122.4 Old fix** | 🟡 **AUTOMATED ONLY** | The Monitor was stationary throughout. |
+| **Sensor line** | 🟢 **PASSED** | `STATIONARY 0.1 km/h`, `A:±11.2m`, `AGE:0s`, against GPS accuracy of about 11m. |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | `device_audit.cmd`, Sensor and Monitor processes: 0 Davey over 500ms, 0 StackLog, 0 fatal. |
+
+**Run history:** a foreground run was stopped by the tool timeout. Running both instrumented modules in one Gradle call then failed with `Starting 0 tests` and install errors, before any test ran. Each module passed when run alone.
+
+---
+
+# Nov6.0 Results (Forensic Entry Integrity & Chapter Review)
 
 ## Nov6.0 Summary
 Executed Nov 6, 2026 on the A15 (`R58X40GV2AR`, API 36). The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.

@@ -51,7 +51,7 @@ class HudLayoutAuditTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
                 RevolutionTheme {
                     Box(Modifier.width(360.dp)) {
-                        HudStatusBar(HudState(appMode = "monitor"), compact = true)
+                        HudStatusBar(HudState(appMode = "monitor", speedKmh = 0f), compact = true)
                     }
                 }
             }

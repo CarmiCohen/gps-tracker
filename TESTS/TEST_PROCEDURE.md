@@ -429,8 +429,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **121.6 Older Android Compatibility:** Verify that `ForensicBuffer` calls no method missing below API 35. Automated by `ForensicBufferApiLevelTest`, which reads the compiled class. On a device with API 34 or lower, verify that the Sensor starts and writes telemetry.
 *   **121.7 Process Kill:** While telemetry runs, kill the Sensor process with `kill -9`. Verify that it restarts by itself, logs no damaged entries, and that the stored reservation advances.
 
+## Chapter 122 - Real HUD Values (Nov6.1)
+*   **122.1 Local HUD Line:** On the Monitor, verify that the local line shows the phone's own battery, charging state, temperature, fix accuracy, and fix age, and compare them with `dumpsys battery` and `dumpsys location`. Automated by `MonitorHudValuesTest.usesBatteryAndFixValues`.
+*   **122.2 Battery Reading:** Verify that a level or temperature the system does not report stays unknown instead of becoming 100% or 30°C, in both apps. Automated by `BatteryReadingTest`.
+*   **122.3 Unknown Values:** With no fix, or before any telemetry, verify that the affected HUD values show `--` and no number, and that a real 0 still shows as a number. Automated by `HudStateTest` and `MonitorHudValuesTest.noFixShowsNoPositionValues`.
+*   **122.4 Old Fix:** Stop moving with the Monitor. Verify that after 35 seconds without a new fix, speed and motion state show `--`, while accuracy and age stay. Automated by `MonitorHudValuesTest.oldFixKeepsItsAccuracyAndAgeButNotItsSpeed`.
+
 ---
-**Active Testing Chapters: 111 of 121**
+**Active Testing Chapters: 112 of 122**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

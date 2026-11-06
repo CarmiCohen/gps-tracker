@@ -75,14 +75,33 @@ class HudStateTest {
         )
 
         val idDisplay = "TRK:${state.targetId.take(6).uppercase()} | SELF:${state.selfId.take(6).uppercase()}"
-        val ageStr = if (state.telemetryAgeSec >= 0) "${state.telemetryAgeSec}s" else "--"
-        val battStr = "${state.batteryLevel}%${if (state.isCharging) "⚡" else ""}"
-        val tempStr = String.format(java.util.Locale.US, "%.0f°C", state.tempCelsius)
-        val accStr = if (state.accuracyMeters > 0) String.format(java.util.Locale.US, "±%.1fm", state.accuracyMeters) else "--"
-        val telemetryStr = "B:$battStr|T:$tempStr|A:$accStr|AGE:$ageStr"
 
         assertEquals("TRK:TRACKE | SELF:VIEWER", idDisplay)
-        assertEquals("B:100%|T:30°C|A:±5.0m|AGE:0s", telemetryStr)
-        assertTrue("Telemetry string must contain AGE:0s without truncation", telemetryStr.contains("AGE:0s"))
+        assertEquals("B:100%|T:30°C|A:±5.0m|AGE:0s", state.telemetryText)
+    }
+
+    @Test
+    fun unknownValuesShowNoNumber() {
+        val state = HudState()
+
+        assertEquals("B:--|T:--|A:--|AGE:--", state.telemetryText)
+        assertEquals("-- km/h", state.speedText)
+        assertEquals(NO_VALUE, state.trackerState)
+    }
+
+    @Test
+    fun knownValuesAreFormatted() {
+        val state = HudState(batteryLevel = 7, isCharging = true, tempCelsius = 41.6f, speedKmh = 12.34f)
+
+        assertEquals("B:7%⚡|T:42°C|A:--|AGE:--", state.telemetryText)
+        assertEquals("12.3 km/h", state.speedText)
+    }
+
+    @Test
+    fun zeroIsAKnownValue() {
+        val state = HudState(batteryLevel = 0, tempCelsius = 0f, speedKmh = 0f)
+
+        assertEquals("B:0%|T:0°C|A:--|AGE:--", state.telemetryText)
+        assertEquals("0.0 km/h", state.speedText)
     }
 }

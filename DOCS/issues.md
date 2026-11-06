@@ -1,17 +1,17 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov6.0)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov6.1)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov6.0, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov6.1, solved one by one in the order below
 
 ### Work Queue
-Nov6.0 is closed and followed Nov5.2; there was no Nov5.3 or Nov5.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov6.1 is closed and followed Nov6.0, which followed Nov5.2; there was no Nov5.3 or Nov5.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
-**Next item: ISSUE-NOV5.0-O2 (item 3).** Items 1, 2, 12, and 17 were released in Nov6.0.
+**Next item: ISSUE-NOV5.2-O14 (item 4).** Items 1, 2, 12, and 17 were released in Nov6.0, and item 3 in Nov6.1.
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
 | 1 | ISSUE-NOV5.4-O17 | **Done for Nov6.0**: A chapters reviewed, chapter 87 decided, QA recounted at 41 of 110 | Nothing |
 | 2 | ISSUE-NOV5.4-O18 | **Done for Nov6.0**: chapter retirement released | Nothing |
-| 3 | ISSUE-NOV5.0-O2 | Replace the hardcoded local HUD | Nothing |
+| 3 | ISSUE-NOV5.0-O2 | **Done for Nov6.1**: both Monitor HUD lines show only real values | Nothing |
 | 4 | ISSUE-NOV5.2-O14 | Bound Monitor trail storage | Nothing |
 | 5 | ISSUE-NOV5.0-O5 | Remove the false relay status text | Nothing |
 | 6 | ISSUE-NOV5.0-O6 | Remove the stale version strings | Nothing |
@@ -27,6 +27,8 @@ Nov6.0 is closed and followed Nov5.2; there was no Nov5.3 or Nov5.4 release. Iss
 | 16 | ISSUE-NOV6.0-O24 | Make `SignalingQueue` thread safe and keep order after a failed flush | Nothing |
 | 17 | ISSUE-NOV6.0-O25 | **Done for Nov6.0**: calls missing on older Android removed, together with O20 | Nothing |
 | 18 | ISSUE-NOV6.0-O26 | Run the Sensor on a device or emulator below API 35 | A device, or user permission to download an API 34 emulator image |
+| 19 | ISSUE-NOV6.1-O27 | Replace the hardcoded values in the Sensor's own HUD | Nothing |
+| 20 | ISSUE-NOV6.1-O28 | Stop a coarse network fix replacing a better GPS fix | Nothing |
 
 ---
 
@@ -43,7 +45,8 @@ Nov6.0 is closed and followed Nov5.2; there was no Nov5.3 or Nov5.4 release. Iss
 - **Status**: Monitored. No crashes or functional failures observed.
 
 ### 2. Open Gaps
-- **ISSUE-NOV5.0-O2 (Medium) - Monitor local HUD line is hardcoded**: `MonitorViewModel.localHudState` always reports battery 100, temperature 30, accuracy 5.0, age 0, speed 0, and STATIONARY instead of real device values. The sensor line also shows placeholder `B:100%|T:30°C` when no telemetry has arrived.
+- **ISSUE-NOV6.1-O27 (Medium) - Sensor HUD still shows invented values**: `SensorViewModel.hudState` hardcodes `trackerState` STATIONARY, speed 0, accuracy 5.0, and age 0, so the Sensor's own screen shows `A:±5.0m|AGE:0s` whatever its GPS is doing. Battery and temperature are real since Nov6.1. Same cause as ISSUE-NOV5.0-O2, found while fixing it; not fixed because that issue covered the Monitor only.
+- **ISSUE-NOV6.1-O28 (Low) - A coarse network fix replaces a better GPS fix**: `MonitorLocationSource` keeps the newest fix from either provider. On a stationary Monitor the 10m filter suppresses GPS updates, while network fixes jitter past it. Seen on the A15: the local line showed `A:±77.6m` and speed `--` while GPS had a fix of about 11m. The values are real but coarser than the phone can give, and the map uses the same position, as it has since Nov5.0.
 - **ISSUE-NOV5.0-O4 (Medium) - Test coverage gap, reduced in Nov5.2**: every chapter now has a status in `TESTS/CHAPTER_TRIAGE.md`. Still outstanding are the chapters needing a person (H) or the S21FE or a second viewer (S). `ProductionReadinessAuditTest` holds three math checks only; `TESTS/device_audit.cmd` now performs the real Davey and StackLog audit. Earlier "100% passing" entries covered unit tests only.
 - **ISSUE-NOV5.2-O11 (High) - Documented features are not wired into the running apps**: many chapters and SOT rules marked PASSED describe behavior the apps cannot perform. Sirens, violations, geofencing, `SentinelLogic` on the Sensor, map tools, export, workers, extra sensors, device hardening, and most Tools actions are unwired (code D in `TESTS/CHAPTER_TRIAGE.md`). Each needs a decision: build it, or retire the chapter and rule. Until then the SOT and QA counts overstate what the product does.
 - **ISSUE-NOV5.2-O12 (Medium) - Relay v6.044 not verified on production**: the backfill routing was pushed as `b4ec94a`, and production answered HTTP 200 on 2026-11-06. No endpoint reports the relay version, so that does not prove v6.044 is running. The code was verified through a local relay only. This stays open until backfill (120.7) works on production.
@@ -65,6 +68,11 @@ Nov6.0 is closed and followed Nov5.2; there was no Nov5.3 or Nov5.4 release. Iss
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov6.1)
+*   **Real HUD Values (ISSUE-NOV5.0-O2)**: The Monitor local line now uses the phone's own battery and position fix, and the sensor line no longer falls back to 100% and 30°C. Unknown values show `--`. Local speed is dropped once its fix is 35 seconds old, because the 10m update filter sends no fix after the Monitor stops. `BatteryReading` replaces the Sensor's private battery code, and `HudState` now owns the HUD text, so `HudStateTest` checks production formatting. Verified by 145 of 145 automated tests and on the A15 against `dumpsys`. The `--` states and the 35-second limit were not observed live. **PASSED.**
 
 ---
 
@@ -145,11 +153,13 @@ Nov6.0 is closed and followed Nov5.2; there was no Nov5.3 or Nov5.4 release. Iss
 *   **SIMP-REVOL39.0-S1**: Integrated Kinetic State Observer. Consolidate acceleration, velocity, and thermal status evaluation into a single unified observer in `core-shared`.
 *   **SIMP-REVOL38.3-S1**: Dynamic Buffer Auto-tuner. Consolidate bitrate detection and buffer resizing into an adaptive native manager.
 *   **SIMP-NOV6.0-S1**: Lint For `core-shared`. Run Gradle lint on `core-shared`, or build it against `android.jar`. That would catch calls missing from older Android across the whole module and could replace the single-class check in `ForensicBufferApiLevelTest`.
+*   **SIMP-NOV6.1-S1**: Shared Device Status. `isNetworkAvailable` and `isLocationProviderEnabled` are copied in `MonitorViewModel` and `SensorViewModel`. Move them next to `readBattery` in `core-ui`, as was done for the battery code.
 *   **SIMP-NOV5.0-S1**: Single Map Path. `OsmMap` in `MapComponents.kt` has no callers, while `MonitorScreen` drives its own `MapView`. Either adopt that stack or delete it, along with its unused models and controller.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov6.1: [SOT Count: 933 (Rules: 433), Open: H:1, M:7, L:12, Ideas: H:0, M:3, L:10, Testing: PASSED (Sub-items: 145), QA: 44]** - Audit Baseline: 145 automated tests passing, including 50 on the A15; Sensor and Monitor live on the A15 through the production relay, with the local HUD line matching `dumpsys`; 0 Davey, StackLog, or fatal entries from either process. QA counts chapters verified at least in part, out of 112 active chapters.
 - **Nov6.0: [SOT Count: 932 (Rules: 432), Open: H:1, M:7, L:11, Ideas: H:0, M:3, L:9, Testing: PASSED (Sub-items: 130), QA: 43]** - Audit Baseline: 130 automated tests passing, including 50 on the A15; real version 2 file upgrade and three `kill -9` recoveries on the A15; 0 Davey, StackLog, or fatal entries from the Sensor process. Interrupted writes are simulated, and nothing was run below API 35. QA counts chapters verified at least in part, out of 111 active chapters.
 - **Nov5.2: [SOT Count: 931 (Rules: 431), Open: H:1, M:5, L:7, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 118), QA: 48]** - Audit Baseline: 118 automated tests passing; A15 live pass including crash, reboot, network loss, Doze, rotation, font, and isolation; relay v6.044 undeployed. **QA is now measured**: chapters verified at least in part, out of 120 (`TESTS/CHAPTER_TRIAGE.md`). Earlier QA values matched the SOT count and were not measured.
 - **Nov5.1: [SOT Count: 929 (Rules: 429), Open: H:0, M:3, L:5, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 103), QA: 929]** - Audit Baseline: 103 automated tests passing and a two-device live run through the production relay on the final build; manual physical chapters not executed. **QA caveat**: `QA: 929` follows the convention of matching the SOT count; those items were not individually re-verified.

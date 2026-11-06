@@ -12,6 +12,7 @@ import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.atUiRate
 import com.jd.core.ui.HudState
+import com.jd.core.ui.readBattery
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -88,8 +89,12 @@ class MonitorViewModel @Inject constructor(
     private val hasLocationPermission = MutableStateFlow(locationSource.hasPermission())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val localPosition: StateFlow<MapPosition?> = hasLocationPermission
-        .flatMapLatest { granted -> if (granted) locationSource.positions() else emptyFlow() }
+    private val localFix: StateFlow<LocalFix?> = hasLocationPermission
+        .flatMapLatest { granted -> if (granted) locationSource.fixes() else emptyFlow() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val localPosition: StateFlow<MapPosition?> = localFix
+        .map { it?.position }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun refreshLocationPermission() {
@@ -121,8 +126,9 @@ class MonitorViewModel @Inject constructor(
         selfId,
         signalingClient.isConnected,
         pairedTelemetry,
+        localFix,
         _ticker
-    ) { self, isConnected, latest, now ->
+    ) { self, isConnected, latest, fix, now ->
         val isInternet = isNetworkAvailable(context)
         val isLocalGps = isLocationProviderEnabled(context)
         val lastTs = latest?.timestamp ?: 0L
@@ -137,15 +143,8 @@ class MonitorViewModel @Inject constructor(
             isLocalGpsActive = isLocalGps,
             isPeerActive = isTrackerPresent,       // TRK: Green ONLY if Tracker T is connected & active
             isDataHealthy = isInternet && isConnected,
-            watchdogOk = true,
-            trackerState = "STATIONARY",
-            speedKmh = 0f,
-            batteryLevel = 100,
-            isCharging = false,
-            tempCelsius = 30f,
-            accuracyMeters = 5.0f,
-            telemetryAgeSec = 0L
-        )
+            watchdogOk = true
+        ).withLocalReadings(fix, readBattery(context), now)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "monitor"))
 
     val remoteHudState: StateFlow<HudState> = combine(
@@ -160,8 +159,7 @@ class MonitorViewModel @Inject constructor(
         val isTrackerPresent = lastTs > 0 && (now - lastTs) < 35000L
         val isInternet = isNetworkAvailable(context)
         val isGpsActive = latest != null && (latest.lat != 0.0 || latest.lng != 0.0)
-        val speedKmh = (latest?.speed ?: 0f) * 3.6f
-        val trackerState = if (speedKmh > 1.5f) "MOVING" else "STATIONARY"
+        val speedKmh = latest?.takeIf { isGpsActive }?.speed?.let(::metersPerSecondToKmh)
 
         HudState(
             appMode = "sensor", // Green remote sensor GPS LED
@@ -173,11 +171,11 @@ class MonitorViewModel @Inject constructor(
             isPeerActive = isTrackerPresent,          // Green ONLY if remote Tracker T is present and active
             isDataHealthy = isInternet && isTrackerPresent,
             watchdogOk = true,
-            trackerState = trackerState,
+            trackerState = motionState(speedKmh),
             speedKmh = speedKmh,
-            batteryLevel = latest?.batteryLevel ?: 100,
+            batteryLevel = latest?.batteryLevel,
             isCharging = latest?.isCharging ?: false,
-            tempCelsius = latest?.tempCelsius ?: 30f,
+            tempCelsius = latest?.tempCelsius,
             accuracyMeters = latest?.accuracy ?: 0f,
             telemetryAgeSec = ageSec,
             sequenceId = latest?.sequenceId ?: 0L

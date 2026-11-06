@@ -1,12 +1,9 @@
 package com.jd.app.sensor
 
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.BatteryManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jd.core.network.ForensicIdentityManager
@@ -14,6 +11,7 @@ import com.jd.core.network.SignalingClient
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.RelayConfig
 import com.jd.core.ui.HudState
+import com.jd.core.ui.readBattery
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
@@ -90,7 +88,7 @@ class SensorViewModel @Inject constructor(
     ) { id, isConnected, isViewerConnected, _ ->
         val isInternet = isNetworkAvailable(context)
         val isGpsActive = isLocationProviderEnabled(context)
-        val batteryInfo = getBatteryInfo(context)
+        val battery = readBattery(context)
 
         HudState(
             appMode = "sensor",
@@ -104,9 +102,9 @@ class SensorViewModel @Inject constructor(
             watchdogOk = true,
             trackerState = "STATIONARY",
             speedKmh = 0f,
-            batteryLevel = batteryInfo.level,
-            isCharging = batteryInfo.isCharging,
-            tempCelsius = batteryInfo.tempCelsius,
+            batteryLevel = battery.level,
+            isCharging = battery.isCharging,
+            tempCelsius = battery.tempCelsius,
             accuracyMeters = 5.0f,
             telemetryAgeSec = 0L
         )
@@ -130,23 +128,6 @@ class SensorViewModel @Inject constructor(
                     lm?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true
         } catch (_: Exception) {
             false
-        }
-    }
-
-    private data class BatteryInfo(val level: Int, val isCharging: Boolean, val tempCelsius: Float)
-
-    private fun getBatteryInfo(ctx: Context): BatteryInfo {
-        return try {
-            val intent = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: 100
-            val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: 100
-            val pct = if (level != -1 && scale != -1) (level * 100 / scale) else 100
-            val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
-            val tempTenths = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 300) ?: 300
-            BatteryInfo(pct, isCharging, tempTenths / 10.0f)
-        } catch (_: Exception) {
-            BatteryInfo(100, false, 30.0f)
         }
     }
 }

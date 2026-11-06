@@ -16,8 +16,8 @@ import kotlinx.coroutines.flow.callbackFlow
 import javax.inject.Inject
 
 /**
- * Streams the Monitor device's own position, starting from the freshest last-known fix.
- * Callers must hold a location permission before collecting [positions].
+ * Streams the Monitor device's own fixes, starting from the freshest last-known fix.
+ * Callers must hold a location permission before collecting [fixes].
  */
 class MonitorLocationSource @Inject constructor(
     @ApplicationContext private val context: Context
@@ -27,16 +27,16 @@ class MonitorLocationSource @Inject constructor(
     }
 
     @SuppressLint("MissingPermission")
-    fun positions(): Flow<MapPosition> = callbackFlow {
+    fun fixes(): Flow<LocalFix> = callbackFlow {
         val locationManager = context.getSystemService(LocationManager::class.java)
         val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
             .filter { it in locationManager.allProviders }
 
         providers.mapNotNull { locationManager.getLastKnownLocation(it) }
             .maxByOrNull { it.time }
-            ?.let { trySend(it.toMapPosition()) }
+            ?.let { trySend(it.toLocalFix()) }
 
-        val listener = LocationListenerCompat { trySend(it.toMapPosition()) }
+        val listener = LocationListenerCompat { trySend(it.toLocalFix()) }
         providers.forEach {
             locationManager.requestLocationUpdates(
                 it, UPDATE_INTERVAL_MS, UPDATE_DISTANCE_M, listener, Looper.getMainLooper()
@@ -45,7 +45,12 @@ class MonitorLocationSource @Inject constructor(
         awaitClose { locationManager.removeUpdates(listener) }
     }
 
-    private fun Location.toMapPosition() = MapPosition(latitude, longitude)
+    private fun Location.toLocalFix() = LocalFix(
+        position = MapPosition(latitude, longitude),
+        timeMs = time,
+        accuracyMeters = if (hasAccuracy()) accuracy else 0f,
+        speedMps = if (hasSpeed()) speed else null
+    )
 
     companion object {
         val LOCATION_PERMISSIONS = arrayOf(

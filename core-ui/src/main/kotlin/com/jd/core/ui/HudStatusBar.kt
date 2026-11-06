@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
-import java.util.Locale
 
 /**
  * HudStatusBar: Standardized HUD status bar composable for Monitor and Sensor apps.
@@ -120,7 +119,7 @@ private fun HudStatusBarContent(
                     )
 
                     Text(
-                        text = String.format(Locale.US, "%.1f km/h", hudState.speedKmh),
+                        text = hudState.speedText,
                         color = if (hudState.isPeerActive || !isMonitor) Color.White else Color.Gray,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -138,10 +137,6 @@ private fun HudStatusBarContent(
             } else {
                 "SELF:${hudState.selfId.take(6).uppercase()}"
             }
-            val ageStr = if (hudState.telemetryAgeSec >= 0) "${hudState.telemetryAgeSec}s" else "--"
-            val battStr = "${hudState.batteryLevel}%${if (hudState.isCharging) "⚡" else ""}"
-            val tempStr = String.format(Locale.US, "%.0f°C", hudState.tempCelsius)
-            val accStr = if (hudState.accuracyMeters > 0) String.format(Locale.US, "±%.1fm", hudState.accuracyMeters) else "--"
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -159,7 +154,7 @@ private fun HudStatusBarContent(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "B:$battStr|T:$tempStr|A:$accStr|AGE:$ageStr",
+                    text = hudState.telemetryText,
                     color = Color.LightGray,
                     fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace,

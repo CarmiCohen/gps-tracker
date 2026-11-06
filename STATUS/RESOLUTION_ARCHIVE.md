@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov6.1)
+- **Real HUD Values (ISSUE-NOV5.0-O2)**: The Monitor local line now uses the phone's own battery and position fix, and the sensor line no longer falls back to 100% and 30°C. Unknown values show `--`. Local speed is dropped once its fix is 35 seconds old, because the 10m update filter sends no fix after the Monitor stops. `BatteryReading` replaces the Sensor's private battery code, and `HudState` now owns the HUD text, so `HudStateTest` checks production formatting. Verified by 145 of 145 automated tests and on the A15 against `dumpsys`. The `--` states and the 35-second limit were not observed live. **PASSED.**
+
 ## ✅ Resolved Issues (Nov6.0)
 - **Chapter Retirement Released (ISSUE-NOV5.4-O18)**: The retirement of chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1 and 2.2 ships with Nov6.0. Their wording is preserved in `TESTS/RETIRED_CHAPTERS.md`. **PASSED.**
 - **Forensic Entry Integrity (ISSUE-NOV6.0-O20)**: Entries carry a CRC32 and damaged ones are skipped; the whole mapping is forced, not only the header; a broken header is rebuilt from entries; the header reserves sequence numbers so none are reused after power loss; version 2 files upgrade in place. The reset header is now written to the file. Verified by `ForensicEntryIntegrityTest` and on the A15: real upgrade, three `kill -9` recoveries, 35 of 35 instrumented tests, zero Davey, StackLog, or fatal entries. Interrupted states are simulated; physical power loss was not run. **PASSED.**
