@@ -1,4 +1,22 @@
-# Test Results - Nov6.4 (Backfill Gap Recovery)
+# Test Results - Nov7.0 (Real Version Strings)
+
+## Nov7.0 Summary
+Executed Nov 7, 2026 on the A15 (`R58X40GV2AR`, API 36), the only phone attached, with Sensor and Monitor on the same phone through the production relay and real positions. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **Automated suite** | 🟢 **182/182** | `:core-shared` 46, `:core-network` 18, `:core-ui` 17, `:app-monitor` unit 30, `:app-monitor` on A15 34, `:app-sensor` on A15 37. Unit tasks were forced with `--rerun`; result files were counted, with 0 failed and 0 skipped. |
+| **126.1 No version in code** | 🟢 **PASSED (automated)** | `VersionLiteralGuardTest` scans all five modules. |
+| **126.2 Version from the package** | 🟢 **PASSED (automated)** | `AppVersionTest` on the A15. The `--` case was not observed on an installed app. |
+| **Deliberate break** | 🟢 **PASSED** | With `Nov1.7 (Final)` and the `Nov4.27` fallback put back, `noProductionStringHoldsAVersion` failed and named both (1 of 3), and `anUnknownPackageShowsNoVersion` failed on the A15 (1 of 2). The fix was then restored. |
+| **126.3 Version on hardware** | 🟢 **PASSED** | `dumpsys`: `versionName` Nov7.0, `versionCode` 41 Sensor, 39 Monitor. Sensor first screen and Monitor pairing screen: `Version: Nov7.0`. Both Setup dialogs: `App Version: Nov7.0`. Log at 10:27:52: `REV_SensorService: onCreate called. Version: Nov7.0`. No log line held `Nov1.7` or `Nov4.27`. |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | `device_audit.cmd` at 10:30, Sensor and Monitor processes, log cleared at install, about 2 minutes of runtime: 0 Davey over 500ms, 0 StackLog, 0 fatal. `ProductionReadinessAuditTest` ran in the Sensor suite. |
+
+**Run history:** two intended failures, the deliberate break above. Every other test run passed the first time. One foreground command with a 60-second wait timed out and was repeated as short commands.
+
+---
+
+# Nov6.4 Results (Backfill Gap Recovery)
 
 ## Nov6.4 Summary
 Executed Nov 6 and 7, 2026 on the A15 (`R58X40GV2AR`, API 36). The S21FE stayed attached during the first Monitor suite, took no part, and kept its Monitor; it was then unplugged, so no two-phone run was possible. The live check used a private copy of `relay-server/index.js`; no test traffic reached the production relay, and both apps used real positions. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.

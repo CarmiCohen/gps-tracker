@@ -37,6 +37,7 @@ import com.jd.core.ui.HudState
 import com.jd.core.ui.HudStatusBar
 import com.jd.core.ui.RevolutionTheme
 import com.jd.core.ui.StatusRed
+import com.jd.core.ui.getAppVersionName
 import com.jd.core.shared.SystemLogger
 import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.RelayConfig
@@ -244,15 +245,6 @@ fun PermissionGuard(content: @Composable () -> Unit) {
         }
     } else {
         content()
-    }
-}
-
-fun getAppVersionName(context: android.content.Context): String {
-    return try {
-        val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        pInfo.versionName ?: "Nov4.27"
-    } catch (_: Exception) {
-        "Nov4.27"
     }
 }
 

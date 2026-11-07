@@ -455,8 +455,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **125.6 Missing Start:** Verify that a fresh pairing requests the rows before its first update, and that a table pruned to its cap does not request its deleted rows. Automated by `aMissingStartIsRequestedOnAFreshPairing` and `aPrunedStartIsNotRequested`.
 *   **125.7 Outage On Hardware:** Through a private relay, never the production relay, cut only the Sensor for 60 seconds at the 10Hz charging rate. Pull the Monitor database after recovery and verify that no hole remains. Repeat with the Monitor on a second phone through the production relay when one is available.
 
+## Chapter 126 - Real Version Strings (Nov7.0)
+*   **126.1 No Version In Code:** Verify that no string in the production Kotlin sources of any module holds a release version, and that comments may still name one. Automated by `VersionLiteralGuardTest`. Run it with `--rerun`, because Gradle does not track the scanned files as inputs of the test.
+*   **126.2 Version From The Package:** Verify that the shown version is the installed `versionName`, and that a package that cannot be read shows `--` and no invented version. Automated by `AppVersionTest`.
+*   **126.3 Version On Hardware:** Install both apps on the A15. Verify that the Sensor first screen, the Sensor Setup dialog, the Monitor pairing screen, and the Monitor Setup dialog all show the `versionName` from the build file, and that the Sensor logs `onCreate called. Version:` with that same version when its service starts.
+
 ---
-**Active Testing Chapters: 115 of 125**
+**Active Testing Chapters: 116 of 126**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

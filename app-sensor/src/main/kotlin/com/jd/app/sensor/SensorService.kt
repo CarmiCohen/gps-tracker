@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.*
+import com.jd.core.ui.getAppVersionName
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
@@ -104,7 +105,7 @@ class SensorService : Service(), SensorEventListener {
 
     override fun onCreate() {
         super.onCreate()
-        SystemLogger.i("SensorService", "onCreate called. Version: Nov1.7 (Final)")
+        SystemLogger.i("SensorService", "onCreate called. Version: ${getAppVersionName(this)}")
         
         val protectedContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             createDeviceProtectedStorageContext()

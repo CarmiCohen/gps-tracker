@@ -30,6 +30,7 @@ import com.jd.core.ui.CappedFontScale
 import com.jd.core.ui.HudState
 import com.jd.core.ui.HudStatusBar
 import com.jd.core.ui.RevolutionTheme
+import com.jd.core.ui.getAppVersionName
 import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.RelayConfig
@@ -223,15 +224,6 @@ fun PairingWizard(
 
         Spacer(modifier = Modifier.height(24.dp))
         Text(text = "Version: ${getAppVersionName(LocalContext.current)}", fontSize = 12.sp, color = Color.Gray)
-    }
-}
-
-fun getAppVersionName(context: android.content.Context): String {
-    return try {
-        val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        pInfo.versionName ?: "Nov4.27"
-    } catch (_: Exception) {
-        "Nov4.27"
     }
 }
 

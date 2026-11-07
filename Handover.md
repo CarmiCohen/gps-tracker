@@ -1,28 +1,24 @@
 git add .
-git commit -m "Nov6.4 - BACKFILL GAP RECOVERY
+git commit -m "Nov7.0 - REAL VERSION STRINGS
 
-- ISSUE-NOV6.3-O32 ROOT CAUSE: A gap existed only at the moment it was detected. Any request that was over the limit, could not be sent, or was never answered lost its rows for good: the two-phone field test left 162 rows missing in 13 holes after a 60-second outage.
-- ISSUE-NOV6.3-O32 FIX: The Monitor reads gaps from the trails table with TrailDao.getSequenceGaps, so a hole stays findable until it is filled. The new BackfillLedger keeps the limit of 10 requests in flight, takes the newest gaps first, and does not repeat an answered range in the same process. A table pruned to its cap does not request its deleted rows.
-- ISSUE-NOV6.3-O32 DROPPED UPDATES: SocketioSignalingClient silently dropped updates when its flow buffers filled: with a busy collector only 64 of 600 telemetry updates and 8 of 200 backfill chunks got through. The flows now hold a full burst (BURST_CAPACITY, 5000). This is a worst-case test; it likely explains the sparse arrival in the field test, but that was not confirmed there.
-- ISSUE-NOV6.2-O31: An unanswered request is released after 30 seconds without a chunk and asked again by a later scan. Scans run only while telemetry arrives. The timeout was not observed on a device.
-- ISSUE-NOV5.2-O12: Closed on the field test of 2026-11-06 with the Nov6.3 apps: 11 requests reached the Sensor through the production relay and 11 chunks returned.
-- TESTS: Added BackfillLedgerTest, BackfillGapRecoveryTest, and two burst tests in SignalingBatchTest. Limiting the scan to the newest gap made two recovery tests fail. 177 of 177 automated tests pass, including 69 on the A15.
-- LIVE: On the A15 through a private relay, a 60-second Sensor outage at 10Hz left one gap of 195 rows, refilled about 2 seconds after reconnecting; the table then held 3,011 rows with no holes. Sensor and Monitor logged 0 Davey, StackLog, or fatal entries. That outage produced one hole, so more holes than the limit has automated proof only. Not run on the production relay or on two phones.
-- NEW ISSUES: ISSUE-NOV6.4-O33, the Sensor keeps sending chunks after one fails. ISSUE-NOV6.4-O34, Sensor Setup shows a fixed service status.
-- IDEA ADDED: SIMP-NOV6.4-S1, forward relay batches as one event.
-- CORRECTION: The S21FE was attached at 14:51:41 during the Nov6.3 Monitor suite, not at about 14:53 as the Nov6.3 commit message says. Working documents are corrected.
-- DOCS: Added Chapter 125, Rule 1.361, Chapter 5.68, and baseline STATUS/BASELINE/Nov6.4/. Root Handover.md is synchronized. QA is 48 of 115 active chapters.
-- VERSION: Nov6.4, versionCode 38 (monitor) and 40 (sensor)."
-git tag Nov6.4
+- ISSUE-NOV5.0-O6 ROOT CAUSE: Versions were written by hand in the code, and getAppVersionName was copied in both apps. SensorService logged Version: Nov1.7 (Final) on every start, and the fallback in both apps was an invented Nov4.27.
+- ISSUE-NOV5.0-O6 FIX: One getAppVersionName in core-ui AppVersion.kt reads the installed package and shows -- if that fails. The copies in AdminActivity and MonitorActivity are removed, and SensorService logs the same value.
+- TESTS: Added VersionLiteralGuardTest, which fails if any production string in the five modules holds a release version, and AppVersionTest on the A15. With the old strings put back, the guard named both and anUnknownPackageShowsNoVersion failed; the fix was then restored. 182 of 182 automated tests pass, including 71 on the A15.
+- LIVE: On the A15 through the production relay, dumpsys, the Sensor first screen, the Sensor Setup dialog, the Monitor pairing screen, and the Monitor Setup dialog all showed Nov7.0, and the Sensor logged onCreate called. Version: Nov7.0. Sensor and Monitor logged 0 Davey, StackLog, or fatal entries over about 2 minutes. The -- case has automated proof only. The S21FE was not used.
+- ISSUE-NOV6.0-O23: Noted that the title and chapters 1.2 and 1.3 of TEST_PROCEDURE.md still name Nov2.24.
+- IDEA ADDED: SIMP-NOV7.0-S1, a single version source for both apps.
+- DOCS: Added Chapter 126, Rule 1.362, Chapter 5.69, and baseline STATUS/BASELINE/Nov7.0/. Root Handover.md is synchronized. QA is 49 of 116 active chapters.
+- VERSION: Nov7.0, versionCode 39 (monitor) and 41 (sensor)."
+git tag Nov7.0
 git push origin main --tags
 
-# Project Handover - Version Nov6.4 (Backfill Gap Recovery)
+# Project Handover - Version Nov7.0 (Real Version Strings)
 
 ## ▶️ Resumption State (Read First)
-- **Version**: Nov6.4 is closed. Run the Git block above if it has not been run: `git log -1` shows whether the Nov6.4 commit and tag exist. The previous commit is `06d4103` (Nov6.3). There was no Nov5.3 or Nov5.4 release, and issue IDs containing NOV5.4 keep their names.
-- **Next work**: the user names the next version. Continue the Work Queue in `DOCS/issues.md`, one item at a time, starting with ISSUE-NOV5.0-O6. Display each issue before fixing it (Rule 1).
-- **Relay**: v6.044 is on production: the field test on 2026-11-06 saw backfill work through it (ISSUE-NOV5.2-O12, closed). No relay code changed in Nov6.4. Relay pushes restart production, so the user runs them.
-- **Phones**: A15 (`R58X40GV2AR`, API 36) runs the Nov6.4 debug Sensor on the default relay with its service started. Its sequence restarted at 1 after the instrumented run. Its Nov6.4 debug Monitor was cleared with `pm clear`, reinstalled with `-g`, and force-stopped, so it needs pairing. S21FE (`R5CRC14PG4F`, API 36) is a personal phone and is unplugged. It holds the Nov6.3 Monitor and the field-test table, with sequences above the restarted Sensor (ISSUE-NOV5.2-O16). Before the next field test, install Nov6.4 and clear that Monitor's data, with the user's agreement. The user allowed installing the Monitor on it. Do not run instrumented tests on it, and do not touch `com.gps19.app`. Run `adb devices` first and name the device in every command.
+- **Version**: Nov7.0 is closed. Run the Git block above if it has not been run: `git log -1` shows whether the Nov7.0 commit and tag exist. The previous commit is `ba93a58` (Nov6.4). There was no Nov5.3 or Nov5.4 release, and issue IDs containing NOV5.4 keep their names.
+- **Next work**: the user names the next version. Continue the Work Queue in `DOCS/issues.md`, one item at a time, starting with ISSUE-NOV5.2-O15. Display each issue before fixing it (Rule 1).
+- **Relay**: v6.044 is on production: the field test on 2026-11-06 saw backfill work through it (ISSUE-NOV5.2-O12, closed). No relay code changed in Nov6.4 or Nov7.0. Relay pushes restart production, so the user runs them.
+- **Phones**: A15 (`R58X40GV2AR`, API 36) runs the Nov7.0 debug Sensor on the default relay with its service started, and the Nov7.0 debug Monitor paired with `T` on the default relay. Both were reinstalled after the instrumented runs, so the Sensor sequence restarted and the Monitor table is new. S21FE (`R5CRC14PG4F`, API 36) is a personal phone and is unplugged. It holds the Nov6.3 Monitor and the field-test table, with sequences above the restarted Sensor (ISSUE-NOV5.2-O16). Before the next field test, install the current version and clear that Monitor's data, with the user's agreement. The user allowed installing the Monitor on it. Do not run instrumented tests on it, and do not touch `com.gps19.app`. Run `adb devices` first and name the device in every command.
 - **Correction**: the S21FE was attached at 14:51:41 during the Nov6.3 Monitor suite, not at about 14:53 as the Nov6.3 commit message says. Tooling read its properties only; its adbd log shows no install, uninstall, or test.
 - **Pending user actions**: make the O11, O19, O29, and O30 decisions when the queue reaches them; allow S21FE use for the second half of chapter 125.7; decide later on a device or emulator below API 35 for O26 (**do not download one until the user says so**); optionally add the shell permission rule to `.claude/settings.local.json`, which Claude cannot write itself; optionally run `setx JAVA_HOME "C:\Program Files\Android\Android Studio\jbr"`.
 
@@ -39,7 +35,6 @@ git push origin main --tags
 | O22 Rotation resets screen state | Low | `MonitorActivity.kt:258-267`, `AdminActivity.kt:83-88` |
 | O24 `SignalingQueue` not thread safe | Low | `SignalingQueue.kt`, `SocketioSignalingClient.kt` `flushQueue` |
 | O19 Nested repository changes | Low | `before splitting/gps-tracker` |
-| O6 Stale version strings | Low | `SensorService.kt:107`, `MonitorActivity.kt:232,234`, `AdminActivity.kt:253,255` |
 | O7 Zero-position rows stored | Low | `MapCenterResolver.kt:6` filters display only |
 | O9 Cold start exceeds 20s timeout | Low | `SocketioSignalingClient.kt` `setTimeout(20000)` |
 | O10 Synchronous relay cache writes | Low | `relay-server/index.js` `saveCache` |
@@ -52,6 +47,9 @@ git push origin main --tags
 | O34 Sensor Setup fixed service status | Low | `AdminActivity.kt:576` |
 
 Line numbers come from Nov5.2 unless newer; recheck them before editing.
+
+### Nov7.0 Fix Locations
+`AppVersion.kt` in `core-ui`: `getAppVersionName`. `SensorService.kt`: `onCreate`. `AdminActivity.kt` and `MonitorActivity.kt`: imports only, their copies are removed.
 
 ### Nov6.4 Fix Locations
 `MonitorDatabase.kt`: `SequenceGap`, `getSequenceGaps`, `getFirstSequenceId`, `countRows`. `BackfillLedger.kt`: `gapsToRequest`, `onRequestSent`, `onChunkReceived`, `onRequestComplete`. `MonitorRepository.kt`: `gapScans`, `observeGapScans`, `processIncomingUpdate`, `findGaps`, `requestMissingRanges`. `SocketioSignalingClient.kt`: `BURST_CAPACITY`.
@@ -68,35 +66,34 @@ Line numbers come from Nov5.2 unless newer; recheck them before editing.
 ### Nov6.0 Fix Locations
 `ForensicBuffer.kt`: `loadHeader`, `addChecksums`, `isHeaderConsistent`, `rebuildHeader`, `loadSlot`, `storeSlot`, `commitHeader`, `nextSequenceId`, `writeTrace`. Use only absolute `get` and `put` in that class: `position()` and the other calls that JDK 9+ redeclares are missing on older Android.
 
-## 🟡 Status: VERIFIED ON A15 THROUGH A PRIVATE RELAY, NOT RUN ON PRODUCTION OR TWO PHONES (Nov6.4)
+## 🟢 Status: VERIFIED ON A15 THROUGH THE PRODUCTION RELAY (Nov7.0)
 
-Version Nov6.4 delivers these changes (ISSUE-NOV6.3-O32, ISSUE-NOV6.2-O31, ISSUE-NOV5.2-O12):
-1. **No forgotten gaps**: Missing ranges are read from the stored trail, so a range that could not be requested or was never answered is requested again.
-2. **Limit delays, never loses**: At most 10 requests are in flight, newest gaps first; the rest wait for a free slot.
-3. **Released requests**: An unanswered request is released after 30 seconds without a chunk.
-4. **No dropped bursts**: The signaling client holds a full reconnect burst instead of silently dropping updates.
+Version Nov7.0 delivers these changes (ISSUE-NOV5.0-O6):
+1. **Real versions**: Every version shown or logged comes from the installed package; an unreadable one shows `--`.
+2. **One function**: `getAppVersionName` lives in `core-ui`, in place of a copy in each app.
+3. **Guarded**: `VersionLiteralGuardTest` fails if a production string holds a release version.
 
-**Resumption Token**: NOV6.4-QUEUE-O6-NEXT
+**Resumption Token**: NOV7.0-QUEUE-O15-NEXT
 
 ---
 
-## 🎯 Next Resumption Focus: Work Queue in `DOCS/issues.md`, one item at a time, next is ISSUE-NOV5.0-O6
+## 🎯 Next Resumption Focus: Work Queue in `DOCS/issues.md`, one item at a time, next is ISSUE-NOV5.2-O15
 
-1. Fix O6 and O15, which need no product decision.
+1. Fix O15, which needs no product decision.
 2. For each D row in `TESTS/CHAPTER_TRIAGE.md`, decide: build it, or retire the chapter and rule (O11). Group the decisions by feature, and include O29 and O30. Fix O13 afterwards, since it depends on whether `SentinelLogic` is wired in.
 3. When the user allows the S21FE: repeat the outage on two phones through the production relay (second half of 125.7), then continue the interrupted field test: a real drive for false MOVING (O13) and relay cold start (O9), and `TESTS\device_audit.cmd` for each phone. Decide on the nested repository changes (O19).
 4. Fix O23, O21, O22, O24, O27, O28, O33, and O34.
 5. Run the H chapters with a person, and the S chapters when the S21FE is free. Run chapter 121.6 below API 35 when the user allows it (O26).
 
-### 🛡️ Implementation Status (Nov6.4)
-- **Version Increment**: ✅ **VERIFIED** (`Nov6.4`, `versionCode` 38 monitor, 40 sensor; debug and release built; no `platinum` variant exists).
-- **Automated Suite**: ✅ **PASSED** (177/177; instrumented tests pinned to A15).
-- **Deliberate Break**: ✅ **PASSED**: limiting the scan to the newest gap made two recovery tests fail, then the fix was restored.
-- **Outage On Hardware (125.7)**: ✅ **PASSED through a private relay**: one gap of 195 rows refilled; 3,011 rows and no holes afterwards.
-- **More Holes Than The Limit, Live**: ⚪ **NOT OBSERVED**: that outage produced one hole; automated proof only.
-- **Unanswered Request Timeout, Live**: ⚪ **NOT OBSERVED**: automated proof only.
-- **Production Relay And Two Phones**: ❌ **NOT RUN for Nov6.4**: the S21FE was unplugged.
-- **10s Battery Rate**: ❌ **NOT RUN**: the outage ran at the 10Hz charging rate.
+### 🛡️ Implementation Status (Nov7.0)
+- **Version Increment**: ✅ **VERIFIED** (`Nov7.0`, `versionCode` 39 monitor, 41 sensor; debug and release built; no `platinum` variant exists).
+- **Automated Suite**: ✅ **PASSED** (182/182; instrumented tests pinned to A15).
+- **Deliberate Break**: ✅ **PASSED**: with the old strings back, the guard named both and `anUnknownPackageShowsNoVersion` failed on the A15, then the fix was restored.
+- **Version On Hardware (126.3)**: ✅ **PASSED**: all four version displays and the Sensor log showed `Nov7.0`.
+- **Forensic Audit**: ✅ **PASSED**: 0 Davey, StackLog, or fatal entries from either process, over about 2 minutes.
+- **Unknown Version, Live**: ⚪ **NOT OBSERVED**: an installed app can always read its package; automated proof only.
+- **Two Phones**: ❌ **NOT RUN for Nov7.0**: the S21FE was not attached.
+- **Carried From Nov6.4**: ❌ **NOT RUN**: more holes than the limit live, the request timeout live, the outage on the production relay and two phones (second half of 125.7), and the outage at the 10s battery rate.
 - **Stress Protocol**: ⚪ **NOT RUN**: last result is in `TESTS/test_results.md` under Nov6.2.
 - **Below API 35**: ❌ **NOT EXECUTED** (ISSUE-NOV6.0-O26).
 - **Physical Power Loss (Nov6.0)**: ❌ **NOT EXECUTED**; interrupted states are simulated in `ForensicEntryIntegrityTest`.
@@ -105,6 +102,7 @@ Version Nov6.4 delivers these changes (ISSUE-NOV6.3-O32, ISSUE-NOV6.2-O31, ISSUE
 ---
 
 ## 📂 Key Implementation Files
+- `core-ui/.../AppVersion.kt`, `core-ui/src/test/.../VersionLiteralGuardTest.kt`, `app-sensor/src/androidTest/.../AppVersionTest.kt`: Chapter 126.
 - `app-monitor/.../MonitorRepository.kt`, `BackfillLedger.kt`, `MonitorDatabase.kt`: gap scan, request tracking, gap query.
 - `core-network/.../SocketioSignalingClient.kt`: burst capacity.
 - `app-monitor/src/test/.../BackfillLedgerTest.kt`, `app-monitor/src/androidTest/.../BackfillGapRecoveryTest.kt`: Chapter 125.
@@ -124,7 +122,8 @@ Version Nov6.4 delivers these changes (ISSUE-NOV6.3-O32, ISSUE-NOV6.2-O31, ISSUE
 - With two phones attached, set `ANDROID_SERIAL` before running `connectedDebugAndroidTest`: it runs on every device and uninstalls the apps it tested.
 - Run the Monitor and Sensor `connectedDebugAndroidTest` tasks in separate Gradle calls, in the background. In one call they failed with `Starting 0 tests` and install errors.
 - `cleanTest` does not reset Android unit test tasks, so `cleanTest test` can run nothing. Force them with a per-task `--rerun`, and check the result file times.
-- `app-sensor` has no unit tests; all 35 of its tests are instrumented.
+- `app-sensor` has no unit tests; all 37 of its tests are instrumented.
+- `VersionLiteralGuardTest` scans other modules, which Gradle does not track as its inputs. Run `:core-ui:testDebugUnitTest` with `--rerun`, or a new version string can pass unseen.
 - Instrumented runs uninstall the Sensor and the Monitor. Reinstall with `adb -s R58X40GV2AR install -r -g app-sensor\build\outputs\apk\debug\app-sensor-debug.apk` and the same for `app-monitor`. Open `AdminActivity`, tap to pass `System Idle`, and tap `START SENSOR SERVICE`. Read its bounds first, because the layout shifts with URL length. Then open the Monitor and tap `Pair Device`; the ID field already holds `T`. The packages are `com.jd.app.sensor` and `com.jd.app.monitor`.
 - A new periodic WorkManager job runs at once, and `cmd jobscheduler run -f` does not run it again before its period ends. To see a second run, wait the 15 minutes.
 - Reciprocal simulation: copy `relay-server/index.js` to a temp folder, run it with `NODE_PATH` set to `relay-server\node_modules`, and use `adb reverse tcp:3000 tcp:3000` with relay URL `http://127.0.0.1:3000`. This keeps `device_cache.json` and production clean. Node 22 has a built-in `WebSocket`, so no client package is needed. Uninstall the Monitor afterwards to remove simulated rows.
@@ -141,9 +140,9 @@ Version Nov6.4 delivers these changes (ISSUE-NOV6.3-O32, ISSUE-NOV6.2-O31, ISSUE
 
 ---
 
-## ✅ Verified Milestones (Nov6.4)
-1. **Automated Suite**: 177/177 on the final code: `:core-shared` 46, `:core-network` 18, `:core-ui` 14, `:app-monitor` unit 30, `:app-monitor` on A15 34, `:app-sensor` on A15 35.
-2. **Hardware**: A 60-second Sensor outage on the A15 through a private relay left one gap of 195 rows, refilled about 2 seconds after reconnecting; the table then held 3,011 rows, sequences 1 to 3011, with no holes. The Sensor and Monitor processes logged 0 Davey, StackLog, or fatal entries.
-3. **Release Integrity**: Baseline stored in `STATUS/BASELINE/Nov6.4/`; tag `Nov6.4` is applied by the Git block above.
+## ✅ Verified Milestones (Nov7.0)
+1. **Automated Suite**: 182/182 on the final code: `:core-shared` 46, `:core-network` 18, `:core-ui` 17, `:app-monitor` unit 30, `:app-monitor` on A15 34, `:app-sensor` on A15 37.
+2. **Hardware**: On the A15 through the production relay, `dumpsys`, the Sensor first screen, the Sensor Setup dialog, the Monitor pairing screen, and the Monitor Setup dialog all showed `Nov7.0`, and the Sensor logged `onCreate called. Version: Nov7.0`. The Sensor and Monitor processes logged 0 Davey, StackLog, or fatal entries over about 2 minutes.
+3. **Release Integrity**: Baseline stored in `STATUS/BASELINE/Nov7.0/`; tag `Nov7.0` is applied by the Git block above.
 
-**Handover complete. System state locked at Nov6.4.**
+**Handover complete. System state locked at Nov7.0.**
