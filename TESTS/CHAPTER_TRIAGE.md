@@ -122,6 +122,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 133 HUD flow 2Hz rate limit | A | 133.1 automated by `UiRateTest` and `HudRateTest` |
 | 134 Screen state preservation | A | 134.1 automated by UI state persistence tests |
 | 135 SignalingQueue thread safety | A | 135.1 and 135.2 automated by `SignalingQueueTest` |
+| 136 Coarse Network Fix Filtering | A | 136.1 and 136.2 automated by `MonitorLocationSourceTest` |
 
 ## TEST_FORENSIC_STRESS_PROTOCOL.md
 | Section | Code | Notes |

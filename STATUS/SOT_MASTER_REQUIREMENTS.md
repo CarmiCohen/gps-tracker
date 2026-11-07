@@ -35,8 +35,10 @@
 *   **1.369 HUD Flow Rate-Limiting (R-ID 140)**: The Monitor `localHudState` and `remoteHudState` flows, as well as the Sensor `hudState` flow, MUST apply `atUiRate()` (500ms sampling window) to incoming telemetry and fix streams, capping UI state recalculations and emissions to at most 2Hz to prevent excess CPU usage, unnecessary IPC calls, and rapid recomposition (R-ID 140).
 *   **1.370 Screen State & Rotation Preservation (R-ID 141)**: All UI overlay visibility flags, dialog states, and map follow modes in `MonitorActivity` and `AdminActivity` MUST use `rememberSaveable` to ensure open overlays, dialogs, unlock states, and follow modes persist across screen rotation and configuration changes (R-ID 141).
 *   **1.371 Thread-Safe Signaling Queue & Order-Preserving Failed Flush (R-ID 142)**: The signaling queue (`SignalingQueue`) MUST perform all queue manipulations and sequence tracking under a `ReentrantLock` for multi-threaded safety between telemetry offering and queue flushing. When a batch flush fails due to a network disconnection or transmit failure in `SocketioSignalingClient`, the un-sent updates MUST be re-queued at the front of the queue (`pushFront`) in their exact original sequence order to prevent reordering behind newer incoming updates (R-ID 142).
+*   **1.372 Coarse Network Fix Filtering (R-ID 143)**: `MonitorLocationSource` MUST filter incoming location updates using `isBetterLocation` to prevent a coarse Network location fix (e.g., accuracy ±77.6m) from replacing a fresh, more accurate GPS location fix (e.g., accuracy ±11m) on the Monitor UI and map. A coarse Network fix MUST only replace a GPS fix if the GPS fix is older than 2 minutes (120s) (R-ID 143).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov7.12**: Coarse Network Fix Filtering (ISSUE-NOV6.1-O28) - PASSED.
 - **Nov7.11**: Thread-Safe SignalingQueue & Failed Flush Re-queuing (ISSUE-NOV6.0-O24) - PASSED.
 - **Nov7.10**: Screen State & Rotation Preservation (ISSUE-NOV6.0-O22) - PASSED.
 - **Nov7.9**: HUD Flow 2Hz Rate Limiting (ISSUE-NOV6.0-O21) - PASSED.

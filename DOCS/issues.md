@@ -1,11 +1,11 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.11)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.12)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov7.11, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov7.12, solved one by one in the order below
 
 ### Work Queue
-Nov7.11 is closed and followed Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, or Nov7.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov7.12 is closed and followed Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, or Nov7.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
-**Next item: ISSUE-NOV6.0-O26 (item 18).** Run the Sensor on a device or emulator below API 35. If the user prefers other work, take the first item marked `Nothing`: ISSUE-NOV6.1-O28.
+**Next item: ISSUE-NOV6.0-O26 (item 18).** Run the Sensor on a device or emulator below API 35. If the user prefers other work, take the first item marked `Nothing`: ISSUE-NOV6.4-O33.
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -28,7 +28,7 @@ Nov7.11 is closed and followed Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, 
 | 17 | ISSUE-NOV6.0-O25 | **Done for Nov6.0**: calls missing on older Android removed, together with O20 | Nothing |
 | 18 | ISSUE-NOV6.0-O26 | Run the Sensor on a device or emulator below API 35 | A device, or user permission to download an API 34 emulator image |
 | 19 | ISSUE-NOV6.1-O27 | **Done for Nov7.2**: the Sensor HUD shows the service's real fix, or `--` | Nothing |
-| 20 | ISSUE-NOV6.1-O28 | Stop a coarse network fix replacing a better GPS fix | Nothing |
+| 20 | ISSUE-NOV6.1-O28 | **Done for Nov7.12**: MonitorLocationSource filters fixes with isBetterLocation, preventing coarse network fixes from overriding fresh GPS fixes | Nothing |
 | 21 | ISSUE-NOV6.2-O29 | Decide whether the Monitor stores its own trail, with item 8 | User decision |
 | 22 | ISSUE-NOV6.2-O30 | Decide what happens to the stored rows of a tracker that is no longer paired | User decision |
 | 23 | ISSUE-NOV6.2-O31 | **Done for Nov6.4**: unanswered backfill requests are released after 30 seconds | Nothing |
@@ -82,6 +82,11 @@ Nov7.11 is closed and followed Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, 
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov7.12)
+*   **Coarse Network Fix Filtering (ISSUE-NOV6.1-O28)**: Added `isBetterLocation` filter to `MonitorLocationSource.kt` based on standard Android location evaluation. Prevents a coarse Network location fix (e.g., accuracy ±77.6m) from overriding a fresh, more accurate GPS location fix (e.g., accuracy ±11m) on the Monitor UI and map while the GPS fix is less than 2 minutes (120s) old. Verified by unit tests in `MonitorLocationSourceTest` and full automated test suite pass across all modules. **PASSED.**
 
 ---
 

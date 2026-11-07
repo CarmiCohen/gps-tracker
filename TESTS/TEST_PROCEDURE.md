@@ -501,8 +501,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **135.1 Thread Safety & ReentrantLock Conflation:** Verify that `SignalingQueue` operations (`offer`, `pollBatch`, `pushFront`, `clear`) are fully thread-safe under concurrent access protected by `ReentrantLock`. Automated by `SignalingQueueTest.testThreadSafetyConcurrentAccess` (ISSUE-NOV6.0-O24).
 *   **135.2 PushFront Failed Flush Order Preservation:** Verify that when `SocketioSignalingClient` fails a batch flush, `pushFront` returns updates to the front of `SignalingQueue` in their exact original sequence order (`1, 2, 3 ...`), preventing reordering behind newer incoming updates. Automated by `SignalingQueueTest.testPushFrontPreservesOrder`.
 
+## Chapter 136 - Coarse Network Fix Filtering (Nov7.12)
+*   **136.1 Coarse Fix Rejection While GPS Fresh:** Verify that `MonitorLocationSource.isBetterLocation` rejects coarse Network location fixes (e.g., accuracy ±77.6m) when a recent, more accurate GPS fix (e.g., accuracy ±11m) is less than 2 minutes (120s) old, preventing location jitter on the Monitor UI and map. Automated by `MonitorLocationSourceTest.coarseNetworkFixRejectedWhenGpsFixIsFresh` (ISSUE-NOV6.1-O28).
+*   **136.2 Stale GPS Fix Fallback:** Verify that a coarse Network fix is accepted when the GPS fix is older than 2 minutes (120s), providing fallback positioning when GPS signal is lost. Automated by `MonitorLocationSourceTest.coarseNetworkFixAcceptedWhenGpsFixIsStale`.
+
 ---
-**Active Testing Chapters: 125 of 135**
+**Active Testing Chapters: 126 of 136**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

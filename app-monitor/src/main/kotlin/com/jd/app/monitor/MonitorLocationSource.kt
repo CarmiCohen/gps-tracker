@@ -33,11 +33,23 @@ class MonitorLocationSource @Inject constructor(
         val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
             .filter { it in locationManager.allProviders }
 
-        providers.mapNotNull { locationManager.getLastKnownLocation(it) }
-            .maxByOrNull { it.time }
-            ?.let { trySend(it.toLocalFix()) }
+        var currentBest: Location? = null
 
-        val listener = LocationListenerCompat { trySend(it.toLocalFix()) }
+        providers.mapNotNull { locationManager.getLastKnownLocation(it) }
+            .sortedBy { it.time }
+            .forEach { loc ->
+                if (isBetterLocation(loc, currentBest)) {
+                    currentBest = loc
+                    trySend(loc.toLocalFix())
+                }
+            }
+
+        val listener = LocationListenerCompat { location ->
+            if (isBetterLocation(location, currentBest)) {
+                currentBest = location
+                trySend(location.toLocalFix())
+            }
+        }
         providers.forEach {
             locationManager.requestLocationUpdates(
                 it, UPDATE_INTERVAL_MS, UPDATE_DISTANCE_M, listener, Looper.getMainLooper()
@@ -55,5 +67,44 @@ class MonitorLocationSource @Inject constructor(
         )
         private const val UPDATE_INTERVAL_MS = 10_000L
         private const val UPDATE_DISTANCE_M = 10f
+        const val TWO_MINUTES_MS = 120_000L
+
+        /**
+         * Determines whether a new [location] fix is better than the [currentBestLocation].
+         * Prevents a coarse Network fix from replacing a fresh, more accurate GPS fix (ISSUE-NOV6.1-O28).
+         */
+        fun isBetterLocation(location: Location, currentBestLocation: Location?): Boolean {
+            if (currentBestLocation == null) return true
+
+            val timeDeltaMs = if (location.elapsedRealtimeNanos > 0L && currentBestLocation.elapsedRealtimeNanos > 0L) {
+                (location.elapsedRealtimeNanos - currentBestLocation.elapsedRealtimeNanos) / 1_000_000L
+            } else {
+                location.time - currentBestLocation.time
+            }
+
+            val isSignificantlyNewer = timeDeltaMs > TWO_MINUTES_MS
+            val isSignificantlyOlder = timeDeltaMs < -TWO_MINUTES_MS
+            val isNewer = timeDeltaMs > 0
+
+            if (isSignificantlyNewer) return true
+            if (isSignificantlyOlder) return false
+
+            val locationAccuracy = if (location.hasAccuracy()) location.accuracy else Float.MAX_VALUE
+            val currentAccuracy = if (currentBestLocation.hasAccuracy()) currentBestLocation.accuracy else Float.MAX_VALUE
+            val accuracyDelta = (locationAccuracy - currentAccuracy).toInt()
+
+            val isMoreAccurate = accuracyDelta < 0
+            val isLessAccurate = accuracyDelta > 0
+            val isSignificantlyLessAccurate = accuracyDelta > 200
+
+            val isFromSameProvider = location.provider == currentBestLocation.provider
+
+            return when {
+                isMoreAccurate -> true
+                isNewer && !isLessAccurate -> true
+                isNewer && !isSignificantlyLessAccurate && isFromSameProvider -> true
+                else -> false
+            }
+        }
     }
 }
