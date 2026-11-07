@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -81,12 +82,12 @@ class AdminActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    var isLocked by remember { mutableStateOf(true) }
-                    var showSettings by remember { mutableStateOf(false) }
-                    var showAlertsOverlay by remember { mutableStateOf(false) }
-                    var showSoundOverlay by remember { mutableStateOf(false) }
-                    var showPhoneSetupOverlay by remember { mutableStateOf(false) }
-                    var showCleanSetupOverlay by remember { mutableStateOf(false) }
+                    var isLocked by rememberSaveable { mutableStateOf(true) }
+                    var showSettings by rememberSaveable { mutableStateOf(false) }
+                    var showAlertsOverlay by rememberSaveable { mutableStateOf(false) }
+                    var showSoundOverlay by rememberSaveable { mutableStateOf(false) }
+                    var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
+                    var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
 
                     val alertSettings by viewModel.alertSettings.collectAsStateWithLifecycle()
                     val sirenType by viewModel.sirenType.collectAsStateWithLifecycle()
@@ -260,10 +261,10 @@ fun SettingsOverlay(
     onSetCustomId: (String) -> Unit,
     onUpdateRelayUrl: (String) -> Unit
 ) {
-    var customId by remember { mutableStateOf("") }
-    var isError by remember { mutableStateOf(false) }
-    var relayUrlInput by remember { mutableStateOf(currentRelayUrl) }
-    var isRelayUrlError by remember { mutableStateOf(false) }
+    var customId by rememberSaveable { mutableStateOf("") }
+    var isError by rememberSaveable { mutableStateOf(false) }
+    var relayUrlInput by rememberSaveable(currentRelayUrl) { mutableStateOf(currentRelayUrl) }
+    var isRelayUrlError by rememberSaveable { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     Column(
@@ -427,8 +428,8 @@ fun SensorAdminConsole(
 ) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
-    var showSetupDialog by remember { mutableStateOf(false) }
-    var showToolsOverlay by remember { mutableStateOf(false) }
+    var showSetupDialog by rememberSaveable { mutableStateOf(false) }
+    var showToolsOverlay by rememberSaveable { mutableStateOf(false) }
 
     if (showToolsOverlay) {
         com.jd.core.ui.ToolsOverlay(

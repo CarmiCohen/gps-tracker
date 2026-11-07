@@ -494,8 +494,11 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 133 - HUD Flow 2Hz Rate Limiting (Nov7.9)
 *   **133.1 HUD Flow Rate Throttling:** Verify that Monitor `localHudState`, `remoteHudState`, and Sensor `hudState` apply `atUiRate()` (500ms sampling window) to incoming telemetry and fix streams, capping UI state recalculations and emissions to at most 2Hz. Automated by `UiRateTest` and `HudRateTest` (ISSUE-NOV6.0-O21).
 
+## Chapter 134 - Screen State & Rotation Preservation (Nov7.10)
+*   **134.1 Overlay and Follow Mode Preservation Across Rotation:** Verify that open overlays, dialog states, and map follow modes persist across screen rotation and configuration changes in `MonitorActivity` and `AdminActivity` by using `rememberSaveable` (ISSUE-NOV6.0-O22).
+
 ---
-**Active Testing Chapters: 123 of 133**
+**Active Testing Chapters: 124 of 134**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

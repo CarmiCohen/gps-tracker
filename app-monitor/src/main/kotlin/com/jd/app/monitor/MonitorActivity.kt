@@ -152,10 +152,10 @@ fun PairingWizard(
     onPair: (String) -> Unit,
     onUpdateRelayUrl: (String) -> Unit
 ) {
-    var text by remember { mutableStateOf(ForensicIdentity.DEFAULT_TRACKER_ID) }
-    var isError by remember { mutableStateOf(false) }
-    var relayUrlInput by remember(relayUrl) { mutableStateOf(relayUrl) }
-    var showRelayConfig by remember { mutableStateOf(false) }
+    var text by rememberSaveable { mutableStateOf(ForensicIdentity.DEFAULT_TRACKER_ID) }
+    var isError by rememberSaveable { mutableStateOf(false) }
+    var relayUrlInput by rememberSaveable(relayUrl) { mutableStateOf(relayUrl) }
+    var showRelayConfig by rememberSaveable { mutableStateOf(false) }
     val isRelayUrlValid = RelayConfig.isValid(relayUrlInput)
 
     Column(
@@ -255,16 +255,16 @@ fun MonitorScreen(
     onUpdateRelayUrl: (String) -> Unit
 ) {
     val context = LocalContext.current
-    var isMapButtonsVisible by remember { mutableStateOf(true) }
-    var showSetupDialog by remember { mutableStateOf(false) }
-    var showAlertsOverlay by remember { mutableStateOf(false) }
-    var showSoundOverlay by remember { mutableStateOf(false) }
-    var showPhoneSetupOverlay by remember { mutableStateOf(false) }
-    var showCleanSetupOverlay by remember { mutableStateOf(false) }
-    var showToolsOverlay by remember { mutableStateOf(false) }
-    var isEditingRelayUrl by remember { mutableStateOf(false) }
-    var relayUrlInput by remember(relayUrl) { mutableStateOf(relayUrl) }
-    var followMode by remember { mutableStateOf(MapFollowMode.AUTO) }
+    var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
+    var showSetupDialog by rememberSaveable { mutableStateOf(false) }
+    var showAlertsOverlay by rememberSaveable { mutableStateOf(false) }
+    var showSoundOverlay by rememberSaveable { mutableStateOf(false) }
+    var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
+    var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
+    var showToolsOverlay by rememberSaveable { mutableStateOf(false) }
+    var isEditingRelayUrl by rememberSaveable { mutableStateOf(false) }
+    var relayUrlInput by rememberSaveable(relayUrl) { mutableStateOf(relayUrl) }
+    var followMode by rememberSaveable { mutableStateOf(MapFollowMode.AUTO) }
     // Every control that unpairs asks first; only the dialog's Unpair button calls onReset.
     var showUnpairConfirm by rememberSaveable { mutableStateOf(false) }
     val requestUnpair = { showUnpairConfirm = true }

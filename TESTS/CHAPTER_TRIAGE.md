@@ -89,7 +89,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 68 Scale | T | `TrailCapTest` uses 1200 rows and no timing; the chapter requires 50,000 points in under 2s |
 | 70 Process death | L | Monitor recovered |
 | 71, 78, 84, 89, 92 Identity and roles | N | Retired: split apps and fixed default IDs |
-| 87 Activity routing | D | Kept active. No routing state is held in a ViewModel, so open overlays and follow mode reset on rotation; found by reading the code, not run (ISSUE-NOV6.0-O22) |
+| 87 Activity routing | A | Verified: overlay flags, dialog states, and follow mode use `rememberSaveable` in MonitorActivity and AdminActivity, persisting across rotation and configuration changes (ISSUE-NOV6.0-O22) |
 | 72, 74 Log encryption and stripping | D | `CryptoUtils` is unused |
 | 73 Foreground revoke | L | Engine stops cleanly |
 | 75 UI rate | A | Verified: UiRateTest and HudRateTest cover 2Hz rate-limiting for trail and HUD flows (ISSUE-NOV6.0-O21) |
