@@ -48,9 +48,8 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **7.3 Uncertainty Drift (R460):** Force GPS Stall; verify accuracy buffer growth.
 
 ## Chapter 8 - Alarm & Siren Logic (Authority Audit)
-*   **8.1 Siren Suppression (Tracker):** Confirm NO local audio or red-screen.
-*   **8.2 Siren Authority (Viewer):** Confirm Viewer triggers full-screen Red Alert and 30s Siren.
-*   **8.3 Mute Lockout:** Dismiss siren on Viewer. Confirm 30s manual mute lockout.
+*   **8.1 Siren Suppression (Tracker):** Confirm NO local audio or red-screen. Automated by `SensorStealthGuardTest` (chapter 129.5).
+*   **8.2 Siren Authority (Viewer):** Confirm Viewer triggers full-screen Red Alert and a siren that sounds until acknowledged (user decision, 2026-11-07; chapter 129).
 
 ## Chapter 9 - Acoustic & Tamper Escalation
 *   **9.1 Acoustic Breach:** Produce noise (>85dB). Verify `ACOUSTIC_ALERT` triggers.
@@ -107,8 +106,6 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ## Chapter 26 - Alarm Suppression & Cooldowns
 *   **26.1 Bootstrap Phase:** Trigger violation within 60s of launch; verify NO alarm.
-*   **26.2 Siren Auto-Stop:** Trigger siren; verify it stops after 30s.
-*   **26.3 Lockout Period:** Dismiss siren; verify 30s manual mute lockout.
 
 ## Chapter 27 - System Health Alarms
 *   **27.1 Critical Battery:** Simulate 9% battery; verify alert.
@@ -471,9 +468,18 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **128.3 No Fix Shows No Values:** With the service stopped, or before its first fix, verify that the Sensor HUD shows `--` for motion state, speed, accuracy, and age, and no `STATIONARY`, `0.0 km/h`, `±5.0m`, or `0s`. Automated by `SensorHudValuesTest.noFixShowsNoPositionValues` and `clearingTheFixRemovesItsValues`.
 *   **128.4 Sensor HUD On Hardware:** On the A15, before `START SENSOR SERVICE`, verify that the Sensor HUD shows `--` for motion state, speed, accuracy, and age. Start the service and verify that the accuracy and speed match the last fused fix in `dumpsys location`, and that the age counts up between fixes and stays under about 10 seconds. The app has no control that stops the service, and `am stopservice` is refused because the service is not exported, so the return to `--` after a stop has automated proof only.
 
+## Chapter 129 - Monitor Alarms And Siren (Nov7.3)
+*   **129.1 Alarm Conditions:** Verify that the Monitor raises `Tracker offline` when no update from the paired tracker arrived for 35 seconds, counted from the start of watching when none arrived yet; `Tracker power disconnected` when the tracker reports no charging; `Tracker battery low` below 20%, ending only at 22% or more; and `Tracker temperature high` above 46°C, ending only at 44°C or less. Verify that a late queued update cannot replace a newer one. Automated by `MonitorAlarmsTest` (ISSUE-NOV5.2-O11).
+*   **129.2 Until Acknowledged:** Verify that an alarm is raised once, sounds until acknowledged even after its condition clears, and is then shown as `(cleared)`; that an acknowledged alarm is raised again only after its condition has cleared; and that switching an alarm off in Alert Settings, or turning on Global Mute, drops it at once. The switches are `Peer Connection Offline`, `Power Disconnected / Unplugged`, `Low Battery Level (<20%)`, and `High Device Temperature (>46°C)`. Automated by `MonitorAlarmsTest`.
+*   **129.3 Pairing And Settings:** Verify that only the paired tracker raises alarms, that a new pairing starts with no alarms, and that nothing is raised before the saved settings are loaded. Automated by `MonitorAlarmsTest`.
+*   **129.4 Siren:** Verify that the siren loops until stopped on the alarm stream, or on the notification stream when `Override ... Silent Mode` is off; that `Force Maximum` sets the alarm volume to maximum and restores the earlier volume when the siren stops, and wins over the custom volume; that each wave type has its own sound; and that `TEST SIREN AUDIO` plays and stops the same siren. Automated by `SirenSoundTest` and `MonitorAlarmDeviceTest`, which plays at gain 0 and restores the phone's alarm volume.
+*   **129.5 Sensor Stays Silent:** Verify that no Sensor, `core-shared`, or `core-network` source uses audio or vibration classes (Rule 14, R872). Automated by `SensorStealthGuardTest`; run it with `--rerun`.
+*   **129.6 Alarm Screen And Notification:** Verify that the alarm notification uses the high-importance `monitor_alarm` channel, that the session notification uses the low-importance `monitor_session` channel, and that the shared `critical_violation_channel` that was lowered to low importance is removed. Verify that the alarm screen names each pending alarm and its start time and acknowledges with one tap. Automated by `MonitorAlarmDeviceTest`.
+*   **129.7 Alarms On Hardware:** On the A15 with both apps paired through the production relay, and the siren at a low volume: simulate an unplugged charger with `dumpsys battery unplug` and `dumpsys battery set status 3`, and verify the full-screen alarm, the siren in `dumpsys audio`, and the alarm notification, then `ACKNOWLEDGE ALARM`. Restore with `dumpsys battery reset`, send the Monitor to the background, unplug again, and verify that the alarm returns and that tapping its notification opens `AlarmOverlayActivity`. Force-stop the Sensor and verify `Tracker offline` after about 35 seconds, then restart it and verify `(cleared)` with the siren still on. Simulate `level 15` and `temp 470` and verify both alarms. Always end with `dumpsys battery reset`.
+
 ---
-**Active Testing Chapters: 118 of 128**
-*Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
+**Active Testing Chapters: 119 of 129**
+*Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
 

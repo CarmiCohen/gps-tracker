@@ -3,7 +3,7 @@ package com.jd.app.monitor
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.media.AudioAttributes
+import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
@@ -21,7 +21,12 @@ import javax.inject.Inject
 class MonitorApp : Application(), Configuration.Provider {
 
     companion object {
-        const val ALARM_CHANNEL_ID = "critical_violation_channel"
+        /** High importance; the siren is played by [SirenPlayer], so the channel itself is silent. */
+        const val ALARM_CHANNEL_ID = "monitor_alarm"
+        /** Low importance, for the ongoing tracking session notification. */
+        const val SESSION_CHANNEL_ID = "monitor_session"
+        /** Shared by both until Nov7.2; the session service had lowered it to low importance. */
+        const val LEGACY_CHANNEL_ID = "critical_violation_channel"
     }
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
@@ -42,31 +47,32 @@ class MonitorApp : Application(), Configuration.Provider {
             }
         }
 
-        createAlarmNotificationChannel()
+        createMonitorNotificationChannels(this)
         TrailPruningWorker.schedule(this)
     }
+}
 
-    private fun createAlarmNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val audioAttributes = AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .build()
-
-            val channel = NotificationChannel(
-                ALARM_CHANNEL_ID,
-                "Critical Theft Alerts",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Used for high-priority theft and sensor violation alerts."
-                setBypassDnd(true)
-                enableLights(true)
-                enableVibration(true)
-                setSound(null, audioAttributes)
-            }
-
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+/**
+ * The only definition of the Monitor channels. Calling it again recreates the same importances, so no caller can
+ * lower the alarm channel, as the session service did with its own definition until Nov7.2.
+ */
+fun createMonitorNotificationChannels(context: Context) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.deleteNotificationChannel(MonitorApp.LEGACY_CHANNEL_ID)
+    manager.createNotificationChannel(
+        NotificationChannel(MonitorApp.ALARM_CHANNEL_ID, "Tracker Alarms", NotificationManager.IMPORTANCE_HIGH).apply {
+            description = "Full-screen alarms about the paired tracker. The app plays the siren itself."
+            setBypassDnd(true)
+            enableLights(true)
+            enableVibration(false)
+            setSound(null, null)
+            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
         }
-    }
+    )
+    manager.createNotificationChannel(
+        NotificationChannel(MonitorApp.SESSION_CHANNEL_ID, "Tracking Session", NotificationManager.IMPORTANCE_LOW).apply {
+            description = "Shown while the Monitor receives a paired tracker."
+        }
+    )
 }

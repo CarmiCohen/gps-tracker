@@ -12,6 +12,7 @@ Chapter numbers are not reused, so older references in `issues.md`, `test_result
 | 78, 84 | Sensor and Monitor are separate apps, so roles cannot mix or share restoration logic |
 | 89 | One-time cleanup check for legacy ViewModels from before the split |
 | 117 | Record of the Nov4.44 release procedure, not a repeatable test |
+| 8.3, 26.2, 26.3 | Superseded in Nov7.3 by the user decision of 2026-11-07: the siren sounds until it is acknowledged, with no 30-second auto-stop or mute lockout (chapter 129). Chapter 8.2 lost the same `30s Siren` wording |
 
 ---
 
@@ -19,6 +20,15 @@ Chapter numbers are not reused, so older references in `issues.md`, `test_result
 Chapter 2.3 remains active in `TEST_PROCEDURE.md`.
 *   **2.1 Enter Tracker Mode:** Tap "Tracker".
 *   **2.2 Verify Setup Bypass:** Confirm app lands directly on Dashboard (R-ID 615).
+
+## Chapter 8 - Alarm & Siren Logic (Authority Audit)
+Chapters 8.1 and 8.2 remain active in `TEST_PROCEDURE.md`. Until Nov7.2, 8.2 read: "Confirm Viewer triggers full-screen Red Alert and 30s Siren."
+*   **8.3 Mute Lockout:** Dismiss siren on Viewer. Confirm 30s manual mute lockout.
+
+## Chapter 26 - Alarm Suppression & Cooldowns
+Chapter 26.1 remains active in `TEST_PROCEDURE.md`.
+*   **26.2 Siren Auto-Stop:** Trigger siren; verify it stops after 30s.
+*   **26.3 Lockout Period:** Dismiss siren; verify 30s manual mute lockout.
 
 ## Chapter 10 - Native Resource Lifecycle (Issue #249)
 *   **10.1 Bridge Disposal:** Switch Tracker/Viewer modes 5 times. Monitor for `BaseEventQueue.dispose` failures.

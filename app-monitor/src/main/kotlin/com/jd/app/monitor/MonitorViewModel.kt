@@ -34,6 +34,7 @@ class MonitorViewModel @Inject constructor(
     private val signalingClient: SignalingClient,
     private val dataStore: MonitorDataStore,
     private val locationSource: MonitorLocationSource,
+    private val alarmEngine: MonitorAlarmEngine,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -47,8 +48,14 @@ class MonitorViewModel @Inject constructor(
     val sirenType: StateFlow<String> = dataStore.sirenType
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Siren")
 
-    private val _isSirenPlaying = MutableStateFlow(false)
-    val isSirenPlaying: StateFlow<Boolean> = _isSirenPlaying.asStateFlow()
+    /** True while the siren really plays, for an alarm or a test. */
+    val isSirenPlaying: StateFlow<Boolean> = alarmEngine.isSirenOn
+
+    val alarms: StateFlow<AlarmBook> = alarmEngine.alarms
+
+    fun acknowledgeAlarms() {
+        alarmEngine.acknowledge()
+    }
 
     fun updateAlertSettings(settings: AlertSettings) {
         viewModelScope.launch {
@@ -70,7 +77,7 @@ class MonitorViewModel @Inject constructor(
     }
 
     fun testSirenAudio() {
-        _isSirenPlaying.value = !_isSirenPlaying.value
+        alarmEngine.toggleSirenTest()
     }
 
     fun updateRelayUrl(url: String) {
@@ -135,7 +142,7 @@ class MonitorViewModel @Inject constructor(
         val isInternet = isNetworkAvailable(context)
         val isLocalGps = isLocationProviderEnabled(context)
         val lastTs = latest?.timestamp ?: 0L
-        val isTrackerPresent = lastTs > 0 && (now - lastTs) < 35000L
+        val isTrackerPresent = lastTs > 0 && (now - lastTs) < TRACKER_PRESENT_MS
 
         HudState(
             appMode = "monitor", // Cyan local GPS LED
@@ -159,7 +166,7 @@ class MonitorViewModel @Inject constructor(
     ) { self, target, isConnected, latest, now ->
         val lastTs = latest?.timestamp ?: 0L
         val ageSec = if (lastTs > 0) (now - lastTs) / 1000 else -1L
-        val isTrackerPresent = lastTs > 0 && (now - lastTs) < 35000L
+        val isTrackerPresent = lastTs > 0 && (now - lastTs) < TRACKER_PRESENT_MS
         val isInternet = isNetworkAvailable(context)
         val isGpsActive = latest != null && (latest.lat != 0.0 || latest.lng != 0.0)
         val speedKmh = latest?.takeIf { isGpsActive }?.speed?.let(::metersPerSecondToKmh)

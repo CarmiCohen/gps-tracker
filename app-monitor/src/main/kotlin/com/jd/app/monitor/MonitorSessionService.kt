@@ -25,30 +25,18 @@ class MonitorSessionService : Service() {
     @Inject lateinit var repository: MonitorRepository
     @Inject lateinit var trailDao: TrailDao
     @Inject lateinit var dataStore: MonitorDataStore
+    @Inject lateinit var alarmEngine: MonitorAlarmEngine
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
-    }
-
-    private fun createNotificationChannel() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            val channel = android.app.NotificationChannel(
-                MonitorApp.ALARM_CHANNEL_ID,
-                "Critical Theft Alerts",
-                android.app.NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Used for high-priority theft and sensor violation alerts."
-            }
-            val manager = getSystemService(android.app.NotificationManager::class.java)
-            manager?.createNotificationChannel(channel)
-        }
+        // startForeground needs its channel even where MonitorApp did not start, such as under a test application.
+        createMonitorNotificationChannels(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val notification = NotificationCompat.Builder(this, MonitorApp.ALARM_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this, MonitorApp.SESSION_CHANNEL_ID)
             .setContentTitle("Active Tracking Session")
             .setContentText("Monitoring remote sensor traces...")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
@@ -62,6 +50,7 @@ class MonitorSessionService : Service() {
         }
         
         startSignaling()
+        alarmEngine.watch(serviceScope)
         
         return START_STICKY
     }
@@ -89,6 +78,7 @@ class MonitorSessionService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        alarmEngine.stop()
         signalingClient.disconnect()
         serviceScope.cancel()
     }

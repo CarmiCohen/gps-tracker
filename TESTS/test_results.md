@@ -1,4 +1,26 @@
-# Test Results - Nov7.2 (Real Sensor HUD Values)
+# Test Results - Nov7.3 (Monitor Alarms And Siren)
+
+## Nov7.3 Summary
+Executed Nov 7, 2026 on the A15 (`R58X40GV2AR`, API 36), the only phone attached, with Sensor and Monitor on the same phone through the production relay. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **Automated suite** | 🟢 **222/222** | `:core-shared` 46, `:core-network` 18, `:core-ui` 29, `:app-monitor` unit 43, `:app-monitor` on A15 44, `:app-sensor` on A15 42. Unit tasks were forced with `--rerun-tasks`; fresh result files were counted, with 0 failures and 0 errors. Both instrumented suites ran on the final code at `Nov7.3`. |
+| **First Monitor run** | 🟠 **FIXED** | `MapJitterAuditTest` crashed the process with `CannotPostForegroundServiceNotificationException`: under the test application `MonitorApp` never runs, so the new session channel did not exist. `MonitorSessionService.onCreate` now calls the single channel definition. `theSirenPlaysInALoopUntilStopped` failed only because of that crash; it passed in the rerun. |
+| **129.1 to 129.3 Alarm logic** | 🟢 **PASSED (automated)** | `MonitorAlarmsTest`, 15 tests, including the book flow with only the paired tracker, no evaluation before settings, acknowledgement, and a new pairing. |
+| **129.4 to 129.6 Siren, silence, channels** | 🟢 **PASSED (automated)** | `SirenSoundTest` 5, `SensorStealthGuardTest` 3, `MonitorAlarmDeviceTest` 5 on the A15, playing at gain 0. |
+| **Deliberate breaks** | 🟢 **PASSED** | Dropping an unacknowledged alarm when it cleared failed `anUnacknowledgedAlarmStaysAfterItsConditionClears`; restoring the maximum instead of the saved volume failed `aForcedMaximumVolumeIsRestoredWhenTheSirenStops` (expected 7, was 15). Both were restored. |
+| **Test side effect** | 🟠 **FIXED** | `MonitorAlarmDeviceTest` changed the A15 alarm volume, which `dumpsys audio` showed at 1 before the first run. It was set back to 1, and the test now saves and restores the phone's alarm volume; after the final run it was still 1. |
+| **129.7 Alarms on hardware** | 🟢 **PASSED** | User decision: low volume, so `Force Maximum` was turned off in the Monitor and the alarm stream stayed at 1 of 15. Unplug at 15:04:10: `POWER_DISCONNECTED` at 15:04:11.3, siren on `USAGE_ALARM` in `dumpsys audio`, full-screen `Tracker T power disconnected since 15:04:11`, notification 2001 on `monitor_alarm` (importance 4, category alarm, full-screen intent). Acknowledged at 15:04:47: siren stopped and notification removed. Re-plugged, sent to the background, unplugged at 15:05:33: raised again with the launcher in front; the phone showed a heads-up, and tapping it in the shade opened `AlarmOverlayActivity`, where acknowledging closed it. Sensor force-stopped at 15:07:17: `TRACKER_OFFLINE` at 15:07:53; after the Sensor was restarted it showed `(cleared)` with the siren on until acknowledged. Level 15 and temperature 470: both alarms at 15:09:25, `(cleared)` after `dumpsys battery reset`, silenced at 15:10:25. `TEST SIREN AUDIO` started and stopped the siren. Battery state reset and checked afterwards. |
+| **Channels on hardware** | 🟢 **PASSED** | `monitor_alarm` importance 4, `monitor_session` importance 2; the Monitor's lowered channel was removed. `mBypassDnd=false`, because the app has no Do Not Disturb access (ISSUE-NOV7.3-O39). |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | `device_audit.cmd` at 15:09:57, Sensor and Monitor processes, log cleared at about 15:01: 0 Davey over 500ms, 0 StackLog, 0 fatal. |
+| **Not run** | ⚪ | The full-screen start over a locked screen, the siren at maximum volume on hardware, and two phones. |
+
+**Run history:** one fixed failure in the first Monitor run, and the two intended failures above. Every other run passed.
+
+---
+
+# Nov7.2 Results (Real Sensor HUD Values)
 
 ## Nov7.2 Summary
 Executed Nov 7, 2026 on the A15 (`R58X40GV2AR`, API 36), the only phone attached, with Sensor and Monitor on the same phone through the production relay and real positions. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.

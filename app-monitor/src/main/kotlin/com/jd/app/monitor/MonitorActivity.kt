@@ -81,13 +81,18 @@ class MonitorActivity : ComponentActivity() {
                     ActivityResultContracts.RequestMultiplePermissions()
                 ) { viewModel.refreshLocationPermission() }
                 LaunchedEffect(Unit) {
-                    locationPermissionLauncher.launch(MonitorLocationSource.LOCATION_PERMISSIONS)
+                    // Alarm notifications need the notification permission from Android 13.
+                    val notificationPermission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        arrayOf(android.Manifest.permission.POST_NOTIFICATIONS)
+                    } else emptyArray()
+                    locationPermissionLauncher.launch(MonitorLocationSource.LOCATION_PERMISSIONS + notificationPermission)
                 }
                 val context = LocalContext.current
 
                 val alertSettings by viewModel.alertSettings.collectAsStateWithLifecycle()
                 val sirenType by viewModel.sirenType.collectAsStateWithLifecycle()
                 val isSirenPlaying by viewModel.isSirenPlaying.collectAsStateWithLifecycle()
+                val alarmBook by viewModel.alarms.collectAsStateWithLifecycle()
 
                 LaunchedEffect(trackerId) {
                     val serviceIntent = Intent(context, MonitorSessionService::class.java)
@@ -102,7 +107,9 @@ class MonitorActivity : ComponentActivity() {
                     }
                 }
 
-                if (trackerId == null) {
+                if (trackerId != null && alarmBook.pending.isNotEmpty()) {
+                    AlarmAlertScreen(alarmBook.pending, trackerId, onAcknowledge = viewModel::acknowledgeAlarms)
+                } else if (trackerId == null) {
                     PairingWizard(
                         relayUrl = relayUrl,
                         onPair = { id -> viewModel.setTargetId(id) },

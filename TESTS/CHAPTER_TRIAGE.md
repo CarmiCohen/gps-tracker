@@ -14,11 +14,11 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 
 **D does not mean the code is absent.** In several chapters logic exists and has unit tests, such as `SentinelLogic`, but nothing in the running apps calls it. The D findings come from reading the code.
 
-**Summary:** 51 of 118 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
+**Summary:** 54 of 119 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
 
-**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1, Chapter 123 makes 113 in Nov6.2, Chapter 124 makes 114 in Nov6.3, Chapter 125 makes 115 in Nov6.4, Chapter 126 makes 116 in Nov7.0, Chapter 127 makes 117 in Nov7.1, and Chapter 128 makes 118 in Nov7.2.
+**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1, Chapter 123 makes 113 in Nov6.2, Chapter 124 makes 114 in Nov6.3, Chapter 125 makes 115 in Nov6.4, Chapter 126 makes 116 in Nov7.0, Chapter 127 makes 117 in Nov7.1, Chapter 128 makes 118 in Nov7.2, and Chapter 129 makes 119 in Nov7.3. Items 8.3, 26.2, and 26.3 were retired in Nov7.3; chapters 8 and 26 stay active.
 
-**A chapter review:** the earlier count of 48 included seven chapters whose tests do not prove the chapter's claim: 53, 66, 67, 68, 83, 88, and 93. None of the 48 were retired, so 48 minus 7 gives 41. ISSUE-NOV6.0-O20 then added chapters 66 and 121, giving 43. ISSUE-NOV5.0-O2 added chapter 122, giving 44. ISSUE-NOV5.2-O14 added chapter 123 and verified chapter 50, giving 46. ISSUE-NOV5.0-O5 added chapter 124, giving 47. ISSUE-NOV6.3-O32 added chapter 125, giving 48. ISSUE-NOV5.0-O6 added chapter 126, giving 49. ISSUE-NOV5.2-O15 added chapter 127, giving 50. ISSUE-NOV6.1-O27 added chapter 128, giving 51.
+**A chapter review:** the earlier count of 48 included seven chapters whose tests do not prove the chapter's claim: 53, 66, 67, 68, 83, 88, and 93. None of the 48 were retired, so 48 minus 7 gives 41. ISSUE-NOV6.0-O20 then added chapters 66 and 121, giving 43. ISSUE-NOV5.0-O2 added chapter 122, giving 44. ISSUE-NOV5.2-O14 added chapter 123 and verified chapter 50, giving 46. ISSUE-NOV5.0-O5 added chapter 124, giving 47. ISSUE-NOV6.3-O32 added chapter 125, giving 48. ISSUE-NOV5.0-O6 added chapter 126, giving 49. ISSUE-NOV5.2-O15 added chapter 127, giving 50. ISSUE-NOV6.1-O27 added chapter 128, giving 51. ISSUE-NOV5.2-O11 group 1 added chapter 129 and verified chapters 8 and 27, giving 54.
 
 ## Chapter 0 - Operational Forensic Audit
 | Item | Code | Notes |
@@ -39,11 +39,13 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 1 Deployment | L / D | Install and version verified; `PLATINUM` branding does not exist |
 | 2 Setup | N / L | 2.1 and 2.2 retired; 2.3 target ID survived `install -r` live (chapter 24). `IdentityPersistenceTest` only re-reads the same manager, and editing the self ID in the UI then reopening was not exercised |
 | 3 Tracker mode | L / H / D | HUD verified; 3.2 shake is physical; 3.3 has no JNI, lux, or tilt |
-| 4 Viewer sync | L / D | 4.3 to 4.6 verified; 4.2 alarms not wired |
+| 4 Viewer sync | L | 4.3 to 4.6 verified; 4.2 verified in Nov7.3: alarms appear on the Monitor only (chapter 129.7), and `SensorStealthGuardTest` keeps the Sensor silent |
 | 5 GNSS and persistence | D / L | 5.1 no `SIGNAL LOSS` state; 5.2 verified |
 | 6 Stress and heat | D / A | Injection buttons do not exist; 6.2 10s interval automated, but no `Cooling Mode` text exists |
 | 7 Map and geofencing | D | No anchor or geofence on the live path |
-| 8, 9, 26, 27, 28, 29 Alarms | D | No siren playback; violations are never sent or received |
+| 8 Alarm authority | L / A | 8.1 automated by `SensorStealthGuardTest`; 8.2 verified on the A15 in chapter 129.7. 8.3 retired in Nov7.3 |
+| 27 System health alarms | L / A | 27.1 and 27.2 verified on the A15 in chapter 129.7 with a simulated 15% battery and 47°C, and automated in `MonitorAlarmsTest` |
+| 9, 26, 28, 29 Alarms | D | Sensor violations are never sent or received; 26.2 and 26.3 retired in Nov7.3; 29 relay and signal alarms are the next slice |
 | 10, 47, 80, 94 JNI | N | Retired: no native code in the project |
 | 11, 21, 61, 62, 98 Motion logic | D | `SentinelLogic` is tested but unused by the Sensor |
 | 12, 46, 69 Workers | D | 12 has no pressure control; 46 periodic work cannot be expedited; 69 no `MaintenanceWorker` exists |
@@ -98,7 +100,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 101, 102, 103 IDs and session | L / A | Verified |
 | 104 Partition tolerance | A | `SignalingResilienceTest` |
 | 105, 106, 107 Relay and LEDs | L | Verified |
-| 109 Alarm setup UI | H / D | Settings exist but drive no alarms |
+| 109 Alarm setup UI | H / D | Since Nov7.3 the Monitor switches for the four chapter 129 alarms, Global Mute, and the Siren & Audio settings drive real alarms, and `TEST SIREN AUDIO` plays on the Monitor. The other switches still drive nothing, and the Sensor's test button does nothing (ISSUE-NOV7.3-O38) |
 | 110 Device hardening | D | `DeviceProfileManager` is never called |
 | 111, 112 Tools and clean setup | D | Screens open, but most actions are empty. The three Monitor `CLEAN` actions only unpair, after a confirmation since Nov7.1 (ISSUE-NOV7.1-O35) |
 | 113, 114 Menu | L / D | All buttons visible; Events and Graphs do nothing |
@@ -113,6 +115,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 126 Real version strings | L / A | 126.1 and 126.2 automated; 126.3 verified on the A15 through the production relay. The `--` case has automated proof only |
 | 127 Unpair confirmation | L / A | 127.1 and 127.2 automated; 127.3 verified on the A15 through the production relay |
 | 128 Real Sensor HUD values | L / A | 128.1 to 128.3 automated; 128.4 verified on the A15 through the production relay against `dumpsys location`. The return to `--` after the service stops has automated proof only, because nothing on the device can stop the service (ISSUE-NOV7.2-O36) |
+| 129 Monitor alarms and siren | L / A | 129.1 to 129.6 automated; 129.7 verified on the A15 through the production relay at low volume. The full-screen start over a locked screen and the maximum-volume path on hardware were not run |
 
 ## TEST_FORENSIC_STRESS_PROTOCOL.md
 | Section | Code | Notes |
