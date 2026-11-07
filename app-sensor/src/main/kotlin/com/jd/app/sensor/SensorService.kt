@@ -176,20 +176,9 @@ class SensorService : Service(), SensorEventListener {
             .onEach { request ->
                 SystemLogger.i("Backfill", "Received request for range ${request.startSequenceId} to ${request.endSequenceId}")
                 val updates = forensicBuffer.readRange(request.startSequenceId, request.endSequenceId)
-                
-                if (updates.isEmpty()) {
-                    signalingClient.sendBackfillResponse(BackfillResponse(request.requestId, emptyList(), true))
-                    return@onEach
-                }
-
-                val chunks = updates.chunked(50)
-                chunks.forEachIndexed { index, chunk ->
-                    val response = BackfillResponse(
-                        requestId = request.requestId,
-                        updates = chunk,
-                        isComplete = index == chunks.size - 1
-                    )
-                    signalingClient.sendBackfillResponse(response)
+                val sent = answerBackfill(request.requestId, updates, signalingClient::sendBackfillResponse)
+                if (!sent) {
+                    SystemLogger.w("Backfill", "Send failed for ${request.requestId}. Remaining chunks dropped; the Monitor will ask again.")
                 }
             }
             .launchIn(serviceScope)

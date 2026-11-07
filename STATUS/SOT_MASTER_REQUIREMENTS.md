@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov7.11)
+# SOT Master Requirements & Hardening Status (Nov7.15)
 
-## 🏗️ Architectural Master Rules (441 Rules)
+## 🏗️ Architectural Master Rules (448 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -36,8 +36,10 @@
 *   **1.370 Screen State & Rotation Preservation (R-ID 141)**: All UI overlay visibility flags, dialog states, and map follow modes in `MonitorActivity` and `AdminActivity` MUST use `rememberSaveable` to ensure open overlays, dialogs, unlock states, and follow modes persist across screen rotation and configuration changes (R-ID 141).
 *   **1.371 Thread-Safe Signaling Queue & Order-Preserving Failed Flush (R-ID 142)**: The signaling queue (`SignalingQueue`) MUST perform all queue manipulations and sequence tracking under a `ReentrantLock` for multi-threaded safety between telemetry offering and queue flushing. When a batch flush fails due to a network disconnection or transmit failure in `SocketioSignalingClient`, the un-sent updates MUST be re-queued at the front of the queue (`pushFront`) in their exact original sequence order to prevent reordering behind newer incoming updates (R-ID 142).
 *   **1.372 Coarse Network Fix Filtering (R-ID 143)**: `MonitorLocationSource` MUST filter incoming location updates using `isBetterLocation` to prevent a coarse Network location fix (e.g., accuracy ±77.6m) from replacing a fresh, more accurate GPS location fix (e.g., accuracy ±11m) on the Monitor UI and map. A coarse Network fix MUST only replace a GPS fix if the GPS fix is older than 2 minutes (120s) (R-ID 143).
+*   **1.373 Backfill Answer Stops On Send Failure (R-ID 144)**: The Sensor MUST answer a backfill request in chunks of at most 50 rows and MUST stop at the first chunk that `sendBackfillResponse` fails to send. After a failed chunk it MUST NOT send any later chunk of that request, including the completion chunk (`isComplete`), so the Monitor never counts a range with missing rows as answered; the Monitor's 30-second request release and stored-trail gap scan (rule 1.361) then request the remaining rows (ISSUE-NOV6.4-O33) (R-ID 144).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov7.15**: Backfill Answer Stops On Send Failure (ISSUE-NOV6.4-O33) - PASSED.
 - **Nov7.12**: Coarse Network Fix Filtering (ISSUE-NOV6.1-O28) - PASSED.
 - **Nov7.11**: Thread-Safe SignalingQueue & Failed Flush Re-queuing (ISSUE-NOV6.0-O24) - PASSED.
 - **Nov7.10**: Screen State & Rotation Preservation (ISSUE-NOV6.0-O22) - PASSED.

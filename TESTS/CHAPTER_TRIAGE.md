@@ -1,4 +1,4 @@
-# Chapter Triage - Nov7.11
+# Chapter Triage - Nov7.15
 
 Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`, and `TEST_FORENSIC_STRESS_PROTOCOL.md`, based on the running code and on tests executed for Nov5.2 on the A15. The A chapters were reviewed for Nov6.0 by comparing each chapter with its named test and with the production code (ISSUE-NOV5.4-O17).
 
@@ -14,11 +14,11 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 
 **D does not mean the code is absent.** In several chapters logic exists and has unit tests, such as `SentinelLogic`, but nothing in the running apps calls it. The D findings come from reading the code.
 
-**Summary:** 56 of 121 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
+**Summary:** 63 of 127 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
 
-**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1, Chapter 123 makes 113 in Nov6.2, Chapter 124 makes 114 in Nov6.3, Chapter 125 makes 115 in Nov6.4, Chapter 126 makes 116 in Nov7.0, Chapter 127 makes 117 in Nov7.1, Chapter 128 makes 118 in Nov7.2, Chapter 129 makes 119 in Nov7.3, Chapter 130 makes 120 in Nov7.5, Chapter 134 makes 120 in Nov7.10, and Chapter 135 makes 121 in Nov7.11. Items 8.3, 26.2, and 26.3 were retired in Nov7.3; chapters 8 and 26 stay active.
+**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1, Chapter 123 makes 113 in Nov6.2, Chapter 124 makes 114 in Nov6.3, Chapter 125 makes 115 in Nov6.4, Chapter 126 makes 116 in Nov7.0, Chapter 127 makes 117 in Nov7.1, Chapter 128 makes 118 in Nov7.2, Chapter 129 makes 119 in Nov7.3, Chapter 130 makes 120 in Nov7.5, Chapter 131 makes 121 in Nov7.6, Chapter 132 makes 122 in Nov7.7, Chapter 133 makes 123 in Nov7.9, Chapter 134 makes 124 in Nov7.10, Chapter 135 makes 125 in Nov7.11, Chapter 136 makes 126 in Nov7.12, and Chapter 137 makes 127 in Nov7.15. Corrected in Nov7.15: the Nov7.10 and Nov7.11 entries said 120 and 121 because chapters 131 to 133 had not been counted; the count now matches `TEST_PROCEDURE.md` (ISSUE-NOV7.15-O40). Items 8.3, 26.2, and 26.3 were retired in Nov7.3; chapters 8 and 26 stay active.
 
-**A chapter review:** the earlier count of 48 included seven chapters whose tests do not prove the chapter's claim: 53, 66, 67, 68, 83, 88, and 93. None of the 48 were retired, so 48 minus 7 gives 41. ISSUE-NOV6.0-O20 then added chapters 66 and 121, giving 43. ISSUE-NOV5.0-O2 added chapter 122, giving 44. ISSUE-NOV5.2-O14 added chapter 123 and verified chapter 50, giving 46. ISSUE-NOV5.0-O5 added chapter 124, giving 47. ISSUE-NOV6.3-O32 added chapter 125, giving 48. ISSUE-NOV5.0-O6 added chapter 126, giving 49. ISSUE-NOV5.2-O15 added chapter 127, giving 50. ISSUE-NOV6.1-O27 added chapter 128, giving 51. ISSUE-NOV5.2-O11 group 1 added chapter 129 and verified chapters 8 and 27, giving 54. ISSUE-NOV5.2-O11 group 1 slice 2 added chapter 130, giving 55. ISSUE-NOV6.0-O24 added chapter 135, giving 56.
+**A chapter review:** the earlier count of 48 included seven chapters whose tests do not prove the chapter's claim: 53, 66, 67, 68, 83, 88, and 93. None of the 48 were retired, so 48 minus 7 gives 41. ISSUE-NOV6.0-O20 then added chapters 66 and 121, giving 43. ISSUE-NOV5.0-O2 added chapter 122, giving 44. ISSUE-NOV5.2-O14 added chapter 123 and verified chapter 50, giving 46. ISSUE-NOV5.0-O5 added chapter 124, giving 47. ISSUE-NOV6.3-O32 added chapter 125, giving 48. ISSUE-NOV5.0-O6 added chapter 126, giving 49. ISSUE-NOV5.2-O15 added chapter 127, giving 50. ISSUE-NOV6.1-O27 added chapter 128, giving 51. ISSUE-NOV5.2-O11 group 1 added chapter 129 and verified chapters 8 and 27, giving 54. ISSUE-NOV5.2-O11 group 1 slice 2 added chapter 130, giving 55. Recounted in Nov7.15 (ISSUE-NOV7.15-O40), because the Nov7.6 to Nov7.12 additions were not all recorded here: chapter 131 gave 56 in Nov7.6, as the dashboard shows; chapter 132 gives 57, chapter 133 gives 58, chapter 134 gives 59, and chapter 87 moving from D to A in Nov7.10 gives 60; ISSUE-NOV6.0-O24 added chapter 135, giving 61; ISSUE-NOV6.1-O28 added chapter 136, giving 62; ISSUE-NOV6.4-O33 added chapter 137, giving 63.
 
 ## Chapter 0 - Operational Forensic Audit
 | Item | Code | Notes |
@@ -123,6 +123,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 134 Screen state preservation | A | 134.1 automated by UI state persistence tests |
 | 135 SignalingQueue thread safety | A | 135.1 and 135.2 automated by `SignalingQueueTest` |
 | 136 Coarse Network Fix Filtering | A | 136.1 and 136.2 automated by `MonitorLocationSourceTest` |
+| 137 Backfill stops on send failure | A | 137.1 to 137.3 automated by `BackfillResponderTest`; 137.4, the Monitor asking again after a real network cut, was not run on hardware |
 
 ## TEST_FORENSIC_STRESS_PROTOCOL.md
 | Section | Code | Notes |

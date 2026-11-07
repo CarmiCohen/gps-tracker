@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov7.15)
+- **Backfill Answer Stops On Send Failure (ISSUE-NOV6.4-O33)**: `SensorService.setupBackfillListener` ignored the result of `sendBackfillResponse`, so after a connection drop between chunks the completion chunk could still reach the Monitor, which then marked the range answered with rows missing until the Monitor process restarted. The chunk loop moved to the new `answerBackfill` in `app-sensor/.../BackfillResponder.kt` (`BACKFILL_CHUNK_SIZE` = 50), which stops at the first failed send and never sends a later chunk or the completion flag for that request; the service logs the failure. The Monitor was not changed: an incomplete request is released by `BackfillLedger` after 30 s without chunks, and the next stored-trail gap scan asks for the rows still missing (rule 1.361). Verified by the 7 tests in the new `BackfillResponderTest` (the first JVM unit test in `:app-sensor`) and by all unit tests passing across all subprojects. SOT rule 1.373, test chapter 137. **PASSED.**
+
 ## ✅ Resolved Issues (Nov7.12)
 - **Coarse Network Fix Filtering (ISSUE-NOV6.1-O28)**: Added `isBetterLocation` filter to `MonitorLocationSource.kt` based on standard Android location evaluation. Prevents a coarse Network location fix (e.g., accuracy ±77.6m) from overriding a fresh, more accurate GPS location fix (e.g., accuracy ±11m) on the Monitor UI and map while the GPS fix is less than 2 minutes (120s) old. Verified by unit tests in `MonitorLocationSourceTest` and full automated test suite pass across all modules. **PASSED.**
 

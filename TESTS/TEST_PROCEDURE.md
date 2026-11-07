@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov7.8 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov7.15 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -505,8 +505,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **136.1 Coarse Fix Rejection While GPS Fresh:** Verify that `MonitorLocationSource.isBetterLocation` rejects coarse Network location fixes (e.g., accuracy ±77.6m) when a recent, more accurate GPS fix (e.g., accuracy ±11m) is less than 2 minutes (120s) old, preventing location jitter on the Monitor UI and map. Automated by `MonitorLocationSourceTest.coarseNetworkFixRejectedWhenGpsFixIsFresh` (ISSUE-NOV6.1-O28).
 *   **136.2 Stale GPS Fix Fallback:** Verify that a coarse Network fix is accepted when the GPS fix is older than 2 minutes (120s), providing fallback positioning when GPS signal is lost. Automated by `MonitorLocationSourceTest.coarseNetworkFixAcceptedWhenGpsFixIsStale`.
 
+## Chapter 137 - Backfill Answer Stops On Send Failure (Nov7.15)
+*   **137.1 Complete Answer:** Verify that a backfill range of 120 rows is sent as chunks of 50, 50, and 20 in sequence order, and that only the last chunk carries `isComplete`. Automated by `BackfillResponderTest.allChunksSent_onlyLastIsComplete` and `singleChunk_isComplete` (ISSUE-NOV6.4-O33).
+*   **137.2 Stop On Failed Chunk:** Verify that when `sendBackfillResponse` fails for a chunk, no later chunk of that request is sent and the completion chunk is never sent, so the Monitor does not count the range as answered. Automated by `BackfillResponderTest.failedMiddleChunk_stopsAndNeverSendsComplete`, `failedFirstChunk_sendsNothingElse`, and `failedLastChunk_reportsFailure`.
+*   **137.3 Empty Range:** Verify that a request for a range the Sensor no longer holds is answered with one empty completion chunk, and that a failed send of it is reported. Automated by `BackfillResponderTest.emptyRange_sendsOneCompleteResponse` and `emptyRange_failedSendReported`.
+*   **137.4 Monitor Re-request (manual, A15 + Monitor):** With the Sensor connected, cut the Sensor's network while it answers a large backfill, then restore it. Within about 30 s of the last chunk received, the Monitor log MUST show `Requested <first> to <last>` again for the rows still missing, without a Monitor restart.
+
 ---
-**Active Testing Chapters: 126 of 136**
+**Active Testing Chapters: 127 of 137**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
