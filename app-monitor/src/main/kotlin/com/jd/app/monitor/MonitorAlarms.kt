@@ -30,7 +30,10 @@ enum class AlarmType(val title: String) {
     TRACKER_OFFLINE("Tracker offline"),
     POWER_DISCONNECTED("Tracker power disconnected"),
     LOW_BATTERY("Tracker battery low"),
-    HIGH_TEMPERATURE("Tracker temperature high")
+    HIGH_TEMPERATURE("Tracker temperature high"),
+    RELAY_DISCONNECTED("Relay disconnected"),
+    LOCAL_INTERNET_OFFLINE("Monitor internet lost"),
+    GPS_SIGNAL_LOSS("Tracker GPS signal loss")
 }
 
 fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) {
@@ -38,6 +41,9 @@ fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) 
     AlarmType.POWER_DISCONNECTED -> power
     AlarmType.LOW_BATTERY -> lowBattery
     AlarmType.HIGH_TEMPERATURE -> highTemperature
+    AlarmType.RELAY_DISCONNECTED -> relayConnection
+    AlarmType.LOCAL_INTERNET_OFFLINE -> localInternet
+    AlarmType.GPS_SIGNAL_LOSS -> signalLoss
 }
 
 /** The newest telemetry from the paired tracker. [receivedAtMs] is Monitor time, so the clocks of the two phones never meet. */
@@ -46,11 +52,28 @@ data class TrackerReading(
     val sensorTimeMs: Long,
     val batteryLevel: Int,
     val isCharging: Boolean,
-    val tempCelsius: Float
+    val tempCelsius: Float,
+    val lat: Double = 0.0,
+    val lng: Double = 0.0,
+    val accuracy: Float = 0f,
+    val status: String = "VALID"
 )
 
 fun LocationUpdate.toTrackerReading(receivedAtMs: Long) =
-    TrackerReading(receivedAtMs, timestamp, batteryLevel, isCharging, tempCelsius)
+    TrackerReading(
+        receivedAtMs = receivedAtMs,
+        sensorTimeMs = timestamp,
+        batteryLevel = batteryLevel,
+        isCharging = isCharging,
+        tempCelsius = tempCelsius,
+        lat = lat,
+        lng = lng,
+        accuracy = accuracy,
+        status = status
+    )
+
+fun TrackerReading.hasGpsSignal(): Boolean =
+    (lat != 0.0 || lng != 0.0) && accuracy > 0f && status != "NO_FIX" && status != "GPS_SIGNAL_LOSS"
 
 /** Keeps [current] unless [incoming] is at least as new on the tracker's clock, so a late queued update cannot undo a newer one. */
 fun newerReading(current: TrackerReading?, incoming: TrackerReading): TrackerReading =
@@ -64,9 +87,16 @@ fun alarmConditions(
     reading: TrackerReading?,
     watchingSinceMs: Long,
     nowMs: Long,
-    active: Set<AlarmType>
+    active: Set<AlarmType>,
+    isRelayConnected: Boolean = true,
+    isLocalInternet: Boolean = true
 ): Set<AlarmType> = buildSet {
     if (nowMs - (reading?.receivedAtMs ?: watchingSinceMs) >= TRACKER_PRESENT_MS) add(AlarmType.TRACKER_OFFLINE)
+    if (!isRelayConnected) add(AlarmType.RELAY_DISCONNECTED)
+    if (!isLocalInternet) add(AlarmType.LOCAL_INTERNET_OFFLINE)
+    if (reading != null && nowMs - reading.receivedAtMs < TRACKER_PRESENT_MS && !reading.hasGpsSignal()) {
+        add(AlarmType.GPS_SIGNAL_LOSS)
+    }
     if (reading == null) return@buildSet
     if (!reading.isCharging) add(AlarmType.POWER_DISCONNECTED)
     val batteryLimit = if (AlarmType.LOW_BATTERY in active) LOW_BATTERY_CLEARS_AT else LOW_BATTERY_BELOW
@@ -131,6 +161,8 @@ fun alarmBooks(
     settings: Flow<AlertSettings>,
     ticks: Flow<Unit>,
     acknowledgements: Flow<Unit>,
+    isRelayConnected: Flow<Boolean> = flowOf(true),
+    isLocalInternet: Flow<Boolean> = flowOf(true),
     clock: () -> Long
 ): Flow<AlarmBook> = target.flatMapLatest { trackerId ->
     if (trackerId == null) return@flatMapLatest flowOf(AlarmBook())
@@ -139,19 +171,30 @@ fun alarmBooks(
         telemetry.filter { it.deviceId == trackerId }.map { BookEvent.Reading(it.toTrackerReading(clock())) },
         settings.map { BookEvent.Settings(it) },
         ticks.map { BookEvent.Tick },
-        acknowledgements.map { BookEvent.Acknowledge }
+        acknowledgements.map { BookEvent.Acknowledge },
+        isRelayConnected.map { BookEvent.RelayConnection(it) },
+        isLocalInternet.map { BookEvent.LocalInternet(it) }
     ).scan(WatchState()) { state, event ->
         val next = when (event) {
             is BookEvent.Reading -> state.copy(reading = newerReading(state.reading, event.reading))
             is BookEvent.Settings -> state.copy(settings = event.settings)
             BookEvent.Tick -> state
             BookEvent.Acknowledge -> state.copy(book = state.book.acknowledge())
+            is BookEvent.RelayConnection -> state.copy(isRelayConnected = event.isConnected)
+            is BookEvent.LocalInternet -> state.copy(isLocalInternet = event.isConnected)
         }
         val alertSettings = next.settings ?: return@scan next
         val nowMs = clock()
         next.copy(
             book = next.book.update(
-                alarmConditions(next.reading, watchingSinceMs, nowMs, next.book.conditions),
+                alarmConditions(
+                    next.reading,
+                    watchingSinceMs,
+                    nowMs,
+                    next.book.conditions,
+                    isRelayConnected = next.isRelayConnected,
+                    isLocalInternet = next.isLocalInternet
+                ),
                 alertSettings,
                 nowMs
             )
@@ -162,7 +205,9 @@ fun alarmBooks(
 private data class WatchState(
     val reading: TrackerReading? = null,
     val settings: AlertSettings? = null,
-    val book: AlarmBook = AlarmBook()
+    val book: AlarmBook = AlarmBook(),
+    val isRelayConnected: Boolean = true,
+    val isLocalInternet: Boolean = true
 )
 
 private sealed interface BookEvent {
@@ -170,4 +215,7 @@ private sealed interface BookEvent {
     data class Settings(val settings: AlertSettings) : BookEvent
     data object Tick : BookEvent
     data object Acknowledge : BookEvent
+    data class RelayConnection(val isConnected: Boolean) : BookEvent
+    data class LocalInternet(val isConnected: Boolean) : BookEvent
 }
+

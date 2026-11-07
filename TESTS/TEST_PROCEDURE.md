@@ -477,8 +477,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **129.6 Alarm Screen And Notification:** Verify that the alarm notification uses the high-importance `monitor_alarm` channel, that the session notification uses the low-importance `monitor_session` channel, and that the shared `critical_violation_channel` that was lowered to low importance is removed. Verify that the alarm screen names each pending alarm and its start time and acknowledges with one tap. Automated by `MonitorAlarmDeviceTest`.
 *   **129.7 Alarms On Hardware:** On the A15 with both apps paired through the production relay, and the siren at a low volume: simulate an unplugged charger with `dumpsys battery unplug` and `dumpsys battery set status 3`, and verify the full-screen alarm, the siren in `dumpsys audio`, and the alarm notification, then `ACKNOWLEDGE ALARM`. Restore with `dumpsys battery reset`, send the Monitor to the background, unplug again, and verify that the alarm returns and that tapping its notification opens `AlarmOverlayActivity`. Force-stop the Sensor and verify `Tracker offline` after about 35 seconds, then restart it and verify `(cleared)` with the siren still on. Simulate `level 15` and `temp 470` and verify both alarms. Always end with `dumpsys battery reset`.
 
+## Chapter 130 - Communication Alarms (Nov7.5)
+*   **130.1 Communication Alarm Conditions:** Verify that the Monitor raises `Relay disconnected` when relay socket connection is disconnected (`signalingClient.isConnected` false), `Monitor internet lost` when local internet network capabilities report no internet, and `Tracker GPS signal loss` when telemetry from the paired tracker reports `(0,0)` coordinates, 0 accuracy, or a `NO_FIX` / `GPS_SIGNAL_LOSS` status while the tracker is online. Automated by `MonitorAlarmsTest` (ISSUE-NOV5.2-O11).
+*   **130.2 Communication Alert Settings Controls:** Verify that each communication alarm follows its respective Alert Settings toggle (`Relay Connection Disconnected`, `Local Internet Offline`, `GNSS Signal Loss`) and Global Mute, dropping immediately when switched off. Automated by `MonitorAlarmsTest`.
+*   **130.3 Communication Alarm Lifecycle:** Verify that communication alarms sound the siren and show on the full-screen alarm overlay until acknowledged even after conditions clear, and that an acknowledged communication alarm re-arms only after its condition clears. Automated by `MonitorAlarmsTest`.
+
 ---
-**Active Testing Chapters: 119 of 129**
+**Active Testing Chapters: 120 of 130**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

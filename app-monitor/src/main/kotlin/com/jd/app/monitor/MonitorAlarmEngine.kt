@@ -28,6 +28,13 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlin.time.Duration.Companion.seconds
+
 /**
  * Raises the Monitor alarms while a tracker is paired: it keeps the [AlarmBook], sounds the siren while any alarm
  * is unacknowledged, and shows the full-screen alarm notification. Started by [MonitorSessionService], so alarms
@@ -50,6 +57,24 @@ class MonitorAlarmEngine @Inject constructor(
     private val acknowledgements = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
     private var watchJob: Job? = null
 
+    private fun localInternetFlow(): Flow<Boolean> = flow {
+        while (true) {
+            emit(isNetworkAvailable(context))
+            delay(1.seconds)
+        }
+    }.distinctUntilChanged()
+
+    private fun isNetworkAvailable(ctx: Context): Boolean {
+        return try {
+            val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val network = cm?.activeNetwork ?: return false
+            val caps = cm.getNetworkCapabilities(network) ?: return false
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     /** Starts watching in [scope]; a second call while watching does nothing. */
     @Synchronized
     fun watch(scope: CoroutineScope) {
@@ -61,6 +86,8 @@ class MonitorAlarmEngine @Inject constructor(
                 settings = dataStore.alertSettings,
                 ticks = secondTicks(),
                 acknowledgements = acknowledgements,
+                isRelayConnected = signalingClient.isConnected,
+                isLocalInternet = localInternetFlow(),
                 clock = System::currentTimeMillis
             ).onEach { book ->
                 if (book.pending.map { it.type } != _alarms.value.pending.map { it.type }) {

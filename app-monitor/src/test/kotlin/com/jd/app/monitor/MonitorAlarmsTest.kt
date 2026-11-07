@@ -23,8 +23,27 @@ class MonitorAlarmsTest {
     private val start = 1_000_000L
     private val settings = AlertSettings()
 
-    private fun reading(at: Long = start, battery: Int = 80, charging: Boolean = true, temp: Float = 30f, sensorTime: Long = at) =
-        TrackerReading(receivedAtMs = at, sensorTimeMs = sensorTime, batteryLevel = battery, isCharging = charging, tempCelsius = temp)
+    private fun reading(
+        at: Long = start,
+        battery: Int = 80,
+        charging: Boolean = true,
+        temp: Float = 30f,
+        sensorTime: Long = at,
+        lat: Double = 37.7749,
+        lng: Double = -122.4194,
+        accuracy: Float = 10f,
+        status: String = "VALID"
+    ) = TrackerReading(
+        receivedAtMs = at,
+        sensorTimeMs = sensorTime,
+        batteryLevel = battery,
+        isCharging = charging,
+        tempCelsius = temp,
+        lat = lat,
+        lng = lng,
+        accuracy = accuracy,
+        status = status
+    )
 
     private fun conditions(reading: TrackerReading?, now: Long = start, active: Set<AlarmType> = emptySet()) =
         alarmConditions(reading, watchingSinceMs = start, nowMs = now, active = active)
@@ -131,11 +150,40 @@ class MonitorAlarmsTest {
     }
 
     @Test
+    fun communicationAlarmsFollowTheirLimitsAndToggles() {
+        // Relay disconnected
+        assertEquals(
+            setOf(AlarmType.RELAY_DISCONNECTED),
+            alarmConditions(reading(), watchingSinceMs = start, nowMs = start, active = emptySet(), isRelayConnected = false, isLocalInternet = true)
+        )
+        // Local internet lost
+        assertEquals(
+            setOf(AlarmType.LOCAL_INTERNET_OFFLINE),
+            alarmConditions(reading(), watchingSinceMs = start, nowMs = start, active = emptySet(), isRelayConnected = true, isLocalInternet = false)
+        )
+        // Tracker GPS signal loss (lat/lng 0, zero accuracy, or NO_FIX status)
+        val noFixReading = TrackerReading(receivedAtMs = start, sensorTimeMs = start, batteryLevel = 80, isCharging = true, tempCelsius = 30f, lat = 0.0, lng = 0.0, accuracy = 0f, status = "NO_FIX")
+        assertEquals(
+            setOf(AlarmType.GPS_SIGNAL_LOSS),
+            alarmConditions(noFixReading, watchingSinceMs = start, nowMs = start, active = emptySet(), isRelayConnected = true, isLocalInternet = true)
+        )
+        // Valid position reading does not trigger GPS signal loss
+        val validFixReading = TrackerReading(receivedAtMs = start, sensorTimeMs = start, batteryLevel = 80, isCharging = true, tempCelsius = 30f, lat = 37.7749, lng = -122.4194, accuracy = 10f, status = "VALID")
+        assertEquals(
+            emptySet<AlarmType>(),
+            alarmConditions(validFixReading, watchingSinceMs = start, nowMs = start, active = emptySet(), isRelayConnected = true, isLocalInternet = true)
+        )
+    }
+
+    @Test
     fun eachAlarmFollowsItsOwnSwitch() {
         assertFalse(settings.copy(serverConnection = false).allows(AlarmType.TRACKER_OFFLINE))
         assertFalse(settings.copy(power = false).allows(AlarmType.POWER_DISCONNECTED))
         assertFalse(settings.copy(lowBattery = false).allows(AlarmType.LOW_BATTERY))
         assertFalse(settings.copy(highTemperature = false).allows(AlarmType.HIGH_TEMPERATURE))
+        assertFalse(settings.copy(relayConnection = false).allows(AlarmType.RELAY_DISCONNECTED))
+        assertFalse(settings.copy(localInternet = false).allows(AlarmType.LOCAL_INTERNET_OFFLINE))
+        assertFalse(settings.copy(signalLoss = false).allows(AlarmType.GPS_SIGNAL_LOSS))
         AlarmType.entries.forEach { assertTrue(settings.allows(it)) }
     }
 
@@ -147,6 +195,10 @@ class MonitorAlarmsTest {
         batteryLevel = 80
         tempCelsius = 30f
         timestamp = time
+        lat = 37.7749
+        lng = -122.4194
+        accuracy = 10f
+        status = "VALID"
     }
 
     /** Collects the book flow into [latest]. Shared flows drop emissions without subscribers, so [ready] waits for them. */
@@ -156,9 +208,13 @@ class MonitorAlarmsTest {
         val settings = MutableSharedFlow<AlertSettings>(replay = 1)
         val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
         val acks = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
+        val isRelayConnected = MutableStateFlow(true)
+        val isLocalInternet = MutableStateFlow(true)
         @Volatile var now = 1_000_000L
         val latest = MutableStateFlow<AlarmBook?>(null)
-        val job = scope.launch { alarmBooks(target, telemetry, settings, ticks, acks) { now }.collect { latest.value = it } }
+        val job = scope.launch {
+            alarmBooks(target, telemetry, settings, ticks, acks, isRelayConnected, isLocalInternet) { now }.collect { latest.value = it }
+        }
 
         suspend fun ready() = withTimeout(5.seconds) {
             listOf(telemetry, ticks, acks).forEach { flow -> flow.subscriptionCount.first { it > 0 } }
@@ -194,6 +250,28 @@ class MonitorAlarmsTest {
 
         watch.telemetry.emit(unplugged("T", time = 2))
         assertEquals(listOf(AlarmType.POWER_DISCONNECTED), watch.awaitBook { it.needsSiren }.pending.map { it.type })
+        watch.job.cancel()
+    }
+
+    @Test
+    fun relayDisconnectEmitsRelayDisconnectedAlarm() = runBlocking {
+        val watch = Watch(this)
+        watch.settings.emit(AlertSettings())
+        watch.ready()
+
+        watch.isRelayConnected.value = false
+        assertEquals(listOf(AlarmType.RELAY_DISCONNECTED), watch.awaitBook { it.needsSiren }.pending.map { it.type })
+        watch.job.cancel()
+    }
+
+    @Test
+    fun localInternetLossEmitsLocalInternetOfflineAlarm() = runBlocking {
+        val watch = Watch(this)
+        watch.settings.emit(AlertSettings())
+        watch.ready()
+
+        watch.isLocalInternet.value = false
+        assertEquals(listOf(AlarmType.LOCAL_INTERNET_OFFLINE), watch.awaitBook { it.needsSiren }.pending.map { it.type })
         watch.job.cancel()
     }
 
