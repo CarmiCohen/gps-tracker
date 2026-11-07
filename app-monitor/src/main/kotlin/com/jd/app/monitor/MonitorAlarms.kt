@@ -33,7 +33,8 @@ enum class AlarmType(val title: String) {
     HIGH_TEMPERATURE("Tracker temperature high"),
     RELAY_DISCONNECTED("Relay disconnected"),
     LOCAL_INTERNET_OFFLINE("Monitor internet lost"),
-    GPS_SIGNAL_LOSS("Tracker GPS signal loss")
+    GPS_SIGNAL_LOSS("Tracker GPS signal loss"),
+    GPS_JUMP("Tracker GPS jump")
 }
 
 fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) {
@@ -44,6 +45,7 @@ fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) 
     AlarmType.RELAY_DISCONNECTED -> relayConnection
     AlarmType.LOCAL_INTERNET_OFFLINE -> localInternet
     AlarmType.GPS_SIGNAL_LOSS -> signalLoss
+    AlarmType.GPS_JUMP -> jammerDetection
 }
 
 /** The newest telemetry from the paired tracker. [receivedAtMs] is Monitor time, so the clocks of the two phones never meet. */
@@ -89,13 +91,17 @@ fun alarmConditions(
     nowMs: Long,
     active: Set<AlarmType>,
     isRelayConnected: Boolean = true,
-    isLocalInternet: Boolean = true
+    isLocalInternet: Boolean = true,
+    hasViolation: Boolean = false
 ): Set<AlarmType> = buildSet {
     if (nowMs - (reading?.receivedAtMs ?: watchingSinceMs) >= TRACKER_PRESENT_MS) add(AlarmType.TRACKER_OFFLINE)
     if (!isRelayConnected) add(AlarmType.RELAY_DISCONNECTED)
     if (!isLocalInternet) add(AlarmType.LOCAL_INTERNET_OFFLINE)
     if (reading != null && nowMs - reading.receivedAtMs < TRACKER_PRESENT_MS && !reading.hasGpsSignal()) {
         add(AlarmType.GPS_SIGNAL_LOSS)
+    }
+    if (reading != null && (reading.status == "JUMP" || reading.status == "OUTLIER" || hasViolation)) {
+        add(AlarmType.GPS_JUMP)
     }
     if (reading == null) return@buildSet
     if (!reading.isCharging) add(AlarmType.POWER_DISCONNECTED)
@@ -158,6 +164,7 @@ fun secondTicks(): Flow<Unit> = flow {
 fun alarmBooks(
     target: Flow<String?>,
     telemetry: Flow<LocationUpdate>,
+    violations: Flow<com.jd.core.shared.ViolationEvent> = flowOf(),
     settings: Flow<AlertSettings>,
     ticks: Flow<Unit>,
     acknowledgements: Flow<Unit>,
@@ -169,6 +176,7 @@ fun alarmBooks(
     val watchingSinceMs = clock()
     merge(
         telemetry.filter { it.deviceId == trackerId }.map { BookEvent.Reading(it.toTrackerReading(clock())) },
+        violations.filter { it.location.deviceId == trackerId || it.location.deviceId.isEmpty() }.map { BookEvent.Violation(it) },
         settings.map { BookEvent.Settings(it) },
         ticks.map { BookEvent.Tick },
         acknowledgements.map { BookEvent.Acknowledge },
@@ -176,10 +184,11 @@ fun alarmBooks(
         isLocalInternet.map { BookEvent.LocalInternet(it) }
     ).scan(WatchState()) { state, event ->
         val next = when (event) {
-            is BookEvent.Reading -> state.copy(reading = newerReading(state.reading, event.reading))
+            is BookEvent.Reading -> state.copy(reading = newerReading(state.reading, event.reading), hasViolation = false)
+            is BookEvent.Violation -> state.copy(hasViolation = true)
             is BookEvent.Settings -> state.copy(settings = event.settings)
             BookEvent.Tick -> state
-            BookEvent.Acknowledge -> state.copy(book = state.book.acknowledge())
+            BookEvent.Acknowledge -> state.copy(book = state.book.acknowledge(), hasViolation = false)
             is BookEvent.RelayConnection -> state.copy(isRelayConnected = event.isConnected)
             is BookEvent.LocalInternet -> state.copy(isLocalInternet = event.isConnected)
         }
@@ -193,7 +202,8 @@ fun alarmBooks(
                     nowMs,
                     next.book.conditions,
                     isRelayConnected = next.isRelayConnected,
-                    isLocalInternet = next.isLocalInternet
+                    isLocalInternet = next.isLocalInternet,
+                    hasViolation = next.hasViolation
                 ),
                 alertSettings,
                 nowMs
@@ -207,11 +217,13 @@ private data class WatchState(
     val settings: AlertSettings? = null,
     val book: AlarmBook = AlarmBook(),
     val isRelayConnected: Boolean = true,
-    val isLocalInternet: Boolean = true
+    val isLocalInternet: Boolean = true,
+    val hasViolation: Boolean = false
 )
 
 private sealed interface BookEvent {
     data class Reading(val reading: TrackerReading) : BookEvent
+    data class Violation(val violation: com.jd.core.shared.ViolationEvent) : BookEvent
     data class Settings(val settings: AlertSettings) : BookEvent
     data object Tick : BookEvent
     data object Acknowledge : BookEvent

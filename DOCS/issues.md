@@ -1,11 +1,11 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.6)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.7)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov7.6, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov7.7, solved one by one in the order below
 
 ### Work Queue
-Nov7.6 is closed and followed Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, or Nov7.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov7.7 is closed and followed Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, or Nov7.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
-**Next item: ISSUE-NOV5.2-O13 (item 9).** Wire Sensor motion detection with `SentinelLogic.validateMovement` on each fix and send its motion state in telemetry. Then build slice 3 of group 1 alarms (Sensor-detected violations, including GPS jump alarm). Groups 2 and 4 to 8 still need user decisions. If the user prefers other work, take the first item marked `Nothing`: ISSUE-NOV6.0-O23 (item 13).
+**Next item: ISSUE-NOV6.0-O23 (item 13).** Replace tests that do not prove their chapter, add the T tests, correct stale chapter wording. Groups 2 and 4 to 8 still need user decisions. If the user prefers other work, take the first item marked `Nothing`: ISSUE-NOV6.0-O23.
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -16,8 +16,8 @@ Nov7.6 is closed and followed Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, No
 | 5 | ISSUE-NOV5.0-O5 | **Done for Nov6.3**: the Setup dialog shows the real relay state | Nothing |
 | 6 | ISSUE-NOV5.0-O6 | **Done for Nov7.0**: versions come from the installed package, and no production string holds one | Nothing |
 | 7 | ISSUE-NOV5.2-O15 | **Done for Nov7.1**: every Monitor control that unpairs asks first | Nothing |
-| 8 | ISSUE-NOV5.2-O11 | Group 1 alarms: **slice 1 done for Nov7.3** (Monitor-side alarms), **slice 2 done for Nov7.5** (communication alarms); next item 9; then slice 3, Sensor-detected violations, including the GPS jump alarm from `validateMovement`. Group 3 (`SentinelLogic`): **build on the Sensor** (user decision, 2026-11-07). Groups 2 and 4 to 8: decide build or retire | Slice 3: item 9 and a relay push by the user. Groups 2 and 4 to 8: user decisions |
-| 9 | ISSUE-NOV5.2-O13 | Fix false MOVING: the Sensor runs `SentinelLogic.validateMovement` with accelerometer motion on each fix and sends its motion state in telemetry; all three HUD lines show it | Nothing (group 3 decided) |
+| 8 | ISSUE-NOV5.2-O11 | Group 1 alarms: **slice 1 done for Nov7.3** (Monitor-side alarms), **slice 2 done for Nov7.5** (communication alarms), **slice 3 done for Nov7.7** (Sensor-detected violations, GPS jump alarm). Group 3 (`SentinelLogic`): **built on the Sensor** (Nov7.7). Groups 2 and 4 to 8: decide build or retire | Groups 2 and 4 to 8: user decisions |
+| 9 | ISSUE-NOV5.2-O13 | **Done for Nov7.7**: Sensor runs `SentinelLogic.validateMovement` with accelerometer motion on each fix and sends motion state / violation status in telemetry and via `ViolationEvent`; Monitor sounds GPS jump alarm | Nothing |
 | 10 | ISSUE-NOV5.2-O12 | **Done for Nov6.4**: backfill round trip seen on the production relay | Nothing |
 | 11 | ISSUE-NOV5.4-O19 | **Decided 2026-11-07**: `before splitting/gps-tracker` is a frozen archive; leave its changes as they are and never edit it. Only its redundant `relay-server/index.js` edit is to be discarded, by the user | User runs `git restore index.js` in `before splitting/gps-tracker/relay-server` |
 | 12 | ISSUE-NOV6.0-O20 | **Done for Nov6.0**: forensic entries protected against interrupted writes and power loss | Nothing |

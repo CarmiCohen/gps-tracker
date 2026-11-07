@@ -173,6 +173,12 @@ class MonitorAlarmsTest {
             emptySet<AlarmType>(),
             alarmConditions(validFixReading, watchingSinceMs = start, nowMs = start, active = emptySet(), isRelayConnected = true, isLocalInternet = true)
         )
+        // GPS jump / outlier violation triggers GPS jump alarm
+        val jumpReading = TrackerReading(receivedAtMs = start, sensorTimeMs = start, batteryLevel = 80, isCharging = true, tempCelsius = 30f, lat = 37.7749, lng = -122.4194, accuracy = 10f, status = "JUMP")
+        assertEquals(
+            setOf(AlarmType.GPS_JUMP),
+            alarmConditions(jumpReading, watchingSinceMs = start, nowMs = start, active = emptySet())
+        )
     }
 
     @Test
@@ -205,6 +211,7 @@ class MonitorAlarmsTest {
     private class Watch(scope: CoroutineScope) {
         val target = MutableStateFlow<String?>("T")
         val telemetry = MutableSharedFlow<LocationUpdate>(extraBufferCapacity = 16)
+        val violations = MutableSharedFlow<com.jd.core.shared.ViolationEvent>(extraBufferCapacity = 16)
         val settings = MutableSharedFlow<AlertSettings>(replay = 1)
         val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
         val acks = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
@@ -213,11 +220,11 @@ class MonitorAlarmsTest {
         @Volatile var now = 1_000_000L
         val latest = MutableStateFlow<AlarmBook?>(null)
         val job = scope.launch {
-            alarmBooks(target, telemetry, settings, ticks, acks, isRelayConnected, isLocalInternet) { now }.collect { latest.value = it }
+            alarmBooks(target, telemetry, violations, settings, ticks, acks, isRelayConnected, isLocalInternet) { now }.collect { latest.value = it }
         }
 
         suspend fun ready() = withTimeout(5.seconds) {
-            listOf(telemetry, ticks, acks).forEach { flow -> flow.subscriptionCount.first { it > 0 } }
+            listOf(telemetry, violations, ticks, acks).forEach { flow -> flow.subscriptionCount.first { it > 0 } }
         }
 
         suspend fun awaitBook(predicate: (AlarmBook) -> Boolean): AlarmBook =

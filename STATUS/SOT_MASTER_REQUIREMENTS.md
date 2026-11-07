@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov7.5)
+# SOT Master Requirements & Hardening Status (Nov7.7)
 
-## 🏗️ Architectural Master Rules (440 Rules)
+## 🏗️ Architectural Master Rules (441 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -31,6 +31,7 @@
 *   **1.365 Monitor Alarms And Siren (R-ID 136)**: While a tracker is paired, the Monitor MUST raise an alarm when the tracker sends nothing for 35 seconds, reports no charging, reports a battery below 20%, or reports a temperature above 46°C, each only while its Alert Settings switch is on and Global Mute is off. An alarm MUST show full screen and sound the siren, with the saved Siren & Audio settings, until it is acknowledged, and MUST be raised again only after its condition has cleared. The alarm notification MUST use a high-importance channel that no other code can lower, and the Sensor MUST NOT play sound or vibrate (Rule 14, R872) (R-ID 136).
 *   **1.366 Communication Alarms (R-ID 137)**: The Monitor MUST raise communication alarms for `Relay disconnected` when relay socket connectivity is lost (`signalingClient.isConnected` false), `Monitor internet lost` when local internet network capabilities report no active internet connection, and `Tracker GPS signal loss` when telemetry from the paired tracker reports `(0,0)` coordinates, 0 accuracy, or a `NO_FIX` / `GPS_SIGNAL_LOSS` status while online. Each MUST be switched by its respective Alert Settings toggle (`relayConnection`, `localInternet`, `signalLoss`) and Global Mute, sounding until acknowledged (R-ID 137).
 *   **1.367 30-Second Siren Auto-Stop (Timer or Acknowledge) (R-ID 138)**: The Monitor siren MUST automatically stop after 30 seconds (`30s`) or when acknowledged, whichever occurs first. When the siren auto-stops via the 30-second timer, the visual alarm and notification MUST remain pending until explicitly acknowledged by the user (R-ID 138).
+*   **1.368 False MOVING Fix & Sensor-Detected Violations (R-ID 139)**: The Sensor MUST run `SentinelLogic.validateMovement` with accelerometer motion (`hasPhysicalMotion`) on each fix to suppress GPS drift and false MOVING while stationary, and MUST transmit its motion state and violation status (`JUMP`, `OUTLIER`) in telemetry and via `ViolationEvent`. The Monitor MUST raise a GPS jump alarm (`AlarmType.GPS_JUMP`) when a violation or jump status is received, following `AlertSettings.jammerDetection` (R-ID 139).
 
 ## 🛡️ Core Hardening Baseline
 - **Nov7.6**: 30-Second Siren Auto-Stop (ISSUE-NOV7.6-O40) - PASSED.

@@ -102,6 +102,7 @@ class MonitorAlarmEngine @Inject constructor(
             alarmBooks(
                 target = identityManager.targetId,
                 telemetry = signalingClient.telemetryFlow,
+                violations = signalingClient.violationFlow,
                 settings = dataStore.alertSettings,
                 ticks = secondTicks(),
                 acknowledgements = acknowledgements,

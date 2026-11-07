@@ -58,6 +58,7 @@ class SensorService : Service(), SensorEventListener {
     private var wakeLock: PowerManager.WakeLock? = null
     private var isMuzzled = false
     private var isInitialized = false
+    private var lastValidationLocation: LocationUpdate? = null
 
     // Raw IMU caches
     private var lastAccel = DoubleArray(3)
@@ -320,6 +321,28 @@ class SensorService : Service(), SensorEventListener {
                     update.speed = loc.speed
                     update.bearing = loc.bearing
                     update.altitude = loc.altitude
+                }
+
+                val hasPhysicalMotion = update.sensorSnapshot.vibration > 0.12f
+                val validation = if (lastValidationLocation != null) {
+                    SentinelLogic.validateMovement(lastValidationLocation!!, update, hasPhysicalMotion)
+                } else {
+                    SentinelLogic.ValidationResult(SentinelLogic.SentinelStatus.VALID)
+                }
+
+                update.status = validation.status.name
+                lastValidationLocation = update.snapshot()
+
+                if (validation.status != SentinelLogic.SentinelStatus.VALID) {
+                    SystemLogger.w("SensorService", "Violation detected: ${validation.status} - ${validation.reason}")
+                    serviceScope.launch {
+                        val violation = ViolationEvent(
+                            type = validation.status.name,
+                            location = update.snapshot(),
+                            nonce = java.util.UUID.randomUUID().toString()
+                        )
+                        signalingClient.sendViolation(violation)
+                    }
                 }
                 
                 forensicBuffer.writeTrace(update)

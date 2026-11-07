@@ -486,8 +486,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **131.1 Siren Auto-Stop Timer:** Verify that when any monitor alarm raises the siren, it automatically stops after 30 seconds (`30s`) even if not acknowledged. Automated by `MonitorAlarmEngine` 30s timeout and `MonitorAlarmsTest` (ISSUE-NOV7.6-O40).
 *   **131.2 First Event (Timer or Acknowledge):** Verify that the siren stops on whichever event occurs first: the 30-second timer expiring OR the user tapping Acknowledge. When the siren auto-stops via timer, verify that the visual alarm and notification remain pending until explicitly acknowledged. Automated by `MonitorAlarmEngine`.
 
+## Chapter 132 - False MOVING & Sensor-Detected Violations (Nov7.7)
+*   **132.1 Accelerometer Motion Validation:** Verify that the Sensor runs `SentinelLogic.validateMovement` with accelerometer motion (`hasPhysicalMotion`) on each location fix, suppressing GPS drift and false MOVING while stationary. Automated by `SentinelLogicTest` and `SensorService` (ISSUE-NOV5.2-O13).
+*   **132.2 Sensor-Detected Violation Transmission:** Verify that when a kinematic jump or outlier (`JUMP`, `OUTLIER`) is detected, the Sensor transmits the violation status in telemetry and dispatches a `ViolationEvent` through `signalingClient.sendViolation`. Automated by `SensorService`.
+*   **132.3 Monitor GPS Jump Alarm:** Verify that the Monitor raises `Tracker GPS jump` when telemetry status is `JUMP` or `OUTLIER` or when a `ViolationEvent` is received, following `AlertSettings.jammerDetection`. Automated by `MonitorAlarmsTest`.
+
 ---
-**Active Testing Chapters: 121 of 131**
+**Active Testing Chapters: 122 of 132**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

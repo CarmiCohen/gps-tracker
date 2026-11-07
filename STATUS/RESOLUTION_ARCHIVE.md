@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov7.7)
+- **False MOVING & Sensor-Detected Violations (ISSUE-NOV5.2-O13, group 1 slice 3)**: Fixed false MOVING on the Sensor by wiring `SentinelLogic.validateMovement` with accelerometer motion (`hasPhysicalMotion`) on each fix in `SensorService.kt`, transmitting motion state and violation status (`JUMP`, `OUTLIER`) in telemetry and via `ViolationEvent`. Added `AlarmType.GPS_JUMP` to `MonitorAlarms.kt`, wired to `AlertSettings.jammerDetection` and `signalingClient.violationFlow` in `MonitorAlarmEngine.kt`. Verified by unit tests in `MonitorAlarmsTest` and full automated test suite pass across all subprojects. **PASSED.**
+
 ## ✅ Resolved Issues (Nov7.6)
 - **30-Second Siren Auto-Stop (ISSUE-NOV7.6-O40)**: Implemented 30-second timer auto-stop for Monitor alarms in `MonitorAlarmEngine.kt`: the siren automatically stops after 30 seconds (`30s`) or when acknowledged by the user, whichever occurs first. When the siren auto-stops via the 30-second timer, the visual alarm and notification remain pending until explicitly acknowledged. Verified by automated tests and test suite pass across all modules. **PASSED.**
 
