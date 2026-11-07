@@ -92,7 +92,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 87 Activity routing | D | Kept active. No routing state is held in a ViewModel, so open overlays and follow mode reset on rotation; found by reading the code, not run (ISSUE-NOV6.0-O22) |
 | 72, 74 Log encryption and stripping | D | `CryptoUtils` is unused |
 | 73 Foreground revoke | L | Engine stops cleanly |
-| 75 UI rate | A | `UiRateTest` covers the operator, which is applied to the trail only; HUD flows are not limited (ISSUE-NOV6.0-O21) |
+| 75 UI rate | A | Verified: UiRateTest and HudRateTest cover 2Hz rate-limiting for trail and HUD flows (ISSUE-NOV6.0-O21) |
 | 81, 82, 85, 86, 90, 91, 95, 97 Internals | D | Described behavior not found in the running apps |
 | 83 Stall watchdog | T | `WatchdogRecoveryTest` only checks a fresh heartbeat; no stall is forced. The loop runs on `Dispatchers.Default` with a 10s minimum threshold, so the chapter's 5s main-thread block cannot trigger recovery |
 | 88 Hydration | D | No staggered hydration runs: `hydrationLevel` is only reached through `OsmMap`, which has no callers. `HydrationStaggeringAuditTest` only times `delay(100)` |

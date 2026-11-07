@@ -10,6 +10,7 @@ import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.RelayConfig
+import com.jd.core.shared.atUiRate
 import com.jd.core.ui.HudState
 import com.jd.core.ui.readBattery
 import com.jd.core.ui.withLocalReadings
@@ -82,11 +83,13 @@ class SensorViewModel @Inject constructor(
         }
     }
 
+    private val uiFix = fixStore.fix.atUiRate()
+
     val hudState: StateFlow<HudState> = combine(
         selfId,
         signalingClient.isConnected,
         signalingClient.viewerStatusFlow,
-        fixStore.fix,
+        uiFix,
         _ticker
     ) { id, isConnected, isViewerConnected, fix, now ->
         val isInternet = isNetworkAvailable(context)
@@ -103,7 +106,9 @@ class SensorViewModel @Inject constructor(
             isDataHealthy = isInternet,
             watchdogOk = true
         ).withLocalReadings(fix, readBattery(context), now)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "sensor"))
+    }
+        .atUiRate()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "sensor"))
 
     private fun isNetworkAvailable(ctx: Context): Boolean {
         return try {

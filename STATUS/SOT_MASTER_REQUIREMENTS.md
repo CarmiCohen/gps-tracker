@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Nov7.7)
+# SOT Master Requirements & Hardening Status (Nov7.9)
 
 ## 🏗️ Architectural Master Rules (441 Rules)
 
@@ -32,9 +32,12 @@
 *   **1.366 Communication Alarms (R-ID 137)**: The Monitor MUST raise communication alarms for `Relay disconnected` when relay socket connectivity is lost (`signalingClient.isConnected` false), `Monitor internet lost` when local internet network capabilities report no active internet connection, and `Tracker GPS signal loss` when telemetry from the paired tracker reports `(0,0)` coordinates, 0 accuracy, or a `NO_FIX` / `GPS_SIGNAL_LOSS` status while online. Each MUST be switched by its respective Alert Settings toggle (`relayConnection`, `localInternet`, `signalLoss`) and Global Mute, sounding until acknowledged (R-ID 137).
 *   **1.367 30-Second Siren Auto-Stop (Timer or Acknowledge) (R-ID 138)**: The Monitor siren MUST automatically stop after 30 seconds (`30s`) or when acknowledged, whichever occurs first. When the siren auto-stops via the 30-second timer, the visual alarm and notification MUST remain pending until explicitly acknowledged by the user (R-ID 138).
 *   **1.368 False MOVING Fix & Sensor-Detected Violations (R-ID 139)**: The Sensor MUST run `SentinelLogic.validateMovement` with accelerometer motion (`hasPhysicalMotion`) on each fix to suppress GPS drift and false MOVING while stationary, and MUST transmit its motion state and violation status (`JUMP`, `OUTLIER`) in telemetry and via `ViolationEvent`. The Monitor MUST raise a GPS jump alarm (`AlarmType.GPS_JUMP`) when a violation or jump status is received, following `AlertSettings.jammerDetection` (R-ID 139).
+*   **1.369 HUD Flow Rate-Limiting (R-ID 140)**: The Monitor `localHudState` and `remoteHudState` flows, as well as the Sensor `hudState` flow, MUST apply `atUiRate()` (500ms sampling window) to incoming telemetry and fix streams, capping UI state recalculations and emissions to at most 2Hz to prevent excess CPU usage, unnecessary IPC calls, and rapid recomposition (R-ID 140).
 
 ## 🛡️ Core Hardening Baseline
-- **Nov7.6**: 30-Second Siren Auto-Stop (ISSUE-NOV7.6-O40) - PASSED.
+- **Nov7.9**: HUD Flow 2Hz Rate Limiting (ISSUE-NOV6.0-O21) - PASSED.
+- **Nov7.8**: Test Hardening & Chapter Alignment (ISSUE-NOV6.0-O23) - PASSED.
+- **Nov7.7**: False MOVING Fix & Sensor-Detected Violations (ISSUE-NOV5.2-O13) - PASSED.
 - **Nov7.5**: Communication Alarms (ISSUE-NOV5.2-O11, group 1, slice 2) - PASSED.
 - **Nov7.3**: Monitor Alarms And Siren (ISSUE-NOV5.2-O11, group 1, slice 1) - PASSED with open items (ISSUE-NOV7.3-O38, O39; O11 remains open for the other slices and groups).
 - **Nov7.2**: Real Sensor HUD Values (ISSUE-NOV6.1-O27) - PASSED.

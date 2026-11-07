@@ -491,8 +491,11 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **132.2 Sensor-Detected Violation Transmission:** Verify that when a kinematic jump or outlier (`JUMP`, `OUTLIER`) is detected, the Sensor transmits the violation status in telemetry and dispatches a `ViolationEvent` through `signalingClient.sendViolation`. Automated by `SensorService`.
 *   **132.3 Monitor GPS Jump Alarm:** Verify that the Monitor raises `Tracker GPS jump` when telemetry status is `JUMP` or `OUTLIER` or when a `ViolationEvent` is received, following `AlertSettings.jammerDetection`. Automated by `MonitorAlarmsTest`.
 
+## Chapter 133 - HUD Flow 2Hz Rate Limiting (Nov7.9)
+*   **133.1 HUD Flow Rate Throttling:** Verify that Monitor `localHudState`, `remoteHudState`, and Sensor `hudState` apply `atUiRate()` (500ms sampling window) to incoming telemetry and fix streams, capping UI state recalculations and emissions to at most 2Hz. Automated by `UiRateTest` and `HudRateTest` (ISSUE-NOV6.0-O21).
+
 ---
-**Active Testing Chapters: 122 of 132**
+**Active Testing Chapters: 123 of 133**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

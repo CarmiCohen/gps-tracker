@@ -116,6 +116,7 @@ class MonitorViewModel @Inject constructor(
 
     private val _latestTelemetry = MutableStateFlow<LocationUpdate?>(null)
     private val pairedTelemetry = combine(_latestTelemetry, targetId) { latest, target -> latest.ifFrom(target) }
+    private val uiTelemetry = pairedTelemetry.atUiRate()
 
     init {
         signalingClient.telemetryFlow
@@ -135,7 +136,7 @@ class MonitorViewModel @Inject constructor(
     val localHudState: StateFlow<HudState> = combine(
         selfId,
         signalingClient.isConnected,
-        pairedTelemetry,
+        uiTelemetry,
         localFix,
         _ticker
     ) { self, isConnected, latest, fix, now ->
@@ -155,13 +156,15 @@ class MonitorViewModel @Inject constructor(
             isDataHealthy = isInternet && isConnected,
             watchdogOk = true
         ).withLocalReadings(fix?.reading, readBattery(context), now)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "monitor"))
+    }
+        .atUiRate()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "monitor"))
 
     val remoteHudState: StateFlow<HudState> = combine(
         selfId,
         targetId.filterNotNull(),
         signalingClient.isConnected,
-        pairedTelemetry,
+        uiTelemetry,
         _ticker
     ) { self, target, isConnected, latest, now ->
         val lastTs = latest?.timestamp ?: 0L
@@ -190,7 +193,9 @@ class MonitorViewModel @Inject constructor(
             telemetryAgeSec = ageSec,
             sequenceId = latest?.sequenceId ?: 0L
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "sensor"))
+    }
+        .atUiRate()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "sensor"))
 
     val hudState: StateFlow<HudState> = remoteHudState
 
