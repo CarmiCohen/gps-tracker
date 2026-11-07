@@ -27,10 +27,14 @@ class SensorViewModel @Inject constructor(
     private val signalingClient: SignalingClient,
     private val sensorDataStore: SensorDataStore,
     private val fixStore: SensorFixStore,
+    serviceStatus: SensorServiceStatus,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val selfId = identityManager.selfId
+
+    /** Reported by [SensorService] itself; shown in the Setup dialog (ISSUE-NOV6.4-O34). */
+    val isServiceRunning: StateFlow<Boolean> = serviceStatus.isRunning
 
     val relayUrl: StateFlow<String> = sensorDataStore.relayUrl
         .map { RelayConfig.resolve(it) }

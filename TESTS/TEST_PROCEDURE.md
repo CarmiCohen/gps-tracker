@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov7.15 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov7.17 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -511,8 +511,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **137.3 Empty Range:** Verify that a request for a range the Sensor no longer holds is answered with one empty completion chunk, and that a failed send of it is reported. Automated by `BackfillResponderTest.emptyRange_sendsOneCompleteResponse` and `emptyRange_failedSendReported`.
 *   **137.4 Monitor Re-request (manual, A15 + Monitor):** With the Sensor connected, cut the Sensor's network while it answers a large backfill, then restore it. Within about 30 s of the last chunk received, the Monitor log MUST show `Requested <first> to <last>` again for the rows still missing, without a Monitor restart.
 
+## Chapter 138 - Real Sensor Service Status In The Setup Dialog (Nov7.17)
+*   **138.1 Service-Reported State:** Verify that `SensorServiceStatus` starts as not running, becomes running only when `SensorService` has started its components (`markRunning` at the end of `initializeServiceComponents`), and returns to not running in `onDestroy` (`markStopped`). Automated by `SensorServiceStatusTest.aNewStatusIsStopped` and `markRunningThenStoppedFollowsTheService` (ISSUE-NOV6.4-O34).
+*   **138.2 Dialog Text:** Verify that the Setup dialog lines read `Sensor Service: Running` / `Stopped` and `Relay Connection: Connected` / `Disconnected`, and that no line claims a fixed `Active` or `Ready` state. Automated by `SensorServiceStatusTest.serviceLineShowsRunningOrStopped`, `relayLineShowsConnectedOrDisconnected`, and `noLineClaimsAnInventedReadyState`.
+*   **138.3 Live Check (manual, A15):** With the Sensor service not running (after `adb install -r`, or with location permission revoked before launch), open the Sensor `Setup` dialog: it MUST show `Sensor Service: Stopped` and `Relay Connection: Disconnected`. Close it, tap `START SENSOR SERVICE`, reopen it: it MUST show `Sensor Service: Running` and, once connected, `Relay Connection: Connected`. The `Close` and `CHANGE RELAY URL` buttons MUST each show their full label (not squeezed into a vertical strip).
+
 ---
-**Active Testing Chapters: 127 of 137**
+**Active Testing Chapters: 128 of 138**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

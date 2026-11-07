@@ -67,6 +67,7 @@ class AdminActivity : ComponentActivity() {
                 val trackerId by identityManager.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
                 val relayUrl by viewModel.relayUrl.collectAsStateWithLifecycle()
                 val hudState by viewModel.hudState.collectAsStateWithLifecycle()
+                val isServiceRunning by viewModel.isServiceRunning.collectAsStateWithLifecycle()
                 val logs by SystemLogger.logs.collectAsStateWithLifecycle()
                 val scope = rememberCoroutineScope()
                 
@@ -170,6 +171,7 @@ class AdminActivity : ComponentActivity() {
                             } else {
                                 SensorAdminConsole(
                                     hudState = hudState,
+                                    isServiceRunning = isServiceRunning,
                                     trackerId = trackerId,
                                     relayUrl = relayUrl,
                                     logs = logs,
@@ -420,6 +422,7 @@ fun SettingsOverlay(
 @Composable
 fun SensorAdminConsole(
     hudState: HudState,
+    isServiceRunning: Boolean,
     trackerId: String,
     relayUrl: String,
     logs: List<SystemLogger.LogEntry>, 
@@ -566,20 +569,21 @@ fun SensorAdminConsole(
                     Text("Sensor Device ID: $trackerId")
                     Text("Relay URL: $relayUrl")
                     Text("App Version: ${getAppVersionName(context)}")
-                    Text("Sensor Service Status: Active / Ready")
+                    Text(serviceStatusText(isServiceRunning))
+                    Text(relayStatusText(hudState.isRelayConnected))
                 }
             },
             confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = {
-                        showSetupDialog = false
-                        onSettingsClick()
-                    }) {
-                        Text("CHANGE RELAY URL")
-                    }
-                    Button(onClick = { showSetupDialog = false }) {
-                        Text("Close")
-                    }
+                Button(onClick = { showSetupDialog = false }) {
+                    Text("Close")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showSetupDialog = false
+                    onSettingsClick()
+                }) {
+                    Text("CHANGE RELAY URL")
                 }
             }
         )

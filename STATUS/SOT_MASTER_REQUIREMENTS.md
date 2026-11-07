@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov7.15)
+# SOT Master Requirements & Hardening Status (Nov7.17)
 
-## 🏗️ Architectural Master Rules (448 Rules)
+## 🏗️ Architectural Master Rules (449 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -37,8 +37,10 @@
 *   **1.371 Thread-Safe Signaling Queue & Order-Preserving Failed Flush (R-ID 142)**: The signaling queue (`SignalingQueue`) MUST perform all queue manipulations and sequence tracking under a `ReentrantLock` for multi-threaded safety between telemetry offering and queue flushing. When a batch flush fails due to a network disconnection or transmit failure in `SocketioSignalingClient`, the un-sent updates MUST be re-queued at the front of the queue (`pushFront`) in their exact original sequence order to prevent reordering behind newer incoming updates (R-ID 142).
 *   **1.372 Coarse Network Fix Filtering (R-ID 143)**: `MonitorLocationSource` MUST filter incoming location updates using `isBetterLocation` to prevent a coarse Network location fix (e.g., accuracy ±77.6m) from replacing a fresh, more accurate GPS location fix (e.g., accuracy ±11m) on the Monitor UI and map. A coarse Network fix MUST only replace a GPS fix if the GPS fix is older than 2 minutes (120s) (R-ID 143).
 *   **1.373 Backfill Answer Stops On Send Failure (R-ID 144)**: The Sensor MUST answer a backfill request in chunks of at most 50 rows and MUST stop at the first chunk that `sendBackfillResponse` fails to send. After a failed chunk it MUST NOT send any later chunk of that request, including the completion chunk (`isComplete`), so the Monitor never counts a range with missing rows as answered; the Monitor's 30-second request release and stored-trail gap scan (rule 1.361) then request the remaining rows (ISSUE-NOV6.4-O33) (R-ID 144).
+*   **1.374 Real Sensor Service Status (R-ID 145)**: The Sensor Setup dialog MUST show the service state reported by `SensorService` itself through the `@Singleton` `SensorServiceStatus` (running only after `initializeServiceComponents` has started the service components, stopped again in `onDestroy`) and the relay state from `SignalingClient.isConnected`, as `Sensor Service: Running` / `Stopped` and `Relay Connection: Connected` / `Disconnected`. No screen may show a fixed service state such as `Active / Ready` (ISSUE-NOV6.4-O34) (R-ID 145).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov7.17**: Real Sensor Service Status (ISSUE-NOV6.4-O34) - PASSED with open item (ISSUE-NOV7.17-O42).
 - **Nov7.15**: Backfill Answer Stops On Send Failure (ISSUE-NOV6.4-O33) - PASSED.
 - **Nov7.12**: Coarse Network Fix Filtering (ISSUE-NOV6.1-O28) - PASSED.
 - **Nov7.11**: Thread-Safe SignalingQueue & Failed Flush Re-queuing (ISSUE-NOV6.0-O24) - PASSED.

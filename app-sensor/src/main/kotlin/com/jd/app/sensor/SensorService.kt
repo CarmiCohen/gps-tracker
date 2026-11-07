@@ -49,6 +49,7 @@ class SensorService : Service(), SensorEventListener {
     @Inject lateinit var identityManager: com.jd.core.network.ForensicIdentityManager
     @Inject lateinit var sensorDataStore: SensorDataStore
     @Inject lateinit var fixStore: SensorFixStore
+    @Inject lateinit var serviceStatus: SensorServiceStatus
     private lateinit var forensicBuffer: ForensicBuffer
     private lateinit var sensorManager: SensorManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -139,6 +140,7 @@ class SensorService : Service(), SensorEventListener {
         connectSignaling()
         
         isInitialized = true
+        serviceStatus.markRunning()
     }
 
     private fun connectSignaling() {
@@ -430,6 +432,7 @@ class SensorService : Service(), SensorEventListener {
         serviceScope.cancel()
         orchestrator.cancelAll()
         fixStore.clear()
+        serviceStatus.markStopped()
         if (isInitialized) {
             sensorManager.unregisterListener(this)
             fusedLocationClient.removeLocationUpdates(locationCallback)
