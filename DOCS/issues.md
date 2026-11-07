@@ -1,11 +1,11 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.21)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.24)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov7.21, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov7.24, solved one by one in the order below
 
 ### Work Queue
-Nov7.21 is closed and followed Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, or Nov7.20 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov7.24 is closed and followed Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, or Nov7.23 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
-**Next item: ISSUE-NOV7.21-O45 (item 37, Medium).** A Sensor service start while the Monitor watches sounds the `Power disconnected` siren on a charging phone, because the Sensor's first loop ticks carry `isCharging = false` before its battery receiver has run. It needs nothing from the user. ISSUE-NOV6.0-O26 (item 18) is still blocked on a device below API 35 or permission to download an API 34 image.
+**Next item: ISSUE-NOV7.19-O44 (item 36, Low).** Re-check the Sensor permissions when `AdminActivity` resumes. It needs nothing from the user. ISSUE-NOV6.0-O26 (item 18) is still blocked on a device below API 35 or permission to download an API 34 image.
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |

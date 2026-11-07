@@ -124,9 +124,9 @@ fun alarmConditions(
     if (reading == null) return@buildSet
     if (!reading.isCharging) add(AlarmType.POWER_DISCONNECTED)
     val batteryLimit = if (AlarmType.LOW_BATTERY in active) LOW_BATTERY_CLEARS_AT else LOW_BATTERY_BELOW
-    if (reading.batteryLevel < batteryLimit) add(AlarmType.LOW_BATTERY)
+    if (reading.batteryLevel >= 0 && reading.batteryLevel < batteryLimit) add(AlarmType.LOW_BATTERY)
     val temperatureLimit = if (AlarmType.HIGH_TEMPERATURE in active) HIGH_TEMPERATURE_CLEARS_AT else HIGH_TEMPERATURE_ABOVE
-    if (reading.tempCelsius > temperatureLimit) add(AlarmType.HIGH_TEMPERATURE)
+    if (reading.tempCelsius > 0f && reading.tempCelsius > temperatureLimit) add(AlarmType.HIGH_TEMPERATURE)
 }
 
 /** One raised alarm. [isActive] is false once its condition has cleared. */

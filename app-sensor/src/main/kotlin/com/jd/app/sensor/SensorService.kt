@@ -88,19 +88,23 @@ class SensorService : Service(), SensorEventListener {
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-            lastBatteryLevel = if (level != -1 && scale != -1) (level * 100 / scale) else 100
-            
-            val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-            lastIsCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || 
-                             status == BatteryManager.BATTERY_STATUS_FULL
-                             
-            val tempTenths = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 300)
-            lastTempCelsius = tempTenths / 10.0f
-            
-            refreshSamplingRate()
+            parseBatteryIntent(intent)
         }
+    }
+
+    private fun parseBatteryIntent(intent: Intent) {
+        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        lastBatteryLevel = if (level >= 0 && scale > 0) level * 100 / scale else -1
+        
+        val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        lastIsCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || 
+                         status == BatteryManager.BATTERY_STATUS_FULL
+                         
+        val tempTenths = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
+        lastTempCelsius = if (tempTenths != Int.MIN_VALUE) tempTenths / 10.0f else 0f
+        
+        refreshSamplingRate()
     }
 
     private val thermalListener = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -163,7 +167,10 @@ class SensorService : Service(), SensorEventListener {
 
     private fun registerBatteryReceiver() {
         try {
-            registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val sticky = registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            if (sticky != null) {
+                parseBatteryIntent(sticky)
+            }
         } catch (e: Exception) {
             SystemLogger.e("SensorService", "Failed to register battery receiver: ${e.message}")
         }
