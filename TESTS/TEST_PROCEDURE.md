@@ -540,8 +540,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **143.1 AlarmSoundOverlay Stealth Tracker Mode:** Verify `AlarmSoundOverlay` checks `isTracker`, rendering `Disabled (Stealth Tracker)` in place of the `TEST SIREN AUDIO` button when `isTracker` is true, ensuring the Sensor (tracker) never provides an interactive local audio test button in compliance with Rule 14 (Stealth Authority, R872). Automated by `SensorStealthGuardTest` and UI inspection (ISSUE-NOV7.3-O38).
 *   **143.2 SensorViewModel Stealth Posture:** Verify `SensorViewModel` does not contain siren playback state or audio test triggers. Automated by unit tests and `SensorStealthGuardTest`.
 
+## Chapter 144 - Real Telemetry Unknown Values Handling (Nov7.30)
+*   **144.1 Unknown Speed Handling:** Verify that when a location fix has no speed (`!hasSpeed()`), `SensorService` transmits `-1f` as the speed, and the Monitor and Sensor HUDs display `--` instead of an invented `0.0 km/h` or `STATIONARY`. Automated by `UnknownTelemetryTest` and `FixReadingTest` (ISSUE-NOV7.2-O37).
+*   **144.2 Unknown Battery and Temperature Handling:** Verify that before battery intents arrive, or when battery level and temperature are unavailable, `SensorService` uses `-1` for battery level and `-1f` for temperature, preventing false low-battery or high-temperature alarms and displaying `--` on HUDs. Automated by `UnknownTelemetryTest`.
+
 ---
-**Active Testing Chapters: 133 of 143**
+**Active Testing Chapters: 134 of 144**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

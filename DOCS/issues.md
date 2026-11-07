@@ -1,9 +1,9 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.28)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.30)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov7.28, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov7.30, solved one by one in the order below
 
 ### Work Queue
-Nov7.28 is closed and followed Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov7.30 is closed and followed Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
 **Next item: ISSUE-NOV6.0-O26 (item 18, Medium, blocked on a device below API 35 or permission to download an API 34 image).**
 
@@ -37,7 +37,7 @@ Nov7.28 is closed and followed Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7
 | 26 | ISSUE-NOV6.4-O34 | **Done for Nov7.17**: the Sensor Setup dialog shows the service state reported by `SensorService` (`SensorServiceStatus`) and the real relay state; its buttons no longer squeeze `Close` (chapter 138) | Nothing |
 | 27 | ISSUE-NOV7.1-O35 | Decide what the three Monitor `CLEAN` actions should do, with item 8 | User decision |
 | 28 | ISSUE-NOV7.2-O36 | Decide whether the Sensor service can be stopped on the device, with item 8 | User decision |
-| 29 | ISSUE-NOV7.2-O37 | Send unknown speed, battery, and temperature as unknown, not as invented numbers | Nothing |
+| 29 | ISSUE-NOV7.2-O37 | **Done for Nov7.30**: unknown speed (-1f), battery (-1), and temperature (-1f) sent as unknown, displaying `--` on HUDs and guarding alarms (chapter 144) | Nothing |
 | 30 | ISSUE-NOV7.3-O38 | **Done for Nov7.28**: Sensor siren test button disabled/replaced on Sensor (stealth tracker) via AlarmSoundOverlay and SensorViewModel cleanup (chapter 143) | Nothing |
 | 31 | ISSUE-NOV7.3-O39 | Let the alarm reach the user under Do Not Disturb and over a locked screen | User decision on the permission flow |
 | 33 | ISSUE-NOV7.15-O41 | Find the main-thread work at Sensor start that delays the first `AdminActivity` frame past 500 ms | Nothing |
@@ -83,6 +83,11 @@ Nov7.28 is closed and followed Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov7.30)
+*   **Real Telemetry Unknown Values Handling (ISSUE-NOV7.2-O37)**: `SensorService` copied `loc.speed` without checking `hasSpeed()`, reporting `0.0 km/h` / `STATIONARY` when speed was unknown, and initialized battery level (100) and temperature (30°C) with invented defaults before broadcast intents arrived. `SensorService` now checks `loc.hasSpeed()` (reporting `-1f` when absent), initializes `lastBatteryLevel` to `-1` and `lastTempCelsius` to `-1f`, and `MonitorViewModel` treats negative speed/battery and non-positive temperature as unknown (`--` on HUD and safe from false low-battery/temperature alarms). Verified by unit tests including `UnknownTelemetryTest` and `FixReadingTest`, 284/284 JVM unit tests passing across all subprojects, build clean with `--warning-mode all`. SOT rule 1.380, test chapter 144. **PASSED.**
 
 ---
 

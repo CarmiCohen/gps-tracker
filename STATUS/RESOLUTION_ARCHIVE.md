@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov7.30)
+- **Real Telemetry Unknown Values Handling (ISSUE-NOV7.2-O37)**: `SensorService` copied `loc.speed` without checking `hasSpeed()`, reporting `0.0 km/h` / `STATIONARY` when speed was unknown, and initialized battery level (100) and temperature (30°C) with invented defaults before broadcast intents arrived. `SensorService` now checks `loc.hasSpeed()` (reporting `-1f` when absent), initializes `lastBatteryLevel` to `-1` and `lastTempCelsius` to `-1f`, and `MonitorViewModel` treats negative speed/battery and non-positive temperature as unknown (`--` on HUD and safe from false low-battery/temperature alarms). Verified by unit tests including `UnknownTelemetryTest` and `FixReadingTest`, 284/284 JVM unit tests passing across all subprojects, build clean with `--warning-mode all`. SOT rule 1.380, test chapter 144. **PASSED.**
+
 ## ✅ Resolved Issues (Nov7.28)
 - **Sensor Siren Test Stealth Enforcement (ISSUE-NOV7.3-O38)**: The Sensor displayed `TEST SIREN AUDIO` in its Siren & Audio setup overlay, which only toggled an unused `_isSirenPlaying` state flow in `SensorViewModel` and could never sound. Rule 14 (Stealth Authority, R872) forbids the Sensor to sound. `AlarmSoundOverlay` (`core-ui`) now checks `isTracker`, rendering `Disabled (Stealth Tracker)` in place of the test button when `isTracker` is true. `_isSirenPlaying` and `testSirenAudio()` were removed from `SensorViewModel` (`app-sensor`), and `AdminActivity` passes `isSirenPlaying = false` and `{}` for the test action. Verified by unit tests across all subprojects, build clean with `--warning-mode all`, and `SensorStealthGuardTest`. SOT rule 1.379. **PASSED.**
 
@@ -31,7 +34,7 @@
 - **Screen State & Rotation Preservation (ISSUE-NOV6.0-O22)**: Updated all UI overlay visibility flags, dialog states, and map follow modes in `MonitorActivity.kt` (`MonitorScreen`, `PairingWizard`) and `AdminActivity.kt` (`AdminActivity`, `SettingsOverlay`) from plain `remember` to `rememberSaveable`, ensuring open overlays, dialogs, unlock states, and follow modes persist across screen rotation and configuration changes. Verified by automated tests and test suite pass across all modules. **PASSED.**
 
 ## ✅ Resolved Issues (Nov7.9)
-- **HUD Flow 2Hz Rate Limiting (ISSUE-NOV6.0-O21)**: Applied `atUiRate()` (500ms sampling window) to `localHudState` and `remoteHudState` in `MonitorViewModel.kt` and to `hudState` in `SensorViewModel.kt`. Throttled incoming telemetry/fix inputs (`uiTelemetry = pairedTelemetry.atUiRate()`, `uiFix = fixStore.fix.atUiRate()`) before combining in `localHudState`, `remoteHudState`, and `hudState`, preventing 10Hz re-evaluations of expensive system service checks (`isNetworkAvailable`, `isLocationProviderEnabled`) and capping UI emissions to 2Hz. Verified by `UiRateTest` and new `HudRateTest` unit tests and full automated test suite pass across all modules. **PASSED.**
+- **HUD Flow 2Hz Rate Limiting (ISSUE-NOV6.0-O21)**: Applied `atUiRate()` (500ms sampling window) to `localHudState` and `remoteHudState` in `MonitorViewModel.kt` and to `hudState` in `SensorViewModel.kt`. Throttled incoming telemetry/fix inputs (`uiTelemetry = pairedTelemetry.atUiRate()`, `uiFix = fixStore.fix.atUiRate()`) before combining in `localHudState`, `remoteHudState`, and `hudState`, preventing 10Hz re-evaluations of expensive system service checks (`isNetworkAvailable`, `isLocationProviderEnabled`) and capping UI emissions to 2Hz. Verified by `UiRateTest` and new `HudRateTest` unit tests and full automated test suite pass across all subprojects. **PASSED.**
 
 ## ✅ Resolved Issues (Nov7.7)
 - **False MOVING & Sensor-Detected Violations (ISSUE-NOV5.2-O13, group 1 slice 3)**: Fixed false MOVING on the Sensor by wiring `SentinelLogic.validateMovement` with accelerometer motion (`hasPhysicalMotion`) on each fix in `SensorService.kt`, transmitting motion state and violation status (`JUMP`, `OUTLIER`) in telemetry and via `ViolationEvent`. Added `AlarmType.GPS_JUMP` to `MonitorAlarms.kt`, wired to `AlertSettings.jammerDetection` and `signalingClient.violationFlow` in `MonitorAlarmEngine.kt`. Verified by unit tests in `MonitorAlarmsTest` and full automated test suite pass across all subprojects. **PASSED.**
@@ -98,48 +101,3 @@
 - **Zeroed Telemetry (GAP-REVOL69.0-G3, Critical)**: The client now owns `LocationUpdate.snapshot()` copies instead of pooled references, and the wire format carries accuracy, speed, battery, charging, and temperature. **PASSED.**
 - **VWR LED Never Activated (GAP-REVOL69.0-G4)**: Added the `viewer_status_relay` listener. **PASSED.**
 - **Relay URL Change Ignored (GAP-REVOL69.0-G5)**: `connect()` now replaces the session on a URL or identity change. **PASSED (automated).**
-- **Trail Drawn To (0,0) (GAP-REVOL69.0-G6)**: Added `knownPositions` filtering. **PASSED.**
-- **Monitor Instrumented Suite Did Not Compile (GAP-REVOL69.0-G7)**: Updated `FakeSignalingClient`. **PASSED.**
-- **Baseline Synchronization**: Version `Nov5.0` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov4.44)
-- **Release Candidate Verification & Reciprocal Virtual Presence Simulation Audit (GAP-REVOL68.0-G1)**: Successfully executed all automated unit test suites (`test --warning-mode all`) across all subprojects with 100% passing results (0 failures), conducted reciprocal virtual presence simulation testing in single-device environment, updated `TESTS/TEST_PROCEDURE.md` (Chapter 117), and synchronized all forensic baseline documentation. **PASSED.**
-- **Baseline Synchronization**: Version `Nov4.44` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov4.37)
-- **Decoupled Peer LED Signaling & Relay-Independent Status Audit (GAP-REVOL67.0-G1)**: Decoupled peer connection LEDs from relay server connection state. Updated `SRV` LED to reflect relay server connection only (GREEN when connected, RED otherwise), `TRK` LED to reflect tracker connection only, and `VWR` LED to reflect viewer connection only. Updated real-time room presence fan-out in `relay-server/index.js`, added Chapter 116 to `TESTS/TEST_PROCEDURE.md`, and updated test evaluation rules. **PASSED.**
-- **Baseline Synchronization**: Version `Nov4.37` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov4.36)
-- **Dual Device Hardware Deployment & Telemetry Audit (GAP-REVOL66.0-G1)**: Successfully deployed `:app-monitor` to S21FE (`R5CRC14PG4F`) and `:app-sensor` to A155 (`R58X40GV2AR`), monitored logcat and event logs for both apps, verified active 10s background telemetry generation, updated `TESTS/TEST_PROCEDURE.md` (Chapter 115), and verified 100% passing test execution across all modules. **PASSED.**
-- **Baseline Synchronization**: Version `Nov4.36` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov4.35)
-- **Monitor Hardware Deployment & Single-Line Fitting Audit (GAP-REVOL65.0-G1)**: Successfully deployed `:app-monitor` to target hardware (S21FE / R58X40GV2AR), inspected logcat and UI snapshots, remediated upper menu header title line wrapping and HUD status bar `idDisplay` / telemetry age formatting, updated `TESTS/TEST_PROCEDURE.md` (Chapter 114), and verified 100% passing test execution across all modules. **PASSED.**
-- **Baseline Synchronization**: Version `Nov4.35` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov4.34)
-- **Upper Menu Line Expansion (GAP-REVOL64.0-G1)**: Successfully added direct one-tap quick navigation buttons for Map (`Place`), Events (`Menu`), Graphs (`Star`), and Info (`Info`) alongside Setup, Settings, and Tools in the upper menu line of both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications. Added Chapter 113 to `TESTS/TEST_PROCEDURE.md` and created `DOCS/UPPER_MENU_LINE_AND_VIEWS.md`. **PASSED.**
-- **Baseline Synchronization**: Version `Nov4.34` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov4.33)
-- **Revived Sound & Setup Options Integration (GAP-REVOL63.0-G1)**: Successfully revived and integrated `CleanSetupOverlay` and `PhoneSetupOverlay` into `:core-ui`, wiring them into configuration settings across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications. **PASSED.**
-- **Baseline Synchronization**: Version `Nov4.33` established as the new forensic stabilization baseline.
-
----
-
-## ✅ Resolved Issues (Nov4.32)
-- **System Tools & Diagnostics Menu Integration (GAP-REVOL62.0-G1)**: Successfully implemented dedicated **Tools** menu option in top header bar of both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications, opening `ToolsOverlay` (`:core-ui`) for 100Hz telemetry burst simulation, manual database pruning, test violation triggering, and watchdog resetting. **PASSED.**
-- **Baseline Synchronization**: Version `Nov4.32` established as the new forensic stabilization baseline.

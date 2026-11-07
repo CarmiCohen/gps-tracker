@@ -72,9 +72,9 @@ class SensorService : Service(), SensorEventListener {
     @Volatile private var lastLocation: Location? = null // Written on the main looper, read by the sensing loop.
     private var sequenceIdCounter = 0L
     
-    private var lastBatteryLevel = 100
+    private var lastBatteryLevel = -1
     private var lastIsCharging = false
-    private var lastTempCelsius = 30.0f
+    private var lastTempCelsius = -1f
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -102,7 +102,7 @@ class SensorService : Service(), SensorEventListener {
                          status == BatteryManager.BATTERY_STATUS_FULL
                          
         val tempTenths = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
-        lastTempCelsius = if (tempTenths != Int.MIN_VALUE) tempTenths / 10.0f else 0f
+        lastTempCelsius = if (tempTenths != Int.MIN_VALUE) tempTenths / 10.0f else -1f
         
         refreshSamplingRate()
     }
@@ -259,7 +259,7 @@ class SensorService : Service(), SensorEventListener {
     }
 
     private fun refreshSamplingRate() {
-        val speed = lastLocation?.speed ?: 0f
+        val speed = if (lastLocation != null && lastLocation!!.hasSpeed()) lastLocation!!.speed else 0f
         val newInterval = SensingEngine.getOptimalIntervalMs(
             currentTemp = lastTempCelsius,
             isCharging = lastIsCharging,
@@ -331,11 +331,11 @@ class SensorService : Service(), SensorEventListener {
                     update.lat = loc.latitude
                     update.lng = loc.longitude
                     update.accuracy = loc.accuracy
-                    update.speed = loc.speed
+                    update.speed = if (loc.hasSpeed()) loc.speed else -1f
                     update.bearing = loc.bearing
                     update.altitude = loc.altitude
                     movementCheck.check(
-                        fixForMovementCheck(loc.latitude, loc.longitude, loc.accuracy, loc.speed, loc.elapsedRealtimeNanos),
+                        fixForMovementCheck(loc.latitude, loc.longitude, loc.accuracy, update.speed, loc.elapsedRealtimeNanos),
                         hasPhysicalMotion
                     )
                 }

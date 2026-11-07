@@ -13,7 +13,7 @@ data class LocationUpdate(
     var lat: Double = 0.0,
     var lng: Double = 0.0,
     var accuracy: Float = 0f,
-    var speed: Float = 0f,
+    var speed: Float = -1f,
     var bearing: Float = 0f,
     var altitude: Double = 0.0,
     var timestamp: Long = 0L,
@@ -21,12 +21,12 @@ data class LocationUpdate(
     var serverArrivalTs: Long = 0L, 
     var sequenceId: Long = 0L,
     var isCharging: Boolean = false,
-    var batteryLevel: Int = 0,
+    var batteryLevel: Int = -1,
     var gsmSignalDbm: Int = 0,
     var networkType: String = "--",
     var isBuffered: Boolean = false,
     var isHistoricalLkg: Boolean = false,
-    var tempCelsius: Float = 0f,
+    var tempCelsius: Float = -1f,
     var isThermalThrottled: Boolean = false,
     var cumulativeBytesSent: Long = 0L,
     var status: String = "VALID", // What the reading means (VALID, NO_FIX, JUMP, ...); delivery never depends on it
@@ -38,10 +38,10 @@ data class LocationUpdate(
     fun snapshot(): LocationUpdate = copy(sensorSnapshot = sensorSnapshot.copy())
 
     fun reset() {
-        deviceId = ""; lat = 0.0; lng = 0.0; accuracy = 0f; speed = 0f; bearing = 0f; altitude = 0.0
+        deviceId = ""; lat = 0.0; lng = 0.0; accuracy = 0f; speed = -1f; bearing = 0f; altitude = 0.0
         timestamp = 0L; monotonicNanos = 0L; serverArrivalTs = 0L; sequenceId = 0L
-        isCharging = false; batteryLevel = 0; gsmSignalDbm = 0; networkType = "--"
-        isBuffered = false; isHistoricalLkg = false; tempCelsius = 0f
+        isCharging = false; batteryLevel = -1; gsmSignalDbm = 0; networkType = "--"
+        isBuffered = false; isHistoricalLkg = false; tempCelsius = -1f
         isThermalThrottled = false; cumulativeBytesSent = 0L; status = "VALID"; isCritical = false
         sensorSnapshot.reset()
     }

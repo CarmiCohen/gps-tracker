@@ -172,7 +172,8 @@ class MonitorViewModel @Inject constructor(
         val isTrackerPresent = lastTs > 0 && (now - lastTs) < TRACKER_PRESENT_MS
         val isInternet = isNetworkAvailable(context)
         val isGpsActive = latest != null && (latest.lat != 0.0 || latest.lng != 0.0)
-        val speedKmh = latest?.takeIf { isGpsActive }?.speed?.let(::metersPerSecondToKmh)
+        val speedMps = latest?.takeIf { isGpsActive && it.speed >= 0f }?.speed
+        val speedKmh = speedMps?.let(::metersPerSecondToKmh)
 
         HudState(
             appMode = "sensor", // Green remote sensor GPS LED
@@ -186,9 +187,9 @@ class MonitorViewModel @Inject constructor(
             watchdogOk = true,
             trackerState = motionState(speedKmh),
             speedKmh = speedKmh,
-            batteryLevel = latest?.batteryLevel,
+            batteryLevel = latest?.takeIf { it.batteryLevel >= 0 }?.batteryLevel,
             isCharging = latest?.isCharging ?: false,
-            tempCelsius = latest?.tempCelsius,
+            tempCelsius = latest?.takeIf { it.tempCelsius > 0f }?.tempCelsius,
             accuracyMeters = latest?.accuracy ?: 0f,
             telemetryAgeSec = ageSec,
             sequenceId = latest?.sequenceId ?: 0L
