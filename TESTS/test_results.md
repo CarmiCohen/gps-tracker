@@ -1,7 +1,28 @@
-# Test Results - Nov6.3 (Real Relay Status Text)
+# Test Results - Nov6.4 (Backfill Gap Recovery)
+
+## Nov6.4 Summary
+Executed Nov 6 and 7, 2026 on the A15 (`R58X40GV2AR`, API 36). The S21FE stayed attached during the first Monitor suite, took no part, and kept its Monitor; it was then unplugged, so no two-phone run was possible. The live check used a private copy of `relay-server/index.js`; no test traffic reached the production relay, and both apps used real positions. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **Automated suite** | 🟢 **177/177** | `:core-shared` 46, `:core-network` 18, `:core-ui` 14, `:app-monitor` unit 30, `:app-monitor` on A15 34, `:app-sensor` on A15 35. Unit tasks were forced with `--rerun`; result file times were checked. |
+| **125.1 to 125.6** | 🟢 **PASSED (automated)** | `BackfillLedgerTest`, `BackfillGapRecoveryTest` with real Room on the A15, and two burst tests in `SignalingBatchTest`. |
+| **Burst before the fix** | 🟢 **Defect shown** | On the unchanged client, with the collector fully busy, 64 of 600 telemetry updates and 8 of 200 backfill chunks arrived. This is a worst case: it shows the mechanism, not the loss rate in the field test. |
+| **Deliberate break** | 🟢 **PASSED** | With the scan limited to the newest gap, `everyHoleIsRefilledWhenThereAreMoreThanTheLimit` and `aFailedRequestIsNotForgotten` failed (2 of 9). The fix was then restored. |
+| **125.7 Outage on hardware** | 🟡 **PASSED, private relay only** | Sensor at 10Hz through a test proxy, Monitor direct. 08:40:35 data discarded for 20s, then connections refused for 40s. 08:41:38 Sensor reconnected; 08:41:40 `1 gaps stored. Requesting 1.`, `Requested 1921 to 2115` (195 rows), 4 chunks. Pulled table: 3,011 rows, sequences 1 to 3011, 0 holes. |
+| **More holes than the limit, live** | ⚪ **NOT OBSERVED** | That outage produced one hole, so this case has automated proof only. |
+| **Production relay and two phones** | ❌ **NOT RUN for Nov6.4** | The second half of 125.7 is outstanding. The production round trip was seen on Nov 6 with Nov6.3 (ISSUE-NOV5.2-O12). |
+| **Unanswered request timeout, live** | ⚪ **NOT OBSERVED** | Covered by `BackfillLedgerTest`. |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | `device_audit.cmd`, Sensor and Monitor processes, log cleared at the cut: 0 Davey over 500ms, 0 StackLog, 0 fatal. `ProductionReadinessAuditTest` ran in the Sensor suite. |
+
+**Run history:** the first Monitor suite was 33 of 34: `everyHoleIsRefilledWhenThereAreMoreThanTheLimit` timed out because `FakeSignalingClient` still had a buffer of 8 and dropped 2 of 10 responses. Raising the fake to the production size fixed it. A first outage attempt was void: removing the `adb reverse` entry left the open socket running, so nothing was cut, and the test proxy replaced it.
+
+---
+
+# Nov6.3 Results (Real Relay Status Text)
 
 ## Nov6.3 Summary
-Executed Nov 6, 2026 on the A15 (`R58X40GV2AR`, API 36), with Sensor and Monitor on the same phone through the production relay. The S21FE was connected to the PC from about 14:53 but was not used; every command named the A15. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
+Executed Nov 6, 2026 on the A15 (`R58X40GV2AR`, API 36), with Sensor and Monitor on the same phone through the production relay. The S21FE was attached at 14:51:41, during the Monitor suite, and took no part: tooling read its properties, and its adbd log shows no install, uninstall, or test. Every test ran on the A15. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
 
 | Check | Status | Notes |
 | :--- | :--- | :--- |

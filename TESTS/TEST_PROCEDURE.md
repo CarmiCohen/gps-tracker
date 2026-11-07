@@ -446,8 +446,17 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **124.1 Status Follows The Relay:** Open the Monitor Setup dialog. Verify that it shows `Relay Status: Connected` while `SRV` is on and `Relay Status: Disconnected` while `SRV` is off, including a change while the dialog stays open. Automated by `HudStateTest.relayStatusTextFollowsTheSrvState` and `RelayStatusDialogTest`.
 *   **124.2 Relay Lost On Hardware:** With the dialog open on the A15, cut the network. Verify that the status changes to `Disconnected` together with `SRV`, and returns to `Connected` after the network returns.
 
+## Chapter 125 - Backfill Gap Recovery (Nov6.4)
+*   **125.1 Holes Come From The Table:** Verify that every hole between stored rows is listed, newest first, ignoring other trackers and local rows, and that a scan of a full table stays under one second. Automated by `BackfillGapRecoveryTest.gapsAreListedNewestFirst`, `aContinuousTrailHasNoGaps`, `otherTrackersAndLocalRowsAreIgnored`, and `scanningTheFullTableStaysFast`.
+*   **125.2 More Holes Than The Limit:** With more holes than the 10-request limit, verify that only 10 requests are in flight, and that every hole is refilled as slots free. Automated by `everyHoleIsRefilledWhenThereAreMoreThanTheLimit` and `BackfillLedgerTest.gapsOverTheLimitWaitAndAreRequestedWhenASlotFrees`.
+*   **125.3 Failed And Unanswered Requests:** Verify that a request that could not be sent is made again by a later scan, and that an unanswered request is released after 30 seconds without a chunk and asked again. Automated by `aFailedRequestIsNotForgotten`, `BackfillLedgerTest.anUnansweredRequestIsReleasedAndAskedAgain`, and `eachChunkRestartsTheTimeout`.
+*   **125.4 Unfillable Holes:** Verify that a hole the Sensor answers without rows is not requested again in the same process, while a new hole still is. Automated by `aHoleTheSensorCannotFillIsAskedOnce` and `BackfillLedgerTest.anAnsweredHoleIsNotAskedForever`.
+*   **125.5 Reconnect Burst:** Verify that a flushed queue and a full backfill reach a busy collector with nothing dropped. Automated by `SignalingBatchTest.testReconnectBurstReachesABusyCollector` and `testBackfillBurstReachesABusyCollector`.
+*   **125.6 Missing Start:** Verify that a fresh pairing requests the rows before its first update, and that a table pruned to its cap does not request its deleted rows. Automated by `aMissingStartIsRequestedOnAFreshPairing` and `aPrunedStartIsNotRequested`.
+*   **125.7 Outage On Hardware:** Through a private relay, never the production relay, cut only the Sensor for 60 seconds at the 10Hz charging rate. Pull the Monitor database after recovery and verify that no hole remains. Repeat with the Monitor on a second phone through the production relay when one is available.
+
 ---
-**Active Testing Chapters: 114 of 124**
+**Active Testing Chapters: 115 of 125**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

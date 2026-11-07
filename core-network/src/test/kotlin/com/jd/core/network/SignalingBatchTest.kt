@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -143,6 +144,58 @@ class SignalingBatchTest {
             val payload = fakeSocket.emittedEvents.first { it.first == "backfill_response" }.second as JSONObject
             assertEquals("The relay routes on id", "T", payload.getString("id"))
             assertEquals("T", payload.getJSONArray("updates").getJSONObject(0).getString("id"))
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun testReconnectBurstReachesABusyCollector() = runTest {
+        val fakeSocket = FakeSocket()
+        val client = SocketioSignalingClient(FakeSocketFactory(fakeSocket), StandardTestDispatcher(testScheduler))
+
+        try {
+            client.connect("http://localhost", "T", "T")
+            fakeSocket.simulateConnect()
+            val received = mutableListOf<Long>()
+            backgroundScope.launch { client.telemetryFlow.collect { received += it.sequenceId } }
+            runCurrent()
+
+            // The socket thread delivers a flushed queue faster than the database stores it.
+            val burst = 1L..600L
+            burst.forEach { sequence ->
+                val payload = JSONObject().put("id", "T").put("seq", sequence)
+                fakeSocket.listeners["location_relay"]!!.forEach { it.call(payload) }
+            }
+            runCurrent()
+
+            assertEquals(burst.toList(), received)
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun testBackfillBurstReachesABusyCollector() = runTest {
+        val fakeSocket = FakeSocket()
+        val client = SocketioSignalingClient(FakeSocketFactory(fakeSocket), StandardTestDispatcher(testScheduler))
+
+        try {
+            client.connect("http://localhost", "T", "T")
+            fakeSocket.simulateConnect()
+            val received = mutableListOf<String>()
+            backgroundScope.launch { client.backfillResponseFlow.collect { received += it.requestId } }
+            runCurrent()
+
+            // A full Sensor buffer is 10000 rows, sent as 200 chunks of 50.
+            val chunks = (1..200).map { "chunk-$it" }
+            chunks.forEach { requestId ->
+                val payload = JSONObject().put("reqId", requestId).put("done", false).put("updates", JSONArray())
+                fakeSocket.listeners["backfill_response"]!!.forEach { it.call(payload) }
+            }
+            runCurrent()
+
+            assertEquals(chunks, received)
         } finally {
             client.disconnect()
         }

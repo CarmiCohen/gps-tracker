@@ -198,7 +198,7 @@ class FakeSignalingClient : SignalingClient {
     private val _backfillRequestFlow = MutableSharedFlow<BackfillRequest>(extraBufferCapacity = 8)
     override val backfillRequestFlow: Flow<BackfillRequest> = _backfillRequestFlow
 
-    private val _backfillResponseFlow = MutableSharedFlow<BackfillResponse>(extraBufferCapacity = 8)
+    private val _backfillResponseFlow = MutableSharedFlow<BackfillResponse>(extraBufferCapacity = 5000)
     override val backfillResponseFlow: Flow<BackfillResponse> = _backfillResponseFlow
 
     var onRequestBackfill: ((BackfillRequest) -> Boolean)? = null

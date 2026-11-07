@@ -28,6 +28,9 @@ data class TrailEntity(
     val isLocalUser: Boolean = false
 )
 
+/** A run of missing sequence numbers, both ends included. */
+data class SequenceGap(val firstMissing: Long, val lastMissing: Long)
+
 @Dao
 interface TrailDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -41,6 +44,36 @@ interface TrailDao {
 
     @Query("SELECT sequenceId FROM trails WHERE trackerId = :id AND isLocalUser = 0 ORDER BY sequenceId DESC LIMIT 1")
     suspend fun getLastSequenceId(id: String): Long?
+
+    @Query("SELECT MIN(sequenceId) FROM trails WHERE trackerId = :id AND isLocalUser = 0")
+    suspend fun getFirstSequenceId(id: String): Long?
+
+    @Query("SELECT COUNT(*) FROM trails WHERE trackerId = :id AND isLocalUser = 0")
+    suspend fun countRows(id: String): Int
+
+    /**
+     * Returns every hole between stored rows, newest first. The table is the only record of
+     * what is missing, so a hole stays findable until it is filled (ISSUE-NOV6.3-O32).
+     * Uses the unique index. Window functions are avoided: they need API 30 and minSdk is 26.
+     */
+    @Query(
+        """
+        SELECT stored.sequenceId + 1 AS firstMissing,
+            (SELECT MIN(later.sequenceId) FROM trails later
+             WHERE later.trackerId = :id AND later.isLocalUser = 0
+             AND later.sequenceId > stored.sequenceId) - 1 AS lastMissing
+        FROM trails stored
+        WHERE stored.trackerId = :id AND stored.isLocalUser = 0
+        AND stored.sequenceId < (SELECT MAX(sequenceId) FROM trails WHERE trackerId = :id AND isLocalUser = 0)
+        AND NOT EXISTS (
+            SELECT 1 FROM trails adjacent
+            WHERE adjacent.trackerId = :id AND adjacent.isLocalUser = 0
+            AND adjacent.sequenceId = stored.sequenceId + 1
+        )
+        ORDER BY stored.sequenceId DESC
+        """
+    )
+    suspend fun getSequenceGaps(id: String): List<SequenceGap>
 
     /**
      * Prunes local user trails faster than remote sensor trails.

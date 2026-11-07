@@ -38,7 +38,7 @@ class SocketioSignalingClient @Inject constructor(
 
     private var socket: Socket? = null
     private val clientScope = CoroutineScope(SupervisorJob() + ioDispatcher)
-    private val queue = SignalingQueue(maxCapacity = 5000)
+    private val queue = SignalingQueue(maxCapacity = BURST_CAPACITY)
 
     private val _isConnected = MutableStateFlow(false)
     override val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
@@ -46,16 +46,16 @@ class SocketioSignalingClient @Inject constructor(
     private val _viewerStatusFlow = MutableStateFlow(false)
     override val viewerStatusFlow: StateFlow<Boolean> = _viewerStatusFlow.asStateFlow()
 
-    private val _telemetryFlow = MutableSharedFlow<LocationUpdate>(extraBufferCapacity = 64)
+    private val _telemetryFlow = MutableSharedFlow<LocationUpdate>(extraBufferCapacity = BURST_CAPACITY)
     override val telemetryFlow: SharedFlow<LocationUpdate> = _telemetryFlow.asSharedFlow()
 
     private val _violationFlow = MutableSharedFlow<ViolationEvent>(extraBufferCapacity = 16)
     override val violationFlow: SharedFlow<ViolationEvent> = _violationFlow.asSharedFlow()
 
-    private val _backfillRequestFlow = MutableSharedFlow<BackfillRequest>(extraBufferCapacity = 8)
+    private val _backfillRequestFlow = MutableSharedFlow<BackfillRequest>(extraBufferCapacity = BURST_CAPACITY)
     override val backfillRequestFlow: SharedFlow<BackfillRequest> = _backfillRequestFlow.asSharedFlow()
 
-    private val _backfillResponseFlow = MutableSharedFlow<BackfillResponse>(extraBufferCapacity = 8)
+    private val _backfillResponseFlow = MutableSharedFlow<BackfillResponse>(extraBufferCapacity = BURST_CAPACITY)
     override val backfillResponseFlow: SharedFlow<BackfillResponse> = _backfillResponseFlow.asSharedFlow()
 
     private var bytesSent: Long = 0
@@ -372,5 +372,13 @@ class SocketioSignalingClient @Inject constructor(
         socket?.emit("backfill_response", payload)
         bytesSent += payload.toString().length.toLong()
         return true
+    }
+
+    private companion object {
+        /**
+         * The most a peer can flush at once. Socket callbacks use tryEmit, which drops
+         * silently when a flow buffer is full (ISSUE-NOV6.3-O32).
+         */
+        const val BURST_CAPACITY = 5000
     }
 }

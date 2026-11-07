@@ -2,12 +2,13 @@ package com.jd.app.monitor
 
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.BackfillRequest
-import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.SystemLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -18,8 +19,8 @@ import javax.inject.Singleton
 
 /**
  * MonitorRepository: Orchestrates telemetry ingestion and Forensic Backfill (R-ID 768).
- * Detects sequence gaps in incoming data and requests missing ranges from the Sensor.
- * Hardened for Nov1.1: Range-based deduplication to prevent redundant backfill requests (ISSUE-REVOL32.0-F1).
+ * Missing ranges are read from the stored trail, so a range that could not be requested
+ * or was never answered is found again by a later scan (ISSUE-NOV6.3-O32).
  */
 @Singleton
 class MonitorRepository @Inject constructor(
@@ -27,12 +28,19 @@ class MonitorRepository @Inject constructor(
     private val signalingClient: SignalingClient
 ) {
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val activeRequests = mutableMapOf<String, BackfillRequest>()
-    private val rangeMutex = Mutex()
+    private val ledger = BackfillLedger()
+    private val ledgerMutex = Mutex()
+
+    /** Holds the tracker to scan. Conflated, so a burst of updates costs one scan. */
+    private val gapScans = Channel<String>(Channel.CONFLATED)
+
+    @Volatile
+    private var lastScanMs = 0L
 
     init {
         observeTelemetry()
         observeBackfill()
+        observeGapScans()
     }
 
     fun getTrail(trackerId: String): Flow<List<TrailEntity>> = trailDao.getTrail(trackerId)
@@ -63,24 +71,36 @@ class MonitorRepository @Inject constructor(
                 }
                 trailDao.insertAll(entities)
 
-                if (response.isComplete) {
-                    rangeMutex.withLock {
-                        activeRequests.remove(response.requestId)
+                ledgerMutex.withLock {
+                    ledger.onChunkReceived(response.requestId, System.currentTimeMillis())
+                    if (response.isComplete) {
+                        ledger.onRequestComplete(response.requestId)?.let { gapScans.trySend(it.deviceId) }
                     }
                 }
             }
         }
     }
 
-    private suspend fun processIncomingUpdate(update: LocationUpdate, isBackfill: Boolean = false) {
-        val lastSeq = trailDao.getLastSequenceId(update.deviceId) ?: 0L
-        
-        // Gap Detection Logic (R-ID 768)
-        if (!isBackfill && update.sequenceId > lastSeq + 1) {
-            triggerBackfill(update.deviceId, lastSeq + 1, update.sequenceId - 1)
+    /** Scans run only while telemetry arrives, so a silent Sensor gets no repeated requests. */
+    private fun observeGapScans() {
+        repositoryScope.launch {
+            for (deviceId in gapScans) {
+                delay(GAP_SETTLE_MS)
+                requestMissingRanges(deviceId)
+            }
         }
+    }
 
+    private suspend fun processIncomingUpdate(update: LocationUpdate) {
+        val lastSeq = trailDao.getLastSequenceId(update.deviceId) ?: 0L
+
+        // Stored first: a hole can only be read from the table once a newer row exists.
         trailDao.insert(update.toEntity())
+
+        val isSequenceJump = update.sequenceId > lastSeq + 1
+        if (isSequenceJump || System.currentTimeMillis() - lastScanMs >= GAP_RESCAN_MS) {
+            gapScans.trySend(update.deviceId)
+        }
     }
 
     private fun LocationUpdate.toEntity() = TrailEntity(
@@ -94,26 +114,38 @@ class MonitorRepository @Inject constructor(
         isLocalUser = false
     )
 
-    private suspend fun triggerBackfill(deviceId: String, start: Long, end: Long) {
-        rangeMutex.withLock {
-            // Hardening: Check if this range (or an overlapping one) is already being fetched
-            val isRedundant = activeRequests.values.any { 
-                it.deviceId == deviceId && it.startSequenceId <= start && it.endSequenceId >= end 
-            }
-            
-            if (isRedundant) {
-                SystemLogger.i("Backfill", "Request for $deviceId ($start..$end) skipped: overlap with active request.")
-                return
+    private suspend fun findGaps(deviceId: String): List<SequenceGap> {
+        val gaps = trailDao.getSequenceGaps(deviceId)
+        val first = trailDao.getFirstSequenceId(deviceId) ?: return gaps
+
+        // A table at the cap has been pruned, so its missing start is not a gap.
+        val hasMissingStart = first > 1 && trailDao.countRows(deviceId) < MAX_STORED_TRAIL_POINTS
+        return if (hasMissingStart) gaps + SequenceGap(1, first - 1) else gaps
+    }
+
+    private suspend fun requestMissingRanges(deviceId: String) {
+        lastScanMs = System.currentTimeMillis()
+        val gaps = findGaps(deviceId)
+
+        ledgerMutex.withLock {
+            val now = System.currentTimeMillis()
+            val toRequest = ledger.gapsToRequest(deviceId, gaps, now)
+            if (toRequest.isNotEmpty()) {
+                SystemLogger.w("Backfill", "${gaps.size} gaps stored. Requesting ${toRequest.size}.")
             }
 
-            if (activeRequests.size > 10) return // Increased limit for multi-peer scenarios
-
-            val requestId = UUID.randomUUID().toString()
-            SystemLogger.w("Backfill", "Gap detected ($start to $end). Requesting backfill...")
-            val request = BackfillRequest(deviceId, start, end, requestId)
-            if (signalingClient.requestBackfill(request)) {
-                activeRequests[requestId] = request
+            for (gap in toRequest) {
+                val request = BackfillRequest(deviceId, gap.firstMissing, gap.lastMissing, UUID.randomUUID().toString())
+                if (!signalingClient.requestBackfill(request)) break
+                SystemLogger.i("Backfill", "Requested ${gap.firstMissing} to ${gap.lastMissing}")
+                ledger.onRequestSent(request, now)
             }
         }
+    }
+
+    private companion object {
+        /** Lets the rest of a reconnect burst land, so its rows are not requested as well. */
+        const val GAP_SETTLE_MS = 2_000L
+        const val GAP_RESCAN_MS = 30_000L
     }
 }
