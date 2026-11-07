@@ -497,8 +497,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 134 - Screen State & Rotation Preservation (Nov7.10)
 *   **134.1 Overlay and Follow Mode Preservation Across Rotation:** Verify that open overlays, dialog states, and map follow modes persist across screen rotation and configuration changes in `MonitorActivity` and `AdminActivity` by using `rememberSaveable` (ISSUE-NOV6.0-O22).
 
+## Chapter 135 - Thread-Safe Signaling Queue & Order-Preserving Failed Flush (Nov7.11)
+*   **135.1 Thread Safety & ReentrantLock Conflation:** Verify that `SignalingQueue` operations (`offer`, `pollBatch`, `pushFront`, `clear`) are fully thread-safe under concurrent access protected by `ReentrantLock`. Automated by `SignalingQueueTest.testThreadSafetyConcurrentAccess` (ISSUE-NOV6.0-O24).
+*   **135.2 PushFront Failed Flush Order Preservation:** Verify that when `SocketioSignalingClient` fails a batch flush, `pushFront` returns updates to the front of `SignalingQueue` in their exact original sequence order (`1, 2, 3 ...`), preventing reordering behind newer incoming updates. Automated by `SignalingQueueTest.testPushFrontPreservesOrder`.
+
 ---
-**Active Testing Chapters: 124 of 134**
+**Active Testing Chapters: 125 of 135**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

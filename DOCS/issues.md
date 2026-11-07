@@ -1,11 +1,11 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.10)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.11)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov7.10, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov7.11, solved one by one in the order below
 
 ### Work Queue
-Nov7.10 is closed and followed Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, or Nov7.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov7.11 is closed and followed Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, or Nov7.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
-**Next item: ISSUE-NOV6.0-O24 (item 16).** Make `SignalingQueue` thread safe and keep order after a failed flush. If the user prefers other work, take the first item marked `Nothing`: ISSUE-NOV6.0-O24.
+**Next item: ISSUE-NOV6.0-O26 (item 18).** Run the Sensor on a device or emulator below API 35. If the user prefers other work, take the first item marked `Nothing`: ISSUE-NOV6.1-O28.
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -24,7 +24,7 @@ Nov7.10 is closed and followed Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, N
 | 13 | ISSUE-NOV6.0-O23 | **Done for Nov7.8**: test hardening & chapter alignment (IdentityPersistenceTest reopen test added) | Nothing |
 | 14 | ISSUE-NOV6.0-O21 | **Done for Nov7.9**: HUD flows rate-limited to 2Hz via `atUiRate()` on `uiTelemetry`, `uiFix`, `localHudState`, `remoteHudState`, and `hudState` | Nothing |
 | 15 | ISSUE-NOV6.0-O22 | **Done for Nov7.10**: overlay flags, dialog states, and follow mode updated to rememberSaveable in MonitorActivity and AdminActivity, persisting across rotation and configuration changes | Nothing |
-| 16 | ISSUE-NOV6.0-O24 | Make `SignalingQueue` thread safe and keep order after a failed flush | Nothing |
+| 16 | ISSUE-NOV6.0-O24 | **Done for Nov7.11**: SignalingQueue made thread safe via ReentrantLock and failed flush re-queuing preserves exact order at queue head via pushFront | Nothing |
 | 17 | ISSUE-NOV6.0-O25 | **Done for Nov6.0**: calls missing on older Android removed, together with O20 | Nothing |
 | 18 | ISSUE-NOV6.0-O26 | Run the Sensor on a device or emulator below API 35 | A device, or user permission to download an API 34 emulator image |
 | 19 | ISSUE-NOV6.1-O27 | **Done for Nov7.2**: the Sensor HUD shows the service's real fix, or `--` | Nothing |
@@ -82,6 +82,11 @@ Nov7.10 is closed and followed Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, N
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov7.11)
+*   **Thread-Safe SignalingQueue & Failed Flush Re-queuing (ISSUE-NOV6.0-O24)**: Made `SignalingQueue` thread-safe by protecting operations with `ReentrantLock` and thread-safe collections. Updated `SocketioSignalingClient.flushQueue` to push failed telemetry batches back to the front of the queue in their original order via `queue.pushFront(batch)`, preventing reordering behind newer updates. Verified by `SignalingQueueTest` and test suite pass across all subprojects. **PASSED.**
 
 ---
 

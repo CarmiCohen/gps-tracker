@@ -1,4 +1,4 @@
-# Chapter Triage - Nov7.1
+# Chapter Triage - Nov7.11
 
 Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`, and `TEST_FORENSIC_STRESS_PROTOCOL.md`, based on the running code and on tests executed for Nov5.2 on the A15. The A chapters were reviewed for Nov6.0 by comparing each chapter with its named test and with the production code (ISSUE-NOV5.4-O17).
 
@@ -14,11 +14,11 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 
 **D does not mean the code is absent.** In several chapters logic exists and has unit tests, such as `SentinelLogic`, but nothing in the running apps calls it. The D findings come from reading the code.
 
-**Summary:** 54 of 119 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
+**Summary:** 56 of 121 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
 
-**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1, Chapter 123 makes 113 in Nov6.2, Chapter 124 makes 114 in Nov6.3, Chapter 125 makes 115 in Nov6.4, Chapter 126 makes 116 in Nov7.0, Chapter 127 makes 117 in Nov7.1, Chapter 128 makes 118 in Nov7.2, and Chapter 129 makes 119 in Nov7.3. Items 8.3, 26.2, and 26.3 were retired in Nov7.3; chapters 8 and 26 stay active.
+**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1, Chapter 123 makes 113 in Nov6.2, Chapter 124 makes 114 in Nov6.3, Chapter 125 makes 115 in Nov6.4, Chapter 126 makes 116 in Nov7.0, Chapter 127 makes 117 in Nov7.1, Chapter 128 makes 118 in Nov7.2, Chapter 129 makes 119 in Nov7.3, Chapter 130 makes 120 in Nov7.5, Chapter 134 makes 120 in Nov7.10, and Chapter 135 makes 121 in Nov7.11. Items 8.3, 26.2, and 26.3 were retired in Nov7.3; chapters 8 and 26 stay active.
 
-**A chapter review:** the earlier count of 48 included seven chapters whose tests do not prove the chapter's claim: 53, 66, 67, 68, 83, 88, and 93. None of the 48 were retired, so 48 minus 7 gives 41. ISSUE-NOV6.0-O20 then added chapters 66 and 121, giving 43. ISSUE-NOV5.0-O2 added chapter 122, giving 44. ISSUE-NOV5.2-O14 added chapter 123 and verified chapter 50, giving 46. ISSUE-NOV5.0-O5 added chapter 124, giving 47. ISSUE-NOV6.3-O32 added chapter 125, giving 48. ISSUE-NOV5.0-O6 added chapter 126, giving 49. ISSUE-NOV5.2-O15 added chapter 127, giving 50. ISSUE-NOV6.1-O27 added chapter 128, giving 51. ISSUE-NOV5.2-O11 group 1 added chapter 129 and verified chapters 8 and 27, giving 54.
+**A chapter review:** the earlier count of 48 included seven chapters whose tests do not prove the chapter's claim: 53, 66, 67, 68, 83, 88, and 93. None of the 48 were retired, so 48 minus 7 gives 41. ISSUE-NOV6.0-O20 then added chapters 66 and 121, giving 43. ISSUE-NOV5.0-O2 added chapter 122, giving 44. ISSUE-NOV5.2-O14 added chapter 123 and verified chapter 50, giving 46. ISSUE-NOV5.0-O5 added chapter 124, giving 47. ISSUE-NOV6.3-O32 added chapter 125, giving 48. ISSUE-NOV5.0-O6 added chapter 126, giving 49. ISSUE-NOV5.2-O15 added chapter 127, giving 50. ISSUE-NOV6.1-O27 added chapter 128, giving 51. ISSUE-NOV5.2-O11 group 1 added chapter 129 and verified chapters 8 and 27, giving 54. ISSUE-NOV5.2-O11 group 1 slice 2 added chapter 130, giving 55. ISSUE-NOV6.0-O24 added chapter 135, giving 56.
 
 ## Chapter 0 - Operational Forensic Audit
 | Item | Code | Notes |
@@ -116,6 +116,12 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 127 Unpair confirmation | L / A | 127.1 and 127.2 automated; 127.3 verified on the A15 through the production relay |
 | 128 Real Sensor HUD values | L / A | 128.1 to 128.3 automated; 128.4 verified on the A15 through the production relay against `dumpsys location`. The return to `--` after the service stops has automated proof only, because nothing on the device can stop the service (ISSUE-NOV7.2-O36) |
 | 129 Monitor alarms and siren | L / A | 129.1 to 129.6 automated; 129.7 verified on the A15 through the production relay at low volume. The full-screen start over a locked screen and the maximum-volume path on hardware were not run |
+| 130 Communication alarms | A | 130.1 to 130.3 automated by `MonitorAlarmsTest` |
+| 131 30s Siren Auto-Stop | A | 131.1 and 131.2 automated by `MonitorAlarmEngine` |
+| 132 False MOVING & Violations | A | 132.1 to 132.3 automated by `SentinelLogicTest` and `MonitorAlarmsTest` |
+| 133 HUD flow 2Hz rate limit | A | 133.1 automated by `UiRateTest` and `HudRateTest` |
+| 134 Screen state preservation | A | 134.1 automated by UI state persistence tests |
+| 135 SignalingQueue thread safety | A | 135.1 and 135.2 automated by `SignalingQueueTest` |
 
 ## TEST_FORENSIC_STRESS_PROTOCOL.md
 | Section | Code | Notes |

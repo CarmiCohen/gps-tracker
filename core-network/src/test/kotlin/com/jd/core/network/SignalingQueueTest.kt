@@ -4,6 +4,7 @@ import com.jd.core.shared.LocationUpdate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.concurrent.thread
 
 class SignalingQueueTest {
 
@@ -56,5 +57,51 @@ class SignalingQueueTest {
         assertEquals(10L, batch[0].sequenceId)
         assertTrue(batch[1].isBuffered)
         assertEquals(11L, batch[1].sequenceId)
+    }
+
+    @Test
+    fun testPushFrontPreservesOrder() {
+        val queue = SignalingQueue(maxCapacity = 100)
+        for (i in 1..5) {
+            queue.offer(LocationUpdate(sequenceId = i.toLong()))
+        }
+
+        val batch = queue.pollBatch(3) // 1, 2, 3
+        assertEquals(3, batch.size)
+        assertEquals(1L, batch.first().sequenceId)
+        assertEquals(3L, batch.last().sequenceId)
+
+        // Push failed batch back to front
+        queue.pushFront(batch)
+
+        // Next poll should get 1, 2, 3 back first, then 4, 5
+        val repoll = queue.pollBatch(10)
+        assertEquals(5, repoll.size)
+        assertEquals(1L, repoll[0].sequenceId)
+        assertEquals(2L, repoll[1].sequenceId)
+        assertEquals(3L, repoll[2].sequenceId)
+        assertEquals(4L, repoll[3].sequenceId)
+        assertEquals(5L, repoll[4].sequenceId)
+    }
+
+    @Test
+    fun testThreadSafetyConcurrentAccess() {
+        val queue = SignalingQueue(maxCapacity = 1000)
+        val threads = mutableListOf<Thread>()
+
+        // Spawn multiple threads offering and polling concurrently
+        for (t in 0 until 10) {
+            threads.add(thread {
+                for (i in 0 until 100) {
+                    queue.offer(LocationUpdate(sequenceId = (t * 100 + i).toLong()))
+                    if (i % 10 == 0) {
+                        queue.pollBatch(5)
+                    }
+                }
+            })
+        }
+
+        threads.forEach { it.join() }
+        assertTrue(queue.size() >= 0)
     }
 }

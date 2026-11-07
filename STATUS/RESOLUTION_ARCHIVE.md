@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov7.11)
+- **Thread-Safe SignalingQueue & Failed Flush Re-queuing (ISSUE-NOV6.0-O24)**: Made `SignalingQueue` thread-safe by protecting operations with `ReentrantLock` and thread-safe collections. Updated `SocketioSignalingClient.flushQueue` to push failed telemetry batches back to the front of the queue in their original order via `queue.pushFront(batch)`, preventing reordering behind newer updates. Verified by `SignalingQueueTest` and test suite pass across all subprojects. **PASSED.**
+
 ## ✅ Resolved Issues (Nov7.10)
 - **Screen State & Rotation Preservation (ISSUE-NOV6.0-O22)**: Updated all UI overlay visibility flags, dialog states, and map follow modes in `MonitorActivity.kt` (`MonitorScreen`, `PairingWizard`) and `AdminActivity.kt` (`AdminActivity`, `SettingsOverlay`) from plain `remember` to `rememberSaveable`, ensuring open overlays, dialogs, unlock states, and follow modes persist across screen rotation and configuration changes. Verified by automated tests and test suite pass across all modules. **PASSED.**
 

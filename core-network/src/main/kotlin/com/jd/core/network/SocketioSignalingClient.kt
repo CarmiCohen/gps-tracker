@@ -180,8 +180,8 @@ class SocketioSignalingClient @Inject constructor(
             val batch = queue.pollBatch(50) 
             if (batch.isEmpty()) break
             if (!sendTelemetryBatch(batch)) {
-                // If send failed (disconnected), put them back
-                batch.forEach { queue.offer(it) }
+                // If send failed (disconnected), put them back at the front in original order
+                queue.pushFront(batch)
                 break
             }
             yield()
