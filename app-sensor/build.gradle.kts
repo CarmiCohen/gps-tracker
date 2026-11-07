@@ -14,8 +14,8 @@ android {
         applicationId = "com.jd.app.sensor"
         minSdk = 26
         targetSdk = 34
-        versionCode = 51
-        versionName = "Nov7.17"
+        versionCode = 52
+        versionName = "Nov7.19"
 
         testInstrumentationRunner = "com.jd.app.sensor.HiltTestRunner"
     }

@@ -59,7 +59,7 @@ class SensorService : Service(), SensorEventListener {
     private var wakeLock: PowerManager.WakeLock? = null
     private var isMuzzled = false
     private var isInitialized = false
-    private var lastValidationLocation: LocationUpdate? = null
+    private val movementCheck = MovementCheck()
 
     // Raw IMU caches
     private var lastAccel = DoubleArray(3)
@@ -67,7 +67,7 @@ class SensorService : Service(), SensorEventListener {
     
     // Adaptive Sampling & Throttling State
     private var currentIntervalMs = 1000L
-    private var lastLocation: Location? = null
+    @Volatile private var lastLocation: Location? = null // Written on the main looper, read by the sensing loop.
     private var sequenceIdCounter = 0L
     
     private var lastBatteryLevel = 100
@@ -305,35 +305,31 @@ class SensorService : Service(), SensorEventListener {
                 update.isCharging = lastIsCharging
                 update.tempCelsius = lastTempCelsius
                 
-                lastLocation?.let { loc ->
+                val hasPhysicalMotion = update.sensorSnapshot.vibration > 0.12f
+                // Only the tick that carries a new fix is checked; repeated ticks of the same fix stay VALID.
+                val validation = lastLocation?.let { loc ->
                     update.lat = loc.latitude
                     update.lng = loc.longitude
                     update.accuracy = loc.accuracy
                     update.speed = loc.speed
                     update.bearing = loc.bearing
                     update.altitude = loc.altitude
+                    movementCheck.check(
+                        fixForMovementCheck(loc.latitude, loc.longitude, loc.accuracy, loc.speed, loc.elapsedRealtimeNanos),
+                        hasPhysicalMotion
+                    )
                 }
 
-                val hasPhysicalMotion = update.sensorSnapshot.vibration > 0.12f
-                val validation = if (lastValidationLocation != null) {
-                    SentinelLogic.validateMovement(lastValidationLocation!!, update, hasPhysicalMotion)
-                } else {
-                    SentinelLogic.ValidationResult(SentinelLogic.SentinelStatus.VALID)
-                }
-
-                update.status = validation.status.name
-                lastValidationLocation = update.snapshot()
-
-                if (validation.status != SentinelLogic.SentinelStatus.VALID) {
+                if (validation != null && validation.status != SentinelLogic.SentinelStatus.VALID) {
+                    update.status = validation.status.name
                     SystemLogger.w("SensorService", "Violation detected: ${validation.status} - ${validation.reason}")
-                    serviceScope.launch {
-                        val violation = ViolationEvent(
-                            type = validation.status.name,
-                            location = update.snapshot(),
-                            nonce = java.util.UUID.randomUUID().toString()
-                        )
-                        signalingClient.sendViolation(violation)
-                    }
+                    // Built before launching: the pooled update is zeroed on release, before the launched send runs.
+                    val violation = ViolationEvent(
+                        type = validation.status.name,
+                        location = update.snapshot(),
+                        nonce = java.util.UUID.randomUUID().toString()
+                    )
+                    serviceScope.launch { signalingClient.sendViolation(violation) }
                 }
                 
                 forensicBuffer.writeTrace(update)

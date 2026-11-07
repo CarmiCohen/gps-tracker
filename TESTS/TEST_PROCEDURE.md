@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov7.17 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov7.19 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -516,8 +516,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **138.2 Dialog Text:** Verify that the Setup dialog lines read `Sensor Service: Running` / `Stopped` and `Relay Connection: Connected` / `Disconnected`, and that no line claims a fixed `Active` or `Ready` state. Automated by `SensorServiceStatusTest.serviceLineShowsRunningOrStopped`, `relayLineShowsConnectedOrDisconnected`, and `noLineClaimsAnInventedReadyState`.
 *   **138.3 Live Check (manual, A15):** With the Sensor service not running (after `adb install -r`, or with location permission revoked before launch), open the Sensor `Setup` dialog: it MUST show `Sensor Service: Stopped` and `Relay Connection: Disconnected`. Close it, tap `START SENSOR SERVICE`, reopen it: it MUST show `Sensor Service: Running` and, once connected, `Relay Connection: Connected`. The `Close` and `CHANGE RELAY URL` buttons MUST each show their full label (not squeezed into a vertical strip).
 
+## Chapter 139 - No False Alarms While The Monitor And Tracker Start (Nov7.19)
+*   **139.1 Relay And GPS Loss At Start:** Verify that a relay that has not yet connected raises no `RELAY_DISCONNECTED` until `RELAY_FIRST_CONNECT_GRACE_MS` (30 s) after watching starts, that a relay lost after a connection raises it at once, and that `GPS_SIGNAL_LOSS` is raised only after the tracker has reported no position for `GPS_SIGNAL_LOSS_AFTER_MS` (30 s), a position in between restarting the count. Automated by `MonitorAlarmsTest.aRelayNotYetConnectedIsLostOnlyAfterTheGracePeriod`, `gpsSignalLossNeedsNoPositionForTheWholeLimit`, `aColdStartRaisesNoAlarmWhileTheRelayConnectsAndTheTrackerFindsItsFirstFix`, `aRelayThatNeverConnectsIsLostAfterTheGracePeriod`, `aTrackerWithoutAPositionForTheLimitRaisesGpsSignalLoss`, and `aPositionInBetweenRestartsTheGpsSignalLossLimit` (ISSUE-NOV7.17-O42).
+*   **139.2 Movement Checked Once Per Fix:** Verify that the Sensor checks movement only when a new fix arrives, against the previous fix and timed by the fixes' monotonic clock, so a fix sent again on later loop ticks is not checked again and the A15's network-to-GPS correction (34.5 m) is valid. Automated by `MovementCheckTest` (6 tests).
+*   **139.3 Drift Inside The GPS Error:** Verify that `SentinelLogic.validateMovement` returns `VALID` (`Within GPS error`) when the distance between two fixes is smaller than the larger of their accuracies (the A15 still: 23 m in 1.6 s at 68 m and 59 m accuracy), that a larger move is still judged, and that a `JUMP` reason carries its speed, distance, interval, and accuracies. Automated by `SentinelLogicTest` `Drift inside the GPS error radius of a still phone is valid` and `A move beyond the GPS error radius is still judged and reported with its measurements`.
+*   **139.4 Live Cold Start (manual, A15):** Force-stop both apps, start the Sensor service, then start the Monitor within about 10 s, and leave the phone still for at least 60 s. The Monitor log MUST show `Connecting to relay` and `Connected to relay` with no `Pending alarms` line and no siren, and the Sensor log MUST show no `Violation detected`.
+
 ---
-**Active Testing Chapters: 128 of 138**
+**Active Testing Chapters: 129 of 139**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

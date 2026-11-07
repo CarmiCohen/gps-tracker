@@ -161,11 +161,11 @@ class MonitorAlarmsTest {
             setOf(AlarmType.LOCAL_INTERNET_OFFLINE),
             alarmConditions(reading(), watchingSinceMs = start, nowMs = start, active = emptySet(), isRelayConnected = true, isLocalInternet = false)
         )
-        // Tracker GPS signal loss (lat/lng 0, zero accuracy, or NO_FIX status)
+        // Tracker GPS signal loss (lat/lng 0, zero accuracy, or NO_FIX status), reported for GPS_SIGNAL_LOSS_AFTER_MS
         val noFixReading = TrackerReading(receivedAtMs = start, sensorTimeMs = start, batteryLevel = 80, isCharging = true, tempCelsius = 30f, lat = 0.0, lng = 0.0, accuracy = 0f, status = "NO_FIX")
         assertEquals(
             setOf(AlarmType.GPS_SIGNAL_LOSS),
-            alarmConditions(noFixReading, watchingSinceMs = start, nowMs = start, active = emptySet(), isRelayConnected = true, isLocalInternet = true)
+            alarmConditions(noFixReading, watchingSinceMs = start, nowMs = start, active = emptySet(), isRelayConnected = true, isLocalInternet = true, noGpsSignalSinceMs = start - GPS_SIGNAL_LOSS_AFTER_MS)
         )
         // Valid position reading does not trigger GPS signal loss
         val validFixReading = TrackerReading(receivedAtMs = start, sensorTimeMs = start, batteryLevel = 80, isCharging = true, tempCelsius = 30f, lat = 37.7749, lng = -122.4194, accuracy = 10f, status = "VALID")
@@ -179,6 +179,101 @@ class MonitorAlarmsTest {
             setOf(AlarmType.GPS_JUMP),
             alarmConditions(jumpReading, watchingSinceMs = start, nowMs = start, active = emptySet())
         )
+    }
+
+    // 139.1 ISSUE-NOV7.17-O42: no false alarm while the Monitor and the tracker start
+
+    @Test
+    fun aRelayNotYetConnectedIsLostOnlyAfterTheGracePeriod() {
+        fun relay(now: Long, hasConnected: Boolean) = alarmConditions(
+            reading(at = now), watchingSinceMs = start, nowMs = now, active = emptySet(),
+            isRelayConnected = false, hasRelayConnected = hasConnected
+        )
+
+        assertEquals(emptySet<AlarmType>(), relay(start, hasConnected = false))
+        assertEquals(emptySet<AlarmType>(), relay(start + RELAY_FIRST_CONNECT_GRACE_MS - 1, hasConnected = false))
+        assertEquals(setOf(AlarmType.RELAY_DISCONNECTED), relay(start + RELAY_FIRST_CONNECT_GRACE_MS, hasConnected = false))
+        assertEquals(setOf(AlarmType.RELAY_DISCONNECTED), relay(start + 1, hasConnected = true))
+    }
+
+    @Test
+    fun gpsSignalLossNeedsNoPositionForTheWholeLimit() {
+        val noPosition = reading(lat = 0.0, lng = 0.0, accuracy = 0f)
+        fun gps(since: Long?) = alarmConditions(noPosition, watchingSinceMs = start, nowMs = start, active = emptySet(), noGpsSignalSinceMs = since)
+
+        assertEquals(emptySet<AlarmType>(), gps(null))
+        assertEquals(emptySet<AlarmType>(), gps(start - GPS_SIGNAL_LOSS_AFTER_MS + 1))
+        assertEquals(setOf(AlarmType.GPS_SIGNAL_LOSS), gps(start - GPS_SIGNAL_LOSS_AFTER_MS))
+    }
+
+    @Test
+    fun aColdStartRaisesNoAlarmWhileTheRelayConnectsAndTheTrackerFindsItsFirstFix() = runBlocking {
+        val watch = Watch(this)
+        watch.isRelayConnected.value = false // The socket's initial state, as SocketioSignalingClient starts.
+        watch.settings.emit(AlertSettings())
+        watch.ready()
+
+        watch.now += 1_400 // 19:46:01.963 to 03.329 on the A15
+        watch.ticks.emit(Unit); settle()
+        watch.isRelayConnected.value = true; settle()
+        watch.now += 4_000
+        watch.telemetry.emit(charging("T", time = 1, lat = 0.0, lng = 0.0, accuracy = 0f)); settle() // no fix yet
+        watch.now += 5_000
+        watch.telemetry.emit(charging("T", time = 2)); settle()
+        watch.ticks.emit(Unit)
+        delay(200)
+
+        assertEquals(emptyList<Alarm>(), watch.latest.value?.alarms.orEmpty())
+        watch.job.cancel()
+    }
+
+    @Test
+    fun aRelayThatNeverConnectsIsLostAfterTheGracePeriod() = runBlocking {
+        val watch = Watch(this)
+        watch.isRelayConnected.value = false
+        watch.settings.emit(AlertSettings())
+        watch.ready()
+        watch.ticks.emit(Unit)
+        delay(200)
+        assertEquals(emptyList<Alarm>(), watch.latest.value?.alarms.orEmpty())
+
+        watch.now += RELAY_FIRST_CONNECT_GRACE_MS
+        watch.telemetry.emit(charging("T", time = 1)) // keeps the tracker present
+        assertEquals(listOf(AlarmType.RELAY_DISCONNECTED), watch.awaitBook { it.needsSiren }.pending.map { it.type })
+        watch.job.cancel()
+    }
+
+    @Test
+    fun aTrackerWithoutAPositionForTheLimitRaisesGpsSignalLoss() = runBlocking {
+        val watch = Watch(this)
+        watch.settings.emit(AlertSettings())
+        watch.ready()
+        watch.telemetry.emit(charging("T", time = 1, lat = 0.0, lng = 0.0, accuracy = 0f))
+        delay(200)
+        assertEquals(emptyList<Alarm>(), watch.latest.value?.alarms.orEmpty())
+
+        watch.now += GPS_SIGNAL_LOSS_AFTER_MS
+        watch.telemetry.emit(charging("T", time = 2, lat = 0.0, lng = 0.0, accuracy = 0f))
+        assertEquals(listOf(AlarmType.GPS_SIGNAL_LOSS), watch.awaitBook { it.needsSiren }.pending.map { it.type })
+        watch.job.cancel()
+    }
+
+    @Test
+    fun aPositionInBetweenRestartsTheGpsSignalLossLimit() = runBlocking {
+        val watch = Watch(this)
+        watch.settings.emit(AlertSettings())
+        watch.ready()
+        watch.telemetry.emit(charging("T", time = 1, lat = 0.0, lng = 0.0, accuracy = 0f)); settle()
+        watch.now += GPS_SIGNAL_LOSS_AFTER_MS - 1_000
+        watch.telemetry.emit(charging("T", time = 2)); settle()
+        watch.now += 1_000
+        watch.telemetry.emit(charging("T", time = 3, lat = 0.0, lng = 0.0, accuracy = 0f)); settle()
+        watch.now += GPS_SIGNAL_LOSS_AFTER_MS - 1
+        watch.ticks.emit(Unit)
+        delay(200)
+
+        assertEquals(emptyList<Alarm>(), watch.latest.value?.alarms.orEmpty())
+        watch.job.cancel()
     }
 
     @Test
@@ -206,6 +301,17 @@ class MonitorAlarmsTest {
         accuracy = 10f
         status = "VALID"
     }
+
+    /** Lets the book flow evaluate the last emission before the test moves its clock; merged sources run in their own collectors. */
+    private suspend fun settle() = delay(100)
+
+    private fun charging(device: String, time: Long, lat: Double = 37.7749, lng: Double = -122.4194, accuracy: Float = 10f) =
+        unplugged(device, time).apply {
+            isCharging = true
+            this.lat = lat
+            this.lng = lng
+            this.accuracy = accuracy
+        }
 
     /** Collects the book flow into [latest]. Shared flows drop emissions without subscribers, so [ready] waits for them. */
     private class Watch(scope: CoroutineScope) {

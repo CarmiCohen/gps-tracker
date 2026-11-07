@@ -70,6 +70,12 @@ object SentinelLogic {
         val timeDeltaSec = max(0.1, (current.timestamp - last.timestamp) / 1000.0)
         val speedMps = dist / timeDeltaSec
 
+        // 0. GPS error: a displacement inside the fixes' own error radius is noise, not movement (ISSUE-NOV7.17-O42).
+        // A still A15 reported 23 m in 1.6 s between fixes of 68 m and 59 m accuracy as a jump.
+        if (dist < max(last.accuracy, current.accuracy)) {
+            return ValidationResult(SentinelStatus.VALID, "Within GPS error")
+        }
+
         // 1. Hard Outlier Check
         if (speedMps > 138.8) { // > 500 km/h (Bullet train / Extreme outliers)
             return ValidationResult(SentinelStatus.OUTLIER, "Speed Outlier: ${speedMps.toInt()} m/s")
@@ -82,23 +88,19 @@ object SentinelLogic {
             jumpScore += 60
         }
 
-        // 3. Accuracy Recovery: Suppression of "Snaps"
-        val isAccuracyImproving = last.accuracy > 0 && current.accuracy < (last.accuracy * 0.8)
-        val isWithinPreviousError = dist < last.accuracy
-        if (isAccuracyImproving && isWithinPreviousError) {
-            return ValidationResult(SentinelStatus.VALID, "Suppressed Accuracy Snap")
-        }
-
-        // 4. Kinematic Consistency (Acceleration)
+        // 3. Kinematic Consistency (Acceleration)
         // Use the calculated speed of the current segment for future comparisons
         val accel = abs(speedMps - last.speed) / timeDeltaSec
         if (accel > ACCEL_LIMIT && dist > 15.0) {
             jumpScore += 40
         }
 
+        // The measured movement, kept in the reason for the forensic log.
+        val measured = "%.1f m/s, %.0f m in %.1f s, accuracy %.0f to %.0f m"
+            .format(java.util.Locale.ROOT, speedMps, dist, timeDeltaSec, last.accuracy, current.accuracy)
         return when {
-            jumpScore >= 50 -> ValidationResult(SentinelStatus.JUMP, "Kinematic Violation", jumpScore)
-            speedMps > MAX_PHYSICAL_SPEED_MPS -> ValidationResult(SentinelStatus.JUMP, "Speed Threshold Exceeded", jumpScore)
+            jumpScore >= 50 -> ValidationResult(SentinelStatus.JUMP, "Kinematic Violation: $measured", jumpScore)
+            speedMps > MAX_PHYSICAL_SPEED_MPS -> ValidationResult(SentinelStatus.JUMP, "Speed Threshold Exceeded: $measured", jumpScore)
             else -> ValidationResult(SentinelStatus.VALID)
         }
     }

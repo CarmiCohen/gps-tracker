@@ -33,6 +33,31 @@ class SentinelLogicTest {
         assertTrue(res2.reason.contains("Speed Outlier"))
     }
 
+    // Chapter 139.3, ISSUE-NOV7.17-O42: drift inside the GPS error radius is not a movement.
+    @Test
+    fun `Drift inside the GPS error radius of a still phone is valid`() {
+        // The A15 lying still, 2026-11-07 20:10:54: 23 m in 1.6 s between fixes of 68 m and 59 m accuracy.
+        val last = LocationUpdate(lat = 32.653092, lng = 35.301082, accuracy = 68f, timestamp = 10_000L)
+        val current = LocationUpdate(lat = 32.653299, lng = 35.301082, accuracy = 59f, timestamp = 11_600L)
+
+        val result = SentinelLogic.validateMovement(last, current, hasPhysicalMotion = false)
+
+        assertEquals(SentinelLogic.SentinelStatus.VALID, result.status)
+        assertEquals("Within GPS error", result.reason)
+    }
+
+    @Test
+    fun `A move beyond the GPS error radius is still judged and reported with its measurements`() {
+        // About 111 m in 5 s without vibration, with 14 m fixes.
+        val last = LocationUpdate(lat = 32.653092, lng = 35.301082, accuracy = 14f, timestamp = 10_000L)
+        val current = LocationUpdate(lat = 32.654092, lng = 35.301082, accuracy = 14f, timestamp = 15_000L)
+
+        val result = SentinelLogic.validateMovement(last, current, hasPhysicalMotion = false)
+
+        assertEquals(SentinelLogic.SentinelStatus.JUMP, result.status)
+        assertTrue(result.reason, result.reason.startsWith("Kinematic Violation: 22.2 m/s, 111 m in 5.0 s, accuracy 14 to 14 m"))
+    }
+
     @Test
     fun `Verify Geofence transition detection`() {
         val insideUpdate = LocationUpdate(lat = 32.7940, lng = 34.9896)

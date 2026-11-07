@@ -18,6 +18,15 @@ import kotlin.time.Duration.Companion.seconds
 /** The tracker counts as present while its newest update is younger than this. The TRK LED uses the same limit. */
 const val TRACKER_PRESENT_MS = 35_000L
 
+/**
+ * Before the relay has been connected once, it counts as lost only this long after watching starts: longer than the
+ * 20 s socket timeout and a relay cold start (ISSUE-NOV5.1-O9), so the first connection never sounds the siren (ISSUE-NOV7.17-O42).
+ */
+const val RELAY_FIRST_CONNECT_GRACE_MS = 30_000L
+
+/** The tracker's GPS counts as lost once it has reported no position this long, so the time to a first fix does not sound the siren. */
+const val GPS_SIGNAL_LOSS_AFTER_MS = 30_000L
+
 const val LOW_BATTERY_BELOW = 20
 const val HIGH_TEMPERATURE_ABOVE = 46f
 
@@ -84,6 +93,9 @@ fun newerReading(current: TrackerReading?, incoming: TrackerReading): TrackerRea
 /**
  * The alarm conditions that hold at [nowMs]. With nothing heard yet, offline counts from [watchingSinceMs].
  * [active] holds the conditions of the previous evaluation, which decide the clearing margins.
+ * [hasRelayConnected] tells whether the relay has been connected since [watchingSinceMs]; until then a relay that is
+ * not connected counts as lost only after [RELAY_FIRST_CONNECT_GRACE_MS].
+ * [noGpsSignalSinceMs] is when the tracker started to report no position, or null while it reports one.
  */
 fun alarmConditions(
     reading: TrackerReading?,
@@ -91,13 +103,19 @@ fun alarmConditions(
     nowMs: Long,
     active: Set<AlarmType>,
     isRelayConnected: Boolean = true,
+    hasRelayConnected: Boolean = true,
     isLocalInternet: Boolean = true,
-    hasViolation: Boolean = false
+    hasViolation: Boolean = false,
+    noGpsSignalSinceMs: Long? = null
 ): Set<AlarmType> = buildSet {
     if (nowMs - (reading?.receivedAtMs ?: watchingSinceMs) >= TRACKER_PRESENT_MS) add(AlarmType.TRACKER_OFFLINE)
-    if (!isRelayConnected) add(AlarmType.RELAY_DISCONNECTED)
+    if (!isRelayConnected && (hasRelayConnected || nowMs - watchingSinceMs >= RELAY_FIRST_CONNECT_GRACE_MS)) {
+        add(AlarmType.RELAY_DISCONNECTED)
+    }
     if (!isLocalInternet) add(AlarmType.LOCAL_INTERNET_OFFLINE)
-    if (reading != null && nowMs - reading.receivedAtMs < TRACKER_PRESENT_MS && !reading.hasGpsSignal()) {
+    if (reading != null && nowMs - reading.receivedAtMs < TRACKER_PRESENT_MS && !reading.hasGpsSignal() &&
+        noGpsSignalSinceMs != null && nowMs - noGpsSignalSinceMs >= GPS_SIGNAL_LOSS_AFTER_MS
+    ) {
         add(AlarmType.GPS_SIGNAL_LOSS)
     }
     if (reading != null && (reading.status == "JUMP" || reading.status == "OUTLIER" || hasViolation)) {
@@ -184,12 +202,22 @@ fun alarmBooks(
         isLocalInternet.map { BookEvent.LocalInternet(it) }
     ).scan(WatchState()) { state, event ->
         val next = when (event) {
-            is BookEvent.Reading -> state.copy(reading = newerReading(state.reading, event.reading), hasViolation = false)
+            is BookEvent.Reading -> {
+                val reading = newerReading(state.reading, event.reading)
+                state.copy(
+                    reading = reading,
+                    hasViolation = false,
+                    noGpsSignalSinceMs = if (reading.hasGpsSignal()) null else state.noGpsSignalSinceMs ?: reading.receivedAtMs
+                )
+            }
             is BookEvent.Violation -> state.copy(hasViolation = true)
             is BookEvent.Settings -> state.copy(settings = event.settings)
             BookEvent.Tick -> state
             BookEvent.Acknowledge -> state.copy(book = state.book.acknowledge(), hasViolation = false)
-            is BookEvent.RelayConnection -> state.copy(isRelayConnected = event.isConnected)
+            is BookEvent.RelayConnection -> state.copy(
+                isRelayConnected = event.isConnected,
+                hasRelayConnected = state.hasRelayConnected || event.isConnected
+            )
             is BookEvent.LocalInternet -> state.copy(isLocalInternet = event.isConnected)
         }
         val alertSettings = next.settings ?: return@scan next
@@ -202,8 +230,10 @@ fun alarmBooks(
                     nowMs,
                     next.book.conditions,
                     isRelayConnected = next.isRelayConnected,
+                    hasRelayConnected = next.hasRelayConnected,
                     isLocalInternet = next.isLocalInternet,
-                    hasViolation = next.hasViolation
+                    hasViolation = next.hasViolation,
+                    noGpsSignalSinceMs = next.noGpsSignalSinceMs
                 ),
                 alertSettings,
                 nowMs
@@ -217,8 +247,10 @@ private data class WatchState(
     val settings: AlertSettings? = null,
     val book: AlarmBook = AlarmBook(),
     val isRelayConnected: Boolean = true,
+    val hasRelayConnected: Boolean = false,
     val isLocalInternet: Boolean = true,
-    val hasViolation: Boolean = false
+    val hasViolation: Boolean = false,
+    val noGpsSignalSinceMs: Long? = null
 )
 
 private sealed interface BookEvent {
