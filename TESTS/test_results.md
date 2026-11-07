@@ -1,4 +1,21 @@
-# Test Results - Nov7.0 (Real Version Strings)
+# Test Results - Nov7.1 (Unpair Confirmation)
+
+## Nov7.1 Summary
+Executed Nov 7, 2026 on the A15 (`R58X40GV2AR`, API 36), the only phone attached, with Sensor and Monitor on the same phone through the production relay and real positions. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **Automated suite** | 🟢 **187/187** | `:core-shared` 46, `:core-network` 18, `:core-ui` 17, `:app-monitor` unit 30, `:app-monitor` on A15 39, `:app-sensor` on A15 37. Unit tasks were forced with `--rerun`; fresh result files were counted, with 0 failures and 0 errors. The Monitor suite ran on the final code after the deliberate break was reverted. |
+| **127.1, 127.2 Unpair controls** | 🟢 **PASSED (automated)** | `UnpairConfirmationTest`, 5 tests on the real `MonitorScreen` on the A15: gear, `Disconnect`, the three `CLEAN` actions, `Cancel`, and `Unpair` once. |
+| **Deliberate break** | 🟢 **PASSED** | With `MonitorMenuBar` wired straight to `onReset`, 4 of 5 failed: `gearAsksBeforeUnpairing` and `disconnectAsksBeforeUnpairing` (no dialog), `cancelKeepsThePairing` and `confirmUnpairsOnce` (nothing to tap). `cleanActionsAskBeforeUnpairing` passed because its path was not changed. The fix was then restored. |
+| **127.3 Unpair on hardware** | 🟢 **PASSED** | Both apps at `Nov7.1` (`versionCode` 42 Sensor, 40 Monitor), paired with `T`. Gear: dialog `Unpair from tracker T?` with `Cancel` and `Unpair`. `Cancel`: still paired, sensor line `AGE:0s`, `MonitorSessionService` running. `Disconnect`: the same dialog; `Unpair`: `Welcome to Watcher` pairing screen, service stopped. Paired again with `T`. Screens read with `uiautomator dump`. |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | `device_audit.cmd` at 11:21, Sensor and Monitor processes, log cleared at 11:19 before launch, about 2 minutes of runtime: 0 Davey over 500ms, 0 StackLog, 0 fatal. Sensor logged `onCreate called. Version: Nov7.1`. `ProductionReadinessAuditTest` ran in the Sensor suite. |
+
+**Run history:** four intended failures, the deliberate break above. Every other test run passed the first time.
+
+---
+
+# Nov7.0 Results (Real Version Strings)
 
 ## Nov7.0 Summary
 Executed Nov 7, 2026 on the A15 (`R58X40GV2AR`, API 36), the only phone attached, with Sensor and Monitor on the same phone through the production relay and real positions. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.

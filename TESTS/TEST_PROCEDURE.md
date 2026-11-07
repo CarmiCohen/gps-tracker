@@ -460,8 +460,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **126.2 Version From The Package:** Verify that the shown version is the installed `versionName`, and that a package that cannot be read shows `--` and no invented version. Automated by `AppVersionTest`.
 *   **126.3 Version On Hardware:** Install both apps on the A15. Verify that the Sensor first screen, the Sensor Setup dialog, the Monitor pairing screen, and the Monitor Setup dialog all show the `versionName` from the build file, and that the Sensor logs `onCreate called. Version:` with that same version when its service starts.
 
+## Chapter 127 - Unpair Confirmation (Nov7.1)
+*   **127.1 Every Unpair Control Asks First:** On the paired Monitor screen, tap the `Settings / Re-pair` gear, the `Disconnect` X, and each of the three `CLEAN` actions in turn. Verify that each shows `Unpair from tracker <id>?` and that the pairing is not cleared. Automated by `UnpairConfirmationTest.gearAsksBeforeUnpairing`, `disconnectAsksBeforeUnpairing`, and `cleanActionsAskBeforeUnpairing` (ISSUE-NOV5.2-O15).
+*   **127.2 Cancel And Confirm:** Verify that `Cancel` closes the dialog and keeps the pairing, and that `Unpair` clears it exactly once and returns to the pairing screen. Automated by `cancelKeepsThePairing` and `confirmUnpairsOnce`.
+*   **127.3 Unpair On Hardware:** On the A15, tap the gear and then `Cancel`, and verify that the map screen and telemetry stay. Tap `Disconnect` and then `Unpair`, and verify that the pairing screen opens and the session notification stops. Pair again with `T`.
+
 ---
-**Active Testing Chapters: 116 of 126**
+**Active Testing Chapters: 117 of 127**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

@@ -1,11 +1,11 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.0)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.1)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov7.0, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov7.1, solved one by one in the order below
 
 ### Work Queue
-Nov7.0 is closed and followed Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3 or Nov5.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov7.1 is closed and followed Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3 or Nov5.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
-**Next item: ISSUE-NOV5.2-O15 (item 7).** Items 1, 2, 12, and 17 were released in Nov6.0, item 3 in Nov6.1, item 4 in Nov6.2, item 5 in Nov6.3, items 10, 23, and 24 in Nov6.4, and item 6 in Nov7.0.
+**Next item: ISSUE-NOV5.2-O11 (item 8), which needs user decisions.** If the user is not ready to decide, take the first item marked `Nothing` instead: ISSUE-NOV6.0-O23 (item 13). Items 1, 2, 12, and 17 were released in Nov6.0, item 3 in Nov6.1, item 4 in Nov6.2, item 5 in Nov6.3, items 10, 23, and 24 in Nov6.4, item 6 in Nov7.0, and item 7 in Nov7.1.
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -15,7 +15,7 @@ Nov7.0 is closed and followed Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2
 | 4 | ISSUE-NOV5.2-O14 | **Done for Nov6.2**: Monitor trail storage bounded per tracker | Nothing |
 | 5 | ISSUE-NOV5.0-O5 | **Done for Nov6.3**: the Setup dialog shows the real relay state | Nothing |
 | 6 | ISSUE-NOV5.0-O6 | **Done for Nov7.0**: versions come from the installed package, and no production string holds one | Nothing |
-| 7 | ISSUE-NOV5.2-O15 | Confirm before the gear unpairs | Nothing |
+| 7 | ISSUE-NOV5.2-O15 | **Done for Nov7.1**: every Monitor control that unpairs asks first | Nothing |
 | 8 | ISSUE-NOV5.2-O11 | Decide build or retire for each unwired feature, grouped by feature | User decisions |
 | 9 | ISSUE-NOV5.2-O13 | Fix false MOVING, after item 8 settles whether `SentinelLogic` is wired in | Item 8 |
 | 10 | ISSUE-NOV5.2-O12 | **Done for Nov6.4**: backfill round trip seen on the production relay | Nothing |
@@ -35,6 +35,7 @@ Nov7.0 is closed and followed Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2
 | 24 | ISSUE-NOV6.3-O32 | **Done for Nov6.4**: gaps are read from the stored trail, so no missing range is forgotten | Nothing |
 | 25 | ISSUE-NOV6.4-O33 | Stop the Sensor sending later backfill chunks after one fails | Nothing |
 | 26 | ISSUE-NOV6.4-O34 | Replace the fixed status text in the Sensor Setup dialog | Nothing |
+| 27 | ISSUE-NOV7.1-O35 | Decide what the three Monitor `CLEAN` actions should do, with item 8 | User decision |
 
 ---
 
@@ -51,6 +52,7 @@ Nov7.0 is closed and followed Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2
 - **Status**: Monitored. No crashes or functional failures observed.
 
 ### 2. Open Gaps
+- **ISSUE-NOV7.1-O35 (Low) - The Monitor `CLEAN` actions only unpair**: `Clear Home Points & Geofence`, `Reset Operational Statistics`, and `Trigger Full System Re-Initialization` in `CleanSetupOverlay` were all wired to `onReset` in `MonitorScreen`, so each one only clears the pairing. Their labels promise something else: the Monitor has no home points or geofence, and there are no statistics to reset. Since Nov7.1 they ask before unpairing, like every other unpair control. Found while fixing ISSUE-NOV5.2-O15. Decide with ISSUE-NOV5.2-O11: build each action, or remove the buttons and their part of rule 1.344.
 - **ISSUE-NOV6.4-O33 (Low) - The Sensor keeps sending backfill chunks after one fails**: `setupBackfillListener` ignores the result of `sendBackfillResponse`. If a connection drops between chunks, the final chunk can still arrive after a reconnect, so the Monitor counts the range as answered with rows missing. Those rows are requested again only after the Monitor process restarts. Found by reading the code; not reproduced.
 - **ISSUE-NOV6.4-O34 (Low) - Sensor Setup shows a fixed service status**: the Setup dialog said `Sensor Service Status: Active / Ready` on the A15 before the service was started. Same class of defect as ISSUE-NOV5.0-O5.
 - **ISSUE-NOV6.2-O29 (Low) - The Monitor's own trail is documented but never stored**: nothing writes a row with `isLocalUser = 1`, so `TrailDao.pruneLocalTrail` has no rows to delete on a real phone. `DOCS/03_MONITOR_REQUIREMENTS.md` and chapter 108.2 describe a local trail. The 48-hour rule stays in the worker and has a test, and it will work if a local trail is built. Decide with ISSUE-NOV5.2-O11: build the local trail, or remove the column and the rule.
@@ -66,7 +68,6 @@ Nov7.0 is closed and followed Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2
 - **ISSUE-NOV6.0-O24 (Low) - `SignalingQueue` is not thread safe, and a failed flush reorders updates**: `seenSequenceIds` is a plain `HashSet`, and `sendTelemetry` offers while `flushQueue` polls with no shared lock. The overlap is narrow, around a reconnect. A batch that fails in `flushQueue` rejoins at the tail, behind newer updates. Found by reading the code; not reproduced.
 - **ISSUE-NOV5.4-O19 (Low) - Uncommitted changes in the nested repository**: `before splitting/gps-tracker` has uncommitted changes to `Handover.md`, `issues.md`, `STATUS/RESOLUTION_ARCHIVE.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, `TESTS/test_results.md`, and `relay-server`. Their origin is unknown. Do not change or commit them without a user decision.
 - **ISSUE-NOV5.2-O13 (Medium) - False MOVING on GPS noise**: the Monitor derives MOVING from GPS speed above 1.5 km/h only, so a stationary Sensor showed `MOVING` at about 2 km/h. `SentinelLogic` and IMU data are not used.
-- **ISSUE-NOV5.2-O15 (Low) - Settings gear unpairs immediately**: the Monitor `Settings / Re-pair` button clears the pairing with no confirmation.
 - **ISSUE-NOV5.2-O16 (Low) - Sequence restarts after a fresh install**: reinstalling the Sensor clears its buffer and restarts at 0, and the Monitor unique index can then replace older rows with the same sequence. The Nov6.0 sequence reservation does not cover this: it lives in the buffer file, which an uninstall removes.
 - **ISSUE-NOV5.0-O7 (Low) - Zero-position rows are still stored and sent**: the sensor sends `(0,0)` until its first fix and the Monitor stores those rows. They are now filtered at display time only.
 - **ISSUE-NOV5.1-O9 (Low) - Relay cold start exceeds the app connection timeout**: the relay took 21-22s to answer after idling, longer than the 20s `setTimeout`. A relay restart recovered in about 4s. Nov6.2 saw recovery once on production: the Sensor logged a connection `timeout` at 14:40:54 and connected at 14:40:57 with no help. The relay's state before that timeout was not measured, so it is probably, not certainly, a cold start.
@@ -74,6 +75,11 @@ Nov7.0 is closed and followed Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov7.1)
+*   **Unpair Confirmation (ISSUE-NOV5.2-O15)**: The `Settings / Re-pair` gear cleared the pairing in one tap. The cause was wider: `MonitorScreen` handed the destructive `onReset` to five controls, the gear, the `Disconnect` X, and the three `CLEAN` actions, and none asked first. All five now open one dialog, `Unpair from tracker <id>?`, and only its `Unpair` button calls `onReset`; `Cancel` keeps the pairing. `MonitorMenuBar` names its parameter `onUnpair`. Verified by `UnpairConfirmationTest` on the real `MonitorScreen`; with the menu bar wired straight to `onReset` again, 4 of its 5 tests failed on the A15. New gap: ISSUE-NOV7.1-O35. **PASSED.**
 
 ---
 
@@ -178,6 +184,7 @@ Nov7.0 is closed and followed Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2
 ---
 
 ## 🚀 Strategic Simplification Ideas
+*   **SIMP-NOV7.1-S1**: One Unpair Control. The Monitor menu bar has two controls that do the same thing, the `Settings / Re-pair` gear and the `Disconnect` X, and three `CLEAN` actions that also only unpair (ISSUE-NOV7.1-O35). Keep `Disconnect` as the single unpair control, and either give the gear a real settings screen or remove it. That would also remove the confusing `Settings / Re-pair` label.
 *   **SIMP-REVOL39.0-S1**: Integrated Kinetic State Observer. Consolidate acceleration, velocity, and thermal status evaluation into a single unified observer in `core-shared`.
 *   **SIMP-REVOL38.3-S1**: Dynamic Buffer Auto-tuner. Consolidate bitrate detection and buffer resizing into an adaptive native manager.
 *   **SIMP-NOV6.0-S1**: Lint For `core-shared`. Run Gradle lint on `core-shared`, or build it against `android.jar`. That would catch calls missing from older Android across the whole module and could replace the single-class check in `ForensicBufferApiLevelTest`.
@@ -191,6 +198,7 @@ Nov7.0 is closed and followed Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov7.1: [SOT Count: 938 (Rules: 438), Open: H:1, M:5, L:14, Ideas: H:0, M:3, L:15, Testing: PASSED (Sub-items: 187), QA: 50]** - Audit Baseline: 187 automated tests passing, including 76 on the A15; on the A15 through the production relay, the gear and `Disconnect` asked before unpairing, `Cancel` kept the pairing and its service, and `Unpair` returned to the pairing screen and stopped the service; 0 Davey, StackLog, or fatal entries from either process over about 2 minutes. QA counts chapters verified at least in part, out of 117 active chapters.
 - **Nov7.0: [SOT Count: 937 (Rules: 437), Open: H:1, M:5, L:14, Ideas: H:0, M:3, L:14, Testing: PASSED (Sub-items: 182), QA: 49]** - Audit Baseline: 182 automated tests passing, including 71 on the A15; Sensor and Monitor live on the A15 through the production relay, with all four version displays and the Sensor log showing `Nov7.0`; 0 Davey, StackLog, or fatal entries from either process over about 2 minutes. QA counts chapters verified at least in part, out of 116 active chapters.
 - **Nov6.4: [SOT Count: 936 (Rules: 436), Open: H:1, M:5, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 177), QA: 48]** - Audit Baseline: 177 automated tests passing, including 69 on the A15; a 60-second Sensor outage on the A15 through a private relay left one gap of 195 rows, refilled with no holes remaining; 0 Davey, StackLog, or fatal entries from either process. Not run on the production relay or on two phones. QA counts chapters verified at least in part, out of 115 active chapters.
 - **Nov6.3: [SOT Count: 935 (Rules: 435), Open: H:1, M:6, L:14, Ideas: H:0, M:3, L:12, Testing: PASSED (Sub-items: 156), QA: 47]** - Audit Baseline: 156 automated tests passing, including 60 on the A15; Sensor and Monitor live on the A15 through the production relay, with the Setup dialog following a real network loss and recovery; 0 Davey, StackLog, or fatal entries from either process. QA counts chapters verified at least in part, out of 114 active chapters.

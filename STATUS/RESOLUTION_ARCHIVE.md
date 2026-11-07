@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov7.1)
+- **Unpair Confirmation (ISSUE-NOV5.2-O15)**: The Monitor `Settings / Re-pair` gear cleared the pairing in one tap. `MonitorScreen` handed the destructive `onReset` to five controls, the gear, the `Disconnect` X, and the three `CLEAN` actions, and none asked first. All five now open one dialog, `Unpair from tracker <id>?`; only its `Unpair` button calls `onReset`, and `Cancel` keeps the pairing. `MonitorMenuBar` names its parameter `onUnpair`. Verified by `UnpairConfirmationTest` (5 tests) on the real `MonitorScreen`; with the menu bar wired straight to `onReset` again, 4 of the 5 failed on the A15, and the `CLEAN` test, whose path was not broken, passed. New gap: ISSUE-NOV7.1-O35, the `CLEAN` actions only unpair. **PASSED.**
+
 ## ✅ Resolved Issues (Nov7.0)
 - **Real Version Strings (ISSUE-NOV5.0-O6)**: `SensorService` logged `Version: Nov1.7 (Final)` on every start, and `getAppVersionName` fell back to an invented `Nov4.27` in both apps, because versions were written by hand in the code and the function was copied. One `getAppVersionName` in `core-ui/.../AppVersion.kt` now reads the installed package and shows `--` if that fails, and `SensorService` logs the same value. `VersionLiteralGuardTest` fails if any production string holds a release version. Verified by 182 of 182 automated tests; with the old strings back, `noProductionStringHoldsAVersion` named both and `AppVersionTest.anUnknownPackageShowsNoVersion` failed on the A15. On the A15 through the production relay, all four version displays showed `Nov7.0`, and the Sensor logged `onCreate called. Version: Nov7.0`. The `--` case has automated proof only. **PASSED.**
 

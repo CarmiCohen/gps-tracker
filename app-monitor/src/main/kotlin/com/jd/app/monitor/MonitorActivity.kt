@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -257,6 +258,33 @@ fun MonitorScreen(
     var isEditingRelayUrl by remember { mutableStateOf(false) }
     var relayUrlInput by remember(relayUrl) { mutableStateOf(relayUrl) }
     var followMode by remember { mutableStateOf(MapFollowMode.AUTO) }
+    // Every control that unpairs asks first; only the dialog's Unpair button calls onReset.
+    var showUnpairConfirm by rememberSaveable { mutableStateOf(false) }
+    val requestUnpair = { showUnpairConfirm = true }
+
+    if (showUnpairConfirm) {
+        AlertDialog(
+            onDismissRequest = { showUnpairConfirm = false },
+            title = { Text("Unpair from tracker $trackerId?") },
+            text = { Text("The Monitor stops receiving this tracker until you pair again. Stored trail rows are kept.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showUnpairConfirm = false
+                        onReset()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = com.jd.core.ui.StatusRed)
+                ) {
+                    Text("Unpair")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnpairConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     if (showAlertsOverlay) {
         com.jd.core.ui.AlertManagementOverlay(
@@ -316,9 +344,9 @@ fun MonitorScreen(
     if (showCleanSetupOverlay) {
         com.jd.core.ui.CleanSetupOverlay(
             isTracker = false,
-            onClearHomePoints = onReset,
-            onResetStats = onReset,
-            onFullInit = onReset,
+            onClearHomePoints = requestUnpair,
+            onResetStats = requestUnpair,
+            onFullInit = requestUnpair,
             onClose = { showCleanSetupOverlay = false }
         )
         return
@@ -385,7 +413,7 @@ fun MonitorScreen(
                     monitorId = monitorId,
                     trackerId = trackerId,
                     onSetup = { showSetupDialog = true },
-                    onReset = onReset,
+                    onUnpair = requestUnpair,
                     onTools = { showToolsOverlay = true },
                     onMap = { followMode = MapFollowMode.AUTO }
                 )
@@ -556,7 +584,7 @@ fun MonitorMenuBar(
     monitorId: String,
     trackerId: String,
     onSetup: () -> Unit,
-    onReset: () -> Unit,
+    onUnpair: () -> Unit,
     onTools: () -> Unit,
     onMap: () -> Unit
 ) {
@@ -577,7 +605,7 @@ fun MonitorMenuBar(
                 IconButton(onClick = onSetup, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(15.dp))
                 }
-                IconButton(onClick = onReset, modifier = Modifier.size(28.dp)) {
+                IconButton(onClick = onUnpair, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Settings, contentDescription = "Settings / Re-pair", tint = Color.White, modifier = Modifier.size(15.dp))
                 }
                 IconButton(onClick = onTools, modifier = Modifier.size(28.dp)) {
@@ -605,7 +633,7 @@ fun MonitorMenuBar(
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onReset, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onUnpair, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Disconnect", tint = Color(0xFFF43F5E), modifier = Modifier.size(18.dp))
             }
         }
