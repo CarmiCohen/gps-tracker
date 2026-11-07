@@ -1,9 +1,9 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.30)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.32)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov7.30, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov7.32, solved one by one in the order below
 
 ### Work Queue
-Nov7.30 is closed and followed Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov7.32 is closed and followed Nov7.30, Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
 **Next item: ISSUE-NOV6.0-O26 (item 18, Medium, blocked on a device below API 35 or permission to download an API 34 image).**
 
@@ -39,7 +39,7 @@ Nov7.30 is closed and followed Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7
 | 28 | ISSUE-NOV7.2-O36 | Decide whether the Sensor service can be stopped on the device, with item 8 | User decision |
 | 29 | ISSUE-NOV7.2-O37 | **Done for Nov7.30**: unknown speed (-1f), battery (-1), and temperature (-1f) sent as unknown, displaying `--` on HUDs and guarding alarms (chapter 144) | Nothing |
 | 30 | ISSUE-NOV7.3-O38 | **Done for Nov7.28**: Sensor siren test button disabled/replaced on Sensor (stealth tracker) via AlarmSoundOverlay and SensorViewModel cleanup (chapter 143) | Nothing |
-| 31 | ISSUE-NOV7.3-O39 | Let the alarm reach the user under Do Not Disturb and over a locked screen | User decision on the permission flow |
+| 31 | ISSUE-NOV7.3-O39 | **Done for Nov7.32**: Phone Setup overlay provides dedicated guidance and direct action buttons for Do Not Disturb (Notification Policy Access) and Full-Screen Intent permissions, ensuring critical alarms reach users under DND and lock screens (chapter 145) | Nothing |
 | 33 | ISSUE-NOV7.15-O41 | Find the main-thread work at Sensor start that delays the first `AdminActivity` frame past 500 ms | Nothing |
 | 32 | ISSUE-NOV7.15-O40 | Fill the missing Nov7.7 to Nov7.12 dashboard entries and Nov7.6 to Nov7.9 Resolved Gaps from `RESOLUTION_ARCHIVE.md` and the baselines | Nothing |
 | 34 | ISSUE-NOV7.17-O42 | **Done for Nov7.19**: no relay alarm before the first connection or 30 s, GPS loss only after 30 s without a position, Sensor movement checked once per fix and within the GPS error (chapter 139) | Nothing |
@@ -83,6 +83,11 @@ Nov7.30 is closed and followed Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov7.32)
+*   **Alarm Reach Under Do Not Disturb & Locked Screen Setup (ISSUE-NOV7.3-O39)**: Both Sensor and Monitor applications now provide dedicated guidance and direct action buttons in their Phone Setup overlays (`PhoneSetupOverlay` in `:core-ui`) to configure Do Not Disturb (Notification Policy Access via `Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`) and Full-Screen Intent permissions (`Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`), ensuring critical tracker alarms and sirens successfully bypass Do Not Disturb mode and display over locked screens. Verified by automated unit tests, build clean with `--warning-mode all`. SOT rule 1.381, test chapter 145. **PASSED.**
 
 ---
 

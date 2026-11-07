@@ -116,6 +116,8 @@ fun PhoneSetupOverlay(
     onOpenBatterySettings: () -> Unit,
     onOpenOverlayPermission: () -> Unit,
     onOpenExactAlarmPermission: () -> Unit,
+    onOpenDndSettings: () -> Unit,
+    onOpenFullScreenIntentSettings: () -> Unit,
     onOpenDiagnostics: () -> Unit,
     onTestAlarm: () -> Unit,
     onRefreshPermissions: () -> Unit,
@@ -200,10 +202,31 @@ fun PhoneSetupOverlay(
                 icon = Icons.Default.Notifications
             )
 
+            Spacer(Modifier.height(12.dp))
+
+            SetupGuideSection(
+                title = "6. Do Not Disturb (DND) Bypass",
+                description = "Required so critical alarms can bypass Do Not Disturb mode and sound sirens when emergencies occur.",
+                buttonText = "Grant DND Access",
+                onClick = onOpenDndSettings,
+                icon = Icons.Default.Star
+            )
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                Spacer(Modifier.height(12.dp))
+                SetupGuideSection(
+                    title = "7. Full-Screen Intent Permission",
+                    description = "Required to automatically display emergency alarm overlays over locked screens.",
+                    buttonText = "Authorize Full-Screen Intent",
+                    onClick = onOpenFullScreenIntentSettings,
+                    icon = Icons.Default.Lock
+                )
+            }
+
             if (!isTracker) {
                 Spacer(Modifier.height(12.dp))
                 SetupGuideSection(
-                    title = "6. Home Points & Geofence Definition",
+                    title = "8. Home Points & Geofence Definition",
                     description = "Define secure zones on the map. Current defined home points: $homePointsCount",
                     buttonText = "Open Map",
                     onClick = {

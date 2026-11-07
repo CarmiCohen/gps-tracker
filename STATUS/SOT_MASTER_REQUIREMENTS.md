@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov7.28)
+# SOT Master Requirements & Hardening Status (Nov7.32)
 
-## 🏗️ Architectural Master Rules (454 Rules)
+## 🏗️ Architectural Master Rules (455 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -42,8 +42,14 @@
 *   **1.376 Real GPS Loss Reporting & Explicit Critical Delivery (R-ID 147)**: Whether a telemetry update is sent unbatched, kept when the queue overflows, and exempt from sequence deduplication MUST be decided only by `LocationUpdate.isCritical`, never by the text of its `status`; the flag stays with the sender and is not sent. The Sensor MUST set it only for an update carrying a violation (`JUMP`, `OUTLIER`), and MUST commit such an update to the forensic buffer at once. The Sensor MUST send `NO_FIX` with no position (latitude, longitude, and accuracy 0) on every tick while it has no fix, or while its newest fix is at least 15 seconds old (`FIX_STALE_AFTER_MS`, measured on `elapsedRealtimeNanos`), and MUST NOT send an older fix as current. It MUST NOT judge movement on, or keep as the reference, a fix whose accuracy is unknown or coarser than 100 m (`MOVEMENT_CHECK_MAX_ACCURACY_M`) (ISSUE-NOV7.19-O43, SIMP-NOV7.19-S1) (R-ID 147).
 *   **1.377 Sensor Battery State Seeding & Unknown Guarding (R-ID 148)**: `SensorService` MUST capture sticky `ACTION_BATTERY_CHANGED` broadcast intent returned by `registerReceiver` prior to starting `startSensingLoop()`, seeding initial charging state, battery level, and temperature to prevent false `POWER_DISCONNECTED` sirens when starting Sensor service while Monitor watches. Monitor alarms MUST guard battery level (`batteryLevel >= 0`) and temperature (`tempCelsius > 0f`) checks against unknown/uninitialized values (ISSUE-NOV7.21-O45, ISSUE-NOV7.2-O37) (R-ID 148).
 *   **1.378 Sensor PermissionGuard Re-check On Resume (R-ID 149)**: `PermissionGuard` in `AdminActivity` MUST observe `Lifecycle.Event.ON_RESUME` using `LocalLifecycleOwner.current` and `DisposableEffect`, re-evaluating `checkSensorPermissions` so that returning to `AdminActivity` after granting permissions in system Settings or external permission flows immediately updates `allGranted` state without requiring button re-clicks (ISSUE-NOV7.19-O44) (R-ID 149).
+*   **1.379 Sensor Siren Test Button Disabled On Stealth Tracker (R-ID 150)**: The Sensor MUST NOT display an interactive local siren audio test button (`TEST SIREN AUDIO`) in its Siren & Audio setup overlay when acting as a stealth tracker (`isTracker = true`), enforcing Rule 14 (Stealth Authority, R872) at the UI component level (`AlarmSoundOverlay`) (ISSUE-NOV7.3-O38) (R-ID 150).
+*   **1.380 Real Telemetry Unknown Values Handling (R-ID 151)**: `SensorService` MUST verify `loc.hasSpeed()` before copying speed into telemetry, transmitting `-1f` when speed is unknown, and MUST NOT invent initial battery level or temperature before broadcast intents arrive. `MonitorViewModel` and HUD renderers MUST treat negative speed/battery and non-positive temperature as unknown (`--`), preventing false alarms (ISSUE-NOV7.2-O37) (R-ID 151).
+*   **1.381 Alarm Reach Under Do Not Disturb & Locked Screen Setup (R-ID 152)**: Both Sensor and Monitor applications MUST provide dedicated guidance and direct action buttons in their Phone Setup overlays (`PhoneSetupOverlay` in `:core-ui`) to configure Do Not Disturb (Notification Policy Access via `Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`) and Full-Screen Intent permissions (`Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`), ensuring critical tracker alarms and sirens successfully bypass DND mode and display over locked screens (ISSUE-NOV7.3-O39) (R-ID 152).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov7.32**: Alarm Reach Under Do Not Disturb & Locked Screen Setup (ISSUE-NOV7.3-O39) - PASSED.
+- **Nov7.30**: Real Telemetry Unknown Values Handling (ISSUE-NOV7.2-O37) - PASSED.
+- **Nov7.28**: Sensor Siren Test Button Disabled on Stealth Tracker (ISSUE-NOV7.3-O38) - PASSED.
 - **Nov7.26**: Sensor PermissionGuard Re-check On Resume (ISSUE-NOV7.19-O44) - PASSED.
 - **Nov7.24**: Sensor Battery Seeding & Unknown Value Guarding (ISSUE-NOV7.21-O45, ISSUE-NOV7.2-O37) - PASSED.
 - **Nov7.21**: The Sensor Reports A Real GPS Loss (ISSUE-NOV7.19-O43, SIMP-NOV7.19-S1) - PASSED.

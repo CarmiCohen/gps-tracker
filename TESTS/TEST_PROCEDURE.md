@@ -544,8 +544,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **144.1 Unknown Speed Handling:** Verify that when a location fix has no speed (`!hasSpeed()`), `SensorService` transmits `-1f` as the speed, and the Monitor and Sensor HUDs display `--` instead of an invented `0.0 km/h` or `STATIONARY`. Automated by `UnknownTelemetryTest` and `FixReadingTest` (ISSUE-NOV7.2-O37).
 *   **144.2 Unknown Battery and Temperature Handling:** Verify that before battery intents arrive, or when battery level and temperature are unavailable, `SensorService` uses `-1` for battery level and `-1f` for temperature, preventing false low-battery or high-temperature alarms and displaying `--` on HUDs. Automated by `UnknownTelemetryTest`.
 
+## Chapter 145 - Alarm Reach Under Do Not Disturb & Locked Screen Setup (Nov7.32)
+*   **145.1 Do Not Disturb (DND) Access Guide:** Verify that `PhoneSetupOverlay` provides dedicated guidance and a direct action button ("Grant DND Access") opening `Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS` so the user can grant notification policy access for critical alarm bypass. Automated by unit tests and UI inspection (ISSUE-NOV7.3-O39).
+*   **145.2 Full-Screen Intent Permission Guide:** Verify that `PhoneSetupOverlay` on Android 14+ (API 34+) provides guidance and an action button ("Authorize Full-Screen Intent") opening `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT` so the app can automatically display emergency alarm overlays over locked screens. Automated by unit tests and UI inspection.
+
 ---
-**Active Testing Chapters: 134 of 144**
+**Active Testing Chapters: 135 of 145**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

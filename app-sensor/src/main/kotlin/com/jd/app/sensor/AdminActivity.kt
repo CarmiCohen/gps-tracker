@@ -133,6 +133,20 @@ class AdminActivity : ComponentActivity() {
                                     onOpenBatterySettings = { requestIgnoreBatteryOptimization() },
                                     onOpenOverlayPermission = { requestOverlayPermission() },
                                     onOpenExactAlarmPermission = { },
+                                    onOpenDndSettings = {
+                                        val intent = android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                                        startActivity(intent)
+                                    },
+                                    onOpenFullScreenIntentSettings = {
+                                        val intent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                            android.content.Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, android.net.Uri.parse("package:$packageName"))
+                                        } else {
+                                            android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                                data = android.net.Uri.parse("package:$packageName")
+                                            }
+                                        }
+                                        startActivity(intent)
+                                    },
                                     onOpenDiagnostics = { },
                                     onTestAlarm = { },
                                     onRefreshPermissions = { },
