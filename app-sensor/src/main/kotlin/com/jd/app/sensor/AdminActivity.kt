@@ -29,10 +29,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jd.core.ui.HudState
 import com.jd.core.ui.HudStatusBar
@@ -208,25 +210,50 @@ class AdminActivity : ComponentActivity() {
     }
 }
 
-@Composable
-fun PermissionGuard(content: @Composable () -> Unit) {
-    val context = LocalContext.current
-    val requiredPermissions = mutableListOf(
+internal fun getRequiredSensorPermissions(sdkInt: Int = Build.VERSION.SDK_INT): List<String> {
+    return mutableListOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
         Manifest.permission.ACCESS_NETWORK_STATE
     ).apply {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (sdkInt >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        if (sdkInt >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             add(Manifest.permission.FOREGROUND_SERVICE_LOCATION)
         }
     }
+}
+
+internal fun checkSensorPermissions(
+    context: android.content.Context,
+    permissions: List<String>,
+    checker: (android.content.Context, String) -> Int = { ctx, perm -> ctx.checkSelfPermission(perm) }
+): Boolean {
+    return permissions.all {
+        checker(context, it) == PackageManager.PERMISSION_GRANTED
+    }
+}
+
+@Composable
+fun PermissionGuard(content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val requiredPermissions = remember { getRequiredSensorPermissions() }
 
     var allGranted by remember {
-        mutableStateOf(requiredPermissions.all {
-            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-        })
+        mutableStateOf(checkSensorPermissions(context, requiredPermissions))
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                allGranted = checkSensorPermissions(context, requiredPermissions)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     val launcher = rememberLauncherForActivityResult(

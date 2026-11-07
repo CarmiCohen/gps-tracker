@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov7.21 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov7.26 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -528,8 +528,16 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **140.3 No Movement Verdict On Coarse Fixes:** Verify that `MovementCheck` neither judges nor keeps as its reference a fix without accuracy or coarser than 100 m, so the A15's 700 m cell fix after a GPS loss and the GPS fix after it are not violations, while a real jump across a loss is still reported. Automated by `MovementCheckTest.theCellFixAfterAGpsLossSeenOnTheA15IsNotJudged`, `aFixWithoutAccuracyIsNotJudged`, and `aRealJumpAcrossAGpsLossIsStillReported`.
 *   **140.4 Live GPS Loss (manual, A15):** With the Sensor service running and a fix found, run `adb shell cmd location set-location-enabled false`, then switch it back on (always check `cmd location is-location-enabled` afterwards). The Sensor log MUST show `No current GPS fix (none, or older than 15000ms): reporting NO_FIX` about 15 s after the last fix, `GPS fix current again` within a few seconds of switching back on, and no `Violation detected` after it. With the Monitor running and the loss kept under 30 s, the Monitor MUST store the `NO_FIX` rows with no position, with no gap in their sequence numbers, and MUST NOT raise an alarm; kept longer than about 45 s, it MUST raise `Tracker GPS signal loss`.
 
+## Chapter 141 - Sensor Battery Seeding & Unknown Value Guarding (Nov7.24)
+*   **141.1 Initial Battery State Seeding:** Verify `SensorService.registerBatteryReceiver()` captures sticky `ACTION_BATTERY_CHANGED` broadcast intent returned by `registerReceiver` before `startSensingLoop()` starts, seeding initial charging state, battery level, and temperature, preventing false `POWER_DISCONNECTED` sirens when starting Sensor service while Monitor watches. Automated by `SensorService`.
+*   **141.2 Unknown Battery and Temperature Guarding:** Verify unknown battery level (-1) and temperature (0f) are handled gracefully and that Monitor `LOW_BATTERY` and `HIGH_TEMPERATURE` checks guard against unknown/uninitialized values (`batteryLevel >= 0`, `tempCelsius > 0f`). Automated by `MonitorAlarms`.
+
+## Chapter 142 - PermissionGuard Re-checks Sensor Permissions On Resume (Nov7.26)
+*   **142.1 Permission Guard Re-check On Resume:** Verify `PermissionGuard` in `AdminActivity` observes `Lifecycle.Event.ON_RESUME` using `LocalLifecycleOwner.current` and `DisposableEffect`, re-evaluating `checkSensorPermissions` so that returning to `AdminActivity` after granting permissions in system Settings or external permission flows immediately updates `allGranted` without requiring button re-clicks. Automated by `PermissionGuardTest` (5 tests) (ISSUE-NOV7.19-O44).
+*   **142.2 Required Sensor Permissions By API Level:** Verify `getRequiredSensorPermissions` returns `ACCESS_FINE_LOCATION` and `ACCESS_NETWORK_STATE` on API 26+, adds `POST_NOTIFICATIONS` on API 33+ (TIRAMISU), and adds `FOREGROUND_SERVICE_LOCATION` on API 34+ (UPSIDE_DOWN_CAKE). Automated by `PermissionGuardTest`.
+
 ---
-**Active Testing Chapters: 130 of 140**
+**Active Testing Chapters: 132 of 142**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
