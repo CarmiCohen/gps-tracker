@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov7.34)
+- **Automatic Sensor Service Startup, Live Uptime Timer & Protected Stop Control (ISSUE-NOV7.2-O36)**: `AdminActivity` now automatically launches `SensorService` on app launch when permissions are verified, providing seamless continuous background sensing. `SensorServiceStatus` tracks service start time (`startTimeMillis`) and `SensorViewModel` exposes live uptime formatted as `HH:mm:ss` (`serviceUptimeText`). `AdminActivity` displays a live Service Status card with uptime counter and a protected `STOP SENSOR SERVICE` action button that presents a confirmation dialog (`"Are you sure you want to stop background sensing?"`) before sending `ACTION_STOP_SERVICE` to `SensorService`. `SensorService.onStartCommand` cleanly intercepts `ACTION_STOP_SERVICE` and calls `stopSelf()`. Verified by 100% passing automated unit tests across all subprojects (`SensorServiceStatusTest`), `assembleDebug --warning-mode all` build clean. SOT rule 1.382, test chapter 146. **PASSED.**
+
 ## ✅ Resolved Issues (Nov7.32)
 - **Alarm Reach Under Do Not Disturb and Over a Locked Screen (ISSUE-NOV7.3-O39)**: Both Sensor and Monitor applications now provide dedicated setup guidance and direct action buttons in their Phone Setup overlays (`PhoneSetupOverlay` in `:core-ui`) to configure Do Not Disturb (Notification Policy Access via `Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`) and Full-Screen Intent permissions (`Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`), ensuring critical tracker alarms and sirens successfully bypass Do Not Disturb mode and display over locked screens. Verified by automated unit tests, build clean with `--warning-mode all`. SOT rule 1.381, test chapter 145. **PASSED.**
 

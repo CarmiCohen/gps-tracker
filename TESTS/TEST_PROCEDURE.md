@@ -548,8 +548,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **145.1 Do Not Disturb (DND) Access Guide:** Verify that `PhoneSetupOverlay` provides dedicated guidance and a direct action button ("Grant DND Access") opening `Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS` so the user can grant notification policy access for critical alarm bypass. Automated by unit tests and UI inspection (ISSUE-NOV7.3-O39).
 *   **145.2 Full-Screen Intent Permission Guide:** Verify that `PhoneSetupOverlay` on Android 14+ (API 34+) provides guidance and an action button ("Authorize Full-Screen Intent") opening `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT` so the app can automatically display emergency alarm overlays over locked screens. Automated by unit tests and UI inspection.
 
+## Chapter 146 - Sensor Automatic Service Startup, Live Uptime Timer & Protected Stop Control (Nov7.34)
+*   **146.1 Automatic Service Startup On App Launch:** Verify that `AdminActivity` automatically launches `SensorService` on app start if the service is not already running and permissions are granted, ensuring continuous background sensing without manual user intervention. Automated by `AdminActivity` inspection and lifecycle handling (ISSUE-NOV7.2-O36).
+*   **146.2 Service Uptime & Start Time Tracking:** Verify that `SensorServiceStatus` tracks service start time (`startTimeMillis`) when `markRunning` is called and resets it to 0 on `markStopped`, and that `formatUptime` formats elapsed time accurately as `HH:mm:ss`. Automated by `SensorServiceStatusTest.markRunningThenStoppedFollowsTheService` and `SensorServiceStatusTest.uptimeFormattingIsCorrect`.
+*   **146.3 Service Status Display & Setup Dialog:** Verify that `serviceStatusText` formats the status line with live uptime (e.g. `Sensor Service: Running (00:01:04)`), and that `SensorViewModel` exposes live `serviceUptimeText` updating on a 1s ticker. Automated by `SensorServiceStatusTest.serviceLineShowsRunningOrStoppedWithUptime`.
+*   **146.4 Protected Stop Control & Intent Stop Handling:** Verify that `AdminActivity` renders a protected `STOP SENSOR SERVICE` control when `isServiceRunning` is true, presenting a confirmation dialog before sending `SensorService.ACTION_STOP_SERVICE` intent, and that `SensorService.onStartCommand` cleanly handles `ACTION_STOP_SERVICE` by calling `stopSelf()`. Automated by `SensorServiceStatusTest` and service intent handling.
+
 ---
-**Active Testing Chapters: 135 of 145**
+**Active Testing Chapters: 136 of 146**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

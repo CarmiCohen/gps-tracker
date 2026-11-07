@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov7.32)
+# SOT Master Requirements & Hardening Status (Nov7.34)
 
-## 🏗️ Architectural Master Rules (455 Rules)
+## 🏗️ Architectural Master Rules (456 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -45,8 +45,10 @@
 *   **1.379 Sensor Siren Test Button Disabled On Stealth Tracker (R-ID 150)**: The Sensor MUST NOT display an interactive local siren audio test button (`TEST SIREN AUDIO`) in its Siren & Audio setup overlay when acting as a stealth tracker (`isTracker = true`), enforcing Rule 14 (Stealth Authority, R872) at the UI component level (`AlarmSoundOverlay`) (ISSUE-NOV7.3-O38) (R-ID 150).
 *   **1.380 Real Telemetry Unknown Values Handling (R-ID 151)**: `SensorService` MUST verify `loc.hasSpeed()` before copying speed into telemetry, transmitting `-1f` when speed is unknown, and MUST NOT invent initial battery level or temperature before broadcast intents arrive. `MonitorViewModel` and HUD renderers MUST treat negative speed/battery and non-positive temperature as unknown (`--`), preventing false alarms (ISSUE-NOV7.2-O37) (R-ID 151).
 *   **1.381 Alarm Reach Under Do Not Disturb & Locked Screen Setup (R-ID 152)**: Both Sensor and Monitor applications MUST provide dedicated guidance and direct action buttons in their Phone Setup overlays (`PhoneSetupOverlay` in `:core-ui`) to configure Do Not Disturb (Notification Policy Access via `Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`) and Full-Screen Intent permissions (`Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`), ensuring critical tracker alarms and sirens successfully bypass DND mode and display over locked screens (ISSUE-NOV7.3-O39) (R-ID 152).
+*   **1.382 Automatic Sensor Service Startup, Live Uptime Timer & Protected Stop Control (R-ID 153)**: The Sensor application MUST automatically launch `SensorService` on app launch (`AdminActivity`) when permissions are verified, display live service running status and uptime counter (`HH:mm:ss`) on both the admin console card and setup dialog, and present a protected `STOP SENSOR SERVICE` control requiring confirmation dialog verification before issuing `ACTION_STOP_SERVICE` to gracefully terminate background sensing (ISSUE-NOV7.2-O36) (R-ID 153).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov7.34**: Automatic Sensor Service Startup, Live Uptime Timer & Protected Stop Control (ISSUE-NOV7.2-O36) - PASSED.
 - **Nov7.32**: Alarm Reach Under Do Not Disturb & Locked Screen Setup (ISSUE-NOV7.3-O39) - PASSED.
 - **Nov7.30**: Real Telemetry Unknown Values Handling (ISSUE-NOV7.2-O37) - PASSED.
 - **Nov7.28**: Sensor Siren Test Button Disabled on Stealth Tracker (ISSUE-NOV7.3-O38) - PASSED.
@@ -105,6 +107,7 @@
 *   **Chapter 5.73 (Nov7.5 Audit)**: PASSED - 222 automated tests (including 18 unit tests in `MonitorAlarmsTest` covering all 3 communication alarms and settings toggles) and on-device verified execution. 55 of 120 active chapters are verified at least in part.
 *   **Chapter 5.74 (Nov7.10 Audit)**: PASSED - Automated unit test verification across all subprojects for overlay and follow mode screen state persistence across rotation via `rememberSaveable`. 55 of 120 active chapters are verified at least in part.
 *   **Chapter 5.75 (Nov7.11 Audit)**: PASSED - 227 automated unit tests across all subprojects (including 5 unit tests in `SignalingQueueTest` covering thread safety, concurrent access, queue conflation, partition deduplication, and order preservation via `pushFront`). 56 of 121 active chapters are verified at least in part.
+*   **Chapter 5.89 (Nov7.34 Audit)**: PASSED - Automated unit test verification across all subprojects (100% passing) and clean build for automatic Sensor service launch on app start, live uptime counter tracking (`HH:mm:ss`), and protected stop control with confirmation dialog sending `ACTION_STOP_SERVICE`. 69 of 136 active chapters verified at least in part.
 *   **Chapter 5.62 (Nov5.1 Audit)**: PASSED - 103 automated tests and a two-device live run with Sensor on A15 and Monitor on S21FE through the production relay on the final build: all LEDs active, real battery, live `AGE`, real map position, relay URL hot switch without restart, and zero Davey or StackLog from either app process. Manual physical chapters were not executed (see `TESTS/test_results.md`).
 *   **Chapter 5.61 (Nov5.0 Audit)**: PASSED - 100 automated tests on the final code (unit and on-device on A15) and a two-device live run with Sensor on A15 and Monitor on S21FE through a local relay: all LEDs active, real battery, live `AGE`, real map position, and zero Davey or StackLog from either app process. The production relay was unavailable, and manual physical chapters were not executed (see `TESTS/test_results.md`).
 *   **Chapter 5.60 (Nov4.44 Release Candidate Verification Audit)**: PASSED - Verification of Nov4.44 release candidate: 100% automated test execution passing across all subprojects, reciprocal virtual presence simulation testing, and baseline lock in `STATUS/BASELINE/Nov4.44/`.

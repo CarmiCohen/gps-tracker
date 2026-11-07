@@ -36,6 +36,28 @@ class SensorViewModel @Inject constructor(
     /** Reported by [SensorService] itself; shown in the Setup dialog (ISSUE-NOV6.4-O34). */
     val isServiceRunning: StateFlow<Boolean> = serviceStatus.isRunning
 
+    val serviceStartTimeMillis: StateFlow<Long> = serviceStatus.startTimeMillis
+
+    private val _ticker = flow {
+        while (true) {
+            emit(System.currentTimeMillis())
+            delay(1000L)
+        }
+    }
+
+    val serviceUptimeText: StateFlow<String> = combine(
+        isServiceRunning,
+        serviceStartTimeMillis,
+        _ticker
+    ) { running, startMs, _ ->
+        if (running && startMs > 0L) {
+            val nowMs = SensorServiceStatus.currentElapsedRealtime()
+            formatUptime(startMs, nowMs)
+        } else {
+            "Stopped"
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Stopped")
+
     val relayUrl: StateFlow<String> = sensorDataStore.relayUrl
         .map { RelayConfig.resolve(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RelayConfig.DEFAULT_URL)
@@ -70,13 +92,6 @@ class SensorViewModel @Inject constructor(
         viewModelScope.launch {
             val formattedUrl = url.trim()
             sensorDataStore.saveRelayUrl(formattedUrl)
-        }
-    }
-
-    private val _ticker = flow {
-        while (true) {
-            emit(System.currentTimeMillis())
-            delay(1000L)
         }
     }
 

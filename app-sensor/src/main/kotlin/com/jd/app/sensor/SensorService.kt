@@ -146,7 +146,8 @@ class SensorService : Service(), SensorEventListener {
         connectSignaling()
         
         isInitialized = true
-        serviceStatus.markRunning()
+        val startMs = try { android.os.SystemClock.elapsedRealtime() } catch (_: Throwable) { System.currentTimeMillis() }
+        serviceStatus.markRunning(startMs)
     }
 
     private fun connectSignaling() {
@@ -196,6 +197,12 @@ class SensorService : Service(), SensorEventListener {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP_SERVICE) {
+            SystemLogger.i("SensorService", "Stop action received via intent. Stopping service...")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         SystemLogger.i("SensorService", "onStartCommand received. Handling FGS activation...")
         
         if (hasRequiredPermissions()) {
@@ -440,8 +447,9 @@ class SensorService : Service(), SensorEventListener {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private companion object {
-        const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L
+    companion object {
+        const val ACTION_STOP_SERVICE = "com.jd.app.sensor.ACTION_STOP_SERVICE"
+        private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L
     }
 
     override fun onDestroy() {

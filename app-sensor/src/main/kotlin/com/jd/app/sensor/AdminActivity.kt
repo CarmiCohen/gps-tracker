@@ -70,8 +70,11 @@ class AdminActivity : ComponentActivity() {
                 val relayUrl by viewModel.relayUrl.collectAsStateWithLifecycle()
                 val hudState by viewModel.hudState.collectAsStateWithLifecycle()
                 val isServiceRunning by viewModel.isServiceRunning.collectAsStateWithLifecycle()
+                val serviceUptimeText by viewModel.serviceUptimeText.collectAsStateWithLifecycle()
                 val logs by SystemLogger.logs.collectAsStateWithLifecycle()
                 val scope = rememberCoroutineScope()
+                val context = LocalContext.current
+                var initialAutoStartTriggered by rememberSaveable { mutableStateOf(false) }
                 
                 LaunchedEffect(Unit) {
                     identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_SENSOR)
@@ -106,6 +109,20 @@ class AdminActivity : ComponentActivity() {
                         }
                     } else {
                         PermissionGuard {
+                            LaunchedEffect(isServiceRunning) {
+                                if (!initialAutoStartTriggered) {
+                                    initialAutoStartTriggered = true
+                                    if (!isServiceRunning) {
+                                        SystemLogger.i("AdminActivity", "Auto-starting SensorService on launch...")
+                                        val intent = Intent(context, SensorService::class.java)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            context.startForegroundService(intent)
+                                        } else {
+                                            context.startService(intent)
+                                        }
+                                    }
+                                }
+                            }
                             if (showAlertsOverlay) {
                                 com.jd.core.ui.AlertManagementOverlay(
                                     isTracker = true,
@@ -187,6 +204,7 @@ class AdminActivity : ComponentActivity() {
                                 SensorAdminConsole(
                                     hudState = hudState,
                                     isServiceRunning = isServiceRunning,
+                                    serviceUptimeText = serviceUptimeText,
                                     trackerId = trackerId,
                                     relayUrl = relayUrl,
                                     logs = logs,
@@ -463,6 +481,7 @@ fun SettingsOverlay(
 fun SensorAdminConsole(
     hudState: HudState,
     isServiceRunning: Boolean,
+    serviceUptimeText: String,
     trackerId: String,
     relayUrl: String,
     logs: List<SystemLogger.LogEntry>, 
@@ -473,6 +492,7 @@ fun SensorAdminConsole(
     val listState = rememberLazyListState()
     var showSetupDialog by rememberSaveable { mutableStateOf(false) }
     var showToolsOverlay by rememberSaveable { mutableStateOf(false) }
+    var showStopConfirmDialog by rememberSaveable { mutableStateOf(false) }
 
     if (showToolsOverlay) {
         com.jd.core.ui.ToolsOverlay(
@@ -563,18 +583,53 @@ fun SensorAdminConsole(
                 Text("WHITELIST BATTERY")
             }
 
-            Button(
-                onClick = {
-                    val intent = Intent(context, SensorService::class.java)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        context.startForegroundService(intent)
-                    } else {
-                        context.startService(intent)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isServiceRunning) Color(0xFF0F291E) else Color(0xFF2C1518)
+                )
             ) {
-                Text("START SENSOR SERVICE")
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isServiceRunning) "SERVICE: RUNNING" else "SERVICE: STOPPED",
+                            fontWeight = FontWeight.Bold,
+                            color = if (isServiceRunning) Color(0xFF10B981) else StatusRed,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = if (isServiceRunning) "Uptime: $serviceUptimeText" else "Background sensing paused",
+                            fontSize = 12.sp,
+                            color = Color.LightGray
+                        )
+                    }
+                    if (isServiceRunning) {
+                        Button(
+                            onClick = { showStopConfirmDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = StatusRed)
+                        ) {
+                            Text("STOP SERVICE")
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                val intent = Intent(context, SensorService::class.java)
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    context.startForegroundService(intent)
+                                } else {
+                                    context.startService(intent)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                        ) {
+                            Text("START SERVICE")
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -600,6 +655,35 @@ fun SensorAdminConsole(
         }
     }
 
+    if (showStopConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showStopConfirmDialog = false },
+            title = { Text("Stop Sensor Service") },
+            text = {
+                Text("Are you sure you want to stop background sensing? The Sensor will stop collecting and transmitting location telemetry until manually restarted.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showStopConfirmDialog = false
+                        val stopIntent = Intent(context, SensorService::class.java).apply {
+                            action = SensorService.ACTION_STOP_SERVICE
+                        }
+                        context.startService(stopIntent)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatusRed)
+                ) {
+                    Text("STOP SERVICE")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStopConfirmDialog = false }) {
+                    Text("CANCEL")
+                }
+            }
+        )
+    }
+
     if (showSetupDialog) {
         AlertDialog(
             onDismissRequest = { showSetupDialog = false },
@@ -609,7 +693,7 @@ fun SensorAdminConsole(
                     Text("Sensor Device ID: $trackerId")
                     Text("Relay URL: $relayUrl")
                     Text("App Version: ${getAppVersionName(context)}")
-                    Text(serviceStatusText(isServiceRunning))
+                    Text(serviceStatusText(isServiceRunning, serviceUptimeText))
                     Text(relayStatusText(hudState.isRelayConnected))
                 }
             },
