@@ -54,6 +54,9 @@ class MonitorAlarmEngine @Inject constructor(
     private val sirenTest = MutableStateFlow(false)
     val isSirenOn: StateFlow<Boolean> = siren.isPlaying
 
+    private val sirenTimedOut = MutableStateFlow(false)
+    private var sirenTimeoutJob: Job? = null
+
     private val acknowledgements = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
     private var watchJob: Job? = null
 
@@ -80,6 +83,22 @@ class MonitorAlarmEngine @Inject constructor(
     fun watch(scope: CoroutineScope) {
         if (watchJob?.isActive == true) return
         watchJob = scope.launch {
+            launch {
+                _alarms.map { it.needsSiren }.distinctUntilChanged().collect { needsSiren ->
+                    sirenTimeoutJob?.cancel()
+                    if (needsSiren) {
+                        sirenTimedOut.value = false
+                        sirenTimeoutJob = scope.launch {
+                            delay(30.seconds)
+                            sirenTimedOut.value = true
+                            SystemLogger.i("Alarm", "Siren auto-stopped after 30s timer (timer or acknowledge)")
+                        }
+                    } else {
+                        sirenTimedOut.value = false
+                    }
+                }
+            }
+
             alarmBooks(
                 target = identityManager.targetId,
                 telemetry = signalingClient.telemetryFlow,
@@ -99,11 +118,12 @@ class MonitorAlarmEngine @Inject constructor(
 
             combine(
                 _alarms.map { it.needsSiren }.distinctUntilChanged(),
+                sirenTimedOut,
                 sirenTest,
                 dataStore.alertSettings,
                 dataStore.sirenType
-            ) { needsSiren, testing, settings, waveType ->
-                if (needsSiren || testing) settings.sirenSound(waveType) else null
+            ) { needsSiren, timedOut, testing, settings, waveType ->
+                if ((needsSiren && !timedOut) || testing) settings.sirenSound(waveType) else null
             }.distinctUntilChanged().onEach { sound ->
                 if (sound != null) siren.play(sound) else siren.stop()
             }.launchIn(this)
@@ -115,6 +135,8 @@ class MonitorAlarmEngine @Inject constructor(
     fun stop() {
         watchJob?.cancel()
         watchJob = null
+        sirenTimeoutJob?.cancel()
+        sirenTimedOut.value = false
         sirenTest.value = false
         siren.stop()
         _alarms.value = AlarmBook()
@@ -122,6 +144,8 @@ class MonitorAlarmEngine @Inject constructor(
     }
 
     fun acknowledge() {
+        sirenTimeoutJob?.cancel()
+        sirenTimedOut.value = false
         acknowledgements.tryEmit(Unit)
     }
 

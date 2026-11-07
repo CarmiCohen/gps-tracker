@@ -1,9 +1,9 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.5)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.6)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov7.5, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov7.6, solved one by one in the order below
 
 ### Work Queue
-Nov7.5 is closed and followed Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, or Nov7.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov7.6 is closed and followed Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, or Nov7.4 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
 **Next item: ISSUE-NOV5.2-O13 (item 9).** Wire Sensor motion detection with `SentinelLogic.validateMovement` on each fix and send its motion state in telemetry. Then build slice 3 of group 1 alarms (Sensor-detected violations, including GPS jump alarm). Groups 2 and 4 to 8 still need user decisions. If the user prefers other work, take the first item marked `Nothing`: ISSUE-NOV6.0-O23 (item 13).
 
@@ -223,6 +223,7 @@ Nov7.5 is closed and followed Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, No
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov7.6: [SOT Count: 942 (Rules: 442), Open: H:1, M:4, L:18, Ideas: H:0, M:3, L:18, Testing: PASSED (Sub-items: 222), QA: 56]** - Audit Baseline: 222 automated tests passing, verifying 30-second siren auto-stop (timer or acknowledge, whichever comes first); QA is 56 of 121 active chapters.
 - **Nov7.5: [SOT Count: 941 (Rules: 441), Open: H:1, M:4, L:18, Ideas: H:0, M:3, L:18, Testing: PASSED (Sub-items: 222), QA: 55]** - Audit Baseline: 222 automated tests passing, including 18 unit tests in MonitorAlarmsTest covering all 3 communication alarms and settings toggles; QA is 55 of 120 active chapters.
 - **Nov7.3: [SOT Count: 940 (Rules: 440), Open: H:1, M:4, L:18, Ideas: H:0, M:3, L:18, Testing: PASSED (Sub-items: 222), QA: 54]** - Audit Baseline: 222 automated tests passing, including 86 on the A15; on the A15 through the production relay at low volume, the Monitor raised and silenced the power, offline, battery, and temperature alarms with the full-screen alarm, siren, and notification, including in the background; 0 Davey, StackLog, or fatal entries from either process over about 7 minutes. QA counts chapters verified at least in part, out of 119 active chapters.
 - **Nov7.2: [SOT Count: 939 (Rules: 439), Open: H:1, M:4, L:16, Ideas: H:0, M:3, L:16, Testing: PASSED (Sub-items: 194), QA: 51]** - Audit Baseline: 194 automated tests passing, including 81 on the A15; on the A15 through the production relay, the Sensor HUD showed `--` before its service started, then the accuracy and speed of the fused fix in `dumpsys location`, with a counting age; 0 Davey, StackLog, or fatal entries from either process over about 2 minutes. QA counts chapters verified at least in part, out of 118 active chapters.

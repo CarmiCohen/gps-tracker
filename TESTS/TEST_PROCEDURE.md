@@ -482,11 +482,16 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **130.2 Communication Alert Settings Controls:** Verify that each communication alarm follows its respective Alert Settings toggle (`Relay Connection Disconnected`, `Local Internet Offline`, `GNSS Signal Loss`) and Global Mute, dropping immediately when switched off. Automated by `MonitorAlarmsTest`.
 *   **130.3 Communication Alarm Lifecycle:** Verify that communication alarms sound the siren and show on the full-screen alarm overlay until acknowledged even after conditions clear, and that an acknowledged communication alarm re-arms only after its condition clears. Automated by `MonitorAlarmsTest`.
 
+## Chapter 131 - 30-Second Siren Auto-Stop (Nov7.6)
+*   **131.1 Siren Auto-Stop Timer:** Verify that when any monitor alarm raises the siren, it automatically stops after 30 seconds (`30s`) even if not acknowledged. Automated by `MonitorAlarmEngine` 30s timeout and `MonitorAlarmsTest` (ISSUE-NOV7.6-O40).
+*   **131.2 First Event (Timer or Acknowledge):** Verify that the siren stops on whichever event occurs first: the 30-second timer expiring OR the user tapping Acknowledge. When the siren auto-stops via timer, verify that the visual alarm and notification remain pending until explicitly acknowledged. Automated by `MonitorAlarmEngine`.
+
 ---
-**Active Testing Chapters: 120 of 130**
+**Active Testing Chapters: 121 of 131**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
+
 
 
 
