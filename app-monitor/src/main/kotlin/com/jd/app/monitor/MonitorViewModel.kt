@@ -12,7 +12,10 @@ import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.atUiRate
 import com.jd.core.ui.HudState
+import com.jd.core.ui.metersPerSecondToKmh
+import com.jd.core.ui.motionState
 import com.jd.core.ui.readBattery
+import com.jd.core.ui.withLocalReadings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -144,7 +147,7 @@ class MonitorViewModel @Inject constructor(
             isPeerActive = isTrackerPresent,       // TRK: Green ONLY if Tracker T is connected & active
             isDataHealthy = isInternet && isConnected,
             watchdogOk = true
-        ).withLocalReadings(fix, readBattery(context), now)
+        ).withLocalReadings(fix?.reading, readBattery(context), now)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "monitor"))
 
     val remoteHudState: StateFlow<HudState> = combine(

@@ -12,6 +12,7 @@ import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.RelayConfig
 import com.jd.core.ui.HudState
 import com.jd.core.ui.readBattery
+import com.jd.core.ui.withLocalReadings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
@@ -24,6 +25,7 @@ class SensorViewModel @Inject constructor(
     private val identityManager: ForensicIdentityManager,
     private val signalingClient: SignalingClient,
     private val sensorDataStore: SensorDataStore,
+    private val fixStore: SensorFixStore,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -84,11 +86,11 @@ class SensorViewModel @Inject constructor(
         selfId,
         signalingClient.isConnected,
         signalingClient.viewerStatusFlow,
+        fixStore.fix,
         _ticker
-    ) { id, isConnected, isViewerConnected, _ ->
+    ) { id, isConnected, isViewerConnected, fix, now ->
         val isInternet = isNetworkAvailable(context)
         val isGpsActive = isLocationProviderEnabled(context)
-        val battery = readBattery(context)
 
         HudState(
             appMode = "sensor",
@@ -99,15 +101,8 @@ class SensorViewModel @Inject constructor(
             isLocalGpsActive = isGpsActive,
             isPeerActive = isViewerConnected,
             isDataHealthy = isInternet,
-            watchdogOk = true,
-            trackerState = "STATIONARY",
-            speedKmh = 0f,
-            batteryLevel = battery.level,
-            isCharging = battery.isCharging,
-            tempCelsius = battery.tempCelsius,
-            accuracyMeters = 5.0f,
-            telemetryAgeSec = 0L
-        )
+            watchdogOk = true
+        ).withLocalReadings(fix, readBattery(context), now)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "sensor"))
 
     private fun isNetworkAvailable(ctx: Context): Boolean {

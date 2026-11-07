@@ -1,4 +1,23 @@
-# Test Results - Nov7.1 (Unpair Confirmation)
+# Test Results - Nov7.2 (Real Sensor HUD Values)
+
+## Nov7.2 Summary
+Executed Nov 7, 2026 on the A15 (`R58X40GV2AR`, API 36), the only phone attached, with Sensor and Monitor on the same phone through the production relay and real positions. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.
+
+| Check | Status | Notes |
+| :--- | :--- | :--- |
+| **Automated suite** | 🟢 **194/194** | `:core-shared` 46, `:core-network` 18, `:core-ui` 26, `:app-monitor` unit 23, `:app-monitor` on A15 39, `:app-sensor` on A15 42. `MonitorHudValuesTest` (7) moved to `core-ui` as `FixReadingTest` (9). Unit tasks were forced with `--rerun-tasks`; fresh result files were counted, with 0 failures and 0 errors. Both instrumented suites ran on the final code at `Nov7.2`, after the deliberate break was reverted. |
+| **128.1 Shared HUD rule** | 🟢 **PASSED (automated)** | `FixReadingTest`, 9 tests, including a fix without accuracy and a line keeping its connection fields. |
+| **128.2, 128.3 Sensor HUD** | 🟢 **PASSED (automated)** | `SensorHudValuesTest`, 5 tests on the A15 against the real `SensorViewModel` and `SensorFixStore`. A match needs a battery reading, so the initial `stateIn` value cannot pass a test. |
+| **Deliberate break** | 🟢 **PASSED** | With the hardcoded `STATIONARY`, `0f`, `5.0f`, and `0L` put back over the real values, 3 of 5 failed: `noFixShowsNoPositionValues`, `showsThePublishedFix`, and `clearingTheFixRemovesItsValues`. The two `Location` conversion tests passed because they do not use the ViewModel. The fix was then restored. |
+| **128.4 Sensor HUD on hardware** | 🟢 **PASSED, stop step not run** | Before `START SENSOR SERVICE`: `--`, `-- km/h`, `B:100%⚡|T:28°C|A:--|AGE:--`. 15 seconds after start: `STATIONARY`, `1.3 km/h`, `A:±22.4m|AGE:2s`, while `dumpsys location` showed the fused fix at `hAcc=22.4` and `vel=0.3656` m/s, which is 1.3 km/h. Four more samples 2 seconds apart: `±13.8m`, `±13.5m`, `±12.8m`, `±12.8m` with `AGE` 0, 0, 0, and 4s. The stop step was not run: the app has no stop control, and `am stopservice` was refused because the service is not exported (ISSUE-NOV7.2-O36). |
+| **Monitor after the move** | 🟢 **PASSED** | Paired with `T`: local line `A:±14.1m|AGE:15s`, sensor line `A:±13.5m|AGE:0s`. |
+| **0.1 Logcat anomalies** | 🟢 **PASSED** | `device_audit.cmd` at 11:45, Sensor and Monitor processes, log cleared before launch, Sensor service started at 11:42:47: 0 Davey over 500ms, 0 StackLog, 0 fatal. Sensor logged `onCreate called. Version: Nov7.2`. `ProductionReadinessAuditTest` ran in the Sensor suite. |
+
+**Run history:** three intended failures, the deliberate break above. Every other test run passed the first time.
+
+---
+
+# Nov7.1 Results (Unpair Confirmation)
 
 ## Nov7.1 Summary
 Executed Nov 7, 2026 on the A15 (`R58X40GV2AR`, API 36), the only phone attached, with Sensor and Monitor on the same phone through the production relay and real positions. The S21FE was not used. Status of every chapter: `TESTS/CHAPTER_TRIAGE.md`.

@@ -9,6 +9,7 @@ import android.location.LocationManager
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationListenerCompat
+import com.jd.core.ui.toFixReading
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -45,12 +46,7 @@ class MonitorLocationSource @Inject constructor(
         awaitClose { locationManager.removeUpdates(listener) }
     }
 
-    private fun Location.toLocalFix() = LocalFix(
-        position = MapPosition(latitude, longitude),
-        timeMs = time,
-        accuracyMeters = if (hasAccuracy()) accuracy else 0f,
-        speedMps = if (hasSpeed()) speed else null
-    )
+    private fun Location.toLocalFix() = LocalFix(MapPosition(latitude, longitude), toFixReading())
 
     companion object {
         val LOCATION_PERMISSIONS = arrayOf(

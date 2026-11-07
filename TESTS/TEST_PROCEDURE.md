@@ -430,10 +430,10 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **121.7 Process Kill:** While telemetry runs, kill the Sensor process with `kill -9`. Verify that it restarts by itself, logs no damaged entries, and that the stored reservation advances.
 
 ## Chapter 122 - Real HUD Values (Nov6.1)
-*   **122.1 Local HUD Line:** On the Monitor, verify that the local line shows the phone's own battery, charging state, temperature, fix accuracy, and fix age, and compare them with `dumpsys battery` and `dumpsys location`. Automated by `MonitorHudValuesTest.usesBatteryAndFixValues`.
+*   **122.1 Local HUD Line:** On the Monitor, verify that the local line shows the phone's own battery, charging state, temperature, fix accuracy, and fix age, and compare them with `dumpsys battery` and `dumpsys location`. Automated by `FixReadingTest.usesBatteryAndFixValues` (`MonitorHudValuesTest` until Nov7.1).
 *   **122.2 Battery Reading:** Verify that a level or temperature the system does not report stays unknown instead of becoming 100% or 30°C, in both apps. Automated by `BatteryReadingTest`.
-*   **122.3 Unknown Values:** With no fix, or before any telemetry, verify that the affected HUD values show `--` and no number, and that a real 0 still shows as a number. Automated by `HudStateTest` and `MonitorHudValuesTest.noFixShowsNoPositionValues`.
-*   **122.4 Old Fix:** Stop moving with the Monitor. Verify that after 35 seconds without a new fix, speed and motion state show `--`, while accuracy and age stay. Automated by `MonitorHudValuesTest.oldFixKeepsItsAccuracyAndAgeButNotItsSpeed`.
+*   **122.3 Unknown Values:** With no fix, or before any telemetry, verify that the affected HUD values show `--` and no number, and that a real 0 still shows as a number. Automated by `HudStateTest` and `FixReadingTest.noFixShowsNoPositionValues`.
+*   **122.4 Old Fix:** Stop moving with the Monitor. Verify that after 35 seconds without a new fix, speed and motion state show `--`, while accuracy and age stay. Automated by `FixReadingTest.oldFixKeepsItsAccuracyAndAgeButNotItsSpeed`.
 
 ## Chapter 123 - Monitor Trail Storage Bound (Nov6.2)
 *   **123.1 Row Cap:** Verify that each tracker keeps only its newest 50,000 trail rows, that one row over the limit removes only the oldest row, and that a tracker at or under the limit loses nothing, even when another tracker is over it. Automated by `TrailStorageBoundTest.workerKeepsTheNewestRowsOfEachTrackerAtTheRealLimit`, `rowCountAtTheLimitIsLeftAlone`, and `oneRowOverTheLimitRemovesOnlyTheOldest`.
@@ -465,8 +465,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **127.2 Cancel And Confirm:** Verify that `Cancel` closes the dialog and keeps the pairing, and that `Unpair` clears it exactly once and returns to the pairing screen. Automated by `cancelKeepsThePairing` and `confirmUnpairsOnce`.
 *   **127.3 Unpair On Hardware:** On the A15, tap the gear and then `Cancel`, and verify that the map screen and telemetry stay. Tap `Disconnect` and then `Unpair`, and verify that the pairing screen opens and the session notification stops. Pair again with `T`.
 
+## Chapter 128 - Real Sensor HUD Values (Nov7.2)
+*   **128.1 One HUD Rule For Both Apps:** Verify that the Sensor HUD and the Monitor local line build their motion state, speed, accuracy, and age with the same function, `withLocalReadings`, and that a fix without accuracy shows `A:--`. Automated by `FixReadingTest` (ISSUE-NOV6.1-O27).
+*   **128.2 The Service's Fix Reaches The HUD:** Verify that a fix published by the Sensor service shows its own motion state, speed, accuracy, and age on the Sensor HUD, and that a `Location` keeps its time, accuracy, and speed, or reports none when it has none. Automated by `SensorHudValuesTest.showsThePublishedFix`, `aLocationKeepsItsSpeedAccuracyAndTime`, and `aLocationWithoutSpeedOrAccuracyReportsNeither`.
+*   **128.3 No Fix Shows No Values:** With the service stopped, or before its first fix, verify that the Sensor HUD shows `--` for motion state, speed, accuracy, and age, and no `STATIONARY`, `0.0 km/h`, `±5.0m`, or `0s`. Automated by `SensorHudValuesTest.noFixShowsNoPositionValues` and `clearingTheFixRemovesItsValues`.
+*   **128.4 Sensor HUD On Hardware:** On the A15, before `START SENSOR SERVICE`, verify that the Sensor HUD shows `--` for motion state, speed, accuracy, and age. Start the service and verify that the accuracy and speed match the last fused fix in `dumpsys location`, and that the age counts up between fixes and stays under about 10 seconds. The app has no control that stops the service, and `am stopservice` is refused because the service is not exported, so the return to `--` after a stop has automated proof only.
+
 ---
-**Active Testing Chapters: 117 of 127**
+**Active Testing Chapters: 118 of 128**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

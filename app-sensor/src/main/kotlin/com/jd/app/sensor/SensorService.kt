@@ -25,6 +25,7 @@ import com.google.android.gms.location.*
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.*
 import com.jd.core.ui.getAppVersionName
+import com.jd.core.ui.toFixReading
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
@@ -47,6 +48,7 @@ class SensorService : Service(), SensorEventListener {
     @Inject lateinit var signalingClient: SignalingClient
     @Inject lateinit var identityManager: com.jd.core.network.ForensicIdentityManager
     @Inject lateinit var sensorDataStore: SensorDataStore
+    @Inject lateinit var fixStore: SensorFixStore
     private lateinit var forensicBuffer: ForensicBuffer
     private lateinit var sensorManager: SensorManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -74,6 +76,7 @@ class SensorService : Service(), SensorEventListener {
         override fun onLocationResult(result: LocationResult) {
             result.lastLocation?.let { location ->
                 lastLocation = location
+                fixStore.publish(location.toFixReading())
                 refreshSamplingRate()
             }
         }
@@ -414,6 +417,7 @@ class SensorService : Service(), SensorEventListener {
         SystemLogger.i("SensorService", "onDestroy called. Cleaning up...")
         serviceScope.cancel()
         orchestrator.cancelAll()
+        fixStore.clear()
         if (isInitialized) {
             sensorManager.unregisterListener(this)
             fusedLocationClient.removeLocationUpdates(locationCallback)

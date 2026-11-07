@@ -14,11 +14,11 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 
 **D does not mean the code is absent.** In several chapters logic exists and has unit tests, such as `SentinelLogic`, but nothing in the running apps calls it. The D findings come from reading the code.
 
-**Summary:** 50 of 117 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
+**Summary:** 51 of 118 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
 
-**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1, Chapter 123 makes 113 in Nov6.2, Chapter 124 makes 114 in Nov6.3, Chapter 125 makes 115 in Nov6.4, Chapter 126 makes 116 in Nov7.0, and Chapter 127 makes 117 in Nov7.1.
+**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1, Chapter 123 makes 113 in Nov6.2, Chapter 124 makes 114 in Nov6.3, Chapter 125 makes 115 in Nov6.4, Chapter 126 makes 116 in Nov7.0, Chapter 127 makes 117 in Nov7.1, and Chapter 128 makes 118 in Nov7.2.
 
-**A chapter review:** the earlier count of 48 included seven chapters whose tests do not prove the chapter's claim: 53, 66, 67, 68, 83, 88, and 93. None of the 48 were retired, so 48 minus 7 gives 41. ISSUE-NOV6.0-O20 then added chapters 66 and 121, giving 43. ISSUE-NOV5.0-O2 added chapter 122, giving 44. ISSUE-NOV5.2-O14 added chapter 123 and verified chapter 50, giving 46. ISSUE-NOV5.0-O5 added chapter 124, giving 47. ISSUE-NOV6.3-O32 added chapter 125, giving 48. ISSUE-NOV5.0-O6 added chapter 126, giving 49. ISSUE-NOV5.2-O15 added chapter 127, giving 50.
+**A chapter review:** the earlier count of 48 included seven chapters whose tests do not prove the chapter's claim: 53, 66, 67, 68, 83, 88, and 93. None of the 48 were retired, so 48 minus 7 gives 41. ISSUE-NOV6.0-O20 then added chapters 66 and 121, giving 43. ISSUE-NOV5.0-O2 added chapter 122, giving 44. ISSUE-NOV5.2-O14 added chapter 123 and verified chapter 50, giving 46. ISSUE-NOV5.0-O5 added chapter 124, giving 47. ISSUE-NOV6.3-O32 added chapter 125, giving 48. ISSUE-NOV5.0-O6 added chapter 126, giving 49. ISSUE-NOV5.2-O15 added chapter 127, giving 50. ISSUE-NOV6.1-O27 added chapter 128, giving 51.
 
 ## Chapter 0 - Operational Forensic Audit
 | Item | Code | Notes |
@@ -112,6 +112,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 125 Backfill gap recovery | L / A | 125.1 to 125.6 automated; 125.7 verified on the A15 through a private relay, with one hole. Production relay and two phones not run |
 | 126 Real version strings | L / A | 126.1 and 126.2 automated; 126.3 verified on the A15 through the production relay. The `--` case has automated proof only |
 | 127 Unpair confirmation | L / A | 127.1 and 127.2 automated; 127.3 verified on the A15 through the production relay |
+| 128 Real Sensor HUD values | L / A | 128.1 to 128.3 automated; 128.4 verified on the A15 through the production relay against `dumpsys location`. The return to `--` after the service stops has automated proof only, because nothing on the device can stop the service (ISSUE-NOV7.2-O36) |
 
 ## TEST_FORENSIC_STRESS_PROTOCOL.md
 | Section | Code | Notes |

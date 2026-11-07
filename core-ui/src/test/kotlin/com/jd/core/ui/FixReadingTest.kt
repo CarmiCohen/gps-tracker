@@ -1,22 +1,22 @@
-package com.jd.app.monitor
+package com.jd.core.ui
 
-import com.jd.core.ui.BatteryReading
-import com.jd.core.ui.HudState
-import com.jd.core.ui.NO_VALUE
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Verifies Chapter 122.1, 122.3, and 122.4: the local HUD line shows the Monitor's own readings. */
-class MonitorHudValuesTest {
+/**
+ * Verifies Chapter 122.1, 122.3, 122.4, and 128.1: a HUD line shows the device's own readings.
+ * Both the Monitor local line and the Sensor HUD use [withLocalReadings] (ISSUE-NOV5.0-O2, ISSUE-NOV6.1-O27).
+ */
+class FixReadingTest {
 
     private val now = 1_000_000L
     private val battery = BatteryReading(level = 42, isCharging = true, tempCelsius = 33.5f)
 
     private fun fix(ageMs: Long = 0L, accuracy: Float = 8f, speedMps: Float? = 10f) =
-        LocalFix(MapPosition(32.0, 34.0), now - ageMs, accuracy, speedMps)
+        FixReading(now - ageMs, accuracy, speedMps)
 
     @Test
     fun usesBatteryAndFixValues() {
@@ -36,6 +36,7 @@ class MonitorHudValuesTest {
         val state = HudState().withLocalReadings(null, battery, now)
 
         assertEquals("B:42%⚡|T:34°C|A:--|AGE:--", state.telemetryText)
+        assertEquals("-- km/h", state.speedText)
         assertNull(state.speedKmh)
         assertEquals(NO_VALUE, state.trackerState)
     }
@@ -67,10 +68,29 @@ class MonitorHudValuesTest {
     }
 
     @Test
+    fun fixWithoutAccuracyShowsNoAccuracy() {
+        val state = HudState().withLocalReadings(fix(accuracy = 0f), battery, now)
+
+        assertEquals("B:42%⚡|T:34°C|A:--|AGE:0s", state.telemetryText)
+    }
+
+    @Test
     fun fixAheadOfTheClockHasZeroAge() {
         val state = HudState().withLocalReadings(fix(ageMs = -5_000L), battery, now)
 
         assertEquals(0L, state.telemetryAgeSec)
+    }
+
+    @Test
+    fun keepsTheConnectionFieldsOfTheLine() {
+        val line = HudState(appMode = "sensor", selfId = "T", isRelayConnected = true, isPeerActive = true)
+
+        val state = line.withLocalReadings(fix(), battery, now)
+
+        assertEquals("sensor", state.appMode)
+        assertEquals("T", state.selfId)
+        assertTrue(state.isRelayConnected)
+        assertTrue(state.isPeerActive)
     }
 
     @Test
