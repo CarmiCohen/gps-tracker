@@ -46,9 +46,6 @@ class SensorViewModel @Inject constructor(
     val sirenType: StateFlow<String> = sensorDataStore.sirenType
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Siren")
 
-    private val _isSirenPlaying = MutableStateFlow(false)
-    val isSirenPlaying: StateFlow<Boolean> = _isSirenPlaying.asStateFlow()
-
     fun updateAlertSettings(settings: AlertSettings) {
         viewModelScope.launch {
             sensorDataStore.saveAlertSettings(settings)
@@ -66,10 +63,6 @@ class SensorViewModel @Inject constructor(
             val current = alertSettings.value
             sensorDataStore.saveAlertSettings(current.copy(alarmVolume = volume, useCustomVolume = true))
         }
-    }
-
-    fun testSirenAudio() {
-        _isSirenPlaying.value = !_isSirenPlaying.value
     }
 
 

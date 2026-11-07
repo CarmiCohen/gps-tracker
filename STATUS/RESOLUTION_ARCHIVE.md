@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov7.28)
+- **Sensor Siren Test Stealth Enforcement (ISSUE-NOV7.3-O38)**: The Sensor displayed `TEST SIREN AUDIO` in its Siren & Audio setup overlay, which only toggled an unused `_isSirenPlaying` state flow in `SensorViewModel` and could never sound. Rule 14 (Stealth Authority, R872) forbids the Sensor to sound. `AlarmSoundOverlay` (`core-ui`) now checks `isTracker`, rendering `Disabled (Stealth Tracker)` in place of the test button when `isTracker` is true. `_isSirenPlaying` and `testSirenAudio()` were removed from `SensorViewModel` (`app-sensor`), and `AdminActivity` passes `isSirenPlaying = false` and `{}` for the test action. Verified by unit tests across all subprojects, build clean with `--warning-mode all`, and `SensorStealthGuardTest`. SOT rule 1.379. **PASSED.**
+
 ## ✅ Resolved Issues (Nov7.26)
 - **Sensor PermissionGuard Re-check On Resume (ISSUE-NOV7.19-O44)**: `PermissionGuard` in `AdminActivity` (`app-sensor`) evaluated permission check only once when entering composition, so after a user granted missing permissions in system Settings or external permission flows and returned to `AdminActivity`, the screen remained stuck on "Permissions Required" until "Grant Permissions" button was clicked again. `PermissionGuard` now observes `Lifecycle.Event.ON_RESUME` using `LocalLifecycleOwner.current` and `DisposableEffect`, re-evaluating required permissions upon activity resume. Extracted `getRequiredSensorPermissions(sdkInt)` and `checkSensorPermissions(context, permissions, checker)` helper functions. Verified by 5 unit tests in `PermissionGuardTest`, 194/194 JVM unit tests passing across all subprojects, `assembleDebug --warning-mode all` build clean. SOT rule 1.378, test chapter 142. **PASSED.**
 

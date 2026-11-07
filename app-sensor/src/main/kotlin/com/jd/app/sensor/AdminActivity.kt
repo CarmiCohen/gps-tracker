@@ -94,7 +94,6 @@ class AdminActivity : ComponentActivity() {
 
                     val alertSettings by viewModel.alertSettings.collectAsStateWithLifecycle()
                     val sirenType by viewModel.sirenType.collectAsStateWithLifecycle()
-                    val isSirenPlaying by viewModel.isSirenPlaying.collectAsStateWithLifecycle()
 
                     if (isLocked) {
                         Box(
@@ -119,11 +118,11 @@ class AdminActivity : ComponentActivity() {
                                     isTracker = true,
                                     draftAlertSettings = alertSettings,
                                     selectedSirenType = sirenType,
-                                    isSirenPlaying = isSirenPlaying,
+                                    isSirenPlaying = false,
                                     onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
                                     onUpdateSirenType = { viewModel.updateSirenType(it) },
                                     onUpdateAlarmVolume = { viewModel.updateAlarmVolume(it) },
-                                    onTestSiren = { viewModel.testSirenAudio() },
+                                    onTestSiren = { },
                                     onClose = { showSoundOverlay = false }
                                 )
                             } else if (showPhoneSetupOverlay) {

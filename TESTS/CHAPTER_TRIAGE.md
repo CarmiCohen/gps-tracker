@@ -1,4 +1,4 @@
-# Chapter Triage - Nov7.26
+# Chapter Triage - Nov7.28
 
 Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`, and `TEST_FORENSIC_STRESS_PROTOCOL.md`, based on the running code and on tests executed for Nov5.2 on the A15. The A chapters were reviewed for Nov6.0 by comparing each chapter with its named test and with the production code (ISSUE-NOV5.4-O17).
 

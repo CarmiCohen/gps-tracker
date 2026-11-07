@@ -1,9 +1,9 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.26)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.28)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov7.26, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov7.28, solved one by one in the order below
 
 ### Work Queue
-Nov7.26 is closed and followed Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, or Nov7.23 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov7.28 is closed and followed Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
 **Next item: ISSUE-NOV6.0-O26 (item 18, Medium, blocked on a device below API 35 or permission to download an API 34 image).**
 
@@ -38,7 +38,7 @@ Nov7.26 is closed and followed Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7
 | 27 | ISSUE-NOV7.1-O35 | Decide what the three Monitor `CLEAN` actions should do, with item 8 | User decision |
 | 28 | ISSUE-NOV7.2-O36 | Decide whether the Sensor service can be stopped on the device, with item 8 | User decision |
 | 29 | ISSUE-NOV7.2-O37 | Send unknown speed, battery, and temperature as unknown, not as invented numbers | Nothing |
-| 30 | ISSUE-NOV7.3-O38 | Remove or relabel the Sensor's siren test button, which can never sound | Nothing |
+| 30 | ISSUE-NOV7.3-O38 | **Done for Nov7.28**: Sensor siren test button disabled/replaced on Sensor (stealth tracker) via AlarmSoundOverlay and SensorViewModel cleanup (chapter 143) | Nothing |
 | 31 | ISSUE-NOV7.3-O39 | Let the alarm reach the user under Do Not Disturb and over a locked screen | User decision on the permission flow |
 | 33 | ISSUE-NOV7.15-O41 | Find the main-thread work at Sensor start that delays the first `AdminActivity` frame past 500 ms | Nothing |
 | 32 | ISSUE-NOV7.15-O40 | Fill the missing Nov7.7 to Nov7.12 dashboard entries and Nov7.6 to Nov7.9 Resolved Gaps from `RESOLUTION_ARCHIVE.md` and the baselines | Nothing |
@@ -83,6 +83,11 @@ Nov7.26 is closed and followed Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov7.28)
+*   **Sensor Siren Test Stealth Enforcement (ISSUE-NOV7.3-O38)**: The Sensor displayed `TEST SIREN AUDIO` in its Siren & Audio setup overlay, which only toggled an unused `_isSirenPlaying` state flow in `SensorViewModel` and could never sound. Rule 14 (Stealth Authority, R872) forbids the Sensor to sound. `AlarmSoundOverlay` (`core-ui`) now checks `isTracker`, rendering `Disabled (Stealth Tracker)` in place of the test button when `isTracker` is true. `_isSirenPlaying` and `testSirenAudio()` were removed from `SensorViewModel` (`app-sensor`), and `AdminActivity` passes `isSirenPlaying = false` and `{}` for the test action. Verified by unit tests across all subprojects, build clean with `--warning-mode all`, and `SensorStealthGuardTest`. SOT rule 1.379, test chapter 143. **PASSED.**
 
 ---
 
@@ -270,6 +275,7 @@ Nov7.26 is closed and followed Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov7.28: [SOT Count: 954 (Rules: 454), Open: H:1, M:2, L:14, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 194), QA: 69]** - Audit Baseline: 194 automated tests passing across all subprojects, build clean with `--warning-mode all`, verifying Sensor siren test button disabled on Sensor (stealth tracker) via `AlarmSoundOverlay` and `SensorViewModel` cleanup. QA is 69 of 132 active chapters (chapter 143 added). Ideas: 16 in total.
 - **Nov7.21: [SOT Count: 951 (Rules: 451), Open: H:1, M:4, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 192), QA: 66]** - Audit Baseline: 192 automated tests passing in this version's runs: 189 JVM unit tests (141 Android-module, including 5 new `FixFreshnessTest`, 4 new `SignalingQueueTest`, 1 new `SignalingBatchTest`, and 3 new `MovementCheckTest` tests, and 48 in `core-shared`) and the 3 `ProductionReadinessAuditTest` checks on the A15. Live on the A15 through the production relay: `NO_FIX` 15 s after the last fix with location off, 126 contiguous `NO_FIX` rows stored by the Monitor, no violation after recovery, and no alarm at a Monitor cold start. **Forensic audit clean**: 0 Davey over 500 ms, 0 StackLog, 0 fatal in both apps (Monitor first frame `+1.24s`). A false `Power disconnected` siren at a Sensor start was found and recorded (ISSUE-NOV7.21-O45). QA is 66 of 130 active chapters (chapter 140 added and verified). Ideas: 16 in total (SIMP-NOV7.19-S1 done, SIMP-NOV7.21-S1 added).
 - **Nov7.19: [SOT Count: 950 (Rules: 450), Open: H:1, M:4, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 179), QA: 65]** - Audit Baseline: 179 automated tests passing in this version's runs: 176 JVM unit tests (128 Android-module, including 6 new `MonitorAlarmsTest` and 6 new `MovementCheckTest` tests, and 48 in `core-shared`, including 2 new `SentinelLogicTest` tests) and the 3 `ProductionReadinessAuditTest` checks on the A15. Live on the A15 through the production relay: no alarm, siren, or Sensor violation at a Monitor cold start (48 s) or a start of both apps (85 s), and 0 violations in 2 minutes on a still phone. **Forensic audit not fully clean**: the Sensor had 0 Davey, StackLog, or fatal entries; the Monitor had 0 StackLog and 0 fatal entries but 1 Davey over 500 ms (834 ms, its first frame; ISSUE-NOV7.15-O41). QA is 65 of 129 active chapters (chapter 139 added and verified). Ideas: 16 in total.
 - **Nov7.17: [SOT Count: 949 (Rules: 449), Open: H:1, M:4, L:14, Ideas: H:0, M:3, L:12, Testing: PASSED (Sub-items: 170), QA: 64]** - Audit Baseline: 170 automated tests passing in this version's runs: 162 JVM unit tests (116 Android-module, including the 5 new `SensorServiceStatusTest` tests, and 46 in `core-shared`) and 8 instrumented tests on the A15 (`ProductionReadinessAuditTest` 3, `SensorHudValuesTest` 5). The Setup dialog was checked live on the A15 in both states. **Forensic audit not clean**: Sensor and Monitor live on the A15 through the production relay, 2 runs of about 2 minutes (a third was not run, because each Monitor start sounds the siren at full volume, ISSUE-NOV7.17-O42). The Sensor had 0 Davey, StackLog, or fatal entries in both runs. The Monitor had 0 StackLog and 0 fatal entries, but 1 Davey over 500 ms in both runs (924 ms and 825 ms, its first frame; ISSUE-NOV7.15-O41). QA is 64 of 128 active chapters (chapter 138 added and verified). Ideas: 15 in total.

@@ -252,11 +252,15 @@ fun AlarmSoundOverlay(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("Test Audio Output", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                Button(
-                    onClick = onTestSiren,
-                    colors = ButtonDefaults.buttonColors(containerColor = if (isSirenPlaying) StatusRed else StatusGreen)
-                ) {
-                    Text(if (isSirenPlaying) "STOP SIREN TEST" else "TEST SIREN AUDIO")
+                if (isTracker) {
+                    Text("Disabled (Stealth Tracker)", color = Slate500, fontSize = 13.sp)
+                } else {
+                    Button(
+                        onClick = onTestSiren,
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isSirenPlaying) StatusRed else StatusGreen)
+                    ) {
+                        Text(if (isSirenPlaying) "STOP SIREN TEST" else "TEST SIREN AUDIO")
+                    }
                 }
             }
 

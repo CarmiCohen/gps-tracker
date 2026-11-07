@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov7.26 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov7.28 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -536,8 +536,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **142.1 Permission Guard Re-check On Resume:** Verify `PermissionGuard` in `AdminActivity` observes `Lifecycle.Event.ON_RESUME` using `LocalLifecycleOwner.current` and `DisposableEffect`, re-evaluating `checkSensorPermissions` so that returning to `AdminActivity` after granting permissions in system Settings or external permission flows immediately updates `allGranted` without requiring button re-clicks. Automated by `PermissionGuardTest` (5 tests) (ISSUE-NOV7.19-O44).
 *   **142.2 Required Sensor Permissions By API Level:** Verify `getRequiredSensorPermissions` returns `ACCESS_FINE_LOCATION` and `ACCESS_NETWORK_STATE` on API 26+, adds `POST_NOTIFICATIONS` on API 33+ (TIRAMISU), and adds `FOREGROUND_SERVICE_LOCATION` on API 34+ (UPSIDE_DOWN_CAKE). Automated by `PermissionGuardTest`.
 
+## Chapter 143 - Sensor Siren Test Button Disabled On Stealth Tracker (Nov7.28)
+*   **143.1 AlarmSoundOverlay Stealth Tracker Mode:** Verify `AlarmSoundOverlay` checks `isTracker`, rendering `Disabled (Stealth Tracker)` in place of the `TEST SIREN AUDIO` button when `isTracker` is true, ensuring the Sensor (tracker) never provides an interactive local audio test button in compliance with Rule 14 (Stealth Authority, R872). Automated by `SensorStealthGuardTest` and UI inspection (ISSUE-NOV7.3-O38).
+*   **143.2 SensorViewModel Stealth Posture:** Verify `SensorViewModel` does not contain siren playback state or audio test triggers. Automated by unit tests and `SensorStealthGuardTest`.
+
 ---
-**Active Testing Chapters: 132 of 142**
+**Active Testing Chapters: 133 of 143**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
