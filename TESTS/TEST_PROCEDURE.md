@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov2.24 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov7.8 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -12,7 +12,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ## Chapter 1 - Deployment & Initial Launch
 *   **1.1 Environment Reset:** Uninstall existing versions.
-*   **1.2 Deployment:** Deploy via Android Studio (Nov2.24).
+*   **1.2 Deployment:** Deploy via Android Studio (Nov7.8).
 *   **1.3 Version Verification:** Confirm string matches `Nov2.24_PLATINUM`.
 *   **1.6 Branding Audit:** Verify the "Platinum" branding and JD logos are centered.
 

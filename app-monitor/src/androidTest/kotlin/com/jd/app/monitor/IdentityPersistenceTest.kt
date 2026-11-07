@@ -49,6 +49,20 @@ class IdentityPersistenceTest {
     }
 
     @Test
+    fun verifyIdentityPersistenceAcrossReopen() = runBlocking {
+        identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_MONITOR)
+        identityManager.setSelfId("custom_persistent_id")
+        
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val reopenedManager = ForensicIdentityManager(context)
+        
+        val reloadedId = reopenedManager.selfId.first()
+        assertEquals("Identity must persist across manager re-instantiation (app restart)", "custom_persistent_id", reloadedId)
+        
+        reopenedManager.resetIdentity(ForensicIdentity.PREFIX_MONITOR)
+    }
+
+    @Test
     fun verifyTargetIdPersistence() = runBlocking {
         val customTargetId = ForensicIdentity.DEFAULT_TRACKER_ID
         
