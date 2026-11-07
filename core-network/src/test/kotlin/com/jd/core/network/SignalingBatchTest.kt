@@ -327,8 +327,8 @@ class SignalingBatchTest {
             client.sendTelemetry(LocationUpdate(sequenceId = 1L))
             client.sendTelemetry(LocationUpdate(sequenceId = 2L))
             
-            // Send critical status update
-            client.sendTelemetry(LocationUpdate(sequenceId = 3L, status = "JUMP"))
+            // Send critical update
+            client.sendTelemetry(LocationUpdate(sequenceId = 3L, status = "JUMP", isCritical = true))
             runCurrent()
 
             // Filter for relevant signaling events (ignore "join")
@@ -343,6 +343,34 @@ class SignalingBatchTest {
             val batch2 = sigEvents[1].second as JSONArray
             assertEquals(1, batch2.length())
             assertEquals("JUMP", batch2.getJSONObject(0).getString("status"))
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun testNoFixStatusIsBatchedNotSentAlone() = runTest {
+        // ISSUE-NOV7.19-O43: the Sensor sends NO_FIX on every tick while it has no fix; at 10 Hz it must not bypass batching.
+        val fakeSocket = FakeSocket()
+        val client = SocketioSignalingClient(FakeSocketFactory(fakeSocket), StandardTestDispatcher(testScheduler))
+
+        try {
+            client.connect("http://localhost", "test-device", "secret")
+            fakeSocket.simulateConnect()
+            runCurrent()
+
+            repeat(3) { client.sendTelemetry(LocationUpdate(sequenceId = it.toLong(), status = "NO_FIX")) }
+            runCurrent()
+            assertTrue("NO_FIX must wait for the batch", fakeSocket.emittedEvents.none { it.first == "location_batch" })
+
+            advanceTimeBy(501)
+            runCurrent()
+            val batches = fakeSocket.emittedEvents.filter { it.first == "location_batch" }
+            assertEquals(1, batches.size)
+            val array = batches[0].second as JSONArray
+            assertEquals(3, array.length())
+            assertEquals("NO_FIX", array.getJSONObject(0).getString("status"))
+            assertFalse("The flag stays local to the sender", array.getJSONObject(0).has("isCritical"))
         } finally {
             client.disconnect()
         }

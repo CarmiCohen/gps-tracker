@@ -2,6 +2,7 @@ package com.jd.core.network
 
 import com.jd.core.shared.LocationUpdate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.concurrent.thread
@@ -82,6 +83,44 @@ class SignalingQueueTest {
         assertEquals(3L, repoll[2].sequenceId)
         assertEquals(4L, repoll[3].sequenceId)
         assertEquals(5L, repoll[4].sequenceId)
+    }
+
+    @Test
+    fun testOverflowDropsOrdinaryUpdatesAndKeepsCriticalOnes() {
+        // SIMP-NOV7.19-S1: criticality is the flag, not the status text.
+        val queue = SignalingQueue(maxCapacity = 3)
+        queue.offer(LocationUpdate(sequenceId = 1L, status = "JUMP", isCritical = true))
+        queue.offer(LocationUpdate(sequenceId = 2L, status = "NO_FIX"))
+        queue.offer(LocationUpdate(sequenceId = 3L, status = "NO_FIX"))
+        queue.offer(LocationUpdate(sequenceId = 4L))
+
+        val batch = queue.pollBatch(10)
+        assertEquals(listOf(1L, 3L, 4L), batch.map { it.sequenceId })
+        assertTrue("The critical update must survive the overflow", batch[0].isCritical)
+    }
+
+    @Test
+    fun testNoFixUpdatesAreDeduplicatedLikeOrdinaryOnes() {
+        val queue = SignalingQueue(maxCapacity = 100)
+        queue.offer(LocationUpdate(sequenceId = 5L, status = "NO_FIX"))
+        queue.offer(LocationUpdate(sequenceId = 5L, status = "NO_FIX"))
+        assertEquals(1, queue.size())
+    }
+
+    @Test
+    fun testCriticalUpdatesAreNeverDeduplicated() {
+        val queue = SignalingQueue(maxCapacity = 100)
+        queue.offer(LocationUpdate(sequenceId = 5L, isCritical = true))
+        queue.offer(LocationUpdate(sequenceId = 5L, isCritical = true))
+        assertEquals(2, queue.size())
+    }
+
+    @Test
+    fun testResetClearsTheCriticalFlag() {
+        val update = LocationUpdate(status = "OUTLIER", isCritical = true)
+        update.reset()
+        assertEquals("VALID", update.status)
+        assertFalse("A pooled update must not stay critical", update.isCritical)
     }
 
     @Test

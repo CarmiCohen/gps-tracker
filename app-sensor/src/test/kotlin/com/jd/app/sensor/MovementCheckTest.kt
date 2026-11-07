@@ -59,6 +59,40 @@ class MovementCheckTest {
     }
 
     @Test
+    fun theCellFixAfterAGpsLossSeenOnTheA15IsNotJudged() {
+        // ISSUE-NOV7.19-O43, A15 2026-11-07 20:38: location off for 30 s on a still phone, then a cell fix 3352 m off at
+        // 700 m accuracy (reported JUMP 97.5 m/s), then a GPS fix back home (reported OUTLIER 488 m/s).
+        val check = MovementCheck()
+        check.check(gpsFix(10 * second), hasPhysicalMotion = false)
+        val cellFix = fixForMovementCheck(32.683092, 35.301082, 700f, 0f, 44 * second)
+
+        assertNull("A cell fix cannot tell a movement", check.check(cellFix, hasPhysicalMotion = false))
+        assertEquals(
+            "The GPS fix after it is compared with the last usable fix",
+            SentinelStatus.VALID,
+            check.check(gpsFix(50 * second), hasPhysicalMotion = false)?.status
+        )
+    }
+
+    @Test
+    fun aFixWithoutAccuracyIsNotJudged() {
+        val check = MovementCheck()
+        assertNull(check.check(fixForMovementCheck(32.65, 35.30, 0f, 0f, 10 * second), hasPhysicalMotion = false))
+        assertEquals(SentinelStatus.VALID, check.check(gpsFix(11 * second), hasPhysicalMotion = false)?.status)
+    }
+
+    @Test
+    fun aRealJumpAcrossAGpsLossIsStillReported() {
+        val check = MovementCheck()
+        check.check(gpsFix(10 * second), hasPhysicalMotion = false)
+        check.check(fixForMovementCheck(32.683092, 35.301082, 700f, 0f, 44 * second), hasPhysicalMotion = false)
+        // About 11 km (0.1 degrees of latitude) in 40 s is 278 m/s.
+        val far = fixForMovementCheck(32.753092, 35.301082, 14.3f, 0f, 50 * second)
+
+        assertEquals(SentinelStatus.OUTLIER, check.check(far, hasPhysicalMotion = true)?.status)
+    }
+
+    @Test
     fun theFixTimeComesFromTheMonotonicClockInMilliseconds() {
         assertEquals(12_345L, fixForMovementCheck(1.0, 2.0, 3f, 4f, 12_345_000_000L).timestamp)
     }

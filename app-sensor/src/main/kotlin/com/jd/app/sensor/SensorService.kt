@@ -19,6 +19,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
@@ -60,6 +61,7 @@ class SensorService : Service(), SensorEventListener {
     private var isMuzzled = false
     private var isInitialized = false
     private val movementCheck = MovementCheck()
+    private var isReportingNoFix = false // Sensing loop only; logs each change between a current fix and NO_FIX.
 
     // Raw IMU caches
     private var lastAccel = DoubleArray(3)
@@ -306,8 +308,19 @@ class SensorService : Service(), SensorEventListener {
                 update.tempCelsius = lastTempCelsius
                 
                 val hasPhysicalMotion = update.sensorSnapshot.vibration > 0.12f
+                // A fix older than FIX_STALE_AFTER_MS is no longer the current position: send NO_FIX without one.
+                val currentFix = lastLocation?.takeIf { isFixFresh(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) }
+                if (currentFix == null) update.status = NO_FIX_STATUS
+                if ((currentFix == null) != isReportingNoFix) {
+                    isReportingNoFix = currentFix == null
+                    if (isReportingNoFix) {
+                        SystemLogger.w("SensorService", "No current GPS fix (none, or older than ${FIX_STALE_AFTER_MS}ms): reporting $NO_FIX_STATUS")
+                    } else {
+                        SystemLogger.i("SensorService", "GPS fix current again")
+                    }
+                }
                 // Only the tick that carries a new fix is checked; repeated ticks of the same fix stay VALID.
-                val validation = lastLocation?.let { loc ->
+                val validation = currentFix?.let { loc ->
                     update.lat = loc.latitude
                     update.lng = loc.longitude
                     update.accuracy = loc.accuracy
@@ -322,6 +335,7 @@ class SensorService : Service(), SensorEventListener {
 
                 if (validation != null && validation.status != SentinelLogic.SentinelStatus.VALID) {
                     update.status = validation.status.name
+                    update.isCritical = true
                     SystemLogger.w("SensorService", "Violation detected: ${validation.status} - ${validation.reason}")
                     // Built before launching: the pooled update is zeroed on release, before the launched send runs.
                     val violation = ViolationEvent(
@@ -332,7 +346,7 @@ class SensorService : Service(), SensorEventListener {
                     serviceScope.launch { signalingClient.sendViolation(violation) }
                 }
                 
-                forensicBuffer.writeTrace(update)
+                forensicBuffer.writeTrace(update, isCritical = update.isCritical)
                 signalingClient.sendTelemetry(update)
 
                 if (System.currentTimeMillis() % 10000 < currentIntervalMs) {

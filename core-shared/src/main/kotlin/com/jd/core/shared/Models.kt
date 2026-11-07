@@ -29,7 +29,9 @@ data class LocationUpdate(
     var tempCelsius: Float = 0f,
     var isThermalThrottled: Boolean = false,
     var cumulativeBytesSent: Long = 0L,
-    var status: String = "VALID", // Added for remote status visibility
+    var status: String = "VALID", // What the reading means (VALID, NO_FIX, JUMP, ...); delivery never depends on it
+    /** Sent at once, never dropped or deduplicated while queued (SIMP-NOV7.19-S1). Local to the sender, not on the wire. */
+    var isCritical: Boolean = false,
     var sensorSnapshot: SensorSnapshot = SensorSnapshot()
 ) {
     /** Deep copy for holders that outlive a pooled instance, which is zeroed on release. */
@@ -40,7 +42,7 @@ data class LocationUpdate(
         timestamp = 0L; monotonicNanos = 0L; serverArrivalTs = 0L; sequenceId = 0L
         isCharging = false; batteryLevel = 0; gsmSignalDbm = 0; networkType = "--"
         isBuffered = false; isHistoricalLkg = false; tempCelsius = 0f
-        isThermalThrottled = false; cumulativeBytesSent = 0L; status = "VALID"
+        isThermalThrottled = false; cumulativeBytesSent = 0L; status = "VALID"; isCritical = false
         sensorSnapshot.reset()
     }
 }

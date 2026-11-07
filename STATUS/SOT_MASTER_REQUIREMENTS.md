@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov7.19)
+# SOT Master Requirements & Hardening Status (Nov7.21)
 
-## 🏗️ Architectural Master Rules (450 Rules)
+## 🏗️ Architectural Master Rules (451 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -39,8 +39,10 @@
 *   **1.373 Backfill Answer Stops On Send Failure (R-ID 144)**: The Sensor MUST answer a backfill request in chunks of at most 50 rows and MUST stop at the first chunk that `sendBackfillResponse` fails to send. After a failed chunk it MUST NOT send any later chunk of that request, including the completion chunk (`isComplete`), so the Monitor never counts a range with missing rows as answered; the Monitor's 30-second request release and stored-trail gap scan (rule 1.361) then request the remaining rows (ISSUE-NOV6.4-O33) (R-ID 144).
 *   **1.374 Real Sensor Service Status (R-ID 145)**: The Sensor Setup dialog MUST show the service state reported by `SensorService` itself through the `@Singleton` `SensorServiceStatus` (running only after `initializeServiceComponents` has started the service components, stopped again in `onDestroy`) and the relay state from `SignalingClient.isConnected`, as `Sensor Service: Running` / `Stopped` and `Relay Connection: Connected` / `Disconnected`. No screen may show a fixed service state such as `Active / Ready` (ISSUE-NOV6.4-O34) (R-ID 145).
 *   **1.375 No False Alarms At Start (R-ID 146)**: The Monitor MUST NOT raise `Relay disconnected` for a relay it has not yet connected to until 30 seconds after it starts watching (`RELAY_FIRST_CONNECT_GRACE_MS`); after a connection, a lost relay MUST raise it at once. `Tracker GPS signal loss` MUST be raised only after the tracker has reported no position for 30 seconds (`GPS_SIGNAL_LOSS_AFTER_MS`). The Sensor MUST check movement once per new fix, against the previous fix and timed by the fixes' monotonic clock, never on loop ticks that send the same fix again; `SentinelLogic.validateMovement` MUST treat a move smaller than the larger of the two fixes' accuracies as `VALID`, and a `JUMP` reason MUST carry the measured speed, distance, interval, and accuracies. A `ViolationEvent` MUST be built before its send is launched, from a copy of the update (ISSUE-NOV7.17-O42) (R-ID 146).
+*   **1.376 Real GPS Loss Reporting & Explicit Critical Delivery (R-ID 147)**: Whether a telemetry update is sent unbatched, kept when the queue overflows, and exempt from sequence deduplication MUST be decided only by `LocationUpdate.isCritical`, never by the text of its `status`; the flag stays with the sender and is not sent. The Sensor MUST set it only for an update carrying a violation (`JUMP`, `OUTLIER`), and MUST commit such an update to the forensic buffer at once. The Sensor MUST send `NO_FIX` with no position (latitude, longitude, and accuracy 0) on every tick while it has no fix, or while its newest fix is at least 15 seconds old (`FIX_STALE_AFTER_MS`, measured on `elapsedRealtimeNanos`), and MUST NOT send an older fix as current. It MUST NOT judge movement on, or keep as the reference, a fix whose accuracy is unknown or coarser than 100 m (`MOVEMENT_CHECK_MAX_ACCURACY_M`) (ISSUE-NOV7.19-O43, SIMP-NOV7.19-S1) (R-ID 147).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov7.21**: The Sensor Reports A Real GPS Loss (ISSUE-NOV7.19-O43, SIMP-NOV7.19-S1) - PASSED with open item (ISSUE-NOV7.21-O45).
 - **Nov7.19**: No False Alarms At Start (ISSUE-NOV7.17-O42) - PASSED with open items (ISSUE-NOV7.19-O43, ISSUE-NOV7.19-O44).
 - **Nov7.17**: Real Sensor Service Status (ISSUE-NOV6.4-O34) - PASSED with open item (ISSUE-NOV7.17-O42).
 - **Nov7.15**: Backfill Answer Stops On Send Failure (ISSUE-NOV6.4-O33) - PASSED.

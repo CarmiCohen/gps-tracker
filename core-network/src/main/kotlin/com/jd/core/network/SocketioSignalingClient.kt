@@ -269,8 +269,8 @@ class SocketioSignalingClient @Inject constructor(
             return false
         }
 
-        // Critical status updates (Geofence transitions, etc.) bypass batching
-        if (owned.status != "VALID") {
+        // Critical updates (violations, geofence transitions) bypass batching; an ordinary status such as NO_FIX does not
+        if (owned.isCritical) {
             flushPendingBatch() // Flush pending first to maintain order
             return sendTelemetryBatch(listOf(owned))
         }

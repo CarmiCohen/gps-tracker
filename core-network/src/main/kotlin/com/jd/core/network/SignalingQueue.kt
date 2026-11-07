@@ -11,6 +11,7 @@ import kotlin.concurrent.withLock
  * Refactored Revol31.9: Atomic size tracking and critical event protection (ISSUE-REVOL31.9-F1).
  * Enhanced Nov4.3: Partition tolerance deduplication and isBuffered flag setting.
  * Hardened Nov7.11 (ISSUE-NOV6.0-O24): Thread-safe queue operations via ReentrantLock and order-preserving pushFront on failed flush.
+ * Nov7.21 (SIMP-NOV7.19-S1): criticality comes from [LocationUpdate.isCritical], not from the status text.
  */
 class SignalingQueue(private val maxCapacity: Int = 5000) {
     private val queue = ConcurrentLinkedDeque<LocationUpdate>()
@@ -25,8 +26,8 @@ class SignalingQueue(private val maxCapacity: Int = 5000) {
         // Partition tolerance: Mark as buffered
         update.isBuffered = true
 
-        // Sequence deduplication for normal valid updates
-        if (update.sequenceId > 0 && update.status == "VALID") {
+        // Sequence deduplication for ordinary updates
+        if (update.sequenceId > 0 && !update.isCritical) {
             if (seenSequenceIds.contains(update.sequenceId)) {
                 return@withLock // Ignore duplicate during partition buffering
             }
@@ -51,7 +52,7 @@ class SignalingQueue(private val maxCapacity: Int = 5000) {
         // Push in reverse order so updates[0] ends up at the very front of queue
         for (update in updates.asReversed()) {
             update.isBuffered = true
-            if (update.sequenceId > 0 && update.status == "VALID") {
+            if (update.sequenceId > 0 && !update.isCritical) {
                 seenSequenceIds.add(update.sequenceId)
             }
             if (currentSize.get() < maxCapacity) {
@@ -65,7 +66,7 @@ class SignalingQueue(private val maxCapacity: Int = 5000) {
         val it = queue.iterator()
         while (it.hasNext()) {
             val next = it.next()
-            if (next.status == "VALID") {
+            if (!next.isCritical) {
                 seenSequenceIds.remove(next.sequenceId)
                 it.remove()
                 return true

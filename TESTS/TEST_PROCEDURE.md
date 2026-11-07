@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov7.19 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov7.21 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -522,8 +522,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **139.3 Drift Inside The GPS Error:** Verify that `SentinelLogic.validateMovement` returns `VALID` (`Within GPS error`) when the distance between two fixes is smaller than the larger of their accuracies (the A15 still: 23 m in 1.6 s at 68 m and 59 m accuracy), that a larger move is still judged, and that a `JUMP` reason carries its speed, distance, interval, and accuracies. Automated by `SentinelLogicTest` `Drift inside the GPS error radius of a still phone is valid` and `A move beyond the GPS error radius is still judged and reported with its measurements`.
 *   **139.4 Live Cold Start (manual, A15):** Force-stop both apps, start the Sensor service, then start the Monitor within about 10 s, and leave the phone still for at least 60 s. The Monitor log MUST show `Connecting to relay` and `Connected to relay` with no `Pending alarms` line and no siren, and the Sensor log MUST show no `Violation detected`.
 
+## Chapter 140 - The Sensor Reports A Real GPS Loss (Nov7.21)
+*   **140.1 Critical Delivery By Flag:** Verify that only `LocationUpdate.isCritical` makes an update bypass batching, survive a full queue, and escape sequence deduplication; that a `NO_FIX` update is batched, deduplicated, and dropped like any reading; that the flag is not sent on the wire; and that `reset()` clears it. Automated by `SignalingQueueTest.testOverflowDropsOrdinaryUpdatesAndKeepsCriticalOnes`, `testNoFixUpdatesAreDeduplicatedLikeOrdinaryOnes`, `testCriticalUpdatesAreNeverDeduplicated`, `testResetClearsTheCriticalFlag`, and `SignalingBatchTest.testCriticalEventFlushesBatch` and `testNoFixStatusIsBatchedNotSentAlone` (ISSUE-NOV7.19-O43, SIMP-NOV7.19-S1).
+*   **140.2 Fix Freshness:** Verify that a fix counts as current for less than `FIX_STALE_AFTER_MS` (15 s) on the monotonic clock and as stale from then on. Automated by `FixFreshnessTest` (5 tests).
+*   **140.3 No Movement Verdict On Coarse Fixes:** Verify that `MovementCheck` neither judges nor keeps as its reference a fix without accuracy or coarser than 100 m, so the A15's 700 m cell fix after a GPS loss and the GPS fix after it are not violations, while a real jump across a loss is still reported. Automated by `MovementCheckTest.theCellFixAfterAGpsLossSeenOnTheA15IsNotJudged`, `aFixWithoutAccuracyIsNotJudged`, and `aRealJumpAcrossAGpsLossIsStillReported`.
+*   **140.4 Live GPS Loss (manual, A15):** With the Sensor service running and a fix found, run `adb shell cmd location set-location-enabled false`, then switch it back on (always check `cmd location is-location-enabled` afterwards). The Sensor log MUST show `No current GPS fix (none, or older than 15000ms): reporting NO_FIX` about 15 s after the last fix, `GPS fix current again` within a few seconds of switching back on, and no `Violation detected` after it. With the Monitor running and the loss kept under 30 s, the Monitor MUST store the `NO_FIX` rows with no position, with no gap in their sequence numbers, and MUST NOT raise an alarm; kept longer than about 45 s, it MUST raise `Tracker GPS signal loss`.
+
 ---
-**Active Testing Chapters: 129 of 139**
+**Active Testing Chapters: 130 of 140**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

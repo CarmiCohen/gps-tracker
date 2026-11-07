@@ -1,72 +1,73 @@
 git add .
-git commit -m "Nov7.19 - NO FALSE ALARMS AT START (ISSUE-NOV7.17-O42)
+git commit -m "Nov7.21 - THE SENSOR REPORTS A REAL GPS LOSS (ISSUE-NOV7.19-O43, SIMP-NOV7.19-S1)
 
-- ISSUE-NOV7.17-O42: every Monitor cold start raised RELAY_DISCONNECTED with the siren at full volume, and a start of both apps also raised GPS_SIGNAL_LOSS and GPS_JUMP. Three root causes, confirmed in the A15 log of 2026-11-07 19:46. (1) Relay: SocketioSignalingClient.isConnected starts false and alarmBooks raised the alarm on it 18 ms after 'Connecting to relay'. MonitorAlarms.kt now raises RELAY_DISCONNECTED only after the relay was connected once in this watch (WatchState.hasRelayConnected), or RELAY_FIRST_CONNECT_GRACE_MS (30 s) after watching starts without a connection; a loss after a connection still alarms at once. (2) GPS loss: the Sensor sends (0,0) until its first fix; GPS_SIGNAL_LOSS now needs GPS_SIGNAL_LOSS_AFTER_MS (30 s) without a position (WatchState.noGpsSignalSinceMs). (3) GPS jump: SensorService ran SentinelLogic.validateMovement on every loop tick (100 ms while charging) against the previous tick, dividing the drift between two fixes by one tick (the 34.5 m network-to-GPS correction became OUTLIER 346 m/s). New app-sensor MovementCheck.kt checks once per new fix, timed by Location.elapsedRealtimeNanos (fixForMovementCheck). A still A15 then showed JUMP 14.3 m/s, 23 m in 1.6 s at 68 m and 59 m accuracy, so SentinelLogic.validateMovement treats a move smaller than the larger accuracy as VALID ('Within GPS error'), replacing the narrower 'Suppressed Accuracy Snap' rule, and JUMP reasons now carry speed, distance, interval and accuracies.
-- Also fixed in SensorService: the ViolationEvent was built inside serviceScope.launch after the pooled update was released and zeroed, so violations carried an empty location; it is now built before the launch. lastLocation is @Volatile.
-- ISSUE-NOV7.19-O43 (new, Medium, open): the Sensor never reports a real GPS loss (lastLocation never ages); blocked on a critical flag, since every status other than VALID is sent as critical (SIMP-NOV7.19-S1).
-- ISSUE-NOV7.19-O44 (new, Low, open): PermissionGuard in AdminActivity does not re-check permissions on resume (split out of O42).
-- ISSUE-NOV7.15-O41 (updated): Nov7.19 audit Sensor 0 Davey, Monitor 1 first-frame Davey (834 ms).
-- TESTS: 176/176 JVM unit tests (128 Android-module, 48 core-shared; new: MonitorAlarmsTest +6, MovementCheckTest 6, SentinelLogicTest +2); ProductionReadinessAuditTest 3/3 on the A15; live A15 through the production relay: Monitor cold start and a start of both apps with no alarm, siren or violation (48 s and 85 s), 0 violations in 2 minutes on a still phone.
-- DOCS: issues.md (queue items 34 to 36, Open Gaps O43 O44 O41, Resolved Gaps Nov7.19, SIMP-NOV7.19-S1, dashboard), RESOLUTION_ARCHIVE.md, SOT_MASTER_REQUIREMENTS.md (rule 1.375, rules 1.366 and 1.368 amended, 450 rules), TEST_PROCEDURE.md (Chapter 139, 129 of 139 active), CHAPTER_TRIAGE.md (QA 65 of 129), VERIFICATION_MANIFEST.md header, Handover.md, baseline STATUS/BASELINE/Nov7.19/.
-- VERSION: Nov7.19, versionCode 50 (monitor) and 52 (sensor). There was no Nov7.18 release."
-git tag Nov7.19
+- ISSUE-NOV7.19-O43: SensorService.lastLocation was never aged, so after a real signal loss the Sensor kept sending its last fix as fresh and the Monitor's Tracker GPS signal loss could only fire before the first fix. New app-sensor FixFreshness.kt (FIX_STALE_AFTER_MS 15 s, isFixFresh on elapsedRealtimeNanos): with no fix, or a fix at least 15 s old, each tick is sent as NO_FIX with no position, and the service logs each change ('No current GPS fix ... reporting NO_FIX' / 'GPS fix current again').
+- SIMP-NOV7.19-S1 (implemented): LocationUpdate.isCritical (cleared by reset(), not sent on the wire) replaces the four status != VALID checks in SocketioSignalingClient.sendTelemetry and SignalingQueue (unbatched send, dedup, pushFront, drop-oldest), so NO_FIX is batched and droppable like any reading. The Sensor sets it only for JUMP / OUTLIER updates and passes it to ForensicBuffer.writeTrace, which commits them at once.
+- Found live on the A15 and fixed: after a GPS loss the first fix was a 700 m cell fix 3352 m off (false JUMP 97.5 m/s), then the GPS fix after it gave a false OUTLIER 488 m/s on a still phone. MovementCheck no longer judges or keeps as its reference a fix without accuracy or coarser than MOVEMENT_CHECK_MAX_ACCURACY_M (100 m).
+- ISSUE-NOV7.21-O45 (new, Medium, open): a Sensor service start while the Monitor watches sounds a false Power disconnected siren on a charging phone (SensorService starts with lastIsCharging false before the sticky battery broadcast arrives; queued ticks flushed on connect). Fix with ISSUE-NOV7.2-O37.
+- ISSUE-NOV7.15-O41 (updated): Nov7.21 audit 0 Davey in both apps.
+- TESTS: 189/189 JVM unit tests (141 Android-module, 48 core-shared; new: FixFreshnessTest 5, SignalingQueueTest +4, SignalingBatchTest +1, MovementCheckTest +3); ProductionReadinessAuditTest 3/3 on the A15; device audit 0 Davey, StackLog, fatal in both apps; live A15 through the production relay: NO_FIX 15 s after the last fix with location off, 126 contiguous NO_FIX rows without position stored by the Monitor, no violation after recovery, no alarm at a Monitor cold start.
+- DOCS: issues.md (queue items 35 and 37, Open Gaps O45 and O41, Resolved Gaps Nov7.21, SIMP-NOV7.21-S1, dashboard), RESOLUTION_ARCHIVE.md, SOT_MASTER_REQUIREMENTS.md (rule 1.376, 451 rules), TEST_PROCEDURE.md (Chapter 140, 130 of 140 active), CHAPTER_TRIAGE.md (QA 66 of 130), VERIFICATION_MANIFEST.md header, Handover.md (also the logcat adbd test tip), baseline STATUS/BASELINE/Nov7.21/.
+- VERSION: Nov7.21, versionCode 51 (monitor) and 53 (sensor). There was no Nov7.20 release."
+git tag Nov7.21
 git push origin main --tags
 
-# Project Handover - Version Nov7.19 (No False Alarms At Start)
+# Project Handover - Version Nov7.21 (The Sensor Reports A Real GPS Loss)
 
 ## ▶️ Resumption State (Read First)
-- **Version**: Nov7.19 is closed. Run the Git block above if it has not been run: `git log -1` shows whether the Nov7.19 commit and tag exist. Previous commits: `Nov7.17`, `Nov7.15`, `Nov7.12`, `Nov7.11`, `Nov7.10`, `Nov7.9`, `Nov7.8`, `Nov7.7`, `Nov7.6`, `Nov7.5`, `Nov7.3`, `Nov7.2`, `Nov7.1`, `Nov7.0`. There was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, or Nov7.18 release (the user chose Nov7.19 directly after Nov7.17).
-- **Next work**: the next Work Queue item in `DOCS/issues.md` is **ISSUE-NOV7.19-O43 (item 35, Medium)**: let the Sensor report a real GPS loss. Do SIMP-NOV7.19-S1 first (an explicit critical flag in `LocationUpdate`), because `SocketioSignalingClient.sendTelemetry` and `SignalingQueue` treat every status other than `VALID` as critical. ISSUE-NOV6.0-O26 (item 18) is still blocked on a device below API 35. Display each issue before fixing it (Rule 1).
-- **User decisions so far (2026-11-07)**: group 1, alarms and sirens: build, in slices; slices 1 to 3 shipped in Nov7.3, Nov7.5, Nov7.7, siren auto-stop in Nov7.6. Group 3 (`SentinelLogic`): built on the Sensor. Groups 2 and 4 to 8 still need user decisions. O19: `before splitting/gps-tracker` is a frozen archive; never edit it. Nov7.15: O33 chosen over O26. Nov7.17: O34 chosen (O26 blocked). Nov7.19: O42 chosen.
-- **Relay**: v6.044 is on production. No relay code changed in Nov6.4 to Nov7.19.
-- **Phones**: A15 (`R58X40GV2AR`, API 36) attached, running the Nov7.19 debug builds of both apps. The last instrumented run reinstalled the Sensor: its permissions were granted again with `pm grant`, but its service must be started with `START SENSOR SERVICE` (tap `System Idle` first). S21FE (`R5CRC14PG4F`) unplugged and in personal use; never run tests on it.
-- **Test tips**: `TESTS/device_audit.cmd` must be run from the `cmd` shell (PowerShell mangles its arguments). Long `adb shell sleep` waits time out in the IDE tool; run them as background sessions.
+- **Version**: Nov7.21 is closed. Run the Git block above if it has not been run: `git log -1` shows whether the Nov7.21 commit and tag exist. Previous commits: `Nov7.19`, `Nov7.17`, `Nov7.15`, `Nov7.12`, `Nov7.11`, `Nov7.10`, `Nov7.9`, `Nov7.8`, `Nov7.7`, `Nov7.6`, `Nov7.5`, `Nov7.3`, `Nov7.2`, `Nov7.1`, `Nov7.0`. There was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, or Nov7.20 release (the user chose Nov7.21 directly after Nov7.19).
+- **Next work**: the next Work Queue item in `DOCS/issues.md` is **ISSUE-NOV7.21-O45 (item 37, Medium)**: a Sensor start sounds a false `Power disconnected` siren on a charging phone. Seed the Sensor's battery readings from the Intent returned by `registerReceiver` before the sensing loop starts, and send unknown readings as unknown (with ISSUE-NOV7.2-O37). ISSUE-NOV6.0-O26 (item 18) is still blocked on a device below API 35. Display each issue before fixing it (Rule 1).
+- **User decisions so far (2026-11-07)**: group 1, alarms and sirens: build, in slices; slices 1 to 3 shipped in Nov7.3, Nov7.5, Nov7.7, siren auto-stop in Nov7.6. Group 3 (`SentinelLogic`): built on the Sensor. Groups 2 and 4 to 8 still need user decisions. O19: `before splitting/gps-tracker` is a frozen archive; never edit it. Nov7.15: O33 chosen over O26. Nov7.17: O34 chosen (O26 blocked). Nov7.19: O42 chosen. Nov7.21: O43 chosen.
+- **Relay**: v6.044 is on production. No relay code changed in Nov6.4 to Nov7.21 (the relay passes `status` through unchanged).
+- **Phones**: A15 (`R58X40GV2AR`, API 36) attached, running the Nov7.21 debug builds of both apps. The last instrumented run uninstalled the Sensor: it was reinstalled, its permissions granted again with `pm grant`, and its service started with `START SENSOR SERVICE` (tap `System Idle` first). The Monitor was force-stopped at 20:45:29 to silence the false siren of ISSUE-NOV7.21-O45. Location is enabled (checked after every loss test). S21FE (`R5CRC14PG4F`) unplugged and in personal use; never run tests on it.
+- **Test tips**: `TESTS/device_audit.cmd` must be run from the `cmd` shell (PowerShell mangles its arguments). Long `adb shell sleep` waits time out in the IDE tool; run them as background sessions, and when a test switches location off, switch it back on in the same `adb shell` call (a timed-out call left it off once in Nov7.21). When reading logcat, silence the `adbd` tag (`logcat -d adbd:S *:V | grep ...`, or append `| grep -v adbd`): `adbd` logs the text of every `adb shell` command, so a grep for a pattern also matches its own command line. This only filters what is read; `TESTS/device_audit.cmd` reads by app `--pid` and is not affected. Send `monkey` launch output to `>/dev/null 2>&1` to hide its argument echo. Run instrumented tests from PowerShell (`$env:ANDROID_SERIAL="R58X40GV2AR"; .\gradlew.bat :app-sensor:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArguments.class=..."`). The phone has no `sqlite3`: copy the Monitor database with `adb exec-out run-as com.jd.app.monitor cat databases/monitor_db` (and `-wal`) from `cmd` into a new temporary folder, query it with the SDK's `platform-tools\sqlite3.exe` (table `trails`), and delete the copy afterwards.
 
 ### Open Issues With Locations
 | Issue | Severity | Location |
 | :--- | :--- | :--- |
 | O11 Unwired features | High | D rows in `TESTS/CHAPTER_TRIAGE.md` |
-| O43 Sensor never reports a real GPS loss | Medium | `SensorService.lastLocation` (never aged); `status != "VALID"` checks in `SocketioSignalingClient.sendTelemetry` and `SignalingQueue` |
+| O45 False `Power disconnected` siren at a Sensor start | Medium | `SensorService` `lastIsCharging` / `lastBatteryLevel` / `lastTempCelsius` defaults, `registerBatteryReceiver`, `startSensingLoop` |
 | O26 Sensor never run below API 35 | Medium | `minSdk` 26 in `app-sensor/build.gradle.kts`; chapter 121.6 |
 | O23 Tests claim more than verified | Medium | Chapters 67, 68, 83, 93 (T rows); R494, R495 in `TESTS/VERIFICATION_MANIFEST.md` |
 | O44 Permissions not re-checked on resume | Low | `PermissionGuard` in `AdminActivity.kt` |
-| O41 Start-up Davey (Monitor first frame in Nov7.17 and Nov7.19) | Low | First frame of `MonitorActivity` / `AdminActivity`; `BootReceiver.onReceive`, `SensorService.onCreate` |
+| O41 Start-up Davey (Monitor first frame in Nov7.17 and Nov7.19; none in Nov7.21) | Low | First frame of `MonitorActivity` / `AdminActivity`; `BootReceiver.onReceive`, `SensorService.onCreate` |
 | O40 Dashboard history gaps | Low | `DOCS/issues.md` dashboard (Nov7.7 to Nov7.12) and Resolved Gaps (Nov7.6 to Nov7.9) |
 | O19 Nested repository changes | Low | `before splitting/gps-tracker` |
 | O38 Sensor siren test can never sound | Low | `SensorViewModel.testSirenAudio`, `AdminActivity.kt` `AlarmSoundOverlay` call |
 | O39 Alarm reach under DND and lock | Low | `createMonitorNotificationChannels` `setBypassDnd`, `MonitorAlarmEngine.showNotification` full-screen intent |
+| O37 Unknown values sent as invented numbers | Low | `SensorService` `loc.speed` without `hasSpeed()`, `batteryReceiver` defaults |
 
 ---
 
-## 🟡 Status: PASSED WITH RECORDED AUDIT FINDING (Nov7.19)
+## 🟡 Status: PASSED WITH RECORDED FINDING (Nov7.21)
 
-Version Nov7.19 delivers ISSUE-NOV7.17-O42 (No False Alarms At Start):
-1. **Relay alarm** (`app-monitor/.../MonitorAlarms.kt`): `RELAY_FIRST_CONNECT_GRACE_MS` = 30 s. `alarmConditions` takes `hasRelayConnected`; `WatchState.hasRelayConnected` latches on the first `true` from `isRelayConnected`. Before it, a disconnected relay counts as lost only 30 s after `watchingSinceMs` (longer than the 20 s socket timeout and the relay cold start of ISSUE-NOV5.1-O9).
-2. **GPS loss alarm** (same file): `GPS_SIGNAL_LOSS_AFTER_MS` = 30 s. `WatchState.noGpsSignalSinceMs` starts at the `receivedAtMs` of the first reading without a position and is cleared by a reading with one; `alarmConditions` takes it.
-3. **GPS jump** (`app-sensor/.../MovementCheck.kt`, new; `SensorService.startSensingLoop`): `MovementCheck.check` returns null for a fix already checked, `VALID` for the first fix, else `SentinelLogic.validateMovement(previousFix, fix)`; `fixForMovementCheck` stamps the fix with `elapsedRealtimeNanos / 1_000_000`. `lastValidationLocation` is removed; only the tick carrying a new fix can get a non-`VALID` status.
-4. **GPS error rule** (`core-shared/.../SentinelLogic.kt`): `dist < max(last.accuracy, current.accuracy)` returns `VALID` (`Within GPS error`) before the outlier check; the `Suppressed Accuracy Snap` rule is removed (it was a narrower case of this). `JUMP` reasons carry `speed m/s, distance m in interval s, accuracy a to b m`.
-5. **Violation payload** (`SensorService`): the `ViolationEvent` is built before `serviceScope.launch`; it used to snapshot the pooled update after release, sending a zeroed location. `lastLocation` is `@Volatile`.
-6. **Tests**: `MonitorAlarmsTest` +6 (with a `settle()` step, because merged sources are collected separately), `MovementCheckTest` (new, 6, using the real A15 fixes), `SentinelLogicTest` +2. `gradlew test assembleDebug assembleRelease --warning-mode all`: BUILD SUCCESSFUL, 176/176 unit tests (128 Android-module, 48 `core-shared`), only the existing Gradle deprecation warnings. There is no `platinum` variant. `ProductionReadinessAuditTest` 3/3 on SM-A155F (`ANDROID_SERIAL=R58X40GV2AR`). `MonitorAlarmDeviceTest` was not run: it plays the siren and covers code this version does not change.
-7. **Live (A15, production relay)**: Monitor cold start: `Connecting` 20:15:28.916, `Connected` 20:15:30.281, no `Pending alarms` in 48 s. Start of both apps (Sensor service 20:16:25 without a fix, Monitor 20:16:37): no alarm, siren, or `Violation detected` in 85 s. Still phone: 0 violations in 2 minutes (Nov7.17: `OUTLIER 346 m/s` and 3 `JUMP` in 90 s).
-8. **Device audit** (`TESTS/device_audit.cmd`): Sensor 0 Davey, StackLog, fatal. Monitor 0 StackLog, 0 fatal, 1 Davey of 834 ms on its first frame (ISSUE-NOV7.15-O41, as in Nov7.17).
-9. **Documents**: SOT rule 1.375 (R-ID 146), rules 1.366 and 1.368 amended, 450 rules; `RESOLUTION_ARCHIVE.md`; Chapter 139 in `TESTS/TEST_PROCEDURE.md` (129 of 139 active); `TESTS/CHAPTER_TRIAGE.md` (QA 65 of 129); `TESTS/VERIFICATION_MANIFEST.md` header; `DOCS/issues.md`; baseline `STATUS/BASELINE/Nov7.19/`.
+Version Nov7.21 delivers ISSUE-NOV7.19-O43 (The Sensor Reports A Real GPS Loss) and SIMP-NOV7.19-S1:
+1. **Critical flag** (`core-shared/.../Models.kt`): `LocationUpdate.isCritical`, default `false`, cleared by `reset()`, copied by `snapshot()`, not put on the wire. `SignalingQueue` uses `!isCritical` for deduplication, `pushFront`, and drop-oldest; `SocketioSignalingClient.sendTelemetry` sends unbatched only when `isCritical`. No production code reads `status` for delivery any more.
+2. **Loss rule** (`app-sensor/.../FixFreshness.kt`, new; `SensorService.startSensingLoop`): `currentFix = lastLocation?.takeIf { isFixFresh(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) }`; with none, the tick is sent as `NO_FIX_STATUS` with position 0. `FIX_STALE_AFTER_MS` = 15 s (three times the 5 s location request). `isReportingNoFix` logs each change once. The Monitor reads `NO_FIX` as no signal (`hasGpsSignal`) and raises `Tracker GPS signal loss` after 30 s of it, so about 45 s after the last fix.
+3. **Violations**: a `JUMP` / `OUTLIER` tick sets `isCritical = true`; `forensicBuffer.writeTrace(update, isCritical = update.isCritical)` commits it at once.
+4. **Coarse fixes** (`app-sensor/.../MovementCheck.kt`): `MOVEMENT_CHECK_MAX_ACCURACY_M` = 100 m; `check` returns null for a fix without accuracy or coarser, and does not keep it as the reference.
+5. **Tests**: `FixFreshnessTest` (new, 5), `SignalingQueueTest` +4, `SignalingBatchTest` +1 (`testCriticalEventFlushesBatch` now sets `isCritical`), `MovementCheckTest` +3. `gradlew test assembleDebug assembleRelease --warning-mode all`: BUILD SUCCESSFUL, 189/189 unit tests (141 Android-module, 48 `core-shared`), only the existing Gradle deprecation warnings and the existing `AlarmStealthTest.kt:16` unused variable. There is no `platinum` variant. `ProductionReadinessAuditTest` 3/3 on SM-A155F.
+6. **Live (A15, production relay)**: location off at 20:37:47: `No current GPS fix` 20:37:59 (last fix about 20:37:44), back on at 20:38:17: `GPS fix current again` 20:38:19, but a false `JUMP` (700 m cell fix) and `OUTLIER 488 m/s` followed, which led to item 4. After item 4: off about 20:40:56 to 20:41:33, `NO_FIX` 20:41:06, current again 20:41:35, no violation. With the Monitor running: off 20:43:03 to 20:43:25, `NO_FIX` 20:43:14.1 to 20:43:27.2, and the Monitor stored 126 `NO_FIX` rows (sequences 3314 to 3439, none missing) with no position, and raised no alarm. The 30 s Monitor alarm on `NO_FIX` was not sounded live; `MonitorAlarmsTest` covers it.
+7. **Device audit** (`TESTS/device_audit.cmd`, Monitor cold start after the Sensor): Sensor and Monitor 0 Davey, 0 StackLog, 0 fatal; no alarm at the Monitor cold start.
+8. **Finding (ISSUE-NOV7.21-O45, Medium, open)**: after the instrumented run, the Sensor service was started with the Monitor watching: `Connected to relay` 20:45:13.623, Monitor `Pending alarms: POWER_DISCONNECTED` 20:45:13.925, `Siren started` 20:45:14.369, on a phone plugged into USB. The Sensor's first ticks carry `isCharging = false` before its battery receiver has run.
+9. **Documents**: SOT rule 1.376 (R-ID 147), 451 rules; `RESOLUTION_ARCHIVE.md`; Chapter 140 in `TESTS/TEST_PROCEDURE.md` (130 of 140 active); `TESTS/CHAPTER_TRIAGE.md` (QA 66 of 130); `TESTS/VERIFICATION_MANIFEST.md` header; `DOCS/issues.md`; baseline `STATUS/BASELINE/Nov7.21/`.
 
-**Audit line**: Nov7.19: [SOT Count: 950 (Rules: 450), Open: H:1, M:4, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 179), QA: 65]
+**Audit line**: Nov7.21: [SOT Count: 951 (Rules: 451), Open: H:1, M:4, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 192), QA: 66]
 
-**Resumption Token**: NOV7.19-NOFALSEALARMS-O43-NEXT
+**Resumption Token**: NOV7.21-REALGPSLOSS-O45-NEXT
 
 ---
 
 ## 🎯 Next Resumption Focus
-ISSUE-NOV7.19-O43 (Work Queue item 35): add an explicit critical flag to `LocationUpdate` (SIMP-NOV7.19-S1), then let the Sensor report `NO_FIX` when its newest fix is too old, with tests.
+ISSUE-NOV7.21-O45 (Work Queue item 37): make the Sensor send its real charging state, battery, and temperature from its first tick (seed from the sticky `ACTION_BATTERY_CHANGED` Intent returned by `registerReceiver` before `startSensingLoop`), so a Sensor start raises no `Power disconnected` siren, with tests; consider closing ISSUE-NOV7.2-O37 in the same version.
 
 ---
 
 ## 📂 Key Implementation Files
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorAlarms.kt`, `app-monitor/src/test/kotlin/com/jd/app/monitor/MonitorAlarmsTest.kt`.
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/MovementCheck.kt` (new), `SensorService.kt`, `app-sensor/src/test/kotlin/com/jd/app/sensor/MovementCheckTest.kt` (new).
-- `core-shared/src/main/kotlin/com/jd/core/shared/SentinelLogic.kt`, `core-shared/src/test/kotlin/com/jd/core/shared/SentinelLogicTest.kt`.
+- `core-shared/src/main/kotlin/com/jd/core/shared/Models.kt` (`LocationUpdate.isCritical`).
+- `core-network/src/main/kotlin/com/jd/core/network/SignalingQueue.kt`, `SocketioSignalingClient.kt`; tests `core-network/src/test/kotlin/com/jd/core/network/SignalingQueueTest.kt`, `SignalingBatchTest.kt`.
+- `app-sensor/src/main/kotlin/com/jd/app/sensor/FixFreshness.kt` (new), `MovementCheck.kt`, `SensorService.kt`; tests `app-sensor/src/test/kotlin/com/jd/app/sensor/FixFreshnessTest.kt` (new), `MovementCheckTest.kt`.
 - `app-monitor/build.gradle.kts`, `app-sensor/build.gradle.kts` (versions).
 - `TESTS/TEST_PROCEDURE.md`, `TESTS/VERIFICATION_MANIFEST.md`, `TESTS/CHAPTER_TRIAGE.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, `STATUS/RESOLUTION_ARCHIVE.md`, `DOCS/issues.md`, `Handover.md`.
 
-**Handover complete. System state locked at Nov7.19.**
+**Handover complete. System state locked at Nov7.21.**
