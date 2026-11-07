@@ -45,6 +45,11 @@ class MonitorRepository @Inject constructor(
 
     fun getTrail(trackerId: String): Flow<List<TrailEntity>> = trailDao.getTrail(trackerId)
 
+    /** Clears all stored trail entries (ISSUE-NOV7.1-O35). */
+    suspend fun clearTrail() {
+        trailDao.deleteAll()
+    }
+
     /**
      * For testing purposes only (ISSUE-REVOL30.0-F7).
      */

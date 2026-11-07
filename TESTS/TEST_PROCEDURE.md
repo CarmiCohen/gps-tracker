@@ -554,8 +554,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **146.3 Service Status Display & Setup Dialog:** Verify that `serviceStatusText` formats the status line with live uptime (e.g. `Sensor Service: Running (00:01:04)`), and that `SensorViewModel` exposes live `serviceUptimeText` updating on a 1s ticker. Automated by `SensorServiceStatusTest.serviceLineShowsRunningOrStoppedWithUptime`.
 *   **146.4 Protected Stop Control & Intent Stop Handling:** Verify that `AdminActivity` renders a protected `STOP SENSOR SERVICE` control when `isServiceRunning` is true, presenting a confirmation dialog before sending `SensorService.ACTION_STOP_SERVICE` intent, and that `SensorService.onStartCommand` cleanly handles `ACTION_STOP_SERVICE` by calling `stopSelf()`. Automated by `SensorServiceStatusTest` and service intent handling.
 
+## Chapter 147 - Independent Clean Setup Actions (Nov7.36)
+*   **147.1 Clear Home Points & Geofence Action:** Verify that clicking "Clear Home Points & Geofence" in `CleanSetupOverlay` clears geofence violation alert settings (`distance`, `jammerDetection`, `tiltAlert`, `liftAlert`, `tamperAlert`) and acknowledges active alarms in `MonitorAlarmEngine` without unpairing the tracker. Automated by `CleanSetupActionsTest.clearHomePointsClearsGeofenceAlertSettings` (ISSUE-NOV7.1-O35).
+*   **147.2 Reset Operational Statistics Action:** Verify that clicking "Reset Operational Statistics" in `CleanSetupOverlay` clears stored trail history from Room DB via `MonitorRepository.clearTrail()` (`TrailDao.deleteAll()`), clears latest telemetry in `MonitorViewModel`, acknowledges alarms on Monitor, and resets service uptime timer in `SensorServiceStatus` / `SensorViewModel` on Sensor. Automated by `CleanSetupActionsTest` and `SensorServiceStatusTest.resetUptimeResetsStartTimeWhenRunning`.
+*   **147.3 Trigger Full System Re-Initialization Action:** Verify that clicking "Trigger Full System Re-Initialization" in `CleanSetupOverlay` clears target tracker pairing ID, resets `AlertSettings` to default defaults, resets `sirenType` to `"Siren"`, resets `relayUrl` to `RelayConfig.DEFAULT_URL`, clears stored trail history, and resets service status on both apps. Automated by `CleanSetupActionsTest.defaultAlertSettingsHasSirenTypeSiren` and `CleanSetupActionsTest.defaultRelayUrlMatchesSpecification`.
+
 ---
-**Active Testing Chapters: 136 of 146**
+**Active Testing Chapters: 137 of 147**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

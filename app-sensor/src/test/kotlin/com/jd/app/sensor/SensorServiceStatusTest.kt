@@ -29,6 +29,20 @@ class SensorServiceStatusTest {
     }
 
     @Test
+    fun resetUptimeResetsStartTimeWhenRunning() {
+        val status = SensorServiceStatus()
+        status.markRunning(1000L)
+        assertEquals(1000L, status.startTimeMillis.value)
+
+        status.resetUptime(5000L)
+        assertEquals(5000L, status.startTimeMillis.value)
+
+        status.markStopped()
+        status.resetUptime(6000L)
+        assertEquals(0L, status.startTimeMillis.value)
+    }
+
+    @Test
     fun uptimeFormattingIsCorrect() {
         assertEquals("00:00:00", formatUptime(0L, 1000L))
         assertEquals("00:00:00", formatUptime(1000L, 500L))

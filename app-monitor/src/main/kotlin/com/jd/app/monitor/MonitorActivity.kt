@@ -135,7 +135,13 @@ class MonitorActivity : ComponentActivity() {
                             viewModel.clearTargetId()
                             context.stopService(Intent(context, MonitorSessionService::class.java))
                         },
-                        onUpdateRelayUrl = { url -> viewModel.updateRelayUrl(url) }
+                        onUpdateRelayUrl = { url -> viewModel.updateRelayUrl(url) },
+                        onClearHomePoints = { viewModel.clearHomePointsAndGeofence() },
+                        onResetStats = { viewModel.resetOperationalStatistics() },
+                        onFullInit = {
+                            viewModel.triggerFullSystemReinitialization()
+                            context.stopService(Intent(context, MonitorSessionService::class.java))
+                        }
                     )
                 }
             }
@@ -252,7 +258,10 @@ fun MonitorScreen(
     onUpdateAlarmVolume: (Float) -> Unit,
     onTestSiren: () -> Unit,
     onReset: () -> Unit,
-    onUpdateRelayUrl: (String) -> Unit
+    onUpdateRelayUrl: (String) -> Unit,
+    onClearHomePoints: () -> Unit = {},
+    onResetStats: () -> Unit = {},
+    onFullInit: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
@@ -365,9 +374,9 @@ fun MonitorScreen(
     if (showCleanSetupOverlay) {
         com.jd.core.ui.CleanSetupOverlay(
             isTracker = false,
-            onClearHomePoints = requestUnpair,
-            onResetStats = requestUnpair,
-            onFullInit = requestUnpair,
+            onClearHomePoints = onClearHomePoints,
+            onResetStats = onResetStats,
+            onFullInit = onFullInit,
             onClose = { showCleanSetupOverlay = false }
         )
         return

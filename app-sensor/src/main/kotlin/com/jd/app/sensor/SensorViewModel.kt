@@ -27,7 +27,7 @@ class SensorViewModel @Inject constructor(
     private val signalingClient: SignalingClient,
     private val sensorDataStore: SensorDataStore,
     private val fixStore: SensorFixStore,
-    serviceStatus: SensorServiceStatus,
+    private val serviceStatus: SensorServiceStatus,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -92,6 +92,21 @@ class SensorViewModel @Inject constructor(
         viewModelScope.launch {
             val formattedUrl = url.trim()
             sensorDataStore.saveRelayUrl(formattedUrl)
+        }
+    }
+
+    /** Resets operational statistics and service uptime timer on Sensor (ISSUE-NOV7.1-O35). */
+    fun resetOperationalStatistics() {
+        serviceStatus.resetUptime()
+    }
+
+    /** Triggers full system re-initialization: resets settings & relay URL to defaults, resets uptime timer (ISSUE-NOV7.1-O35). */
+    fun triggerFullSystemReinitialization() {
+        viewModelScope.launch {
+            sensorDataStore.saveAlertSettings(AlertSettings())
+            sensorDataStore.saveSirenType("Siren")
+            sensorDataStore.saveRelayUrl(RelayConfig.DEFAULT_URL)
+            serviceStatus.resetUptime()
         }
     }
 

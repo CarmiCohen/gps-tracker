@@ -86,6 +86,44 @@ class MonitorViewModel @Inject constructor(
         }
     }
 
+    /** Clears home points & geofence violation settings and acknowledges alarms (ISSUE-NOV7.1-O35). */
+    fun clearHomePointsAndGeofence() {
+        viewModelScope.launch {
+            val current = alertSettings.value
+            val cleared = current.copy(
+                distance = false,
+                jammerDetection = false,
+                tiltAlert = false,
+                liftAlert = false,
+                tamperAlert = false
+            )
+            dataStore.saveAlertSettings(cleared)
+            alarmEngine.acknowledge()
+        }
+    }
+
+    /** Resets operational statistics and clears stored trail history (ISSUE-NOV7.1-O35). */
+    fun resetOperationalStatistics() {
+        viewModelScope.launch {
+            repository.clearTrail()
+            _latestTelemetry.value = null
+            alarmEngine.acknowledge()
+        }
+    }
+
+    /** Triggers full system re-initialization: unpairs target, resets settings & URL to defaults, clears trail (ISSUE-NOV7.1-O35). */
+    fun triggerFullSystemReinitialization() {
+        viewModelScope.launch {
+            identityManager.clearTargetId()
+            dataStore.saveAlertSettings(AlertSettings())
+            dataStore.saveSirenType("Siren")
+            dataStore.saveRelayUrl(RelayConfig.DEFAULT_URL)
+            repository.clearTrail()
+            _latestTelemetry.value = null
+            alarmEngine.acknowledge()
+        }
+    }
+
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val trail: StateFlow<List<TrailEntity>> = identityManager.targetId

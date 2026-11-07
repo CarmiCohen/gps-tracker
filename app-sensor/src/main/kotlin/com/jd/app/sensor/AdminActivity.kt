@@ -174,8 +174,8 @@ class AdminActivity : ComponentActivity() {
                                 com.jd.core.ui.CleanSetupOverlay(
                                     isTracker = true,
                                     onClearHomePoints = { },
-                                    onResetStats = { },
-                                    onFullInit = { },
+                                    onResetStats = { viewModel.resetOperationalStatistics() },
+                                    onFullInit = { viewModel.triggerFullSystemReinitialization() },
                                     onClose = { showCleanSetupOverlay = false }
                                 )
                             } else if (showSettings) {

@@ -29,6 +29,12 @@ class SensorServiceStatus @Inject constructor() {
         running.value = false
     }
 
+    fun resetUptime(nowMs: Long = currentElapsedRealtime()) {
+        if (running.value) {
+            startTime.value = nowMs
+        }
+    }
+
     companion object {
         fun currentElapsedRealtime(): Long {
             return try {

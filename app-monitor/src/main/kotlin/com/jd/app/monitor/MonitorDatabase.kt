@@ -81,6 +81,12 @@ interface TrailDao {
     @Query("DELETE FROM trails WHERE isLocalUser = 1 AND timestamp < :threshold")
     suspend fun pruneLocalTrail(threshold: Long)
 
+    /**
+     * Deletes all trail records across all trackers. Used during clean setup maintenance.
+     */
+    @Query("DELETE FROM trails")
+    suspend fun deleteAll()
+
     @Query("SELECT DISTINCT trackerId FROM trails")
     suspend fun getTrackerIds(): List<String>
 
