@@ -35,6 +35,7 @@ class RelayStatusDialogTest {
                     monitorId = "M",
                     relayUrl = "https://relay.example",
                     trail = emptyList(),
+                    localTrail = emptyList(),
                     alertSettings = AlertSettings(),
                     sirenType = "Siren",
                     isSirenPlaying = false,

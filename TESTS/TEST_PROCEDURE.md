@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov7.28 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov8.5 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -565,10 +565,17 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **148.3 Local Trail TTL Pruning:** Verify that `TrailDao.pruneLocalTrail` successfully prunes local user trail entries older than 48 hours without affecting remote tracker trail storage. Automated by `TrailStorageBoundTest.localRowsExpireAfter48Hours`.
 
 ## Chapter 149 - Unpaired Tracker Trail Retention (Nov8.0)
-*   **149.1 Unpaired Tracker Trail Persistence:** Verify that unpairing a tracker (clearing the target ID via `identityManager.clearTargetId()`) does not delete historical trail data stored in Room database (`TrailDao`), preserving historical telemetry and movement points for potential future re-pairing. Automated by `UnpairedTrackerTrailRetentionTest` (ISSUE-NOV6.2-O30).
+*   **149.1 Unpaired Tracker Trail Persistence:** Verify that unpairing a tracker (clearing the target ID via `identityManager.clearTargetId()`) does not delete historical trail data stored in Room database (`TrailDao`), preserving historical telemetry and movement points for potential future re-pairing. **Not automated**: the `UnpairedTrackerTrailRetentionTest` named here in Nov8.0 asserted a local `false` and was removed in Nov8.5 (ISSUE-NOV8.2-O46); a real test must unpair and then read the trail table (ISSUE-NOV6.0-O23).
+
+## Chapter 150 - Tracking Document Integrity (Nov8.5)
+*Nov8.2 cited a chapter 150 for ISSUE-NOV7.15-O40 but never wrote it; this chapter takes the number (ISSUE-NOV8.2-O46).*
+*   **150.1 Required Sections Survive:** Verify that `DOCS/issues.md` still holds its Next Resumption Focus, Work Queue, Open Gaps, Resolved Gaps, Strategic Simplification Ideas, and Hardening Progress Dashboard sections, and that the dashboard is its last section, so a rewrite that cuts the end of the file fails. Automated by `TrackingDocumentIntegrityTest.issuesKeepsEveryRequiredSectionWithTheDashboardLast`.
+*   **150.2 Every Resolved Version In Every Record:** Verify that the versions of the `RESOLUTION_ARCHIVE.md` sections equal the versions of the Resolved Gaps sections of `issues.md`, and that each one appears in the SOT Core Hardening Baseline and in the dashboard (a row such as `Nov7.7 to Nov7.12` covers each version in it). Automated by `TrackingDocumentIntegrityTest.everyResolvedVersionIsRecordedInEveryTrackingDocument` and `aDashboardRangeRowCoversEachVersionInIt`.
+*   **150.3 Oldest Entries Survive:** Verify that the oldest entries are still present: the Nov4.32 archive and Resolved Gaps sections, the Nov4.26 dashboard row, SOT verification chapter 5.52, and the `Nov4.22-addHUD` baseline entry. Automated by `TrackingDocumentIntegrityTest.historyStillReachesItsOldestEntries`.
+*   **150.4 Order And Detection:** Verify that versions are unique and newest first, and that a truncated archive is detected. Automated by `TrackingDocumentIntegrityTest.versionsAreUniqueAndNewestFirst` and `aTruncatedArchiveIsDetected`. The test runs again whenever one of the three documents changes, because `core-shared/build.gradle.kts` declares them as inputs of `:core-shared:test`. Deliberate break: run against the committed Nov8.2 documents, 3 of the 6 tests failed.
 
 ---
-**Active Testing Chapters: 139 of 149**
+**Active Testing Chapters: 140 of 150**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

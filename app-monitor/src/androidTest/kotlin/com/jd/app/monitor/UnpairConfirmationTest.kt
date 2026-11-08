@@ -22,6 +22,8 @@ class UnpairConfirmationTest {
     val composeRule = createComposeRule()
 
     private var resetCount = 0
+    private var fullInitCount = 0
+    private val maintenanceCalls = mutableListOf<String>()
 
     private fun showMonitorScreen() {
         composeRule.setContent {
@@ -34,6 +36,7 @@ class UnpairConfirmationTest {
                     monitorId = "M",
                     relayUrl = "https://relay.example",
                     trail = emptyList(),
+                    localTrail = emptyList(),
                     alertSettings = AlertSettings(),
                     sirenType = "Siren",
                     isSirenPlaying = false,
@@ -42,7 +45,10 @@ class UnpairConfirmationTest {
                     onUpdateAlarmVolume = {},
                     onTestSiren = {},
                     onReset = { resetCount++ },
-                    onUpdateRelayUrl = {}
+                    onUpdateRelayUrl = {},
+                    onClearHomePoints = { maintenanceCalls += "clear" },
+                    onResetStats = { maintenanceCalls += "stats" },
+                    onFullInit = { fullInitCount++ }
                 )
             }
         }
@@ -51,6 +57,13 @@ class UnpairConfirmationTest {
     private fun assertConfirmationShownWithoutUnpairing() {
         composeRule.onNodeWithText("Unpair from tracker T?").assertExists()
         assertEquals(0, resetCount)
+        assertEquals(0, fullInitCount)
+    }
+
+    private fun tapCleanAction(label: String) {
+        composeRule.onNodeWithContentDescription("Setup").performClick()
+        composeRule.onNodeWithText("CLEAN").performClick()
+        composeRule.onNodeWithText(label).performScrollTo().performClick()
     }
 
     @Test
@@ -67,20 +80,34 @@ class UnpairConfirmationTest {
         assertConfirmationShownWithoutUnpairing()
     }
 
+    /** Full re-initialization unpairs and deletes the trail (ISSUE-NOV7.1-O35), so it asks first (ISSUE-NOV8.2-O46). */
     @Test
-    fun cleanActionsAskBeforeUnpairing() {
-        listOf(
-            "Clear Home Points & Geofence",
-            "Reset Operational Statistics",
-            "Trigger Full System Re-Initialization"
-        ).forEachIndexed { index, label ->
-            if (index == 0) showMonitorScreen()
-            composeRule.onNodeWithContentDescription("Setup").performClick()
-            composeRule.onNodeWithText("CLEAN").performClick()
-            composeRule.onNodeWithText(label).performScrollTo().performClick()
-            assertConfirmationShownWithoutUnpairing()
-            composeRule.onNodeWithText("Cancel").performClick()
-        }
+    fun fullReinitializationAsksBeforeUnpairing() {
+        showMonitorScreen()
+        tapCleanAction("Trigger Full System Re-Initialization")
+        assertConfirmationShownWithoutUnpairing()
+
+        composeRule.onNodeWithText("Cancel").performClick()
+        assertEquals(0, fullInitCount)
+
+        tapCleanAction("Trigger Full System Re-Initialization")
+        composeRule.onNodeWithText("Re-initialize").performClick()
+        composeRule.onNodeWithText("Unpair from tracker T?").assertDoesNotExist()
+        assertEquals(1, fullInitCount)
+        assertEquals(0, resetCount)
+    }
+
+    /** The two maintenance actions that keep the pairing run at once and never show the unpair dialog (ISSUE-NOV7.1-O35). */
+    @Test
+    fun maintenanceActionsThatKeepThePairingDoNotAsk() {
+        showMonitorScreen()
+        tapCleanAction("Clear Home Points & Geofence")
+        tapCleanAction("Reset Operational Statistics")
+
+        composeRule.onNodeWithText("Unpair from tracker T?").assertDoesNotExist()
+        assertEquals(listOf("clear", "stats"), maintenanceCalls)
+        assertEquals(0, resetCount)
+        assertEquals(0, fullInitCount)
     }
 
     @Test

@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov8.2)
+# SOT Master Requirements & Hardening Status (Nov8.5)
 
-## 🏗️ Architectural Master Rules (461 Rules)
+## 🏗️ Architectural Master Rules (462 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -51,12 +51,15 @@
 *   **1.385 Unpaired Tracker Trail Retention (R-ID 156)**: The Monitor application MUST retain historical trail data for trackers that are no longer paired (`identityManager.clearTargetId()`), preserving historical telemetry and movement points in `TrailDao` for potential future re-pairing without auto-deleting them on unpairing (ISSUE-NOV6.2-O30) (R-ID 156).
 *   **1.386 Comprehensive Test Coverage & Verification for Chapters 67, 68, 83, and 93 (R-ID 157)**: The system MUST maintain automated unit tests (`WalPerformanceTest`, `IndexingSpeedTest`, and `SoakSimulationTest`) verifying Write-Ahead-Log burst performance (< 10ms per write), indexing speed for 50,000+ history points (< 2s), main-thread stall watchdog recovery, and programmatic 24h soak stability, upgrading chapters 67, 68, 83, and 93 from `T` to `A` (ISSUE-NOV6.0-O23) (R-ID 157).
 *   **1.387 Tracking Documents & Dashboard Synchronization (R-ID 158)**: The project MUST maintain complete, synchronized tracking records, master requirements, resolution archives, and hardening baselines across all development versions (ISSUE-NOV7.15-O40) (R-ID 158).
+*   **1.388 Tracking Document Integrity & Session Resilience (R-ID 159)**: The system MUST maintain automated integrity tests (`TrackingDocumentIntegrityTest` in `:core-shared`) verifying that tracking documents (`DOCS/issues.md`, `STATUS/RESOLUTION_ARCHIVE.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`) preserve complete historical sections, resolved gaps, strategic simplification ideas, and hardening dashboard baselines without truncation across versions, and MUST ensure `MonitorSession` lifecycle management prevents service re-instantiation and siren reset across configuration changes (ISSUE-NOV8.2-O46, ISSUE-NOV8.5-O50) (R-ID 159).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov8.5**: Tracking Document Integrity & Activity Rotation Session Lifecycle (ISSUE-NOV8.2-O46, ISSUE-NOV8.5-O50) - PASSED.
 - **Nov8.2**: Tracking Documents & Dashboard Synchronization (ISSUE-NOV7.15-O40) - PASSED.
 - **Nov8.1**: Comprehensive Test Coverage & Verification for Chapters 67, 68, 83, and 93 (ISSUE-NOV6.0-O23) - PASSED.
 - **Nov8.0**: Unpaired Tracker Trail Retention (ISSUE-NOV6.2-O30) - PASSED.
 - **Nov7.38**: Local Trail Storage & Pruning (ISSUE-NOV6.2-O29) - PASSED.
+- **Nov7.36**: Independent Clean Setup Maintenance Actions (ISSUE-NOV7.1-O35) - PASSED. (Entry restored in Nov8.5, ISSUE-NOV8.2-O46.)
 - **Nov7.34**: Automatic Sensor Service Startup, Live Uptime Timer & Protected Stop Control (ISSUE-NOV7.2-O36) - PASSED.
 - **Nov7.32**: Alarm Reach Under Do Not Disturb & Locked Screen Setup (ISSUE-NOV7.3-O39) - PASSED.
 - **Nov7.30**: Real Telemetry Unknown Values Handling (ISSUE-NOV7.2-O37) - PASSED.
@@ -73,6 +76,7 @@
 - **Nov7.9**: HUD Flow 2Hz Rate Limiting (ISSUE-NOV6.0-O21) - PASSED.
 - **Nov7.8**: Test Hardening & Chapter Alignment (ISSUE-NOV6.0-O23) - PASSED.
 - **Nov7.7**: False MOVING Fix & Sensor-Detected Violations (ISSUE-NOV5.2-O13) - PASSED.
+- **Nov7.6**: 30-Second Siren Auto-Stop (ISSUE-NOV7.6-O40) - PASSED. (Entry restored in Nov8.5, ISSUE-NOV8.2-O46.)
 - **Nov7.5**: Communication Alarms (ISSUE-NOV5.2-O11, group 1, slice 2) - PASSED.
 - **Nov7.3**: Monitor Alarms And Siren (ISSUE-NOV5.2-O11, group 1, slice 1) - PASSED with open items (ISSUE-NOV7.3-O38, O39; O11 remains open for the other slices and groups).
 - **Nov7.2**: Real Sensor HUD Values (ISSUE-NOV6.1-O27) - PASSED.
@@ -82,6 +86,7 @@
 - **Nov6.3**: Real Relay Status Text (ISSUE-NOV5.0-O5) - PASSED.
 - **Nov6.2**: Bounded Trail Storage (ISSUE-NOV5.2-O14) - PASSED with open items (ISSUE-NOV6.2-O29, O30).
 - **Nov6.1**: Real HUD Values (ISSUE-NOV5.0-O2) - PASSED with open items (ISSUE-NOV6.1-O27, O28).
+- **Nov6.0**: Forensic Entry Integrity, Calls Missing On Older Android, Chapter Review & Retirement (ISSUE-NOV6.0-O20, ISSUE-NOV6.0-O25, ISSUE-NOV5.4-O17, ISSUE-NOV5.4-O18) - PASSED. (Entry restored in Nov8.5, ISSUE-NOV8.2-O46.)
 - **Nov5.2**: Runtime Resilience, Display Limits & Chapter Triage (GAP-REVOL71.0-G1 to G8) - PASSED with open items (relay v6.044 undeployed).
 - **Nov5.1**: Single Default Relay & Deployed Relay Parity (GAP-REVOL70.0-G1, G2) - PASSED (automated suite and two-device live run through the production relay; manual physical chapters not executed).
 - **Nov5.0**: HUD Direction, Real-Position Centering, Telemetry Payload Integrity, Viewer Presence & Relay Switching (GAP-REVOL69.0-G1 to G7) - PASSED (automated suite and two-device live run through a local relay; manual physical chapters not executed).
@@ -103,6 +108,7 @@
 - **Nov4.22-addHUD**: Post-Revolution HUD Integration & LED Status Verification (GAP-REVOL52.0-G1) - PASSED.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.95 (Nov8.5 Audit)**: PASSED - Verification of document integrity guard suite (`TrackingDocumentIntegrityTest`), 100% passing automated test suite (302 tests), single-device reciprocal virtual presence simulation, device audit 0 Davey events >500ms on A15, and session lifecycle rotation protection.
 *   **Chapter 5.94 (Nov8.2 Audit)**: PASSED - Verification and synchronization of tracking documents, hardening baselines, and release archives across Nov7.6 to Nov7.12 (`ISSUE-NOV7.15-O40`). 74 of 132 active chapters verified at least in part.
 *   **Chapter 5.93 (Nov8.1 Audit)**: PASSED - Automated unit test verification across all subprojects (100% passing) and clean build with `--warning-mode all` for comprehensive test coverage of Chapters 67, 68, 83, and 93 (`ISSUE-NOV6.0-O23`). 73 of 132 active chapters verified at least in part.
 *   **Chapter 5.92 (Nov8.0 Audit)**: PASSED - Automated unit test verification across all subprojects (100% passing) and clean build for Unpaired Tracker Trail Retention (`ISSUE-NOV6.2-O30`), verifying that unpairing a tracker retains historical trail points in Room database (`TrailDao`). 72 of 139 active chapters verified at least in part.
@@ -125,3 +131,11 @@
 *   **Chapter 5.62 (Nov5.1 Audit)**: PASSED - 103 automated tests and a two-device live run with Sensor on A15 and Monitor on S21FE through the production relay on the final build: all LEDs active, real battery, live `AGE`, real map position, relay URL hot switch without restart, and zero Davey or StackLog from either app process. Manual physical chapters were not executed (see `TESTS/test_results.md`).
 *   **Chapter 5.61 (Nov5.0 Audit)**: PASSED - 100 automated tests on the final code (unit and on-device on A15) and a two-device live run with Sensor on A15 and Monitor on S21FE through a local relay: all LEDs active, real battery, live `AGE`, real map position, and zero Davey or StackLog from either app process. The production relay was unavailable, and manual physical chapters were not executed (see `TESTS/test_results.md`).
 *   **Chapter 5.60 (Nov4.44 Release Candidate Verification Audit)**: PASSED - Verification of Nov4.44 release candidate: 100% automated test execution passing across all subprojects, reciprocal virtual presence simulation testing, and baseline lock in `STATUS/BASELINE/Nov4.44/`.
+*   **Chapter 5.59 (Nov4.37 Decoupled Peer LED Signaling Audit)**: PASSED - Verification of decoupled peer LED signaling: `SRV` turns GREEN ONLY when connected to Relay Server (otherwise RED); `TRK` on Monitor turns GREEN ONLY when connected to Tracker `T` (otherwise RED); `VWR` on Sensor turns GREEN ONLY when connected to Viewer `V` (otherwise RED). Verified test pass rule (Connection active -> PASSED; Alarm/event present -> PASSED OK; Else -> FAILED).
+*   **Chapter 5.58 (Nov4.36 Dual Device Hardware Deployment Audit)**: PASSED - Verification of simultaneous deployment of Monitor on S21FE and Sensor on A155, active 10,000ms telemetry generation, logcat event logging, and 100% test execution across all subprojects.
+*   **Chapter 5.57 (Nov4.35 Monitor Hardware Deployment & Single-Line Fitting Audit)**: PASSED - Verification of hardware deployment on S21FE / R58X40GV2AR, upper header bar single-line fitting, HUD telemetry age metadata visibility, and 100% test execution across all subprojects.
+*   **Chapter 5.56 (Nov4.34 Upper Menu Line Audit)**: PASSED - Verification of expanded upper menu line quick navigation buttons (Map, Events, Graphs, Info, Setup, Settings, Tools) in Sensor and Monitor applications, and comprehensive unit test execution.
+*   **Chapter 5.55 (Nov4.33 Sound & Setup Options Audit)**: PASSED - Verification of revived `CleanSetupOverlay` and `PhoneSetupOverlay` in `:core-ui`, wiring in `AdminActivity` and `MonitorActivity`, and comprehensive test execution.
+*   **Chapter 5.54 (Nov4.32 System Tools Audit)**: PASSED - Verification of dedicated Tools menu option under top menu bar, `ToolsOverlay` component, 100% test execution, and action dispatch.
+*   **Chapter 5.53 (Nov4.31 Device Hardening Audit)**: PASSED - Verification of revived `DeviceProfileManager`, `DeviceHardeningStrategy`, `HardwareCapabilities`, performance tier profiling (Samsung A15 staggered tier vs S21FE standard tier), and 60s background transition hardening window.
+*   **Chapter 5.52 (Nov4.30 Alarming Setup Audit)**: PASSED - Verification of revived `AlertManagementOverlay` and `AlarmSoundOverlay`, DataStore persistence, bulk toggles, sensitivity sliders, siren wave selection, and audio testing.

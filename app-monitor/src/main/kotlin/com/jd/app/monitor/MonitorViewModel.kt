@@ -38,7 +38,13 @@ class MonitorViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    val targetId = identityManager.targetId
+    /**
+     * The stored pairing; null only until it has been read. The ViewModel outlives Activity recreation,
+     * so a recreated screen sees the pairing at once instead of a placeholder (ISSUE-NOV8.5-O50).
+     */
+    val pairing: StateFlow<Pairing?> = identityManager.targetId
+        .map { Pairing(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val selfId = identityManager.selfId
 
     val relayUrl: StateFlow<String> = dataStore.relayUrl
@@ -162,7 +168,7 @@ class MonitorViewModel @Inject constructor(
     }
 
     private val _latestTelemetry = MutableStateFlow<LocationUpdate?>(null)
-    private val pairedTelemetry = combine(_latestTelemetry, targetId) { latest, target -> latest.ifFrom(target) }
+    private val pairedTelemetry = combine(_latestTelemetry, identityManager.targetId) { latest, target -> latest.ifFrom(target) }
     private val uiTelemetry = pairedTelemetry.atUiRate()
 
     init {
@@ -219,7 +225,7 @@ class MonitorViewModel @Inject constructor(
 
     val remoteHudState: StateFlow<HudState> = combine(
         selfId,
-        targetId.filterNotNull(),
+        identityManager.targetId.filterNotNull(),
         signalingClient.isConnected,
         uiTelemetry,
         _ticker

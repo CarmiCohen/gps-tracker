@@ -28,6 +28,7 @@ class MonitorSessionService : Service() {
     @Inject lateinit var alarmEngine: MonitorAlarmEngine
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var signalingJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -55,8 +56,10 @@ class MonitorSessionService : Service() {
         return START_STICKY
     }
 
+    /** Runs once per service; a repeated start command must not add another relay collector (ISSUE-NOV8.5-O50). */
     private fun startSignaling() {
-        serviceScope.launch {
+        if (signalingJob?.isActive == true) return
+        signalingJob = serviceScope.launch {
             val targetId = identityManager.targetId.first() ?: return@launch
             val selfId = identityManager.selfId.first()
             

@@ -70,7 +70,8 @@ class MonitorActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_MONITOR)
                 }
-                val trackerId by viewModel.targetId.collectAsStateWithLifecycle(initialValue = null)
+                val pairing by viewModel.pairing.collectAsStateWithLifecycle()
+                val trackerId = pairing?.trackerId
                 val monitorId by viewModel.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
                 val relayUrl by viewModel.relayUrl.collectAsStateWithLifecycle()
                 val trail by viewModel.trail.collectAsStateWithLifecycle()
@@ -95,20 +96,23 @@ class MonitorActivity : ComponentActivity() {
                 val isSirenPlaying by viewModel.isSirenPlaying.collectAsStateWithLifecycle()
                 val alarmBook by viewModel.alarms.collectAsStateWithLifecycle()
 
-                LaunchedEffect(trackerId) {
+                LaunchedEffect(pairing) {
                     val serviceIntent = Intent(context, MonitorSessionService::class.java)
-                    if (trackerId != null) {
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                            context.startForegroundService(serviceIntent)
-                        } else {
-                            context.startService(serviceIntent)
-                        }
-                    } else {
-                        context.stopService(serviceIntent)
+                    when (sessionCommandFor(pairing)) {
+                        SessionCommand.START ->
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                context.startForegroundService(serviceIntent)
+                            } else {
+                                context.startService(serviceIntent)
+                            }
+                        SessionCommand.STOP -> context.stopService(serviceIntent)
+                        null -> Unit
                     }
                 }
 
-                if (trackerId != null && alarmBook.pending.isNotEmpty()) {
+                if (pairing == null) {
+                    // The stored pairing is not read yet; drawing the pairing screen here would flash it.
+                } else if (trackerId != null && alarmBook.pending.isNotEmpty()) {
                     AlarmAlertScreen(alarmBook.pending, trackerId, onAcknowledge = viewModel::acknowledgeAlarms)
                 } else if (trackerId == null) {
                     PairingWizard(
@@ -121,7 +125,7 @@ class MonitorActivity : ComponentActivity() {
                         localHudState = localHudState,
                         remoteHudState = remoteHudState,
                         localPosition = localPosition,
-                        trackerId = trackerId!!,
+                        trackerId = trackerId,
                         monitorId = monitorId,
                         relayUrl = relayUrl,
                         trail = trail,
@@ -277,28 +281,32 @@ fun MonitorScreen(
     var isEditingRelayUrl by rememberSaveable { mutableStateOf(false) }
     var relayUrlInput by rememberSaveable(relayUrl) { mutableStateOf(relayUrl) }
     var followMode by rememberSaveable { mutableStateOf(MapFollowMode.AUTO) }
-    // Every control that unpairs asks first; only the dialog's Unpair button calls onReset.
-    var showUnpairConfirm by rememberSaveable { mutableStateOf(false) }
-    val requestUnpair = { showUnpairConfirm = true }
+    // Every control that unpairs asks first; only the dialog's confirm button runs the pending action
+    // (Chapter 127; full re-initialization also unpairs, ISSUE-NOV8.2-O46).
+    var pendingUnpair by rememberSaveable { mutableStateOf<UnpairAction?>(null) }
+    val requestUnpair = { pendingUnpair = UnpairAction.UNPAIR }
 
-    if (showUnpairConfirm) {
+    pendingUnpair?.let { action ->
         AlertDialog(
-            onDismissRequest = { showUnpairConfirm = false },
+            onDismissRequest = { pendingUnpair = null },
             title = { Text("Unpair from tracker $trackerId?") },
-            text = { Text("The Monitor stops receiving this tracker until you pair again. Stored trail rows are kept.") },
+            text = { Text(action.consequence) },
             confirmButton = {
                 Button(
                     onClick = {
-                        showUnpairConfirm = false
-                        onReset()
+                        pendingUnpair = null
+                        when (action) {
+                            UnpairAction.UNPAIR -> onReset()
+                            UnpairAction.FULL_REINITIALIZATION -> onFullInit()
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = com.jd.core.ui.StatusRed)
                 ) {
-                    Text("Unpair")
+                    Text(action.confirmLabel)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showUnpairConfirm = false }) {
+                TextButton(onClick = { pendingUnpair = null }) {
                     Text("Cancel")
                 }
             }
@@ -379,7 +387,7 @@ fun MonitorScreen(
             isTracker = false,
             onClearHomePoints = onClearHomePoints,
             onResetStats = onResetStats,
-            onFullInit = onFullInit,
+            onFullInit = { pendingUnpair = UnpairAction.FULL_REINITIALIZATION },
             onClose = { showCleanSetupOverlay = false }
         )
         return
@@ -736,4 +744,16 @@ fun MapToolButton(icon: ImageVector? = null, symbol: String? = null, label: Stri
             }
         }
     }
+}
+
+/** A Monitor action that unpairs the tracker, and what its confirmation dialog tells the user before it runs. */
+internal enum class UnpairAction(val consequence: String, val confirmLabel: String) {
+    UNPAIR(
+        consequence = "The Monitor stops receiving this tracker until you pair again. Stored trail rows are kept.",
+        confirmLabel = "Unpair"
+    ),
+    FULL_REINITIALIZATION(
+        consequence = "Full re-initialization unpairs this tracker, restores every alert setting, the siren, and the relay URL to their defaults, and deletes all stored trail rows.",
+        confirmLabel = "Re-initialize"
+    )
 }
