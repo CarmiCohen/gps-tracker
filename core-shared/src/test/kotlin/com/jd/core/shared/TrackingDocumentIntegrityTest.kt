@@ -6,67 +6,87 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Chapter 150 (ISSUE-NOV8.2-O46): the forensic tracking documents may only grow.
+ * Chapter 150 (ISSUE-NOV8.2-O46) and chapter 158 (Nov8.100-Documentation): the tracking documents keep their
+ * history and stay lean.
  *
- * Whole-file rewrites cut the tail off `DOCS/issues.md` (Nov7.38) and `STATUS/RESOLUTION_ARCHIVE.md`
- * (Nov7.30, Nov8.0) and dropped SOT verification chapters (Nov7.38) without any test noticing. Every
- * loss either removed the oldest entries at the end of a file or left one record out of step with the
- * others, so this test checks that each resolved version is recorded in all four places, that the
- * oldest entries are still there, and that the dashboard is still the last section of `issues.md`.
- * The documents are declared as inputs of `:core-shared:test`, so editing one re-runs this test.
+ * Whole-file rewrites once cut the tail off `issues.md` and `RESOLUTION_ARCHIVE.md` unnoticed (ISSUE-NOV8.2-O46),
+ * so each resolved version must still be recorded in the archive, the SOT baseline, and a dashboard row, and the
+ * oldest entries must survive. Since Nov8.100-Documentation the archive is the single home of resolved issues
+ * (Documentation Rule D1), `issues.md` is a working file (D2), and `Handover.md` is short (D3); this test holds
+ * those limits. The documents are declared as inputs of `:core-shared:test`, so editing one re-runs it.
  */
 class TrackingDocumentIntegrityTest {
 
     private val issues by lazy { document("DOCS/issues.md") }
     private val archive by lazy { document("STATUS/RESOLUTION_ARCHIVE.md") }
     private val sot by lazy { document("STATUS/SOT_MASTER_REQUIREMENTS.md") }
+    private val handover by lazy { document("Handover.md") }
 
     @Test
-    fun issuesKeepsEveryRequiredSectionWithTheDashboardLast() {
+    fun issuesIsALeanWorkingFileWithTheDashboardLast() {
         val headings = sectionHeadings(issues)
-        listOf("Next Resumption Focus", "Work Queue", "Open Gaps", "Resolved Gaps", "Strategic Simplification Ideas", "Hardening Progress Dashboard")
+        listOf("Next Resumption Focus", "Work Queue", "Open Gaps", "Strategic Simplification Ideas", "Hardening Progress Dashboard")
             .forEach { required -> assertTrue(headings.any { required in it }, "issues.md lost its '$required' section") }
         assertTrue("Hardening Progress Dashboard" in headings.last { it.startsWith("## ") }, "the dashboard must stay the last section of issues.md")
+        assertTrue(headings.none { "Resolved Gaps" in it }, "issues.md must not hold Resolved Gaps; the archive is their home (D1, D2)")
+        assertTrue(dashboardRows(issues).size <= MAX_DASHBOARD_ROWS, "issues.md keeps at most $MAX_DASHBOARD_ROWS dashboard rows; move older ones to the archive (D2)")
+        assertTrue(issues.length <= MAX_ISSUES_CHARS, "issues.md has ${issues.length} characters, more than $MAX_ISSUES_CHARS (D2)")
+    }
+
+    @Test
+    fun handoverFollowsTheShortTemplate() {
+        val lines = handover.lines()
+        assertTrue(lines.size <= MAX_HANDOVER_LINES, "Handover.md has ${lines.size} lines, more than $MAX_HANDOVER_LINES (D3)")
+        assertTrue(lines.first().startsWith("```"), "Handover.md must start with the Git block")
+        listOf("Resumption State", "Status: PASSED", "**Audit line**", "Next Resumption Focus")
+            .forEach { part -> assertTrue(part in handover, "Handover.md lost its '$part' part") }
     }
 
     @Test
     fun everyResolvedVersionIsRecordedInEveryTrackingDocument() {
         val archived = archivedVersions(archive)
-        assertEquals(archived, resolvedGapVersions(issues), "RESOLUTION_ARCHIVE.md and the Resolved Gaps of issues.md disagree")
-
         val sotBaseline = sotBaselineVersions(sot)
         assertEquals(emptyList(), archived.filterNot { it in sotBaseline }, "versions missing from the SOT Core Hardening Baseline")
 
-        val dashboard = dashboardRows(issues)
-        assertEquals(emptyList(), archived.filterNot { v -> dashboard.any { v in it } }, "versions missing from the Hardening Progress Dashboard")
+        val dashboard = dashboardRows(issues) + dashboardRows(archive, ARCHIVE_DASHBOARD)
+        assertEquals(emptyList(), archived.filterNot { v -> dashboard.any { v in it } }, "versions missing from the dashboard of issues.md and the archive's Dashboard History")
     }
 
     @Test
     fun historyStillReachesItsOldestEntries() {
         assertTrue(archivedVersions(archive).contains(Version(4, 32)), "RESOLUTION_ARCHIVE.md lost its Nov4.32 entry")
-        assertTrue(resolvedGapVersions(issues).contains(Version(4, 32)), "issues.md lost its Nov4.32 Resolved Gaps")
-        assertTrue(dashboardRows(issues).any { Version(4, 26) in it }, "the dashboard lost its Nov4.26 row")
+        assertTrue(dashboardRows(archive, ARCHIVE_DASHBOARD).any { Version(4, 26) in it }, "the Dashboard History lost its Nov4.26 row")
+        assertTrue("Dashboard History" in sectionHeadings(archive).last { it.startsWith("## ") }, "the Dashboard History must stay the last section of the archive")
         assertTrue("**Chapter 5.52 (Nov4.30" in sot, "the SOT lost verification chapter 5.52")
         assertTrue("- **Nov4.22-addHUD**" in sot, "the SOT lost its oldest hardening baseline entry")
     }
 
     @Test
     fun versionsAreUniqueAndNewestFirst() {
-        listOf("RESOLUTION_ARCHIVE.md" to archivedVersions(archive), "issues.md Resolved Gaps" to resolvedGapVersions(issues))
-            .forEach { (name, versions) ->
-                assertEquals(versions.sortedDescending(), versions, "$name is not newest first, or repeats a version")
-                assertEquals(versions.distinct(), versions, "$name repeats a version")
-            }
+        val archived = archivedVersions(archive)
+        assertEquals(archived.sortedDescending(), archived, "RESOLUTION_ARCHIVE.md is not newest first, or repeats a version")
+        assertEquals(archived.distinct(), archived, "RESOLUTION_ARCHIVE.md repeats a version")
+
+        val rows = (dashboardRows(issues) + dashboardRows(archive, ARCHIVE_DASHBOARD)).map { it.endInclusive }
+        assertEquals(rows.sortedDescending(), rows, "the dashboard rows, then the Dashboard History, are not newest first")
+        assertEquals(rows.distinct(), rows, "a dashboard row appears twice")
     }
 
     @Test
     fun aTruncatedArchiveIsDetected() {
-        val full = "# Resolution Archive\n\n## ✅ Resolved Issues (Nov8.0)\n- x\n\n## ✅ Resolved Issues (Nov7.38)\n- y\n"
-        val truncated = full.substringBefore("## ✅ Resolved Issues (Nov7.38)")
-        val gaps = "## 🟢 Resolved Gaps (Nov8.0)\n\n## 🟢 Resolved Gaps (Nov7.38)\n"
+        val full = "# Resolution Archive\n\n## ✅ Resolved Issues (Nov8.0)\n- x\n\n## ✅ Resolved Issues (Nov4.32)\n- y\n"
+        val truncated = full.substringBefore("## ✅ Resolved Issues (Nov4.32)")
+        assertTrue(archivedVersions(full).contains(Version(4, 32)))
+        assertTrue(!archivedVersions(truncated).contains(Version(4, 32)))
+    }
 
-        assertEquals(resolvedGapVersions(gaps), archivedVersions(full))
-        assertTrue(archivedVersions(truncated) != resolvedGapVersions(gaps))
+    @Test
+    fun versionNamesWithASuffixAreRead() {
+        assertEquals(listOf(Version(8, 100)), archivedVersions("## ✅ Resolved Issues (Nov8.100-Documentation)\n"))
+        assertEquals(listOf(Version(8, 100)), sotBaselineVersions("## 🛡️ Core Hardening Baseline\n- **Nov8.100-Documentation**: x\n"))
+        val rows = dashboardRows("## 📊 Hardening Progress Dashboard\n- **Nov8.100-Documentation: [SOT Count: 1]**\n- **Nov8.14: [SOT Count: 1]**\n")
+        assertEquals(listOf(Version(8, 100), Version(8, 14)), rows.map { it.start })
+        assertTrue(Version(8, 100) > Version(8, 14), "Nov8.100 must sort after Nov8.14")
     }
 
     @Test
@@ -82,29 +102,38 @@ class TrackingDocumentIntegrityTest {
         override fun compareTo(other: Version) = compareValuesBy(this, other, Version::major, Version::minor)
     }
 
+    private companion object {
+        const val MAX_DASHBOARD_ROWS = 6
+        const val MAX_ISSUES_CHARS = 40_000
+        const val MAX_HANDOVER_LINES = 70
+        const val NAME = """Nov(\d+)\.(\d+)(?:-[A-Za-z]\w*)?"""
+        const val ISSUES_DASHBOARD = "Hardening Progress Dashboard"
+        const val ARCHIVE_DASHBOARD = "Dashboard History"
+    }
+
     private fun document(path: String) = File("../$path").readText(Charsets.UTF_8)
 
     private fun sectionHeadings(text: String) = text.lines().filter { it.startsWith("#") }
 
-    private fun section(text: String, title: String) =
-        text.substringAfter(title, missingDelimiterValue = "").substringBefore("\n## ")
 
     private fun versionsOf(text: String, pattern: Regex) =
         text.lines().mapNotNull { line -> pattern.find(line)?.let { Version(it.groupValues[1].toInt(), it.groupValues[2].toInt()) } }
 
-    private fun archivedVersions(text: String) = versionsOf(text, Regex("""^## .*Resolved Issues \(Nov(\d+)\.(\d+)\)"""))
-
-    private fun resolvedGapVersions(text: String) = versionsOf(text, Regex("""^## .*Resolved Gaps \(Nov(\d+)\.(\d+)\)"""))
+    private fun archivedVersions(text: String) = versionsOf(text, Regex("""^## .*Resolved Issues \($NAME\)"""))
 
     private fun sotBaselineVersions(text: String) =
-        versionsOf(section(text, "Core Hardening Baseline"), Regex("""^- \*\*Nov(\d+)\.(\d+)\*\*"""))
+        versionsOf(text.substringAfter("Core Hardening Baseline", missingDelimiterValue = "").substringBefore("\n## "), Regex("""^- \*\*$NAME\*\*"""))
 
-    private fun dashboardRows(text: String): List<ClosedRange<Version>> =
-        section(text, "Hardening Progress Dashboard").lines().mapNotNull { line ->
-            Regex("""^- \*\*Nov(\d+)\.(\d+)(?: to Nov(\d+)\.(\d+))?:""").find(line)?.groupValues?.let { g ->
+    /** Rows under the heading [title]: "Hardening Progress Dashboard" in issues.md, "Dashboard History" in the archive. */
+    private fun dashboardRows(text: String, title: String = ISSUES_DASHBOARD): List<ClosedRange<Version>> {
+        // Match the heading line itself: archive entries mention these words in their text.
+        val rows = text.substringAfter("## 📊 $title", missingDelimiterValue = "").substringBefore("\n## ")
+        return rows.lines().mapNotNull { line ->
+            Regex("""^- \*\*$NAME(?: to Nov(\d+)\.(\d+))?:""").find(line)?.groupValues?.let { g ->
                 val from = Version(g[1].toInt(), g[2].toInt())
                 val to = if (g[3].isEmpty()) from else Version(g[3].toInt(), g[4].toInt())
-                from..to
+                minOf(from, to)..maxOf(from, to)
             }
         }
+    }
 }

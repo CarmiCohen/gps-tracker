@@ -24,8 +24,9 @@ class BaselineIndexTest {
 
     @Test
     fun everyRecordedVersionHasAnIndexLine() {
-        val recorded = Regex("""Resolved Issues \((Nov\d+\.\d+)\)""").findAll(document("STATUS/RESOLUTION_ARCHIVE.md")).map { it.groupValues[1] } +
-            Regex("""^- \*\*(Nov\d+\.\d+):""", RegexOption.MULTILINE).findAll(document("DOCS/issues.md")).map { it.groupValues[1] }
+        val name = """Nov\d+\.\d+(?:-[A-Za-z]\w*)?"""
+        val recorded = Regex("""Resolved Issues \(($name)\)""").findAll(document("STATUS/RESOLUTION_ARCHIVE.md")).map { it.groupValues[1] } +
+            Regex("""^- \*\*($name):""", RegexOption.MULTILINE).findAll(document("DOCS/issues.md")).map { it.groupValues[1] }
         val indexed = rows.map { it.version }.toSet()
         assertEquals(emptyList(), recorded.distinct().filterNot { it in indexed }.toList(), "versions recorded but missing from STATUS/BASELINE/INDEX.md")
     }

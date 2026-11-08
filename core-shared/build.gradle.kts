@@ -19,6 +19,7 @@ tasks.test {
         rootProject.file("STATUS/RESOLUTION_ARCHIVE.md"),
         rootProject.file("STATUS/SOT_MASTER_REQUIREMENTS.md"),
         rootProject.file("STATUS/BASELINE/INDEX.md"),
+        rootProject.file("Handover.md"),
         rootProject.file(".git/packed-refs"),
         rootProject.fileTree(".git/refs/tags"),
         rootProject.file("gradle.properties"),

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov8.14 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov8.100-Documentation - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -606,8 +606,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **157.2 Tags Match:** Verify that each tagged row's commit equals `git rev-parse --short=7 <tag>^{commit}` and that rows marked `No tag` have no tag. Automated by `BaselineIndexTest.everyTagPointsAtTheIndexedCommit` and `aMovedOrMissingTagIsDetected`; deliberate break: the old Nov8.11 hash failed.
 *   **157.3 Pending Row:** Verify that only the newest row may say `pending`, and only until its tag exists. Automated by `BaselineIndexTest.onlyTheNewestRowMayBePendingAndOnlyUntilItIsTagged`.
 
+## Chapter 158 - Lean Documentation Workflow (Nov8.100-Documentation)
+*Changes chapter 150: `issues.md` no longer holds Resolved Gaps, so 150.2 now checks the archive against the SOT baseline and the dashboard rows of `issues.md` plus the archive's Dashboard History, and 150.3 reads the Nov4.26 row there.*
+*   **158.1 Working File Limits:** Verify that `issues.md` keeps its working sections with the dashboard last, holds no Resolved Gaps, at most 6 dashboard rows, and at most 40,000 characters (D2). Automated by `TrackingDocumentIntegrityTest.issuesIsALeanWorkingFileWithTheDashboardLast`.
+*   **158.2 Short Handover:** Verify that `Handover.md` starts with the Git block, has the template parts, and at most 70 lines (D3). Automated by `TrackingDocumentIntegrityTest.handoverFollowsTheShortTemplate`.
+*   **158.3 One Home, Still Complete:** Verify that every archived version is in the SOT baseline and a dashboard row (`issues.md` or Dashboard History), that both are newest first without repeats, and that version names with a suffix (`Nov8.100-Documentation`) are read and sort after Nov8.14 (D1). Automated by `everyResolvedVersionIsRecordedInEveryTrackingDocument`, `versionsAreUniqueAndNewestFirst`, `versionNamesWithASuffixAreRead`, and `VersionSourceTest`.
+
 ---
-**Active Testing Chapters: 147 of 157**
+**Active Testing Chapters: 148 of 158**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

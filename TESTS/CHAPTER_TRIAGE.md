@@ -1,4 +1,4 @@
-# Chapter Triage - Nov8.14
+# Chapter Triage - Nov8.100-Documentation
 
 Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`, and `TEST_FORENSIC_STRESS_PROTOCOL.md`, based on the running code and on tests executed for Nov5.2 on the A15 and updated in Nov8.10 (SIMP-NOV7.0-S1).
 
@@ -12,7 +12,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | **D** | The feature is not wired into the running apps, so it cannot pass; decision needed |
 | **N** | Obsolete since the app split; retirement proposed |
 
-**Summary:** 86 of 147 active chapters are verified at least in part (L or A) at Nov8.14 (chapter 157 added). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
+**Summary:** 87 of 148 active chapters are verified at least in part (L or A) at Nov8.100-Documentation (chapter 158 added). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
 
 **Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapters 143 to 153 make 143 active chapters. Updated in Nov8.10 (SIMP-NOV7.0-S1): Chapter 153 added for Single Source Version Management (`VersionSourceTest`). Chapter 154 added in Nov8.11. Nov8.13: chapter 155 (owed by Nov8.12, which cited it without writing it, ISSUE-NOV8.13-O53) and chapter 156 (ISSUE-NOV8.13-O51) make 146 active chapters.
 
@@ -140,6 +140,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 155 Geofence breach alarm | A | 155.1 automated by `GeofenceBreachAlarmTest` (violation and telemetry status paths); 155.2 by `MonitorAlarmsTest` (ISSUE-NOV5.2-O11 Group 2) |
 | 156 Home Points geofence | L / A | 156.1 to 156.5 automated by `HomeZoneTest`, `GeofenceWireTest`, `GeofenceSyncTest`, `CleanSetupActionsTest`; 156.6 verified on the A15 through the production relay (add, radius, remove, re-send). A real `EXIT` on a moving tracker was not run (ISSUE-NOV8.13-O51) |
 | 157 Baseline index | A | Automated by `BaselineIndexTest` (ISSUE-NOV8.5-O47) |
+| 158 Lean documentation workflow | A | Automated by `TrackingDocumentIntegrityTest` and `VersionSourceTest` (Documentation Rules D1 to D3) |
 
 ## TEST_FORENSIC_STRESS_PROTOCOL.md
 | Section | Code | Notes |

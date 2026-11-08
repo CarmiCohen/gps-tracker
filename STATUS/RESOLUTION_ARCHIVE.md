@@ -1,5 +1,10 @@
 # Resolution Archive
 
+*The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
+
+## ✅ Resolved Issues (Nov8.100-Documentation)
+- **Lean documentation workflow (user decision 2026-11-08, the 7 points)**: Each session re-read and re-wrote the same facts in up to 9 places, and `DOCS/issues.md` had grown to 450 lines of mostly history. `DEVELOPER_GUIDELINES.md` now holds Documentation Rules D1 to D7: (D1) one home per fact, this archive, with one-line pointers elsewhere; (D2) `issues.md` is a working file with open items, ideas, and at most 6 dashboard rows, older rows going to the Dashboard History here; (D3) a fixed short Handover template, a commit message of at most 12 lines, and no repetition of the Git block in chat; (D4) git tags as baselines (Nov8.14); (D5) a shorter Completion Sequence, 10 steps instead of 14; (D6) `chat_session.md` as a short milestone log; (D7) targeted reads. `issues.md` rewritten: 450 to about 90 lines; done Work Queue rows, Resolved Gaps Nov4.32 to Nov8.14, and resolved gap texts removed (their text is in tag Nov8.14); 46 old dashboard rows moved here unchanged; Open and Ideas recounted from the lists (H:1, M:3, L:8; 16 ideas, after removing SIMP-NOV7.0-S1, done in Nov8.10, and SIMP-NOV6.2-S1, obsolete since the local trail was built). `TrackingDocumentIntegrityTest` rewritten for the new layout and its limits (no Resolved Gaps in `issues.md`, at most 6 dashboard rows, `issues.md` at most 40,000 characters, `Handover.md` at most 70 lines, every archived version in the SOT baseline and in a dashboard row of either file); version names with a suffix such as `Nov8.100-Documentation` accepted by it, `VersionSourceTest`, and `BaselineIndexTest`. SOT rule 1.396, test chapter 158. **PASSED.**
+
 ## ✅ Resolved Issues (Nov8.14)
 - **Git tags are the baselines (ISSUE-NOV8.5-O47, SIMP-NOV8.5-S1, Low)**: the hand-made `STATUS/BASELINE/<version>/` copies were partial or missing for many versions. User decision 2026-11-08, option C: the git tag is the baseline (`git show <tag>:<path>`); `STATUS/BASELINE/INDEX.md` lists all 90 versions newest first with the commit of each tag, and notes the versions without a tag (Nov8.7 in Nov8.8, Nov8.1 in Nov8.2, Nov4.37 in Nov4.44, Nov1.5 in Nov1.6), without a copy, or with a partial copy. The old copies are frozen, not deleted (Rule 9). `DEVELOPER_GUIDELINES.md`: Rule 9 and Completion step 10 (add a `pending` row instead of copying), step 5 (`gradle.properties`), and a session-start check that fills `pending` from the tag. `BaselineIndexTest` (5 tests) checks that every recorded version is indexed, rows are unique and newest first, every tag points at the indexed commit (run against git; a deliberate break with the old Nov8.11 hash failed as expected), and that only the newest row may be `pending`, until it is tagged; `core-shared` declares the index and the git tag refs as test inputs. The untraced SOT placeholder for rules 1.1 to 1.334, noted in O47, continues as ISSUE-NOV8.14-O58. SOT rule 1.395, test chapter 157. **PASSED.**
 - **Nov8.12 release integrity (ISSUE-NOV8.13-O53, Medium)**: the user ran the Nov8.13 Git block. Verified: Nov8.13 = 981668c, Nov8.12 = 6021425, Nov8.11 = dd4be20, Nov8.10 = e45d8fd, the same on `origin`. **PASSED.**
@@ -172,3 +177,53 @@
 
 ## ✅ Resolved Issues (Nov4.32)
 - **System Tools & Diagnostics Menu Integration (GAP-REVOL62.0-G1)**: Integrated **Tools** menu and diagnostics overlay. **PASSED.**
+
+## 📊 Dashboard History
+*Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov8.10: [SOT Count: 965 (Rules: 465), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 320), QA: 81]**
+- **Nov8.8: [SOT Count: 964 (Rules: 464), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 319), QA: 80]**
+- **Nov8.7: [SOT Count: 963 (Rules: 463), Open: H:1, M:2, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 303), QA: 74]**
+- **Nov8.5: [SOT Count: 962 (Rules: 462), Open: H:1, M:2, L:14, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 302), QA: 74]**
+- **Nov8.2: [SOT Count: 961 (Rules: 461), Open: H:1, M:1, L:10, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 289), QA: 74]**
+- **Nov8.1: [SOT Count: 960 (Rules: 460), Open: H:1, M:1, L:11, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 289), QA: 73]**
+- **Nov8.0: [SOT Count: 959 (Rules: 459), Open: H:1, M:2, L:11, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 285), QA: 72]**
+- **Nov7.38: [SOT Count: 958 (Rules: 458), Open: H:1, M:2, L:12, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 286), QA: 71]**
+- **Nov7.36: [SOT Count: 957 (Rules: 457), Open: H:1, M:2, L:12, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 284), QA: 70]**
+- **Nov7.34: [SOT Count: 956 (Rules: 456), Open: H:1, M:2, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 284), QA: 69]**
+- **Nov7.32: [SOT Count: 955 (Rules: 455), Open: H:1, M:2, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 284), QA: 69]**
+- **Nov7.30: [SOT Count: 955 (Rules: 455), Open: H:1, M:2, L:14, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 284), QA: 69]**
+- **Nov7.28: [SOT Count: 954 (Rules: 454), Open: H:1, M:2, L:14, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 194), QA: 69]**
+- **Nov7.26: [SOT Count: 953 (Rules: 453), Open: H:1, M:2, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 194), QA: 68]**
+- **Nov7.24: [SOT Count: 952 (Rules: 452), Open: H:1, M:3, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 192), QA: 67]**
+- **Nov7.21: [SOT Count: 951 (Rules: 451), Open: H:1, M:4, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 192), QA: 66]**
+- **Nov7.19: [SOT Count: 950 (Rules: 450), Open: H:1, M:4, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 179), QA: 65]**
+- **Nov7.17: [SOT Count: 949 (Rules: 449), Open: H:1, M:4, L:14, Ideas: H:0, M:3, L:12, Testing: PASSED (Sub-items: 170), QA: 64]**
+- **Nov7.15: [SOT Count: 948 (Rules: 448), Open: H:1, M:3, L:15, Ideas: H:0, M:3, L:11, Testing: PASSED (Sub-items: 160), QA: 63]**
+- **Nov7.7 to Nov7.12: no audit figures were recorded.**
+- **Nov7.6: [SOT Count: 942 (Rules: 442), Open: H:1, M:4, L:18, Ideas: H:0, M:3, L:18, Testing: PASSED (Sub-items: 222), QA: 56]**
+- **Nov7.5: [SOT Count: 941 (Rules: 441), Open: H:1, M:4, L:18, Ideas: H:0, M:3, L:18, Testing: PASSED (Sub-items: 222), QA: 55]**
+- **Nov7.3: [SOT Count: 940 (Rules: 440), Open: H:1, M:4, L:18, Ideas: H:0, M:3, L:18, Testing: PASSED (Sub-items: 222), QA: 54]**
+- **Nov7.2: [SOT Count: 939 (Rules: 439), Open: H:1, M:4, L:16, Ideas: H:0, M:3, L:16, Testing: PASSED (Sub-items: 194), QA: 51]**
+- **Nov7.1: [SOT Count: 938 (Rules: 438), Open: H:1, M:5, L:14, Ideas: H:0, M:3, L:15, Testing: PASSED (Sub-items: 187), QA: 50]**
+- **Nov7.0: [SOT Count: 937 (Rules: 437), Open: H:1, M:5, L:14, Ideas: H:0, M:3, L:14, Testing: PASSED (Sub-items: 182), QA: 49]**
+- **Nov6.4: [SOT Count: 936 (Rules: 436), Open: H:1, M:5, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 177), QA: 48]**
+- **Nov6.3: [SOT Count: 935 (Rules: 435), Open: H:1, M:6, L:14, Ideas: H:0, M:3, L:12, Testing: PASSED (Sub-items: 156), QA: 47]**
+- **Nov6.2: [SOT Count: 934 (Rules: 434), Open: H:1, M:6, L:15, Ideas: H:0, M:3, L:11, Testing: PASSED (Sub-items: 153), QA: 46]**
+- **Nov6.1: [SOT Count: 933 (Rules: 433), Open: H:1, M:7, L:12, Ideas: H:0, M:3, L:10, Testing: PASSED (Sub-items: 145), QA: 44]**
+- **Nov6.0: [SOT Count: 932 (Rules: 432), Open: H:1, M:7, L:11, Ideas: H:0, M:3, L:9, Testing: PASSED (Sub-items: 130), QA: 43]**
+- **Nov5.2: [SOT Count: 931 (Rules: 431), Open: H:1, M:5, L:7, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 118), QA: 48]**
+- **Nov5.1: [SOT Count: 929 (Rules: 429), Open: H:0, M:3, L:5, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 103), QA: 929]**
+- **Nov5.0: [SOT Count: 928 (Rules: 428), Open: H:1, M:4, L:3, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 100), QA: 928]**
+- **Nov4.44: [SOT Count: 924 (Rules: 424), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Release Candidate & Reciprocal Simulation Audit), QA: 924]**
+- **Nov4.37: [SOT Count: 924 (Rules: 424), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Decoupled Peer LED Signaling Audit), QA: 924]**
+- **Nov4.36: [SOT Count: 923 (Rules: 423), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Dual Device Hardware Deployment & Telemetry Audit), QA: 923]**
+- **Nov4.35: [SOT Count: 922 (Rules: 422), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor Hardware Deployment & Single-Line Fitting Audit), QA: 922]**
+- **Nov4.34: [SOT Count: 921 (Rules: 421), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Upper Menu Line Expansion), QA: 921]**
+- **Nov4.33: [SOT Count: 920 (Rules: 420), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Revived Sound & Setup Options Integration), QA: 920]**
+- **Nov4.32: [SOT Count: 919 (Rules: 419), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (System Tools & Diagnostics Menu Integration), QA: 919]**
+- **Nov4.31: [SOT Count: 918 (Rules: 418), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Device-Specific Setup & Hardware Hardening Revival), QA: 918]**
+- **Nov4.30: [SOT Count: 917 (Rules: 417), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor Dual HUD, Centering & Alarming Setup Revival), QA: 917]**
+- **Nov4.29: [SOT Count: 915 (Rules: 415), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Nov4.29 Stabilization & Comprehensive Test Execution Across All Subprojects), QA: 915]**
+- **Nov4.28: [SOT Count: 914 (Rules: 414), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Pre-Revolution Map Functionality & Specifications Implementation & Test Chapters 107-108), QA: 914]**
+- **Nov4.27: [SOT Count: 913 (Rules: 413), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Relay URL Setup Option Integration in Sensor App & Reactive Signaling Reconnect), QA: 913]**
+- **Nov4.26: [SOT Count: 912 (Rules: 412), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor UI Refinement, Upper Menu, Setup Button, SRV/GPS LED Fixes & Map Controls), QA: 912]**

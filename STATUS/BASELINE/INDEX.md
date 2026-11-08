@@ -10,7 +10,8 @@ No copies are made any more. User decision, 2026-11-08 (option C).
 
 | Version | Commit | Notes |
 | :--- | :--- | :--- |
-| Nov8.14 | pending | |
+| Nov8.100-Documentation | pending | |
+| Nov8.14 | 3fc4fb4 | |
 | Nov8.13 | 981668c | |
 | Nov8.12 | 6021425 | Committed during Nov8.13; tag moved from dd4be20 (ISSUE-NOV8.13-O53). Partial copy (Handover, issues only) |
 | Nov8.11 | dd4be20 | Tag moved from e45d8fd (ISSUE-NOV8.13-O53) |

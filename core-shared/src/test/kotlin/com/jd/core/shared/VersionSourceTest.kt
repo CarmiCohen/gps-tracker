@@ -27,8 +27,8 @@ class VersionSourceTest {
 
         // The format is checked, not a fixed value: a test pinned to one version had to be edited each release,
         // and Nov8.12 shipped without a version bump (ISSUE-NOV8.13-O53).
-        assertTrue(versionName != null && Regex("""[A-Z][a-z]+\d+\.\d+""").matches(versionName), "appVersionName must look like Nov8.13, was $versionName")
-        assertTrue((versionCode?.toIntOrNull() ?: 0) >= 64, "appVersionCode must be a number of at least 64 (Nov8.13), was $versionCode")
+        assertTrue(versionName != null && Regex("""[A-Z][a-z]+\d+\.\d+(-[A-Za-z]\w*)?""").matches(versionName), "appVersionName must look like Nov8.13 or Nov8.100-Documentation, was $versionName")
+        assertTrue((versionCode?.toIntOrNull() ?: 0) >= 66, "appVersionCode must be a number of at least 66 (Nov8.100-Documentation), was $versionCode")
     }
 
     @Test
