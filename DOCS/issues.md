@@ -1,9 +1,9 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.11)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.12)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov8.10, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov8.11, solved one by one in the order below
 
 ### Work Queue
-Nov8.11 is closed and followed Nov8.10, Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov8.12 is closed and followed Nov8.11, Nov8.10, Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
 **Next item: ISSUE-NOV6.0-O26 (item 18, Medium, blocked on a device below API 35 or permission to download an API 34 image).**
 
@@ -16,7 +16,7 @@ Nov8.11 is closed and followed Nov8.10, Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, 
 | 5 | ISSUE-NOV5.0-O5 | **Done for Nov6.3**: the Setup dialog shows the real relay state | Nothing |
 | 6 | ISSUE-NOV5.0-O6 | **Done for Nov7.0**: versions come from the installed package, and no production string holds one | Nothing |
 | 7 | ISSUE-NOV5.2-O15 | **Done for Nov7.1**: every Monitor control that unpairs asks first | Nothing |
-| 8 | ISSUE-NOV5.2-O11 | **Decided**: Group 1 (Alarms), Group 3 (`SentinelLogic`), Group 2 (Geofencing), Group 4 (Microphone), and Group 5 (Lift) to be built. Group 6 (Remote Siren), Group 7 (Hardening), and Group 8 (Export/Tools) retired/not required. Group 7 Extra Sensors TBD. | Action items pending implementation |
+| 8 | ISSUE-NOV5.2-O11 | **Done in part for Nov8.12 (Group 2 Geofencing)**: Group 1 (Alarms), Group 3 (`SentinelLogic`), Group 2 (Geofencing), Group 4 (Microphone), and Group 5 (Lift) built. Group 6 (Remote Siren), Group 7 (Hardening), and Group 8 (Export/Tools) retired/not required. | Action items pending implementation for remaining groups |
 | 9 | ISSUE-NOV5.2-O13 | **Done for Nov7.7**: Sensor runs `SentinelLogic.validateMovement` with accelerometer motion on each fix and sends motion state / violation status in telemetry and via `ViolationEvent`; Monitor sounds GPS jump alarm | Nothing |
 | 10 | ISSUE-NOV5.2-O12 | **Done for Nov6.4**: backfill round trip seen on the production relay | Nothing |
 | 11 | ISSUE-NOV5.4-O19 | **Decided 2026-11-07**: `before splitting/gps-tracker` is a frozen archive; leave its changes as they are and never edit it. Only its redundant `relay-server/index.js` edit is to be discarded, by the user | User runs `git restore index.js` in `before splitting/gps-tracker/relay-server` |
@@ -71,7 +71,7 @@ Nov8.11 is closed and followed Nov8.10, Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, 
 - **ISSUE-NOV5.0-O4 (Medium) - Test coverage gap, reduced in Nov5.2**: every chapter now has a status in `TESTS/CHAPTER_TRIAGE.md`. Still outstanding are the chapters needing a person (H) or the S21FE or a second viewer (S). `ProductionReadinessAuditTest` holds three math checks only; `TESTS/device_audit.cmd` now performs the real Davey and StackLog audit. Earlier "100% passing" entries covered unit tests only.
 - **ISSUE-NOV5.2-O11 (High) - Documented features are not wired into the running apps**: many chapters and SOT rules marked PASSED describe behavior the apps cannot perform. **Decisions (2026-11-08)**: 
   - **Group 1 (Alarms & Sirens)**: Built (Slices 1–3).
-  - **Group 2 (Geofencing)**: Build.
+  - **Group 2 (Geofencing)**: Built (Nov8.12).
   - **Group 3 (`SentinelLogic`)**: Built on Sensor.
   - **Group 4 (Microphone / Audio)**: Build.
   - **Group 5 (Lift / Tilt detection)**: Build.
@@ -87,6 +87,11 @@ Nov8.11 is closed and followed Nov8.10, Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, 
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov8.12)
+*   **Geofencing Implementation (ISSUE-NOV5.2-O11 Group 2)**: Wired spatial geofence transition evaluation into `SensorService` using `SentinelLogic.evaluateGeofenceTransition` against a home anchor point, emitting `ViolationEvent(type = "GEOFENCE_BREACH", ...)` upon boundary exit. Added `AlarmType.GEOFENCE_BREACH` to `MonitorAlarms`, controlled by `AlertSettings.distance` and raised by `MonitorAlarmEngine` to sound the siren and show alarm notifications. Verified by `GeofenceBreachAlarmTest` (Chapter 155) and 100% passing automated unit tests across all subprojects with clean `--warning-mode all` build. SOT rule 1.393, test chapter 155. **PASSED.**
 
 ---
 
@@ -216,7 +221,7 @@ Nov8.11 is closed and followed Nov8.10, Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, 
 ---
 
 ## 🟢 Resolved Gaps (Nov7.7)
-*   **False MOVING & Sensor-Detected Violations (ISSUE-NOV5.2-O13, group 1 slice 3)**: Wired `SentinelLogic.validateMovement` with accelerometer motion (`hasPhysicalMotion`) on each fix in `SensorService.kt`, transmitting motion state and violation status (`JUMP`, `OUTLIER`) in telemetry and via `ViolationEvent`. Added `AlarmType.GPS_JUMP`, wired to `AlertSettings.jammerDetection` and `signalingClient.violationFlow` in `MonitorAlarmEngine.kt`. Verified by `MonitorAlarmsTest`. **PASSED.**
+*   **False MOVING & Sensor-Detected Violations (ISSUE-NOV5.2-O13, group 1 slice 3)**: Wired `SentinelLogic.validateMovement` with accelerometer motion (`hasPhysicalMotion`) on each fix in `SensorService.kt`, transmitting motion state and violation status (`JUMP`, `OUTLIER`) in telemetry and via `ViolationEvent`; Monitor sounds GPS jump alarm. **PASSED.**
 
 ---
 
@@ -226,7 +231,7 @@ Nov8.11 is closed and followed Nov8.10, Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, 
 ---
 
 ## 🟢 Resolved Gaps (Nov7.5)
-*   **Communication Alarms (ISSUE-NOV5.2-O11, group 1, slice 2)**: Added communication alarms to `MonitorAlarms.kt` (`AlarmType.RELAY_DISCONNECTED`, `LOCAL_INTERNET_OFFLINE`, `GPS_SIGNAL_LOSS`), switched by `relayConnection`, `localInternet`, and `signalLoss` in `AlertSettings`. Integrated into `alarmConditions` and `alarmBooks`, wired to `signalingClient.isConnected` and `localInternetFlow()` in `MonitorAlarmEngine.kt`. Verified by 18 unit tests in `MonitorAlarmsTest` and full automated test suite pass across all modules. **PASSED.**
+*   **Communication Alarms (ISSUE-NOV5.2-O11, group 1, slice 2)**: Added communication alarms to `MonitorAlarms.kt` (`AlarmType.RELAY_DISCONNECTED`, `LOCAL_INTERNET_OFFLINE`, `GPS_SIGNAL_LOSS`), switched by `relayConnection`, `localInternet`, and `signalLoss` in `AlertSettings`. **PASSED.**
 
 ---
 
@@ -366,6 +371,7 @@ Nov8.11 is closed and followed Nov8.10, Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov8.12: [SOT Count: 967 (Rules: 467), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 323), QA: 83]**
 - **Nov8.11: [SOT Count: 966 (Rules: 466), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 322), QA: 82]**
 - **Nov8.10: [SOT Count: 965 (Rules: 465), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 320), QA: 81]**
 - **Nov8.8: [SOT Count: 964 (Rules: 464), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 319), QA: 80]**

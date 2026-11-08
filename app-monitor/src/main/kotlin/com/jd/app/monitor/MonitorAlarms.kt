@@ -43,7 +43,8 @@ enum class AlarmType(val title: String) {
     RELAY_DISCONNECTED("Relay disconnected"),
     LOCAL_INTERNET_OFFLINE("Monitor internet lost"),
     GPS_SIGNAL_LOSS("Tracker GPS signal loss"),
-    GPS_JUMP("Tracker GPS jump")
+    GPS_JUMP("Tracker GPS jump"),
+    GEOFENCE_BREACH("Geofence boundary breach")
 }
 
 fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) {
@@ -55,6 +56,7 @@ fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) 
     AlarmType.LOCAL_INTERNET_OFFLINE -> localInternet
     AlarmType.GPS_SIGNAL_LOSS -> signalLoss
     AlarmType.GPS_JUMP -> jammerDetection
+    AlarmType.GEOFENCE_BREACH -> distance
 }
 
 /** The newest telemetry from the paired tracker. [receivedAtMs] is Monitor time, so the clocks of the two phones never meet. */
@@ -106,6 +108,7 @@ fun alarmConditions(
     hasRelayConnected: Boolean = true,
     isLocalInternet: Boolean = true,
     hasViolation: Boolean = false,
+    violationType: String? = null,
     noGpsSignalSinceMs: Long? = null
 ): Set<AlarmType> = buildSet {
     if (nowMs - (reading?.receivedAtMs ?: watchingSinceMs) >= TRACKER_PRESENT_MS) add(AlarmType.TRACKER_OFFLINE)
@@ -118,7 +121,9 @@ fun alarmConditions(
     ) {
         add(AlarmType.GPS_SIGNAL_LOSS)
     }
-    if (reading != null && (reading.status == "JUMP" || reading.status == "OUTLIER" || hasViolation)) {
+    if (violationType == "GEOFENCE_BREACH" || reading?.status == "GEOFENCE_BREACH") {
+        add(AlarmType.GEOFENCE_BREACH)
+    } else if ((reading != null && (reading.status == "JUMP" || reading.status == "OUTLIER")) || hasViolation) {
         add(AlarmType.GPS_JUMP)
     }
     if (reading == null) return@buildSet
@@ -207,13 +212,14 @@ fun alarmBooks(
                 state.copy(
                     reading = reading,
                     hasViolation = false,
+                    violationType = null,
                     noGpsSignalSinceMs = if (reading.hasGpsSignal()) null else state.noGpsSignalSinceMs ?: reading.receivedAtMs
                 )
             }
-            is BookEvent.Violation -> state.copy(hasViolation = true)
+            is BookEvent.Violation -> state.copy(hasViolation = true, violationType = event.violation.type)
             is BookEvent.Settings -> state.copy(settings = event.settings)
             BookEvent.Tick -> state
-            BookEvent.Acknowledge -> state.copy(book = state.book.acknowledge(), hasViolation = false)
+            BookEvent.Acknowledge -> state.copy(book = state.book.acknowledge(), hasViolation = false, violationType = null)
             is BookEvent.RelayConnection -> state.copy(
                 isRelayConnected = event.isConnected,
                 hasRelayConnected = state.hasRelayConnected || event.isConnected
@@ -233,6 +239,7 @@ fun alarmBooks(
                     hasRelayConnected = next.hasRelayConnected,
                     isLocalInternet = next.isLocalInternet,
                     hasViolation = next.hasViolation,
+                    violationType = next.violationType,
                     noGpsSignalSinceMs = next.noGpsSignalSinceMs
                 ),
                 alertSettings,
@@ -250,6 +257,7 @@ private data class WatchState(
     val hasRelayConnected: Boolean = false,
     val isLocalInternet: Boolean = true,
     val hasViolation: Boolean = false,
+    val violationType: String? = null,
     val noGpsSignalSinceMs: Long? = null
 )
 

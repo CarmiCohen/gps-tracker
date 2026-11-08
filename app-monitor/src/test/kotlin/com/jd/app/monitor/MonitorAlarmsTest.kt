@@ -416,4 +416,20 @@ class MonitorAlarmsTest {
         assertEquals(emptyList<Alarm>(), watch.awaitBook { it.alarms.isEmpty() }.alarms)
         watch.job.cancel()
     }
+
+    @Test
+    fun geofenceBreachViolationEmitsGeofenceBreachAlarm() = runBlocking {
+        val watch = Watch(this)
+        watch.settings.emit(AlertSettings())
+        watch.ready()
+
+        val violation = com.jd.core.shared.ViolationEvent(
+            type = "GEOFENCE_BREACH",
+            location = LocationUpdate(deviceId = "T", lat = 38.0, lng = -122.0),
+            nonce = "123"
+        )
+        watch.violations.emit(violation)
+        assertEquals(listOf(AlarmType.GEOFENCE_BREACH), watch.awaitBook { it.needsSiren }.pending.map { it.type })
+        watch.job.cancel()
+    }
 }

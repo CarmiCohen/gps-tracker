@@ -76,6 +76,8 @@ class SensorService : Service(), SensorEventListener {
     private var lastBatteryLevel = -1
     private var lastIsCharging = false
     private var lastTempCelsius = -1f
+    private var homeGeofence: SentinelLogic.Geofence? = null
+    private var geofenceState = SentinelLogic.GeofenceState.INSIDE
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -352,6 +354,35 @@ class SensorService : Service(), SensorEventListener {
                     update.speed = if (loc.hasSpeed()) loc.speed else -1f
                     update.bearing = loc.bearing
                     update.altitude = loc.altitude
+
+                    if (homeGeofence == null) {
+                        homeGeofence = SentinelLogic.Geofence(
+                            id = "HOME_ANCHOR",
+                            lat = loc.latitude,
+                            lng = loc.longitude,
+                            radiusMeters = 100.0
+                        )
+                        geofenceState = SentinelLogic.GeofenceState.INSIDE
+                    } else {
+                        val tempUpdate = LocationUpdate().apply {
+                            lat = loc.latitude
+                            lng = loc.longitude
+                        }
+                        val geofenceResult = SentinelLogic.evaluateGeofenceTransition(tempUpdate, homeGeofence!!, geofenceState)
+                        geofenceState = geofenceResult.currentState
+                        if (geofenceResult.transition == SentinelLogic.GeofenceTransition.EXIT) {
+                            update.status = "GEOFENCE_BREACH"
+                            update.isCritical = true
+                            SystemLogger.w("SensorService", "Geofence Breach detected! Distance: ${geofenceResult.distanceToCenter}m")
+                            val violation = ViolationEvent(
+                                type = "GEOFENCE_BREACH",
+                                location = update.snapshot(),
+                                nonce = java.util.UUID.randomUUID().toString()
+                            )
+                            serviceScope.launch { signalingClient.sendViolation(violation) }
+                        }
+                    }
+
                     movementCheck.check(
                         fixForMovementCheck(loc.latitude, loc.longitude, loc.accuracy, update.speed, loc.elapsedRealtimeNanos),
                         hasPhysicalMotion

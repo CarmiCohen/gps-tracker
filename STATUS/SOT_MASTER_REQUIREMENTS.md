@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov8.11)
+# SOT Master Requirements & Hardening Status (Nov8.12)
 
-## 🏗️ Architectural Master Rules (466 Rules)
+## 🏗️ Architectural Master Rules (467 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -55,8 +55,12 @@
 *   **1.389 Async ForensicBuffer Initialization & Main-Thread Startup Optimization (R-ID 160)**: `SensorService` MUST initialize `ForensicBuffer` on `Dispatchers.IO` background thread during `onCreate()` and await the background initialization job (`initJob.join()`) before executing background sensing loop writes or backfill reads. The main thread MUST NOT execute blocking buffer file I/O or header validation during app launch or service creation, ensuring 0ms main-thread I/O delay and frame display within 500ms (ISSUE-NOV7.15-O41) (R-ID 160).
 *   **1.390 Comprehensive Test Coverage & Non-Placebo Verification (R-ID 161)**: The system MUST maintain rigorous, non-placebo automated unit test suites covering core performance, scaling, watchdog, soak, permission, maintenance, trail storage, and retention requirements across chapters 67, 68, 83, 93, 145, 147, 148, and 149 (ISSUE-NOV6.0-O23) (R-ID 161).
 *   **1.391 Single Source Version Management Architecture & Gradle Synchronization (R-ID 162)**: The system MUST centralize application `versionName` and `versionCode` in `gradle.properties` as the single source of truth across all application modules (`app-monitor` and `app-sensor`), dynamically loading properties via `providers.gradleProperty()`, verified by automated unit tests (`VersionSourceTest`) to prevent version code drift or duplicate hardcoded version declarations across build scripts (SIMP-NOV7.0-S1) (R-ID 162).
+*   **1.392 Trail Persistence Integrity & Pending Identity Collection (R-ID 163)**: Room database `TrailEntity` primary key composite MUST be `["trackerId", "timestamp", "sequenceId"]` to prevent equal-timestamp telemetry replacement overwrite, and Monitor local trail collection flow MUST filter valid `selfId` first (`selfId.filter { it != "LOADING..." && it.isNotBlank() }`) and `flatMapLatest` into `localFix`, ensuring zero initial local fixes are dropped during cold start identity loading (ISSUE-NOV4.3-O48, ISSUE-NOV4.3-O49) (R-ID 163).
+*   **1.393 Geofencing Boundary Breach Detection & Alarm Annunciation (R-ID 164)**: The Sensor MUST evaluate spatial geofence transition updates using `SentinelLogic.evaluateGeofenceTransition` against a home anchor point, emitting `ViolationEvent(type = "GEOFENCE_BREACH", ...)` upon boundary exit. The Monitor MUST raise `AlarmType.GEOFENCE_BREACH` via `MonitorAlarmEngine` and `AlertSettings.distance` upon receiving a geofence breach violation, triggering visual alarms and siren annunciation (ISSUE-NOV5.2-O11 Group 2) (R-ID 164).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov8.12**: Geofencing Implementation (ISSUE-NOV5.2-O11 Group 2) - PASSED.
+- **Nov8.11**: Trail Persistence Integrity & Pending Identity Collection (ISSUE-NOV4.3-O48, ISSUE-NOV4.3-O49) - PASSED.
 - **Nov8.10**: Single Source Version Management Architecture & Gradle Synchronization (SIMP-NOV7.0-S1) - PASSED.
 - **Nov8.8**: Comprehensive Test Coverage & Verification for Chapters 67, 68, 83, 93, 145, 147, 148, and 149 (ISSUE-NOV6.0-O23) - PASSED.
 - **Nov8.7**: Async ForensicBuffer Initialization & Startup Main-Thread Frame Optimization (ISSUE-NOV7.15-O41) - PASSED.
@@ -113,6 +117,8 @@
 - **Nov4.22-addHUD**: Post-Revolution HUD Integration & LED Status Verification (GAP-REVOL52.0-G1) - PASSED.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.99 (Nov8.12 Audit)**: PASSED - Geofencing Boundary Breach Detection & Alarm Annunciation (ISSUE-NOV5.2-O11 Group 2). Sensor evaluates geofence transition updates via `SentinelLogic.evaluateGeofenceTransition` against a home anchor point, emitting `ViolationEvent(type = "GEOFENCE_BREACH", ...)` upon boundary exit. Monitor raises `AlarmType.GEOFENCE_BREACH` via `MonitorAlarmEngine` and `AlertSettings.distance` upon receiving geofence breach violation. Verified by `GeofenceBreachAlarmTest` (Chapter 155) and 100% passing automated unit tests across all subprojects.
+*   **Chapter 5.98 (Nov8.11 Audit)**: PASSED - Trail Persistence Integrity & Pending Identity Collection (`ISSUE-NOV4.3-O48`, `ISSUE-NOV4.3-O49`). Verified by `TrailPersistenceIntegrityTest` (Chapter 154) and 100% passing automated test execution across all subprojects with clean build.
 *   **Chapter 5.97 (Nov8.10 Audit)**: PASSED - Single Source Version Management Architecture & Gradle Build Synchronization (`SIMP-NOV7.0-S1`). Centralized application `versionName` ("Nov8.10") and `versionCode` (60) in `gradle.properties` as single source of truth. Verified by `VersionSourceTest` (Chapter 153) and 100% passing automated test execution across all subprojects.
 *   **Chapter 5.96 (Nov8.8 Audit)**: PASSED - Verification of comprehensive unit test suite covering Chapters 67, 68, 83, 93, 145, 147, 148, and 149 (`ISSUE-NOV6.0-O23`), 100% passing automated test execution across all subprojects, and clean build with `--warning-mode all`. 80 of 140 active chapters verified at least in part.
 *   **Chapter 5.95 (Nov8.5 Audit)**: PASSED - Verification of document integrity guard suite (`TrackingDocumentIntegrityTest`), 100% passing automated test suite (302 tests), single-device reciprocal virtual presence simulation, device audit 0 Davey events >500ms on A15, and session lifecycle rotation protection.
