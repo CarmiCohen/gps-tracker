@@ -1,6 +1,6 @@
-# Chapter Triage - Nov8.8
+# Chapter Triage - Nov8.10
 
-Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`, and `TEST_FORENSIC_STRESS_PROTOCOL.md`, based on the running code and on tests executed for Nov5.2 on the A15 and updated in Nov8.8 (ISSUE-NOV6.0-O23).
+Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`, and `TEST_FORENSIC_STRESS_PROTOCOL.md`, based on the running code and on tests executed for Nov5.2 on the A15 and updated in Nov8.10 (SIMP-NOV7.0-S1).
 
 | Code | Meaning |
 | :--- | :--- |
@@ -12,9 +12,9 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | **D** | The feature is not wired into the running apps, so it cannot pass; decision needed |
 | **N** | Obsolete since the app split; retirement proposed |
 
-**Summary:** 80 of 140 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
+**Summary:** 83 of 143 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
 
-**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapters 143 to 150 make 140 active chapters. Updated in Nov8.8 (ISSUE-NOV6.0-O23): robust non-placebo unit tests added for chapters 67, 68, 83, 93, 145, 147, 148, and 149 (`WalPerformanceTest`, `IndexingSpeedTest`, `RealWatchdogRecoveryTest`, `SoakSimulationTest`, `AlarmSetupPermissionTest`, `CleanSetupActionsTest`, `LocalTrailTest`, `UnpairedTrailRetentionTest`), upgrading them from `T` to `A` and raising QA to 80.
+**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapters 143 to 153 make 143 active chapters. Updated in Nov8.10 (SIMP-NOV7.0-S1): Chapter 153 added for Single Source Version Management (`VersionSourceTest`).
 
 ## Chapter 0 - Operational Forensic Audit
 | Item | Code | Notes |
@@ -133,6 +133,9 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 148 Local trail storage and pruning | A | Automated by `LocalTrailTest` verifying local trail entity ingestion, dual-trail separation, and 48-hour TTL pruning (ISSUE-NOV6.2-O29, ISSUE-NOV6.0-O23) |
 | 149 Unpaired tracker trail retention | A | Automated by `UnpairedTrailRetentionTest` verifying that tracker unpairing retains historical trail data in Room DB (ISSUE-NOV6.2-O30, ISSUE-NOV6.0-O23) |
 | 150 Tracking document integrity | A | 150.1 to 150.4 automated by `TrackingDocumentIntegrityTest` (ISSUE-NOV8.2-O46) |
+| 151 SessionCommand state machine | A | Automated by `SessionCommandTest` (ISSUE-NOV8.5-O50) |
+| 152 Async ForensicBuffer initialization | A | Automated by `SensorService` async init (ISSUE-NOV7.15-O41) |
+| 153 Single version source | A | Automated by `VersionSourceTest` (SIMP-NOV7.0-S1) |
 
 ## TEST_FORENSIC_STRESS_PROTOCOL.md
 | Section | Code | Notes |

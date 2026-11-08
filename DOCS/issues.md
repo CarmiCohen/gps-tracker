@@ -1,9 +1,9 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.8)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.10)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov8.5, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov8.8, solved one by one in the order below
 
 ### Work Queue
-Nov8.8 is closed and followed Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov8.10 is closed and followed Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
 **Next item: ISSUE-NOV6.0-O26 (item 18, Medium, blocked on a device below API 35 or permission to download an API 34 image).**
 
@@ -48,6 +48,7 @@ Nov8.8 is closed and followed Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, Nov7.38, N
 | 37 | ISSUE-NOV7.21-O45 | **Done for Nov7.24**: `SensorService` seeds initial battery state from sticky intent prior to sensing loop start (chapter 141) | Nothing |
 | 38 | ISSUE-NOV8.2-O46 | **Done for Nov8.5**: truncated tracking documents restored from git history (`issues.md` Resolved Gaps Nov4.32 to Nov7.34, Ideas, Dashboard; `RESOLUTION_ARCHIVE.md` Nov4.32 to Nov7.12; SOT chapters 5.52 to 5.59 and baseline entries Nov7.36, Nov7.6, Nov6.0), guarded by `TrackingDocumentIntegrityTest` (chapter 150); placebo tests of Nov8.0 and Nov8.1 removed and their chapters set back to T | Nothing |
 | 39 | ISSUE-NOV8.5-O47 | Partial or missing `STATUS/BASELINE` copies (Nov7.7 to Nov7.12, Nov7.26, Nov7.28, Nov7.34 to Nov8.2): restore each from its git tag, or replace the copies by the tags (SIMP-NOV8.5-S1) | A user decision: restore by `git show <tag>:<path>` (shell redirection, which the tool rules forbid) or adopt SIMP-NOV8.5-S1 |
+| 40 | SIMP-NOV7.0-S1 | **Done for Nov8.10**: Single Source Version Management in `gradle.properties` (`appVersionName=Nov8.10`, `appVersionCode=60`) dynamically loaded across build scripts and verified by `VersionSourceTest` (chapter 153) | Nothing |
 
 ---
 
@@ -88,6 +89,11 @@ Nov8.8 is closed and followed Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, Nov7.38, N
 
 ---
 
+## 🟢 Resolved Gaps (Nov8.10)
+*   **Single Source Version Management Architecture & Gradle Build Synchronization (SIMP-NOV7.0-S1)**: Centralized application `versionName` ("Nov8.10") and `versionCode` (60) in `gradle.properties` as the single source of truth across all subprojects. Refactored `app-monitor/build.gradle.kts` and `app-sensor/build.gradle.kts` to dynamically pull version properties via `providers.gradleProperty()`, eliminating version code drift and redundant manual build script declarations. Verified by `VersionSourceTest` (Chapter 153) and 100% passing unit tests across all subprojects with clean `--warning-mode all` build. SOT rule 1.391, test chapter 153. **PASSED.**
+
+---
+
 ## 🟢 Resolved Gaps (Nov8.8)
 *   **Comprehensive Test Coverage & Verification for Chapters 67, 68, 83, 93, 145, 147, 148, and 149 (ISSUE-NOV6.0-O23)**: Implemented 8 robust, non-placebo automated unit test suites (`WalPerformanceTest`, `IndexingSpeedTest`, `RealWatchdogRecoveryTest`, `SoakSimulationTest`, `AlarmSetupPermissionTest`, `CleanSetupActionsTest`, `LocalTrailTest`, and `UnpairedTrailRetentionTest`) verifying Write-Ahead-Log burst latency (<10ms/write), 50,000-point trail indexing and query speed (<2s), stall watchdog recovery threshold logic, continuous 24h soak sequence continuity, DND & full-screen intent permission intent helpers, independent clean setup maintenance actions, local trail 48h TTL pruning, and unpaired tracker trail retention. Upgraded chapters 67, 68, 83, 93, 145, 147, 148, and 149 from `T` to `A` in `CHAPTER_TRIAGE.md`, raising QA count to 80 of 140 active chapters. Verified by 100% passing automated unit tests across all subprojects and clean build with `--warning-mode all`. SOT rule 1.390, test chapters 67, 68, 83, 93, 145, 147, 148, 149. **PASSED.**
 
@@ -114,7 +120,7 @@ Nov8.8 is closed and followed Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, Nov7.38, N
 ---
 
 ## 🟢 Resolved Gaps (Nov8.0)
-*   **Unpaired Tracker Trail Retention (ISSUE-NOV6.2-O30)**: Verified and tested that unpairing a tracker (clearing target ID via `identityManager.clearTargetId()`) does not delete historical trail data stored in Room database (`TrailDao`), preserving historical telemetry and movement points for potential future re-pairing. Automated by `UnpairedTrackerTrailRetentionTest`. SOT rule 1.385, test chapter 149. **PASSED.**
+*   **Unpaired Tracker Trail Retention (ISSUE-NOV6.2-O30)**: Verified and tested that unpairing a tracker (clearing target ID via `identityManager.clearTargetId()`) does not delete historical trail data stored in Room database (`TrailDao`), preserving historical telemetry and movement points for potential future re-pairing. Automated by `UnpairedTrailRetentionTest`. SOT rule 1.385, test chapter 149. **PASSED.**
 
 ---
 
@@ -153,6 +159,186 @@ Nov8.8 is closed and followed Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, Nov7.38, N
 
 ---
 
+## 🟢 Resolved Gaps (Nov7.24)
+*   **Sensor Battery Seeding & Unknown Value Guarding (ISSUE-NOV7.21-O45, ISSUE-NOV7.2-O37)**: `SensorService` now seeds its initial charging state, battery level, and temperature from the sticky `ACTION_BATTERY_CHANGED` broadcast intent returned by `registerReceiver` prior to starting `startSensingLoop()`. Unknown battery level (-1) and temperature (0f) are handled gracefully, and `MonitorAlarms` guards low battery (`batteryLevel >= 0`) and high temperature (`tempCelsius > 0f`) checks against unknown/uninitialized values. Verified by unit tests, 189/189 JVM unit tests passing, `ProductionReadinessAuditTest` 3/3 on A15, device audit 0 Davey, StackLog, or fatal entries. SOT rule 1.377, chapter 141. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.21)
+*   **The Sensor Reports A Real GPS Loss (ISSUE-NOV7.19-O43, with SIMP-NOV7.19-S1)**: the Sensor sent its last fix again as fresh forever, so `Tracker GPS signal loss` could only fire before the first fix. Delivery first: `LocationUpdate.isCritical` now decides whether an update is sent unbatched, kept on overflow, and exempt from deduplication, instead of `status != "VALID"` in `SocketioSignalingClient` and `SignalingQueue`; only a Sensor violation sets it, so a `NO_FIX` status is batched like any reading. Then the rule: once the newest fix is 15 s old (`FIX_STALE_AFTER_MS`, by `elapsedRealtimeNanos`), or before the first fix, the Sensor sends `NO_FIX` with no position, and logs each change. Found live and fixed: when the GPS came back, a 700 m cell fix 3352 m off raised a false `JUMP` and the next GPS fix a false `OUTLIER 488 m/s`; `MovementCheck` now neither judges nor keeps a fix coarser than 100 m. Verified by 13 new unit tests (189 of 189), `ProductionReadinessAuditTest` 3 of 3, and live on the A15 through the production relay. SOT rule 1.376, chapter 140. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.19)
+*   **No False Alarms At Start (ISSUE-NOV7.17-O42)**: every Monitor cold start raised `Relay disconnected` with the siren at full volume, because the alarm fired on the socket's initial not-connected state; it now waits for a first connection, or 30 s without one. `Tracker GPS signal loss` fired on the Sensor's first reading before its first fix; it now needs 30 s without a position. `Tracker GPS jump` fired because the Sensor checked movement on every 100 ms loop tick, dividing the drift between two fixes by one tick. Verified by 14 new unit tests, 176 of 176 unit tests, 3 of 3 instrumented tests on the A15, and live on the A15. SOT rule 1.375, chapter 139. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.17)
+*   **Real Sensor Service Status (ISSUE-NOV6.4-O34)**: the Sensor Setup dialog showed the fixed text `Sensor Service Status: Active / Ready`, also before the service was started, because nothing recorded whether `SensorService` was running. The service now reports its own state through the new `@Singleton` `SensorServiceStatus`. SOT rule 1.374, test chapter 138. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.15)
+*   **Backfill Answer Stops On Send Failure (ISSUE-NOV6.4-O33)**: the backfill chunk loop moved from `SensorService.setupBackfillListener` to the new `answerBackfill` in `app-sensor/.../BackfillResponder.kt`. It stops at the first chunk that `sendBackfillResponse` cannot send and never sends a later chunk or the completion chunk for that request. SOT rule 1.373, test chapter 137. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.12)
+*   **Coarse Network Fix Filtering (ISSUE-NOV6.1-O28)**: Added `isBetterLocation` filter to `MonitorLocationSource.kt` based on standard Android location evaluation. Prevents a coarse Network location fix (e.g., accuracy ±77.6m) from overriding a fresh, more accurate GPS location fix (e.g., accuracy ±11m) on the Monitor UI and map while the GPS fix is less than 2 minutes (120s) old. Verified by unit tests in `MonitorLocationSourceTest` and full automated test suite pass across all modules. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.11)
+*   **Thread-Safe SignalingQueue & Failed Flush Re-queuing (ISSUE-NOV6.0-O24)**: Made `SignalingQueue` thread-safe by protecting operations with `ReentrantLock` and thread-safe collections. Updated `SocketioSignalingClient.flushQueue` to push failed telemetry batches back to the front of the queue in their original order via `queue.pushFront(batch)`, preventing reordering behind newer updates. Verified by `SignalingQueueTest` and test suite pass across all subprojects. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.10)
+*   **Screen State & Rotation Preservation (ISSUE-NOV6.0-O22)**: Updated all UI overlay visibility flags, dialog states, and map follow modes in `MonitorActivity.kt` (`MonitorScreen`, `PairingWizard`) and `AdminActivity.kt` (`AdminActivity`, `SettingsOverlay`) from plain `remember` to `rememberSaveable`, ensuring open overlays, dialogs, unlock states, and follow modes persist across screen rotation and configuration changes. Verified by automated tests and test suite pass across all modules. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.9)
+*   **HUD Flow 2Hz Rate Limiting (ISSUE-NOV6.0-O21)**: Applied `atUiRate()` (500ms sampling window) to `localHudState` and `remoteHudState` in `MonitorViewModel.kt` and to `hudState` in `SensorViewModel.kt`. Throttled incoming telemetry/fix inputs (`uiTelemetry = pairedTelemetry.atUiRate()`, `uiFix = fixStore.fix.atUiRate()`) before combining, capping UI emissions to 2Hz. Verified by `UiRateTest` and `HudRateTest`. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.8)
+*   **Identity Reopen Test (ISSUE-NOV6.0-O23, partial)**: `IdentityPersistenceTest` gained a real manager re-instantiation test across a simulated app restart, and `TESTS/TEST_PROCEDURE.md` and `TESTS/VERIFICATION_MANIFEST.md` were relabelled `Nov7.8`. Chapters 67, 68, 83, and 93 stayed T; they were addressed in Nov8.1. **PARTIAL.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.7)
+*   **False MOVING & Sensor-Detected Violations (ISSUE-NOV5.2-O13, group 1 slice 3)**: Wired `SentinelLogic.validateMovement` with accelerometer motion (`hasPhysicalMotion`) on each fix in `SensorService.kt`, transmitting motion state and violation status (`JUMP`, `OUTLIER`) in telemetry and via `ViolationEvent`. Added `AlarmType.GPS_JUMP`, wired to `AlertSettings.jammerDetection` and `signalingClient.violationFlow` in `MonitorAlarmEngine.kt`. Verified by `MonitorAlarmsTest`. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.6)
+*   **30-Second Siren Auto-Stop (recorded as ISSUE-NOV7.6-O40)**: The Monitor siren stops after 30 seconds or when acknowledged, whichever comes first; the visual alarm and notification stay pending until acknowledged (`MonitorAlarmEngine.kt`). **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.5)
+*   **Communication Alarms (ISSUE-NOV5.2-O11, group 1, slice 2)**: Added communication alarms to `MonitorAlarms.kt` (`AlarmType.RELAY_DISCONNECTED`, `LOCAL_INTERNET_OFFLINE`, `GPS_SIGNAL_LOSS`), switched by `relayConnection`, `localInternet`, and `signalLoss` in `AlertSettings`. Integrated into `alarmConditions` and `alarmBooks`, wired to `signalingClient.isConnected` and `localInternetFlow()` in `MonitorAlarmEngine.kt`. Verified by 18 unit tests in `MonitorAlarmsTest` and full automated test suite pass across all modules. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.3)
+*   **Monitor Alarms And Siren (ISSUE-NOV5.2-O11, group 1, slice 1)**: The Monitor raises four alarms from telemetry: `Tracker offline` after 35 seconds without an update, `Tracker power disconnected`, `Tracker battery low` below 20%, and `Tracker temperature high` above 46°C. `MonitorAlarmEngine` runs in `MonitorSessionService`, so alarms work in the background. `SirenPlayer` synthesizes the Siren, Chimes, and Pulse waves. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.2)
+*   **Real Sensor HUD Values (ISSUE-NOV6.1-O27)**: The Sensor's own HUD now reads from `@Singleton` `SensorFixStore`. The fix-to-HUD rule, `withLocalReadings`, moved to `core-ui/.../FixReading.kt`. Unknown values show `--`. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.1)
+*   **Unpair Confirmation (ISSUE-NOV5.2-O15)**: All five unpair controls open `Unpair from tracker <id>?` dialog before unpairing. Verified by `UnpairConfirmationTest`. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov7.0)
+*   **Real Version Strings (ISSUE-NOV5.0-O6)**: One `getAppVersionName` in `core-ui/.../AppVersion.kt` reads the installed package. `VersionLiteralGuardTest` fails if any production string holds a release version. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov6.4)
+*   **Backfill Gap Recovery (ISSUE-NOV6.3-O32, High)**: The Monitor reads gaps from Room DB with `TrailDao.getSequenceGaps`. `BackfillLedger` keeps 10 requests in flight. **PASSED.**
+*   **Unanswered Backfill Requests (ISSUE-NOV6.2-O31)**: Request released after 30 seconds without a chunk. **PASSED.**
+*   **Relay v6.044 On Production (ISSUE-NOV5.2-O12)**: Verified on production relay. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov6.3)
+*   **Real Relay Status Text (ISSUE-NOV5.0-O5)**: Monitor Setup dialog shows `HudState.relayStatusText`. Verified by `RelayStatusDialogTest`. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov6.2)
+*   **Bounded Trail Storage (ISSUE-NOV5.2-O14)**: Each tracker keeps newest 50,000 trail rows. `TrailPruningWorker` scheduled from `MonitorApp`. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov6.1)
+*   **Real HUD Values (ISSUE-NOV5.0-O2)**: Monitor local line uses phone's battery and position fix. Unknown values show `--`. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov6.0)
+*   **Chapter Retirement Released (ISSUE-NOV5.4-O18)**: Retired chapters in `TESTS/RETIRED_CHAPTERS.md`. **PASSED.**
+*   **Forensic Entry Integrity (ISSUE-NOV6.0-O20)**: CRC32 checksums and power loss sequence reservation. **PASSED.**
+*   **Calls Missing On Older Android (ISSUE-NOV6.0-O25)**: JDK calls reviewed against API 26. **PASSED.**
+*   **Chapter Review (ISSUE-NOV5.4-O17)**: Chapter audit complete. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov5.2)
+*   **Telemetry Interval Explained (ISSUE-NOV5.0-O3)**: 100ms charging rate verified. **PASSED.**
+*   **Sequence Restart (GAP-REVOL71.0-G1)**: Sequence continuity across crashes. **PASSED.**
+*   **Wake Lock Expiry (GAP-REVOL71.0-G2)**: Watchdog lock renewal. **PASSED.**
+*   **Unbounded Trail Display (GAP-REVOL71.0-G3)**: 1000-point map display cap. **PASSED.**
+*   **Relay URL Validation (GAP-REVOL71.0-G4)**: Malformed URL rejection. **PASSED.**
+*   **Hidden Monitor Menu Actions (GAP-REVOL71.0-G5)**: Visible menu actions. **PASSED.**
+*   **Clipping At Largest Font (GAP-REVOL71.0-G6)**: 130% font cap. **PASSED.**
+*   **Backfill Could Not Complete (GAP-REVOL71.0-G7)**: Routable chunk IDs. **PASSED.**
+*   **Stale Data After Re-Pairing (GAP-REVOL71.0-G8)**: Paired device filtering. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov5.1)
+*   **Wrong Default Relay & Undeployed Relay Code (ISSUE-NOV5.0-O1, GAP-REVOL70.0-G1)**: `RelayConfig` centralized URLs. **PASSED.**
+*   **Final Build Verified Live (ISSUE-NOV5.0-O8, GAP-REVOL70.0-G2)**: Live two-device verification. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov5.0)
+*   **Compact Left-To-Right HUD (GAP-REVOL69.0-G1)**: Compact mode in `HudStatusBar`. **PASSED.**
+*   **Real-Position Map Centering (GAP-REVOL69.0-G2)**: Dynamic location map centering. **PASSED.**
+*   **Zeroed Telemetry (GAP-REVOL69.0-G3)**: Snapshot telemetry copies. **PASSED.**
+*   **VWR LED Never Activated (GAP-REVOL69.0-G4)**: Added `viewer_status_relay` listener. **PASSED.**
+*   **Relay URL Change Ignored (GAP-REVOL69.0-G5)**: Close old socket on URL change. **PASSED.**
+*   **Trail Drawn To (0,0) (GAP-REVOL69.0-G6)**: Filter zero positions. **PASSED.**
+*   **Monitor Instrumented Suite Did Not Compile (GAP-REVOL69.0-G7)**: `FakeSignalingClient` updated. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov4.44)
+*   **Release Candidate Verification & Reciprocal Virtual Presence Simulation Audit (GAP-REVOL68.0-G1)**: Automated test execution and virtual presence simulation. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov4.37)
+*   **Decoupled Peer LED Signaling & Relay-Independent Status Audit (GAP-REVOL67.0-G1)**: Independent `SRV`, `TRK`, and `VWR` connection LEDs. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov4.36)
+*   **Dual Device Hardware Deployment & Telemetry Audit (GAP-REVOL66.0-G1)**: Dual device deployment to A15 and S21FE. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov4.35)
+*   **Monitor Hardware Deployment & Single-Line Fitting Audit (GAP-REVOL65.0-G1)**: UI line fitting and formatting. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov4.34)
+*   **Upper Menu Line Expansion (GAP-REVOL64.0-G1)**: Quick navigation upper menu buttons. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov4.33)
+*   **Revived Sound & Setup Options Integration (GAP-REVOL63.0-G1)**: `CleanSetupOverlay` and `PhoneSetupOverlay` integration. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov4.32)
+*   **System Tools & Diagnostics Menu Integration (GAP-REVOL62.0-G1)**: Integrated **Tools** menu and diagnostics overlay. **PASSED.**
+
+---
+
 ## 🚀 Strategic Simplification Ideas
 *   **SIMP-NOV7.21-S1**: One Fix Freshness Rule. The Sensor now stops sending a fix after 15 s (`FIX_STALE_AFTER_MS`), while its own HUD keeps showing that fix with a growing age and drops its speed only after 35 s (`SPEED_VALID_MS` in `FixReading.kt`), and the Monitor GPS LED reads only the position. One freshness rule in `core-ui`, used by `SensorService`, the Sensor HUD, and `SensorFixStore`, would keep the Sensor's screen and its telemetry from disagreeing. With it, `ForensicBuffer.writeTrace` could read `update.isCritical` itself and drop its separate `isCritical` parameter. (SIMP-NOV7.19-S1, the explicit critical flag, was implemented in Nov7.21 and is recorded in `RESOLUTION_ARCHIVE.md`.)
 *   **SIMP-NOV7.17-S1**: One Sensor Service State. `SensorService` now publishes two `@Singleton` stores, `SensorFixStore` (latest fix, cleared in `onDestroy`) and `SensorServiceStatus` (running flag, cleared in `onDestroy`). A single `SensorServiceState` holding `running` and `fix` would be set and cleared in one place, and the HUD and Setup dialog would read one flow. It would also be the natural home for the `Location` of SIMP-NOV7.2-S1.
@@ -174,9 +360,50 @@ Nov8.8 is closed and followed Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, Nov7.38, N
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov8.10: [SOT Count: 965 (Rules: 465), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 320), QA: 81]**
 - **Nov8.8: [SOT Count: 964 (Rules: 464), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 319), QA: 80]**
 - **Nov8.7: [SOT Count: 963 (Rules: 463), Open: H:1, M:2, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 303), QA: 74]**
 - **Nov8.5: [SOT Count: 962 (Rules: 462), Open: H:1, M:2, L:14, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 302), QA: 74]**
 - **Nov8.2: [SOT Count: 961 (Rules: 461), Open: H:1, M:1, L:10, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 289), QA: 74]**
 - **Nov8.1: [SOT Count: 960 (Rules: 460), Open: H:1, M:1, L:11, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 289), QA: 73]**
 - **Nov8.0: [SOT Count: 959 (Rules: 459), Open: H:1, M:2, L:11, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 285), QA: 72]**
+- **Nov7.38: [SOT Count: 958 (Rules: 458), Open: H:1, M:2, L:12, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 286), QA: 71]**
+- **Nov7.36: [SOT Count: 957 (Rules: 457), Open: H:1, M:2, L:12, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 284), QA: 70]**
+- **Nov7.34: [SOT Count: 956 (Rules: 456), Open: H:1, M:2, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 284), QA: 69]**
+- **Nov7.32: [SOT Count: 955 (Rules: 455), Open: H:1, M:2, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 284), QA: 69]**
+- **Nov7.30: [SOT Count: 955 (Rules: 455), Open: H:1, M:2, L:14, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 284), QA: 69]**
+- **Nov7.28: [SOT Count: 954 (Rules: 454), Open: H:1, M:2, L:14, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 194), QA: 69]**
+- **Nov7.26: [SOT Count: 953 (Rules: 453), Open: H:1, M:2, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 194), QA: 68]**
+- **Nov7.24: [SOT Count: 952 (Rules: 452), Open: H:1, M:3, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 192), QA: 67]**
+- **Nov7.21: [SOT Count: 951 (Rules: 451), Open: H:1, M:4, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 192), QA: 66]**
+- **Nov7.19: [SOT Count: 950 (Rules: 450), Open: H:1, M:4, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 179), QA: 65]**
+- **Nov7.17: [SOT Count: 949 (Rules: 449), Open: H:1, M:4, L:14, Ideas: H:0, M:3, L:12, Testing: PASSED (Sub-items: 170), QA: 64]**
+- **Nov7.15: [SOT Count: 948 (Rules: 448), Open: H:1, M:3, L:15, Ideas: H:0, M:3, L:11, Testing: PASSED (Sub-items: 160), QA: 63]**
+- **Nov7.7 to Nov7.12: no audit figures were recorded.**
+- **Nov7.6: [SOT Count: 942 (Rules: 442), Open: H:1, M:4, L:18, Ideas: H:0, M:3, L:18, Testing: PASSED (Sub-items: 222), QA: 56]**
+- **Nov7.5: [SOT Count: 941 (Rules: 441), Open: H:1, M:4, L:18, Ideas: H:0, M:3, L:18, Testing: PASSED (Sub-items: 222), QA: 55]**
+- **Nov7.3: [SOT Count: 940 (Rules: 440), Open: H:1, M:4, L:18, Ideas: H:0, M:3, L:18, Testing: PASSED (Sub-items: 222), QA: 54]**
+- **Nov7.2: [SOT Count: 939 (Rules: 439), Open: H:1, M:4, L:16, Ideas: H:0, M:3, L:16, Testing: PASSED (Sub-items: 194), QA: 51]**
+- **Nov7.1: [SOT Count: 938 (Rules: 438), Open: H:1, M:5, L:14, Ideas: H:0, M:3, L:15, Testing: PASSED (Sub-items: 187), QA: 50]**
+- **Nov7.0: [SOT Count: 937 (Rules: 437), Open: H:1, M:5, L:14, Ideas: H:0, M:3, L:14, Testing: PASSED (Sub-items: 182), QA: 49]**
+- **Nov6.4: [SOT Count: 936 (Rules: 436), Open: H:1, M:5, L:15, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 177), QA: 48]**
+- **Nov6.3: [SOT Count: 935 (Rules: 435), Open: H:1, M:6, L:14, Ideas: H:0, M:3, L:12, Testing: PASSED (Sub-items: 156), QA: 47]**
+- **Nov6.2: [SOT Count: 934 (Rules: 434), Open: H:1, M:6, L:15, Ideas: H:0, M:3, L:11, Testing: PASSED (Sub-items: 153), QA: 46]**
+- **Nov6.1: [SOT Count: 933 (Rules: 433), Open: H:1, M:7, L:12, Ideas: H:0, M:3, L:10, Testing: PASSED (Sub-items: 145), QA: 44]**
+- **Nov6.0: [SOT Count: 932 (Rules: 432), Open: H:1, M:7, L:11, Ideas: H:0, M:3, L:9, Testing: PASSED (Sub-items: 130), QA: 43]**
+- **Nov5.2: [SOT Count: 931 (Rules: 431), Open: H:1, M:5, L:7, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 118), QA: 48]**
+- **Nov5.1: [SOT Count: 929 (Rules: 429), Open: H:0, M:3, L:5, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 103), QA: 929]**
+- **Nov5.0: [SOT Count: 928 (Rules: 428), Open: H:1, M:4, L:3, Ideas: H:0, M:3, L:8, Testing: PASSED (Sub-items: 100), QA: 928]**
+- **Nov4.44: [SOT Count: 924 (Rules: 424), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Release Candidate & Reciprocal Simulation Audit), QA: 924]**
+- **Nov4.37: [SOT Count: 924 (Rules: 424), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Decoupled Peer LED Signaling Audit), QA: 924]**
+- **Nov4.36: [SOT Count: 923 (Rules: 423), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Dual Device Hardware Deployment & Telemetry Audit), QA: 923]**
+- **Nov4.35: [SOT Count: 922 (Rules: 422), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor Hardware Deployment & Single-Line Fitting Audit), QA: 922]**
+- **Nov4.34: [SOT Count: 921 (Rules: 421), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Upper Menu Line Expansion), QA: 921]**
+- **Nov4.33: [SOT Count: 920 (Rules: 420), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Revived Sound & Setup Options Integration), QA: 920]**
+- **Nov4.32: [SOT Count: 919 (Rules: 419), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (System Tools & Diagnostics Menu Integration), QA: 919]**
+- **Nov4.31: [SOT Count: 918 (Rules: 418), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Device-Specific Setup & Hardware Hardening Revival), QA: 918]**
+- **Nov4.30: [SOT Count: 917 (Rules: 417), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor Dual HUD, Centering & Alarming Setup Revival), QA: 917]**
+- **Nov4.29: [SOT Count: 915 (Rules: 415), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Nov4.29 Stabilization & Comprehensive Test Execution Across All Subprojects), QA: 915]**
+- **Nov4.28: [SOT Count: 914 (Rules: 414), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Pre-Revolution Map Functionality & Specifications Implementation & Test Chapters 107-108), QA: 914]**
+- **Nov4.27: [SOT Count: 913 (Rules: 413), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Relay URL Setup Option Integration in Sensor App & Reactive Signaling Reconnect), QA: 913]**
+- **Nov4.26: [SOT Count: 912 (Rules: 412), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:7, Testing: PASSED (Monitor UI Refinement, Upper Menu, Setup Button, SRV/GPS LED Fixes & Map Controls), QA: 912]**

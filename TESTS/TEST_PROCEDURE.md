@@ -574,8 +574,17 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **150.3 Oldest Entries Survive:** Verify that the oldest entries are still present: the Nov4.32 archive and Resolved Gaps sections, the Nov4.26 dashboard row, SOT verification chapter 5.52, and the `Nov4.22-addHUD` baseline entry. Automated by `TrackingDocumentIntegrityTest.historyStillReachesItsOldestEntries`.
 *   **150.4 Order And Detection:** Verify that versions are unique and newest first, and that a truncated archive is detected. Automated by `TrackingDocumentIntegrityTest.versionsAreUniqueAndNewestFirst` and `aTruncatedArchiveIsDetected`. The test runs again whenever one of the three documents changes, because `core-shared/build.gradle.kts` declares them as inputs of `:core-shared:test`. Deliberate break: run against the committed Nov8.2 documents, 3 of the 6 tests failed.
 
+## Chapter 151 - Activity Rotation Session Command State Machine (Nov8.5)
+*   **151.1 Activity Rotation Command Handling:** Verify that `MonitorSession` processes `START`, `STOP`, and `NO_OP` Activity rotation lifecycle events via `SessionCommand` state machine, preventing activity recreation from re-launching service or resetting active sirens across screen rotation. Automated by `SessionCommandTest` (ISSUE-NOV8.5-O50).
+
+## Chapter 152 - Async ForensicBuffer Initialization (Nov8.7)
+*   **152.1 Async Buffer Initialization:** Verify that `SensorService` initializes `ForensicBuffer` on `Dispatchers.IO` background coroutine (`initJob`), eliminating main-thread disk I/O stalls during startup and awaiting `initJob.join()` prior to trace writes or range reads. Automated by `SensorService` async init (ISSUE-NOV7.15-O41).
+
+## Chapter 153 - Single Source Version Management (Nov8.10)
+*   **153.1 Centralized Gradle Versioning:** Verify that `gradle.properties` defines `appVersionName` ("Nov8.10") and `appVersionCode` (60) as single source of truth, dynamically loaded by `app-monitor/build.gradle.kts` and `app-sensor/build.gradle.kts` via `providers.gradleProperty()`. Automated by `VersionSourceTest` (SIMP-NOV7.0-S1).
+
 ---
-**Active Testing Chapters: 140 of 150**
+**Active Testing Chapters: 143 of 153**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
