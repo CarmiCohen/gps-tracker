@@ -57,6 +57,22 @@ class MonitorRepository @Inject constructor(
         trailDao.insert(entity)
     }
 
+    /** Inserts local user movement fix into trail database (ISSUE-NOV6.2-O29). */
+    suspend fun insertLocalTrail(selfId: String, fix: LocalFix) {
+        val ts = if (fix.reading.timeMs > 0) fix.reading.timeMs else System.currentTimeMillis()
+        val entity = TrailEntity(
+            trackerId = selfId,
+            timestamp = ts,
+            sequenceId = ts,
+            lat = fix.position.lat,
+            lng = fix.position.lng,
+            accuracy = fix.reading.accuracyMeters,
+            status = "VALID",
+            isLocalUser = true
+        )
+        trailDao.insert(entity)
+    }
+
     private fun observeTelemetry() {
         repositoryScope.launch {
             signalingClient.telemetryFlow.collect { update ->

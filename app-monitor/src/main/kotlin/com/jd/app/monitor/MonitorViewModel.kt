@@ -38,6 +38,9 @@ class MonitorViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
+    val targetId = identityManager.targetId
+    val selfId = identityManager.selfId
+
     val relayUrl: StateFlow<String> = dataStore.relayUrl
         .map { RelayConfig.resolve(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RelayConfig.DEFAULT_URL)
@@ -134,6 +137,15 @@ class MonitorViewModel @Inject constructor(
         .atUiRate()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val localTrail: StateFlow<List<TrailEntity>> = selfId
+        .filter { it != "LOADING..." && it.isNotBlank() }
+        .flatMapLatest { id ->
+            repository.getTrail(id)
+        }
+        .atUiRate()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val hasLocationPermission = MutableStateFlow(locationSource.hasPermission())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -149,9 +161,6 @@ class MonitorViewModel @Inject constructor(
         hasLocationPermission.value = locationSource.hasPermission()
     }
 
-    val targetId = identityManager.targetId
-    val selfId = identityManager.selfId
-
     private val _latestTelemetry = MutableStateFlow<LocationUpdate?>(null)
     private val pairedTelemetry = combine(_latestTelemetry, targetId) { latest, target -> latest.ifFrom(target) }
     private val uiTelemetry = pairedTelemetry.atUiRate()
@@ -162,6 +171,16 @@ class MonitorViewModel @Inject constructor(
                 _latestTelemetry.value = update
             }
             .launchIn(viewModelScope)
+
+        viewModelScope.launch {
+            combine(selfId, localFix) { id, fix ->
+                Pair(id, fix)
+            }.collect { (id, fix) ->
+                if (id != "LOADING..." && id.isNotBlank() && fix != null) {
+                    repository.insertLocalTrail(id, fix)
+                }
+            }
+        }
     }
 
     private val _ticker = flow {

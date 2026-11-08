@@ -74,6 +74,7 @@ class MonitorActivity : ComponentActivity() {
                 val monitorId by viewModel.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
                 val relayUrl by viewModel.relayUrl.collectAsStateWithLifecycle()
                 val trail by viewModel.trail.collectAsStateWithLifecycle()
+                val localTrail by viewModel.localTrail.collectAsStateWithLifecycle()
                 val localHudState by viewModel.localHudState.collectAsStateWithLifecycle()
                 val remoteHudState by viewModel.remoteHudState.collectAsStateWithLifecycle()
                 val localPosition by viewModel.localPosition.collectAsStateWithLifecycle()
@@ -124,6 +125,7 @@ class MonitorActivity : ComponentActivity() {
                         monitorId = monitorId,
                         relayUrl = relayUrl,
                         trail = trail,
+                        localTrail = localTrail,
                         alertSettings = alertSettings,
                         sirenType = sirenType,
                         isSirenPlaying = isSirenPlaying,
@@ -250,6 +252,7 @@ fun MonitorScreen(
     monitorId: String, 
     relayUrl: String,
     trail: List<TrailEntity>,
+    localTrail: List<TrailEntity>,
     alertSettings: AlertSettings,
     sirenType: String,
     isSirenPlaying: Boolean,
@@ -403,10 +406,31 @@ fun MonitorScreen(
     var hasCentered by remember(mapView) { mutableStateOf(false) }
     val sensorTrail = remember(trail) { knownPositions(trail) }
     val sensorPosition = sensorTrail.firstOrNull()
+    val localPath = remember(localTrail) { knownPositions(localTrail) }
 
     // Automatic Centering & Connection Logic
-    LaunchedEffect(remoteHudState.isPeerActive, trail, followMode, localPosition) {
+    LaunchedEffect(remoteHudState.isPeerActive, trail, localTrail, followMode, localPosition) {
         mapView.overlays.clear()
+
+        if (localPath.isNotEmpty()) {
+            val localPoints = localPath.map { GeoPoint(it.lat, it.lng) }
+            val localPolyline = Polyline().apply {
+                setPoints(localPoints)
+                outlinePaint.color = android.graphics.Color.parseColor("#06B6D4")
+                outlinePaint.strokeWidth = 4f
+            }
+            mapView.overlays.add(localPolyline)
+        }
+
+        localPosition?.let { pos ->
+            val localMarker = Marker(mapView).apply {
+                position = GeoPoint(pos.lat, pos.lng)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                title = "Local Device"
+            }
+            mapView.overlays.add(localMarker)
+        }
+
         if (sensorTrail.isNotEmpty()) {
             val points = sensorTrail.map { GeoPoint(it.lat, it.lng) }
             val polyline = Polyline().apply {

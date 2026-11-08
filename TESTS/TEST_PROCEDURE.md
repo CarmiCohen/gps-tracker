@@ -559,8 +559,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **147.2 Reset Operational Statistics Action:** Verify that clicking "Reset Operational Statistics" in `CleanSetupOverlay` clears stored trail history from Room DB via `MonitorRepository.clearTrail()` (`TrailDao.deleteAll()`), clears latest telemetry in `MonitorViewModel`, acknowledges alarms on Monitor, and resets service uptime timer in `SensorServiceStatus` / `SensorViewModel` on Sensor. Automated by `CleanSetupActionsTest` and `SensorServiceStatusTest.resetUptimeResetsStartTimeWhenRunning`.
 *   **147.3 Trigger Full System Re-Initialization Action:** Verify that clicking "Trigger Full System Re-Initialization" in `CleanSetupOverlay` clears target tracker pairing ID, resets `AlertSettings` to default defaults, resets `sirenType` to `"Siren"`, resets `relayUrl` to `RelayConfig.DEFAULT_URL`, clears stored trail history, and resets service status on both apps. Automated by `CleanSetupActionsTest.defaultAlertSettingsHasSirenTypeSiren` and `CleanSetupActionsTest.defaultRelayUrlMatchesSpecification`.
 
+## Chapter 148 - Local Trail Storage & Pruning (Nov7.38)
+*   **148.1 Local Trail Entity Ingestion:** Verify that the Monitor persists its own movement path (`isLocalUser = true`) in `TrailDao` via `MonitorRepository.insertLocalTrail` when receiving location fixes from `MonitorLocationSource`, storing local trail points with `isLocalUser = true`. Automated by `LocalTrailTest` and `MonitorViewModel` local fix collection (ISSUE-NOV6.2-O29).
+*   **148.2 Dual Trail Map Rendering:** Verify that `MonitorActivity` renders independent polylines for remote tracker trail (Blue) and local viewer trail (Cyan) on the osmdroid map canvas. Automated by UI implementation and `LocalTrailTest`.
+*   **148.3 Local Trail TTL Pruning:** Verify that `TrailDao.pruneLocalTrail` successfully prunes local user trail entries older than 48 hours without affecting remote tracker trail storage. Automated by `TrailStorageBoundTest.localRowsExpireAfter48Hours`.
+
 ---
-**Active Testing Chapters: 137 of 147**
+**Active Testing Chapters: 138 of 148**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
