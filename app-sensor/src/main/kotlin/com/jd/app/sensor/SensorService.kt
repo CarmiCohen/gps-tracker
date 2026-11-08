@@ -70,7 +70,8 @@ class SensorService : Service(), SensorEventListener {
     // Adaptive Sampling & Throttling State
     private var currentIntervalMs = 1000L
     @Volatile private var lastLocation: Location? = null // Written on the main looper, read by the sensing loop.
-    private var sequenceIdCounter = 0L
+    private val sequenceIdCounter = java.util.concurrent.atomic.AtomicLong(0L)
+    private var initJob: Job? = null
     
     private var lastBatteryLevel = -1
     private var lastIsCharging = false
@@ -124,8 +125,16 @@ class SensorService : Service(), SensorEventListener {
         
         val capacity = ForensicBuffer.calculateAdaptiveCapacity(sampleRateHz = 100, retentionSeconds = 100)
         forensicBuffer = ForensicBuffer(protectedContext.filesDir, capacity = capacity)
-        forensicBuffer.initialize()
-        sequenceIdCounter = forensicBuffer.nextSequenceId()
+        
+        initJob = serviceScope.launch(Dispatchers.IO) {
+            try {
+                forensicBuffer.initialize()
+                sequenceIdCounter.set(forensicBuffer.nextSequenceId())
+                SystemLogger.i("SensorService", "ForensicBuffer initialized asynchronously. Next seq: ${sequenceIdCounter.get()}")
+            } catch (e: Exception) {
+                SystemLogger.e("SensorService", "Async ForensicBuffer initialization failed: ${e.message}")
+            }
+        }
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
@@ -186,6 +195,7 @@ class SensorService : Service(), SensorEventListener {
     private fun setupBackfillListener() {
         signalingClient.backfillRequestFlow
             .onEach { request ->
+                initJob?.join()
                 SystemLogger.i("Backfill", "Received request for range ${request.startSequenceId} to ${request.endSequenceId}")
                 val updates = forensicBuffer.readRange(request.startSequenceId, request.endSequenceId)
                 val sent = answerBackfill(request.requestId, updates, signalingClient::sendBackfillResponse)
@@ -305,6 +315,7 @@ class SensorService : Service(), SensorEventListener {
             scope = serviceScope,
             intervalProvider = { currentIntervalMs }
         ) {
+            initJob?.join()
             val update = PoolRegistry.locationUpdatePool.acquire()
             try {
                 val worldAccel = SensingEngine.rotateToWorldSpace(
@@ -315,7 +326,7 @@ class SensorService : Service(), SensorEventListener {
                 update.sensorSnapshot.vibration = worldAccel[0].toFloat()
                 update.timestamp = System.currentTimeMillis()
                 update.monotonicNanos = System.nanoTime()
-                update.sequenceId = sequenceIdCounter++
+                update.sequenceId = sequenceIdCounter.getAndIncrement()
                 update.status = "VALID"
                 update.batteryLevel = lastBatteryLevel
                 update.isCharging = lastIsCharging
