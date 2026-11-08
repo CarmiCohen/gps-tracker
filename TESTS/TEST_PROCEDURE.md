@@ -583,8 +583,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 153 - Single Source Version Management (Nov8.10)
 *   **153.1 Centralized Gradle Versioning:** Verify that `gradle.properties` defines `appVersionName` ("Nov8.10") and `appVersionCode` (60) as single source of truth, dynamically loaded by `app-monitor/build.gradle.kts` and `app-sensor/build.gradle.kts` via `providers.gradleProperty()`. Automated by `VersionSourceTest` (SIMP-NOV7.0-S1).
 
+## Chapter 154 - Trail Persistence Integrity & Pending Identity Collection (Nov8.11)
+*   **154.1 Equal Timestamp Room Retention:** Verify that `TrailEntity` primary key composite `["trackerId", "timestamp", "sequenceId"]` retains multiple telemetry points sharing the exact same millisecond timestamp with distinct sequence IDs without Room replacement overwrite. Automated by `TrailPersistenceIntegrityTest.verifyEqualTimestampRetentionWithDistinctSequenceIds` (ISSUE-NOV4.3-O48).
+*   **154.2 Pending Identity Local Trail Collection:** Verify that `MonitorViewModel` local trail ingestion flow waits for valid `selfId` (`selfId.filter { it != "LOADING..." && it.isNotBlank() }`) and collects local fixes without dropping points during initial startup identity loading. Automated by `TrailPersistenceIntegrityTest` and `MonitorViewModel` (ISSUE-NOV4.3-O49).
+
 ---
-**Active Testing Chapters: 143 of 153**
+**Active Testing Chapters: 144 of 154**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

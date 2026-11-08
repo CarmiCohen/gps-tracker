@@ -14,7 +14,7 @@ const val MAX_STORED_TRAIL_POINTS = 50_000
 
 @Entity(
     tableName = "trails",
-    primaryKeys = ["trackerId", "timestamp"],
+    primaryKeys = ["trackerId", "timestamp", "sequenceId"],
     indices = [Index(value = ["trackerId", "sequenceId"], unique = true)]
 )
 data class TrailEntity(
@@ -108,7 +108,7 @@ interface TrailDao {
     suspend fun pruneOldestRows(id: String, keep: Int): Int
 }
 
-@Database(entities = [TrailEntity::class], version = 3, exportSchema = false)
+@Database(entities = [TrailEntity::class], version = 4, exportSchema = false)
 abstract class MonitorDatabase : RoomDatabase() {
     abstract fun trailDao(): TrailDao
 }

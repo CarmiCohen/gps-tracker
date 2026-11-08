@@ -26,8 +26,8 @@ class VersionSourceTest {
         val versionName = gradleProperties.lines().firstOrNull { it.startsWith("appVersionName=") }?.substringAfter("=")
         val versionCode = gradleProperties.lines().firstOrNull { it.startsWith("appVersionCode=") }?.substringAfter("=")
 
-        assertEquals("Nov8.10", versionName, "gradle.properties appVersionName must be Nov8.10")
-        assertEquals("60", versionCode, "gradle.properties appVersionCode must be 60")
+        assertEquals("Nov8.11", versionName, "gradle.properties appVersionName must be Nov8.11")
+        assertEquals("62", versionCode, "gradle.properties appVersionCode must be 62")
     }
 
     @Test

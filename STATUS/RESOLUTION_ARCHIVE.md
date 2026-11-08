@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov8.11)
+- **Trail Persistence Integrity & Pending Identity Collection (ISSUE-NOV4.3-O48, ISSUE-NOV4.3-O49)**: Updated `TrailEntity` primary key composite `["trackerId", "timestamp", "sequenceId"]` in `MonitorDatabase.kt` to prevent equal-timestamp telemetry replacement overwrite, and refactored `MonitorViewModel` local trail collection flow to filter valid `selfId` first (`selfId.filter { it != "LOADING..." && it.isNotBlank() }`) and `flatMapLatest` into `localFix`, ensuring zero initial local fixes are dropped during cold start identity loading. Verified by `TrailPersistenceIntegrityTest` (Chapter 154) and 100% passing automated test execution across all subprojects with clean `--warning-mode all` build. SOT rule 1.392, test chapter 154. **PASSED.**
+
 ## ✅ Resolved Issues (Nov8.10)
 - **Single Source Version Management Architecture & Gradle Build Synchronization (SIMP-NOV7.0-S1)**: Centralized application `versionName` ("Nov8.10") and `versionCode` (60) in `gradle.properties` as the single source of truth across all subprojects. Refactored `app-monitor/build.gradle.kts` and `app-sensor/build.gradle.kts` to dynamically pull version properties via `providers.gradleProperty()`, eliminating version code drift and redundant manual build script declarations. Verified by `VersionSourceTest` (Chapter 153) and 100% passing unit tests across all subprojects with clean `--warning-mode all` build. SOT rule 1.391, test chapter 153. **PASSED.**
 

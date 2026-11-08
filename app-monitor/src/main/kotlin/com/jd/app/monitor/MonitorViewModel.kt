@@ -178,14 +178,16 @@ class MonitorViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
 
+        @OptIn(ExperimentalCoroutinesApi::class)
         viewModelScope.launch {
-            combine(selfId, localFix) { id, fix ->
-                Pair(id, fix)
-            }.collect { (id, fix) ->
-                if (id != "LOADING..." && id.isNotBlank() && fix != null) {
+            selfId
+                .filter { it != "LOADING..." && it.isNotBlank() }
+                .flatMapLatest { id ->
+                    localFix.filterNotNull().map { fix -> Pair(id, fix) }
+                }
+                .collect { (id, fix) ->
                     repository.insertLocalTrail(id, fix)
                 }
-            }
         }
     }
 

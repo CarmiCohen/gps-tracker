@@ -1,9 +1,9 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.10)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.11)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov8.8, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov8.10, solved one by one in the order below
 
 ### Work Queue
-Nov8.10 is closed and followed Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov8.11 is closed and followed Nov8.10, Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
 **Next item: ISSUE-NOV6.0-O26 (item 18, Medium, blocked on a device below API 35 or permission to download an API 34 image).**
 
@@ -49,6 +49,7 @@ Nov8.10 is closed and followed Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, N
 | 38 | ISSUE-NOV8.2-O46 | **Done for Nov8.5**: truncated tracking documents restored from git history (`issues.md` Resolved Gaps Nov4.32 to Nov7.34, Ideas, Dashboard; `RESOLUTION_ARCHIVE.md` Nov4.32 to Nov7.12; SOT chapters 5.52 to 5.59 and baseline entries Nov7.36, Nov7.6, Nov6.0), guarded by `TrackingDocumentIntegrityTest` (chapter 150); placebo tests of Nov8.0 and Nov8.1 removed and their chapters set back to T | Nothing |
 | 39 | ISSUE-NOV8.5-O47 | Partial or missing `STATUS/BASELINE` copies (Nov7.7 to Nov7.12, Nov7.26, Nov7.28, Nov7.34 to Nov8.2): restore each from its git tag, or replace the copies by the tags (SIMP-NOV8.5-S1) | A user decision: restore by `git show <tag>:<path>` (shell redirection, which the tool rules forbid) or adopt SIMP-NOV8.5-S1 |
 | 40 | SIMP-NOV7.0-S1 | **Done for Nov8.10**: Single Source Version Management in `gradle.properties` (`appVersionName=Nov8.10`, `appVersionCode=60`) dynamically loaded across build scripts and verified by `VersionSourceTest` (chapter 153) | Nothing |
+| 41 | ISSUE-NOV4.3-O48 / O49 | **Done for Nov8.11**: Composite primary key `["trackerId", "timestamp", "sequenceId"]` in `TrailEntity` prevents equal-timestamp telemetry replacement, and `MonitorViewModel` local trail collection defers collection until `selfId` is resolved (`selfId.filter { it != "LOADING..." && it.isNotBlank() }`), verified by `TrailPersistenceIntegrityTest` (chapter 154) | Nothing |
 
 ---
 
@@ -86,6 +87,11 @@ Nov8.10 is closed and followed Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, N
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov8.11)
+*   **Trail Persistence Integrity & Pending Identity Collection (ISSUE-NOV4.3-O48, ISSUE-NOV4.3-O49)**: Updated `TrailEntity` primary key composite `["trackerId", "timestamp", "sequenceId"]` in `MonitorDatabase.kt` to prevent equal-timestamp telemetry replacement overwrite, and refactored `MonitorViewModel` local trail collection flow to filter valid `selfId` first (`selfId.filter { it != "LOADING..." && it.isNotBlank() }`) and `flatMapLatest` into `localFix`, ensuring zero initial local fixes are dropped during cold start identity loading. Verified by `TrailPersistenceIntegrityTest` (Chapter 154) and 100% passing automated test execution across all subprojects with clean `--warning-mode all` build. SOT rule 1.392, test chapter 154. **PASSED.**
 
 ---
 
@@ -360,6 +366,7 @@ Nov8.10 is closed and followed Nov8.8, Nov8.7, Nov8.5, Nov8.2, Nov8.1, Nov8.0, N
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov8.11: [SOT Count: 966 (Rules: 466), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 322), QA: 82]**
 - **Nov8.10: [SOT Count: 965 (Rules: 465), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 320), QA: 81]**
 - **Nov8.8: [SOT Count: 964 (Rules: 464), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 319), QA: 80]**
 - **Nov8.7: [SOT Count: 963 (Rules: 463), Open: H:1, M:2, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 303), QA: 74]**

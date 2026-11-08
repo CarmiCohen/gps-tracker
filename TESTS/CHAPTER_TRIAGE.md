@@ -136,6 +136,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 151 SessionCommand state machine | A | Automated by `SessionCommandTest` (ISSUE-NOV8.5-O50) |
 | 152 Async ForensicBuffer initialization | A | Automated by `SensorService` async init (ISSUE-NOV7.15-O41) |
 | 153 Single version source | A | Automated by `VersionSourceTest` (SIMP-NOV7.0-S1) |
+| 154 Trail persistence & pending identity collection | A | Automated by `TrailPersistenceIntegrityTest` (ISSUE-NOV4.3-O48, ISSUE-NOV4.3-O49) |
 
 ## TEST_FORENSIC_STRESS_PROTOCOL.md
 | Section | Code | Notes |
