@@ -40,8 +40,13 @@ Documents are written for the next session, which pays to read them. Write each 
 *   **D3. Short Handover and commit message**: `Handover.md` follows the template below and stays within 70 lines *(tested)*. The commit message has at most 12 lines: title with version and issue IDs, one line per issue, tests, version. The final chat message does not repeat the Git block or the archive text; it names the issue IDs, the result, and points to `Handover.md`.
 *   **D4. Git tags are the baselines**: no document copies; one `pending` row in `STATUS/BASELINE/INDEX.md` per version (Nov8.14). *(tested by `BaselineIndexTest`)*
 *   **D5. Short Completion Sequence**: the 10 steps below.
-*   **D6. `chat_session.md` is a milestone log**: decisions, files changed (one line each), test results, next steps, and any temporary device state that must be restored. Append short lines; do not rewrite it.
-*   **D7. Targeted reads**: find sections with search, read only the needed line ranges, use `git --no-pager` and file hashes or line counts for checks, and do not re-read a file whose content is already known in the session.
+*   **D6. `chat_session.md` is a milestone log**: decisions, test results, next steps, and any temporary device state that must be restored. Append short lines; do not rewrite it. Changed files are logged automatically by the `PostToolUse` hook in `.claude/settings.json` (`.claude/hooks/log-change.ps1`, one `edited <path>` line per write while the log exists), so they are not written by hand; this also satisfies Rule 6.
+*   **D7. Targeted reads**: find sections with search, read only the needed line ranges, use `git --no-pager` and file hashes or line counts for checks, and do not re-read a file whose content is already known in the session. The growing files are edited at fixed anchors, never read whole to find the place:
+    *   `STATUS/RESOLUTION_ARCHIVE.md`: new version section right after the italic line under `# Resolution Archive`; oldest dashboard row moved to the top of `## 📊 Dashboard History`.
+    *   `TESTS/TEST_PROCEDURE.md`: new chapter right before the `---` line above `**Active Testing Chapters: X of Y**`, then update that line; title line 1.
+    *   `STATUS/SOT_MASTER_REQUIREMENTS.md`: title line 1; rule count in `## 🏗️ Architectural Master Rules (N Rules)`; new rule after the last `*   **1.` rule line (search `1.` + highest number); baseline line after `## 🛡️ Core Hardening Baseline`; chapter line after `## ✅ Verification Chapters`.
+    *   `STATUS/BASELINE/INDEX.md`: new row right after `| :--- | :--- | :--- |`.
+    *   `TESTS/CHAPTER_TRIAGE.md`: title line 1, the `**Summary:**` line, and the new row after the last chapter row (search the previous chapter number).
 
 ### Handover template (D3)
 ```

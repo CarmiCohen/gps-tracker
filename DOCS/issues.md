@@ -7,7 +7,7 @@
 ### Work Queue
 Take one item at a time, and display it before fixing it (Rule 1). Row numbers are kept from earlier versions.
 
-**Next item: the user runs the Nov8.100-Documentation Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md`. Then ISSUE-NOV5.2-O11 Group 4 (Microphone) or Group 5 (Lift), both decided "Build" and not built (item 8, High). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
+**Next item: the user runs the Nov8.100-Documentation Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md`. Then SIMP-NOV8.100-S1 (item 49) and SIMP-NOV8.100-S2 (item 50), which cut the token cost of the work after them; then ISSUE-NOV5.2-O11 Group 4 (Microphone) or Group 5 (Lift), both decided "Build" and not built (item 8, High). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -18,6 +18,8 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 | 46 | ISSUE-NOV8.13-O56 | Every Sensor starts with the ID `T`, so two default Sensors share one relay room and receive each other's geofence and backfill requests | A decision: generate a unique Sensor ID, or require one at setup |
 | 47 | ISSUE-NOV8.13-O57 | `--warning-mode all` shows Gradle 9 deprecations ("Mutating the dependencies of configuration ... after it has been resolved") in every module | Find the build logic that mutates resolved configurations |
 | 48 | ISSUE-NOV8.14-O58 | The SOT shows rules 1.1 to 1.334 only as the placeholder `... (Rules 1.1 to 1.334 preserved)` | Trace the rules in git history and restore them, or record where they live |
+| 49 | SIMP-NOV8.100-S1 | Token-lean device testing and tooling: debug-build-only adb broadcasts (set Sensor ID, pair, add or clear Home Points) checked through `REV_*` logcat instead of screenshots; `TESTS/run_tests.ps1`, `device_check.ps1`, `audit_line.ps1` printing one summary line each | Nothing; agreed 2026-11-08 |
+| 50 | SIMP-NOV8.100-S2 | Documentation cleanup: freeze the SOT baseline and verification-chapter lists (archive is their home); merge `CHAPTER_TRIAGE.md` codes into `TEST_PROCEDURE.md`; move stale files (`DOCS/Handover.md`, `TESTS/TESTS.md`, `test_results.md`, `VERIFICATION_MANIFEST.md`, `QA_VALIDATION_STATUS.md`) to an archive folder after checking each | Nothing; agreed 2026-11-08 |
 
 ---
 

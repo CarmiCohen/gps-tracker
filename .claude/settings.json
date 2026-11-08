@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "mcp__ide-tools__studio_(write_file|replace_file_content|multi_replace_file_content)|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:/CCwork/JD/.claude/hooks/log-change.ps1"],
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
