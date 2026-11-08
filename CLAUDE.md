@@ -1,0 +1,9 @@
+# JD project - standing session instructions
+
+These apply to every session automatically; the user does not need to repeat them.
+
+- **Start**: run the Resumption Sequence of `DEVELOPER_GUIDELINES.md` (index `pending` row check first), read `Handover.md` and `chat_session.md` if it exists, then take the next item of the Work Queue in `DOCS/issues.md` unless the user names another. Display the chosen issue before fixing it (Rule 1).
+- **Rules**: follow `DEVELOPER_GUIDELINES.md` strictly, including Documentation Rules D1 to D7 and the 10-step Completion Sequence.
+- **Session log (D6)**: keep `chat_session.md` (git-ignored) as a short, append-only milestone log from the first action on: decisions, files changed (one line each), test results, next steps, temporary device state to restore. Enough to resume after a crash; no long rewrites. Delete it at Completion step 9.
+- **Version name**: use the name the user gives; otherwise ask once.
+- **Phones**: test only on the A15 (`R58X40GV2AR`); the S21FE is in personal use.
