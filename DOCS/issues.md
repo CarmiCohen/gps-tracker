@@ -1,11 +1,11 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov7.38)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.0)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov7.38, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov8.0, solved one by one in the order below
 
 ### Work Queue
-Nov7.38 is closed and followed Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov8.0 is closed and followed Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
-**Next item: ISSUE-NOV6.2-O30 (item 22, Low, decided: retain historical data of unpaired trackers).**
+**Next item: ISSUE-NOV6.0-O26 (item 18, Medium, blocked on a device below API 35 or permission to download an API 34 image).**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -30,7 +30,7 @@ Nov7.38 is closed and followed Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7
 | 19 | ISSUE-NOV6.1-O27 | **Done for Nov7.2**: the Sensor HUD shows the service's real fix, or `--` | Nothing |
 | 20 | ISSUE-NOV6.1-O28 | **Done for Nov7.12**: MonitorLocationSource filters fixes with isBetterLocation, preventing coarse network fixes from overriding fresh GPS fixes | Nothing |
 | 21 | ISSUE-NOV6.2-O29 | **Done for Nov7.38**: Monitor stores and displays its own movement path (`isLocalUser = true`) alongside remote tracker, activating `TrailDao.pruneLocalTrail` (chapter 148) | Nothing |
-| 22 | ISSUE-NOV6.2-O30 | **Decided**: Retain historical data of unpaired trackers (do not auto-delete on unpairing, preserving history for re-pairing) | Action item pending implementation |
+| 22 | ISSUE-NOV6.2-O30 | **Done for Nov8.0**: Retain historical data of unpaired trackers (do not auto-delete on unpairing, preserving history for potential re-pairing) (chapter 149) | Nothing |
 | 23 | ISSUE-NOV6.2-O31 | **Done for Nov6.4**: unanswered backfill requests are released after 30 seconds | Nothing |
 | 24 | ISSUE-NOV6.3-O32 | **Done for Nov6.4**: gaps are read from the stored trail, so no missing range is forgotten | Nothing |
 | 25 | ISSUE-NOV6.4-O33 | **Done for Nov7.15**: the Sensor stops at the first backfill chunk it cannot send and never sends the completion chunk after it, so the Monitor asks again (`answerBackfill`, chapter 137) | Nothing |
@@ -68,7 +68,6 @@ Nov7.38 is closed and followed Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7
 - **ISSUE-NOV7.3-O39 (Low) - Alarm reach under Do Not Disturb and on a locked phone**: the `monitor_alarm` channel asks to bypass Do Not Disturb, but Android ignores that until the user grants the app Do Not Disturb access, and the A15 shows `mBypassDnd=false`. The siren itself plays on the alarm stream, which Do Not Disturb allows by default. The full-screen alarm opens by itself only when the phone is locked or idle; on an unlocked phone in use, Android shows a heads-up notification, which was seen on the A15, and tapping it opened the alarm. The locked-screen start was not run, and from Android 14 the full-screen permission can be withdrawn by the user (`USE_FULL_SCREEN_INTENT` is `allow` on the A15). Needs a decision: add a setup step for Do Not Disturb and full-screen access, for example in the Phone Setup overlay.
 - **ISSUE-NOV7.2-O36 (Low) - The Sensor service cannot be stopped on the device**: `AdminActivity` offered only `START SENSOR SERVICE`, and `am stopservice` is refused because `SensorService` is not exported. Only a force stop or an uninstall ends it, and `START_STICKY` restarts it after a crash. **Decision (2026-11-08)**: Replace the manual `START SENSOR SERVICE` button with automatic service startup (on app launch and device boot) and a live service uptime/status timer, and implement a protected stop control with a confirmation dialog. Action item added for implementation.
 - **ISSUE-NOV7.2-O37 (Low) - Unknown values are sent as invented numbers**: `SensorService` copies `loc.speed` into every update without checking `hasSpeed()`, so a fix without speed reaches the Monitor sensor line as `0.0 km/h` and `STATIONARY`. Since Nov7.2 the Sensor's own HUD shows `--` for the same fix, so the two screens can disagree. Accuracy is not affected, because 0 already shows as `--`. Found by reading the code; not seen live, since fused fixes almost always carry a speed. Found in Nov7.3: the Sensor's `batteryReceiver` sends 100% when the level is unknown and starts at 100% and 30°C, so a broken battery reading can never raise the low battery alarm; since Nov6.1 `BatteryReading` in `core-ui` already reads these values without inventing them.
-- **ISSUE-NOV6.2-O30 (Low) - Rows of a tracker that is no longer paired stay stored**: the Nov6.2 cap is per tracker, so each tracker ID ever paired can keep up to 50,000 rows, about 4.4MB. Total storage therefore grows with the number of IDs used, not with time. **Decision (2026-11-08)**: Retain historical data of unpaired trackers (do not auto-delete on unpairing, preserving history for potential re-pairing).
 - **ISSUE-NOV5.0-O4 (Medium) - Test coverage gap, reduced in Nov5.2**: every chapter now has a status in `TESTS/CHAPTER_TRIAGE.md`. Still outstanding are the chapters needing a person (H) or the S21FE or a second viewer (S). `ProductionReadinessAuditTest` holds three math checks only; `TESTS/device_audit.cmd` now performs the real Davey and StackLog audit. Earlier "100% passing" entries covered unit tests only.
 - **ISSUE-NOV5.2-O11 (High) - Documented features are not wired into the running apps**: many chapters and SOT rules marked PASSED describe behavior the apps cannot perform. **Decisions (2026-11-08)**: 
   - **Group 1 (Alarms & Sirens)**: Built (Slices 1–3).
@@ -89,6 +88,11 @@ Nov7.38 is closed and followed Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov8.0)
+*   **Unpaired Tracker Trail Retention (ISSUE-NOV6.2-O30)**: Verified and tested that unpairing a tracker (clearing target ID via `identityManager.clearTargetId()`) does not delete historical trail data stored in Room database (`TrailDao`), preserving historical telemetry and movement points for potential future re-pairing. Automated by `UnpairedTrackerTrailRetentionTest`. SOT rule 1.385, test chapter 149. **PASSED.**
 
 ---
 

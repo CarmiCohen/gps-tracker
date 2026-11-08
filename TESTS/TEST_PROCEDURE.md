@@ -564,8 +564,11 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **148.2 Dual Trail Map Rendering:** Verify that `MonitorActivity` renders independent polylines for remote tracker trail (Blue) and local viewer trail (Cyan) on the osmdroid map canvas. Automated by UI implementation and `LocalTrailTest`.
 *   **148.3 Local Trail TTL Pruning:** Verify that `TrailDao.pruneLocalTrail` successfully prunes local user trail entries older than 48 hours without affecting remote tracker trail storage. Automated by `TrailStorageBoundTest.localRowsExpireAfter48Hours`.
 
+## Chapter 149 - Unpaired Tracker Trail Retention (Nov8.0)
+*   **149.1 Unpaired Tracker Trail Persistence:** Verify that unpairing a tracker (clearing the target ID via `identityManager.clearTargetId()`) does not delete historical trail data stored in Room database (`TrailDao`), preserving historical telemetry and movement points for potential future re-pairing. Automated by `UnpairedTrackerTrailRetentionTest` (ISSUE-NOV6.2-O30).
+
 ---
-**Active Testing Chapters: 138 of 148**
+**Active Testing Chapters: 139 of 149**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
