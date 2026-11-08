@@ -1,32 +1,33 @@
 ```
 git add .
-git commit -m "Nov8.100-Documentation - LEAN DOCUMENTATION WORKFLOW (DOCUMENTATION RULES D1 TO D7)
+git commit -m "Nov8.101-Tooling - DEBUG-ONLY ADB TEST COMMANDS AND ONE-LINE TEST TOOLING (SIMP-NOV8.100-S1)
 
-- DEVELOPER_GUIDELINES.md: Documentation Rules D1 to D7 (one home per fact, issues.md as working file, short Handover and commit message, tags as baselines, 10-step Completion Sequence, milestone session log, targeted reads); Rule 6 now a progress log.
-- issues.md rewritten as a working file (450 to about 90 lines); old dashboard rows moved to the archive's Dashboard History; Open and Ideas recounted.
-- TESTS: TrackingDocumentIntegrityTest rewritten (limits, suffixed version names, chapter 158); BaselineIndexTest and VersionSourceTest accept suffixed names.
-- DOCS: RESOLUTION_ARCHIVE.md, SOT rule 1.396, TEST_PROCEDURE.md (148 of 158), CHAPTER_TRIAGE.md, INDEX.md, Handover.md.
-- VERSION: Nov8.100-Documentation, versionCode 66. No app code changed."
-git tag Nov8.100-Documentation
+- core-shared DebugCommand (strict parsing); src/debug DebugCommandReceiver in both apps (DUMP-guarded, one REV_DEBUG_CMD line): Sensor SET_ID/STATE, Monitor PAIR/UNPAIR/ADD_HOME/CLEAR_HOME/STATE.
+- TESTS/run_tests.ps1, device_check.ps1, audit_line.ps1: one summary line each; usage in TEST_GUIDELINES.md section 4; Completion steps 1 and 5 use them.
+- Audit line: QA read from the CHAPTER_TRIAGE summary; Sub-items now = numbered TEST_PROCEDURE sub-items.
+- New gap ISSUE-NOV8.101-O59 (Sensor without a first screen has no ID). Housekeeping: CLAUDE.md token economy, D5 docs-only versions, D7.
+- TESTS: DebugCommandTest (chapter 159); all unit tests, assembleDebug/assembleRelease pass; A15 commands and device audit run.
+- VERSION: Nov8.101-Tooling, versionCode 67."
+git tag Nov8.101-Tooling
 git push origin main --tags
 ```
 
-# Project Handover - Version Nov8.100-Documentation (Lean Documentation Workflow)
+# Project Handover - Version Nov8.101-Tooling (Debug Test Commands and One-Line Tooling)
 
 ## ▶️ Resumption State (Read First)
 - **Git**: run the block above; next session, replace `pending` in the top row of `STATUS/BASELINE/INDEX.md` (Resumption step 1).
-- **Workflow**: follow `DEVELOPER_GUIDELINES.md`, now with Documentation Rules D1 to D7 and a 10-step Completion Sequence; tests enforce the limits.
-- **Where things are**: resolved issues in `STATUS/RESOLUTION_ARCHIVE.md`; open work in `DOCS/issues.md`; old text in tags (`git show Nov8.14:DOCS/issues.md`).
-- **Phones**: A15 (`R58X40GV2AR`) has the Nov8.13 debug builds, Monitor paired to `T`. S21FE in personal use; never test on it.
-- **Test tips**: logcat tags `REV_*`, read with `adb logcat -d adbd:S` (not `-s`); `TESTS/device_audit.cmd` from `cmd`, one app per call; instrumented runs need `$env:ANDROID_SERIAL="R58X40GV2AR"` and uninstall the Sensor.
+- **Workflow**: `DEVELOPER_GUIDELINES.md` (D1 to D7, 10-step Completion Sequence). New tools in `TESTS/TEST_GUIDELINES.md` section 4: `run_tests.ps1`, `device_check.ps1`, `audit_line.ps1`.
+- **Where things are**: resolved issues in `STATUS/RESOLUTION_ARCHIVE.md`; open work in `DOCS/issues.md`; old text in tags.
+- **Phones**: A15 (`R58X40GV2AR`) has the Nov8.101-Tooling debug builds; Monitor paired to `T` with its 2 Home Points (restored after the tests); Sensor ID set to `T` by `SET_ID` (it was `PENDING_IDENTITY`, ISSUE-NOV8.101-O59). S21FE in personal use; never test on it.
+- **Test tips**: `device_check.ps1 -App monitor -Command STATE` prints pairing and Home Points before a test, to restore them after. Instrumented runs need `$env:ANDROID_SERIAL="R58X40GV2AR"` and uninstall the Sensor.
 
-## 🟢 Status: PASSED (Nov8.100-Documentation)
-- The 7 documentation points accepted on 2026-11-08 are now rules D1 to D7, enforced by `TrackingDocumentIntegrityTest` (chapter 158) and `BaselineIndexTest`. Details: `RESOLUTION_ARCHIVE.md`.
-- All unit tests and `assembleDebug` / `assembleRelease` pass. Device audit not run: no app code changed.
+## 🟢 Status: PASSED (Nov8.101-Tooling)
+- SIMP-NOV8.100-S1 done: debug-only adb commands answer in one `REV_DEBUG_CMD` line; release manifests contain no receiver. Details: `RESOLUTION_ARCHIVE.md`.
+- All unit tests (366) and `assembleDebug` / `assembleRelease` pass; only the known Gradle 9 deprecations (ISSUE-NOV8.13-O57). Device audit: Sensor clean; Monitor 2 Davey frames, the known ISSUE-NOV8.13-O55. `ProductionReadinessAuditTest` not run: `src/main` unchanged, and it uninstalls the Sensor.
 
-**Audit line**: Nov8.100-Documentation: [SOT Count: 970 (Rules: 470), Open: H:1, M:3, L:8, Ideas: H:0, M:0, L:16, Testing: PASSED (Sub-items: 336), QA: 87]
+**Audit line**: Nov8.101-Tooling: [SOT Count: 971 (Rules: 471), Open: H:1, M:3, L:9, Ideas: H:0, M:0, L:16, Testing: PASSED (Sub-items: 296), QA: 88]
 
 ## 🎯 Next Resumption Focus
 1. Fill the `pending` index row (after the Git block).
-2. ISSUE-NOV5.2-O11 Group 4 (Microphone) or Group 5 (Lift), High; the user picks which first.
-3. ISSUE-NOV8.13-O55 (Medium): Perfetto trace of the Monitor start.
+2. SIMP-NOV8.100-S2 (item 50): documentation cleanup.
+3. ISSUE-NOV5.2-O11 Group 4 (Microphone) or Group 5 (Lift), High; the user picks which first.

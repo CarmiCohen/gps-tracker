@@ -612,8 +612,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **158.2 Short Handover:** Verify that `Handover.md` starts with the Git block, has the template parts, and at most 70 lines (D3). Automated by `TrackingDocumentIntegrityTest.handoverFollowsTheShortTemplate`.
 *   **158.3 One Home, Still Complete:** Verify that every archived version is in the SOT baseline and a dashboard row (`issues.md` or Dashboard History), that both are newest first without repeats, and that version names with a suffix (`Nov8.100-Documentation`) are read and sort after Nov8.14 (D1). Automated by `everyResolvedVersionIsRecordedInEveryTrackingDocument`, `versionsAreUniqueAndNewestFirst`, `versionNamesWithASuffixAreRead`, and `VersionSourceTest`.
 
+## Chapter 159 - Debug Test Commands And One-Line Tooling (Nov8.101-Tooling)
+*   **159.1 Strict Parsing:** Verify that ids must be non-blank, coordinates in range (latitude -90 to 90, longitude -180 to 180), and that each app rejects the other app's and unknown actions. Automated by `DebugCommandTest` (SIMP-NOV8.100-S1).
+*   **159.2 Debug Builds Only:** Verify that `DebugCommandReceiver` is in the merged debug manifest of both apps and absent from the release ones, and that it requires the `DUMP` permission.
+*   **159.3 On Device (A15):** Verify with `TESTS/device_check.ps1` that `STATE`, `SET_ID`, `PAIR`, `UNPAIR`, `ADD_HOME`, and `CLEAR_HOME` answer `OK` with the new state in one `REV_DEBUG_CMD` line, that invalid input answers `REJECTED`, and that `-ScreenText` finds text in a `uiautomator` dump. Restore the Home Points printed by `STATE` afterwards.
+*   **159.4 One-Line Scripts:** Verify that `run_tests.ps1` prints one `TESTS PASSED|FAILED` line (with `tests=up-to-date` when Gradle re-ran nothing) and `audit_line.ps1` reproduces the hand-checked Open, Ideas, Rules, and QA figures.
+
 ---
-**Active Testing Chapters: 148 of 158**
+**Active Testing Chapters: 149 of 159**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

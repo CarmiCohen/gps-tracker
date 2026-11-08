@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.100-Documentation)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.101-Tooling)
 
 *Working file: open work only. Resolved issues are described once, in `STATUS/RESOLUTION_ARCHIVE.md`. The text this file held up to Nov8.14 (done Work Queue rows, Resolved Gaps Nov4.32 to Nov8.14, resolved gap texts) is in tag Nov8.14: `git show Nov8.14:DOCS/issues.md`. Older dashboard rows are in the Dashboard History at the end of the archive (Documentation Rule D2).*
 
-## 🎯 Next Resumption Focus: Work Queue after Nov8.100-Documentation, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov8.101-Tooling, solved one by one in the order below
 
 ### Work Queue
 Take one item at a time, and display it before fixing it (Rule 1). Row numbers are kept from earlier versions.
 
-**Next item: the user runs the Nov8.100-Documentation Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md`. Then SIMP-NOV8.100-S1 (item 49) and SIMP-NOV8.100-S2 (item 50), which cut the token cost of the work after them; then ISSUE-NOV5.2-O11 Group 4 (Microphone) or Group 5 (Lift), both decided "Build" and not built (item 8, High). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
+**Next item: the user runs the Nov8.101-Tooling Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md`. Then SIMP-NOV8.100-S2 (item 50), which cuts the token cost of the work after it; then ISSUE-NOV5.2-O11 Group 4 (Microphone) or Group 5 (Lift), both decided "Build" and not built (item 8, High). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -18,8 +18,8 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 | 46 | ISSUE-NOV8.13-O56 | Every Sensor starts with the ID `T`, so two default Sensors share one relay room and receive each other's geofence and backfill requests | A decision: generate a unique Sensor ID, or require one at setup |
 | 47 | ISSUE-NOV8.13-O57 | `--warning-mode all` shows Gradle 9 deprecations ("Mutating the dependencies of configuration ... after it has been resolved") in every module | Find the build logic that mutates resolved configurations |
 | 48 | ISSUE-NOV8.14-O58 | The SOT shows rules 1.1 to 1.334 only as the placeholder `... (Rules 1.1 to 1.334 preserved)` | Trace the rules in git history and restore them, or record where they live |
-| 49 | SIMP-NOV8.100-S1 | Token-lean device testing and tooling: debug-build-only adb broadcasts (set Sensor ID, pair, add or clear Home Points) checked through `REV_*` logcat instead of screenshots; `TESTS/run_tests.ps1`, `device_check.ps1`, `audit_line.ps1` printing one summary line each | Nothing; agreed 2026-11-08 |
 | 50 | SIMP-NOV8.100-S2 | Documentation cleanup: freeze the SOT baseline and verification-chapter lists (archive is their home); merge `CHAPTER_TRIAGE.md` codes into `TEST_PROCEDURE.md`; move stale files (`DOCS/Handover.md`, `TESTS/TESTS.md`, `test_results.md`, `VERIFICATION_MANIFEST.md`, `QA_VALIDATION_STATUS.md`) to an archive folder after checking each | Nothing; agreed 2026-11-08 |
+| 51 | ISSUE-NOV8.101-O59 | A Sensor started before its first screen connects as `PENDING_IDENTITY` | Generate the ID where it is read |
 
 ---
 
@@ -55,6 +55,7 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 - **ISSUE-NOV5.1-O10 (Low) - Relay writes its cache synchronously per update**: `saveCache()` runs `writeFileSync` for each item in `location_batch`, which may limit throughput at high telemetry rates. The cache may also be lost on redeploy unless Render uses a persistent disk.
 - **ISSUE-NOV8.13-O56 (Low) - Every Sensor defaults to the ID `T`**: `ForensicIdentity.DEFAULT_TRACKER_ID` is `T`. Two Sensors left at the default join the same relay room, so a Monitor paired to `T` sends its geofence and backfill requests to both, and receives both trails.
 - **ISSUE-NOV8.13-O57 (Low) - Gradle 9 deprecations under `--warning-mode all`**: every module prints "Mutating the dependencies of configuration ... after it has been resolved or consumed. This will fail with an error in Gradle 9.0". These predate Nov8.13; the "clean `--warning-mode all` build" claims of earlier versions did not hold. Also seen: `w:` redundant-initializer warnings in `CleanSetupActionsTest`, and the kapt line "options were not recognized by any processor".
+- **ISSUE-NOV8.101-O59 (Low) - A Sensor started before its first screen has no ID**: `ForensicIdentityManager.selfId` reads `PENDING_IDENTITY` until `AdminActivity` calls `ensureIdentityGenerated`. Found in Nov8.101-Tooling: the A15 Sensor, reinstalled by an instrumented run, still had no ID. `BootReceiver` or any start that skips the first screen would connect to the relay as `PENDING_IDENTITY`. Generating the ID where it is read (in `ForensicIdentityManager` itself, or in `SensorService` before connecting) would close it.
 - **ISSUE-NOV8.14-O58 (Low) - SOT rules 1.1 to 1.334 are a placeholder**: the SOT lists them only as `... (Rules 1.1 to 1.334 preserved)`, which predates the Nov7 series and has not been traced (split from ISSUE-NOV8.5-O47).
 
 ### 3. Operational Notes
@@ -84,6 +85,7 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 
 ## 📊 Hardening Progress Dashboard
 *The newest rows only (at most 6); older rows are in the Dashboard History of `STATUS/RESOLUTION_ARCHIVE.md`. From Nov8.100-Documentation, Open and Ideas are counted from the lists in this file; earlier figures used a count that cannot be traced.*
+- **Nov8.101-Tooling: [SOT Count: 971 (Rules: 471), Open: H:1, M:3, L:9, Ideas: H:0, M:0, L:16, Testing: PASSED (Sub-items: 296), QA: 88]**
 - **Nov8.100-Documentation: [SOT Count: 970 (Rules: 470), Open: H:1, M:3, L:8, Ideas: H:0, M:0, L:16, Testing: PASSED (Sub-items: 336), QA: 87]**
 - **Nov8.14: [SOT Count: 969 (Rules: 469), Open: H:1, M:2, L:15, Ideas: H:0, M:3, L:15, Testing: PASSED (Sub-items: 334), QA: 86]**
 - **Nov8.13: [SOT Count: 968 (Rules: 468), Open: H:1, M:3, L:15, Ideas: H:0, M:3, L:15, Testing: PASSED (Sub-items: 331), QA: 85]**
