@@ -34,7 +34,7 @@ git push origin main --tags
 
 Version Nov7.36 delivers ISSUE-NOV7.1-O35:
 1. **Independent Clean Setup Maintenance Actions** (`CleanSetupOverlay`, `MonitorActivity`, `MonitorViewModel`, `AdminActivity`, `SensorViewModel`, `TrailDao`, `MonitorRepository`):
-   - `Clear Home Points & Geofence` (`onClearHomePoints`): Disables spatial violation alert settings (`distance`, `jammerDetection`, `tiltAlert`, `liftAlert`, `tamperAlert`) and acknowledges active alarms in `MonitorAlarmEngine` without unpairing tracker.
+   - `Clear Home Points & Geofence` (`onClearHomePoints`): Disables spatial violation alert settings (`distance`, `jammerDetection`, `tiltAlert`, `liftAlert`, `tamperAlert`) and acknowledges active alarms in `MonitorAlarmEngine` without unpairing tracker. *(Superseded in Nov8.13, ISSUE-NOV8.13-O54: it now removes the Home Points only and leaves alarm settings and alarms unchanged.)*
    - `Reset Operational Statistics` (`onResetStats`): Clears stored trail history from Room DB via `MonitorRepository.clearTrail()` (`TrailDao.deleteAll()`), clears latest telemetry in `MonitorViewModel`, acknowledges alarms, and resets service uptime counter in `SensorServiceStatus` / `SensorViewModel`.
    - `Trigger Full System Re-Initialization` (`onFullInit`): Unpairs target tracker pairing ID, resets `AlertSettings` to default defaults, resets `sirenType` to `"Siren"`, resets `relayUrl` to `RelayConfig.DEFAULT_URL`, clears stored trail history, and resets service status on both applications.
 2. **Tests & Build**: All 284 JVM unit tests passing across all subprojects, `assembleDebug --warning-mode all` build clean.

@@ -1,6 +1,8 @@
 package com.jd.app.monitor
 
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.GeofenceConfig
+import com.jd.core.shared.HomePoint
 import com.jd.core.shared.RelayConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,26 +17,20 @@ import org.junit.Test
  */
 class CleanSetupActionsTest {
 
+    /**
+     * ISSUE-NOV8.13-O51 (user decision 2026-11-08): Clear Home Points removes the points only. It no longer
+     * switches alarms off, so Home Points added later raise breach alarms again; the cleared geofence carries
+     * a newer revision, so the tracker replaces its stored copy with the empty one.
+     */
     @Test
-    fun clearHomePointsClearsGeofenceAlertSettingsWithoutUnpairing() {
-        val pairing = "T_123"
-        val defaultSettings = AlertSettings()
-        assertTrue("Distance alert enabled by default", defaultSettings.distance)
+    fun clearHomePointsRemovesOnlyThePoints() {
+        val stored = GeofenceConfig(points = listOf(HomePoint(32.0, 34.0), HomePoint(32.1, 34.1)), radiusMeters = 200.0, revision = 7L)
+        val cleared = stored.cleared().revisedAfter(stored, nowMs = 1L)
 
-        val clearedSettings = defaultSettings.copy(
-            distance = false,
-            jammerDetection = false,
-            tiltAlert = false,
-            liftAlert = false,
-            tamperAlert = false
-        )
-
-        assertFalse("Distance alert cleared", clearedSettings.distance)
-        assertFalse("Jammer detection cleared", clearedSettings.jammerDetection)
-        assertFalse("Tilt alert cleared", clearedSettings.tiltAlert)
-        assertFalse("Lift alert cleared", clearedSettings.liftAlert)
-        assertFalse("Tamper alert cleared", clearedSettings.tamperAlert)
-        assertEquals("Pairing remains unchanged after clearing home points", "T_123", pairing)
+        assertTrue("No Home Point is left", cleared.points.isEmpty())
+        assertFalse("An empty geofence raises no breach", cleared.isActive)
+        assertEquals("The radius the user chose is kept", 200.0, cleared.radiusMeters, 0.0)
+        assertTrue("The tracker takes the cleared geofence over its stored one", cleared.revision > stored.revision)
     }
 
     @Test

@@ -145,4 +145,35 @@ object SentinelLogic {
 
         return GeofenceResult(transition, currentState, dist)
     }
+
+    /**
+     * Checks a fix against the user's Home Points (ISSUE-NOV8.13-O51). The tracker is INSIDE when it is within
+     * the radius of any point, and OUTSIDE only when even the near edge of its GPS error circle is beyond the
+     * radius of every point; in between, [previousState] is kept, so GPS noise at the boundary raises no alarm.
+     * With [previousState] UNKNOWN (a new start or a changed geofence) the state is set without a transition:
+     * only leaving home is a breach, not being away when the check begins.
+     * [GeofenceResult.distanceToCenter] is the distance to the nearest point; an inactive config yields UNKNOWN.
+     */
+    fun evaluateHomeZone(
+        lat: Double,
+        lng: Double,
+        accuracyMeters: Float,
+        config: GeofenceConfig,
+        previousState: GeofenceState
+    ): GeofenceResult {
+        if (!config.isActive) return GeofenceResult(GeofenceTransition.NONE, GeofenceState.UNKNOWN, -1.0)
+
+        val nearest = config.points.minOf { SpatialMath.calculateDistance(lat, lng, it.lat, it.lng) }
+        val measured = when {
+            nearest <= config.radiusMeters -> GeofenceState.INSIDE
+            nearest - max(0f, accuracyMeters) > config.radiusMeters -> GeofenceState.OUTSIDE
+            else -> previousState
+        }
+        val transition = when {
+            previousState == GeofenceState.INSIDE && measured == GeofenceState.OUTSIDE -> GeofenceTransition.EXIT
+            previousState == GeofenceState.OUTSIDE && measured == GeofenceState.INSIDE -> GeofenceTransition.ENTER
+            else -> GeofenceTransition.NONE
+        }
+        return GeofenceResult(transition, measured, nearest)
+    }
 }

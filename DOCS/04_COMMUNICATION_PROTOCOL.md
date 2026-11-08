@@ -28,7 +28,7 @@ The communication protocol between the **Sensor** and the **Monitor** is designe
 ### D. Remote Commands (Monitor -> Relay -> Sensor)
 - **Command Set**:
     - `CALIBRATE_BASELINE`: Reset vibration/lux floors.
-    - `SET_CONFIG`: Update sensing intervals or geofence radii.
+    - `SET_CONFIG`: Update sensing intervals or geofence radii. *Built for the geofence only (Nov8.13, ISSUE-NOV8.13-O51), as the relay's existing generic event: the Monitor emits `settings_update` `{id: <trackerId>, type: "geofence", rev: <edit time ms>, radius: <m>, points: [{lat, lng}]}`, and the relay (v6.044, unchanged) forwards it to the tracker's room as `settings_relay`. It is sent on each edit and each time the tracker comes online; the relay keeps no copy. The Sensor keeps the newest `rev` only, so repeats are harmless; there is no `ACK_TS`.*
     - `TRIGGER_SIREN`: Manual alarm activation.
 - **Ack Cycle**: Every command requires an `ACK_TS` (Timestamped Acknowledgment) from the Sensor to be considered successful by the Monitor UI.
 

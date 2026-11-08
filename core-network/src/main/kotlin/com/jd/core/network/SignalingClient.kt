@@ -2,6 +2,7 @@ package com.jd.core.network
 
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
+import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.ViolationEvent
 import kotlinx.coroutines.flow.Flow
@@ -64,4 +65,15 @@ interface SignalingClient {
      * Sensor: Sends backfill data in response to a request (R-ID 768).
      */
     suspend fun sendBackfillResponse(response: BackfillResponse): Boolean
+
+    /**
+     * Sensor: geofence configurations sent by the paired Monitor (ISSUE-NOV8.13-O51).
+     */
+    val geofenceFlow: Flow<GeofenceConfig>
+
+    /**
+     * Monitor: sends the user's geofence to the tracker [targetId], which enforces it (ISSUE-NOV8.13-O51).
+     * Returns false when not connected; the caller sends again once the tracker is reachable.
+     */
+    suspend fun sendGeofence(targetId: String, config: GeofenceConfig): Boolean
 }

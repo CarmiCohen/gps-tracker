@@ -34,11 +34,15 @@ import com.jd.core.ui.RevolutionTheme
 import com.jd.core.ui.getAppVersionName
 import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.RelayConfig
 import com.jd.core.network.ForensicIdentityManager
 import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
 import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -95,6 +99,7 @@ class MonitorActivity : ComponentActivity() {
                 val sirenType by viewModel.sirenType.collectAsStateWithLifecycle()
                 val isSirenPlaying by viewModel.isSirenPlaying.collectAsStateWithLifecycle()
                 val alarmBook by viewModel.alarms.collectAsStateWithLifecycle()
+                val geofence by viewModel.geofence.collectAsStateWithLifecycle()
 
                 LaunchedEffect(pairing) {
                     val serviceIntent = Intent(context, MonitorSessionService::class.java)
@@ -142,7 +147,11 @@ class MonitorActivity : ComponentActivity() {
                             context.stopService(Intent(context, MonitorSessionService::class.java))
                         },
                         onUpdateRelayUrl = { url -> viewModel.updateRelayUrl(url) },
-                        onClearHomePoints = { viewModel.clearHomePointsAndGeofence() },
+                        onClearHomePoints = viewModel::clearHomePoints,
+                        geofence = geofence,
+                        onAddHomePoint = viewModel::addHomePoint,
+                        onRemoveHomePoint = viewModel::removeHomePoint,
+                        onSetGeofenceRadius = viewModel::setGeofenceRadius,
                         onResetStats = { viewModel.resetOperationalStatistics() },
                         onFullInit = {
                             viewModel.triggerFullSystemReinitialization()
@@ -267,6 +276,10 @@ fun MonitorScreen(
     onReset: () -> Unit,
     onUpdateRelayUrl: (String) -> Unit,
     onClearHomePoints: () -> Unit = {},
+    geofence: GeofenceConfig = GeofenceConfig(),
+    onAddHomePoint: (lat: Double, lng: Double) -> Unit = { _, _ -> },
+    onRemoveHomePoint: (index: Int) -> Unit = {},
+    onSetGeofenceRadius: (meters: Double) -> Unit = {},
     onResetStats: () -> Unit = {},
     onFullInit: () -> Unit = {}
 ) {
@@ -285,6 +298,28 @@ fun MonitorScreen(
     // (Chapter 127; full re-initialization also unpairs, ISSUE-NOV8.2-O46).
     var pendingUnpair by rememberSaveable { mutableStateOf<UnpairAction?>(null) }
     val requestUnpair = { pendingUnpair = UnpairAction.UNPAIR }
+    // Home Point editing (ISSUE-NOV8.13-O51): a map tap adds a point, a tapped point asks before it is removed.
+    var isEditingHome by rememberSaveable { mutableStateOf(false) }
+    var pendingHomeRemoval by rememberSaveable { mutableStateOf<Int?>(null) }
+    val currentOnAddHomePoint by rememberUpdatedState(onAddHomePoint)
+
+    pendingHomeRemoval?.let { index ->
+        AlertDialog(
+            onDismissRequest = { pendingHomeRemoval = null },
+            title = { Text("Remove Home Point ${index + 1}?") },
+            text = { Text("The tracker stops treating this area as home once it receives the change.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingHomeRemoval = null
+                        onRemoveHomePoint(index)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = com.jd.core.ui.StatusRed)
+                ) { Text("Remove") }
+            },
+            dismissButton = { TextButton(onClick = { pendingHomeRemoval = null }) { Text("Cancel") } }
+        )
+    }
 
     pendingUnpair?.let { action ->
         AlertDialog(
@@ -341,7 +376,7 @@ fun MonitorScreen(
     if (showPhoneSetupOverlay) {
         com.jd.core.ui.PhoneSetupOverlay(
             isTracker = false,
-            homePointsCount = 0,
+            homePointsCount = geofence.points.size,
             onOpenAppInfo = {
                 val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = android.net.Uri.parse("package:${context.packageName}")
@@ -408,6 +443,8 @@ fun MonitorScreen(
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
+            // The map has its own IN/OUT buttons; osmdroid's would cover the Home Point editor (ISSUE-NOV8.13-O51).
+            zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             controller.setZoom(WORLD_ZOOM)
         }
     }
@@ -415,10 +452,53 @@ fun MonitorScreen(
     val sensorTrail = remember(trail) { knownPositions(trail) }
     val sensorPosition = sensorTrail.firstOrNull()
     val localPath = remember(localTrail) { knownPositions(localTrail) }
+    val breaches = remember(trail) { geofenceBreaches(trail) }
 
     // Automatic Centering & Connection Logic
-    LaunchedEffect(remoteHudState.isPeerActive, trail, localTrail, followMode, localPosition) {
+    LaunchedEffect(remoteHudState.isPeerActive, trail, localTrail, followMode, localPosition, geofence, isEditingHome) {
         mapView.overlays.clear()
+
+        // Bottom overlay: taps that no marker takes add a Home Point while editing.
+        mapView.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
+            override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
+                if (!isEditingHome) return false
+                currentOnAddHomePoint(p.latitude, p.longitude)
+                return true
+            }
+            override fun longPressHelper(p: GeoPoint): Boolean = false
+        }))
+
+        geofence.points.forEachIndexed { index, home ->
+            val center = GeoPoint(home.lat, home.lng)
+            mapView.overlays.add(Polygon(mapView).apply {
+                points = Polygon.pointsAsCircle(center, geofence.radiusMeters)
+                fillPaint.color = android.graphics.Color.argb(40, 16, 185, 129)
+                outlinePaint.color = android.graphics.Color.rgb(16, 185, 129)
+                outlinePaint.strokeWidth = 3f
+                setOnClickListener { _, _, _ -> false } // Taps inside the circle still reach the map.
+            })
+            mapView.overlays.add(Marker(mapView).apply {
+                position = center
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = homeMarkerIcon(context)
+                title = "Home ${index + 1}"
+                setOnMarkerClickListener { marker, _ ->
+                    if (isEditingHome) pendingHomeRemoval = index else marker.showInfoWindow()
+                    true
+                }
+            })
+        }
+
+        // OUT markers: where the tracker reported leaving every Home Point.
+        breaches.forEach { breach ->
+            mapView.overlays.add(Marker(mapView).apply {
+                position = GeoPoint(breach.lat, breach.lng)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = breachMarkerIcon(context)
+                title = "Geofence breach"
+                snippet = java.text.DateFormat.getDateTimeInstance().format(java.util.Date(breach.timestamp))
+            })
+        }
 
         if (localPath.isNotEmpty()) {
             val localPoints = localPath.map { GeoPoint(it.lat, it.lng) }
@@ -533,8 +613,25 @@ fun MonitorScreen(
                             followMode = MapFollowMode.VIEWER
                             localPosition?.let { mapView.controller.setCenter(GeoPoint(it.lat, it.lng)) }
                         }, iconColor = Color(0xFF06B6D4))
+                        MapToolButton(
+                            icon = Icons.Default.Home,
+                            label = "HOME",
+                            onClick = { isEditingHome = !isEditingHome },
+                            iconColor = if (isEditingHome) Color.White else Color(0xFF10B981),
+                            containerColor = if (isEditingHome) Color(0xFF10B981) else Color.White
+                        )
                     }
                 }
+            }
+
+            if (isEditingHome) {
+                HomePointEditor(
+                    geofence = geofence,
+                    onSetRadius = onSetGeofenceRadius,
+                    onDone = { isEditingHome = false },
+                    // Clear of the map control column, which sits at the start edge.
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(start = 72.dp, end = 8.dp, bottom = 8.dp)
+                )
             }
         }
     }
@@ -745,6 +842,67 @@ fun MapToolButton(icon: ImageVector? = null, symbol: String? = null, label: Stri
         }
     }
 }
+
+/** Home Point editing panel: how to edit, the point count, and the geofence radius (ISSUE-NOV8.13-O51). */
+@Composable
+fun HomePointEditor(
+    geofence: GeofenceConfig,
+    onSetRadius: (Double) -> Unit,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // The slider moves locally and stores once released, so dragging does not send a geofence per step.
+    var radius by remember(geofence.radiusMeters) { mutableFloatStateOf(geofence.radiusMeters.toFloat()) }
+    // Compact, so the map stays usable for tapping points and the map controls stay uncovered.
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = Color.Black.copy(alpha = 0.85f),
+        contentColor = Color.White
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "HOME: ${geofence.points.size} | ${radius.toInt()} m",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF10B981),
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onDone) { Text("DONE") }
+            }
+            Text("Tap the map to add, tap a home to remove", fontSize = 11.sp, color = Color.LightGray)
+            Slider(
+                value = radius,
+                onValueChange = { radius = (it / RADIUS_STEP_METERS).toInt() * RADIUS_STEP_METERS },
+                onValueChangeFinished = { onSetRadius(radius.toDouble()) },
+                valueRange = GeofenceConfig.MIN_RADIUS_METERS.toFloat()..GeofenceConfig.MAX_RADIUS_METERS.toFloat(),
+                modifier = Modifier.height(32.dp)
+            )
+        }
+    }
+}
+
+private const val RADIUS_STEP_METERS = 10f
+
+/** A red dot, so an OUT marker cannot be mistaken for the tracker or a Home Point marker. */
+private fun breachMarkerIcon(context: android.content.Context): android.graphics.drawable.Drawable =
+    android.graphics.drawable.ShapeDrawable(android.graphics.drawable.shapes.OvalShape()).apply {
+        val sizePx = (18 * context.resources.displayMetrics.density).toInt()
+        paint.color = android.graphics.Color.RED
+        intrinsicWidth = sizePx
+        intrinsicHeight = sizePx
+    }
+
+/** A green square, so a Home Point cannot be mistaken for the tracker's pin or an OUT dot. */
+private fun homeMarkerIcon(context: android.content.Context): android.graphics.drawable.Drawable =
+    android.graphics.drawable.ShapeDrawable(android.graphics.drawable.shapes.RectShape()).apply {
+        val sizePx = (20 * context.resources.displayMetrics.density).toInt()
+        paint.color = android.graphics.Color.rgb(16, 185, 129)
+        intrinsicWidth = sizePx
+        intrinsicHeight = sizePx
+    }
+
 
 /** A Monitor action that unpairs the tracker, and what its confirmation dialog tells the user before it runs. */
 internal enum class UnpairAction(val consequence: String, val confirmLabel: String) {

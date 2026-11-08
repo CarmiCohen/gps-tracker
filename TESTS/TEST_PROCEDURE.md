@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov8.5 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov8.13 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -555,7 +555,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **146.4 Protected Stop Control & Intent Stop Handling:** Verify that `AdminActivity` renders a protected `STOP SENSOR SERVICE` control when `isServiceRunning` is true, presenting a confirmation dialog before sending `SensorService.ACTION_STOP_SERVICE` intent, and that `SensorService.onStartCommand` cleanly handles `ACTION_STOP_SERVICE` by calling `stopSelf()`. Automated by `SensorServiceStatusTest` and service intent handling.
 
 ## Chapter 147 - Independent Clean Setup Actions (Nov7.36)
-*   **147.1 Clear Home Points & Geofence Action:** Verify that clicking "Clear Home Points & Geofence" in `CleanSetupOverlay` clears geofence violation alert settings (`distance`, `jammerDetection`, `tiltAlert`, `liftAlert`, `tamperAlert`) and acknowledges active alarms in `MonitorAlarmEngine` without unpairing the tracker. Automated by `CleanSetupActionsTest.clearHomePointsClearsGeofenceAlertSettings` (ISSUE-NOV7.1-O35).
+*   **147.1 Clear Home Points & Geofence Action:** Verify that clicking "Clear Home Points & Geofence" in `CleanSetupOverlay` removes every Home Point (`MonitorViewModel.clearHomePoints`, a cleared `GeofenceConfig` with a newer revision, which the tracker receives as an empty geofence), leaves every alarm setting as it is, and does not unpair the tracker. Automated by `CleanSetupActionsTest.clearHomePointsRemovesOnlyThePoints`. *Changed in Nov8.13 (ISSUE-NOV8.13-O54, user decision 2026-11-08): until Nov8.12 this action switched off `distance`, `jammerDetection`, `tiltAlert`, `liftAlert`, and `tamperAlert` and acknowledged alarms, so Home Points added later raised no breach alarm (ISSUE-NOV7.1-O35).*
 *   **147.2 Reset Operational Statistics Action:** Verify that clicking "Reset Operational Statistics" in `CleanSetupOverlay` clears stored trail history from Room DB via `MonitorRepository.clearTrail()` (`TrailDao.deleteAll()`), clears latest telemetry in `MonitorViewModel`, acknowledges alarms on Monitor, and resets service uptime timer in `SensorServiceStatus` / `SensorViewModel` on Sensor. Automated by `CleanSetupActionsTest` and `SensorServiceStatusTest.resetUptimeResetsStartTimeWhenRunning`.
 *   **147.3 Trigger Full System Re-Initialization Action:** Verify that clicking "Trigger Full System Re-Initialization" in `CleanSetupOverlay` clears target tracker pairing ID, resets `AlertSettings` to default defaults, resets `sirenType` to `"Siren"`, resets `relayUrl` to `RelayConfig.DEFAULT_URL`, clears stored trail history, and resets service status on both apps. Automated by `CleanSetupActionsTest.defaultAlertSettingsHasSirenTypeSiren` and `CleanSetupActionsTest.defaultRelayUrlMatchesSpecification`.
 
@@ -581,14 +581,28 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **152.1 Async Buffer Initialization:** Verify that `SensorService` initializes `ForensicBuffer` on `Dispatchers.IO` background coroutine (`initJob`), eliminating main-thread disk I/O stalls during startup and awaiting `initJob.join()` prior to trace writes or range reads. Automated by `SensorService` async init (ISSUE-NOV7.15-O41).
 
 ## Chapter 153 - Single Source Version Management (Nov8.10)
-*   **153.1 Centralized Gradle Versioning:** Verify that `gradle.properties` defines `appVersionName` ("Nov8.10") and `appVersionCode` (60) as single source of truth, dynamically loaded by `app-monitor/build.gradle.kts` and `app-sensor/build.gradle.kts` via `providers.gradleProperty()`. Automated by `VersionSourceTest` (SIMP-NOV7.0-S1).
+*   **153.1 Centralized Gradle Versioning:** Verify that `gradle.properties` defines `appVersionName` and `appVersionCode` as single source of truth, dynamically loaded by `app-monitor/build.gradle.kts` and `app-sensor/build.gradle.kts` via `providers.gradleProperty()`. Automated by `VersionSourceTest` (SIMP-NOV7.0-S1). *Nov8.13: the test checks the format (`Nov8.13`-like name, code of at least 64) instead of one fixed value, which had to be edited each release; Nov8.12 shipped without a bump (ISSUE-NOV8.13-O53).*
 
 ## Chapter 154 - Trail Persistence Integrity & Pending Identity Collection (Nov8.11)
 *   **154.1 Equal Timestamp Room Retention:** Verify that `TrailEntity` primary key composite `["trackerId", "timestamp", "sequenceId"]` retains multiple telemetry points sharing the exact same millisecond timestamp with distinct sequence IDs without Room replacement overwrite. Automated by `TrailPersistenceIntegrityTest.verifyEqualTimestampRetentionWithDistinctSequenceIds` (ISSUE-NOV4.3-O48).
 *   **154.2 Pending Identity Local Trail Collection:** Verify that `MonitorViewModel` local trail ingestion flow waits for valid `selfId` (`selfId.filter { it != "LOADING..." && it.isNotBlank() }`) and collects local fixes without dropping points during initial startup identity loading. Automated by `TrailPersistenceIntegrityTest` and `MonitorViewModel` (ISSUE-NOV4.3-O49).
 
+## Chapter 155 - Geofence Breach Alarm (Nov8.12)
+*Nov8.12 cited this chapter but never wrote it; written in Nov8.13 (ISSUE-NOV8.13-O53).*
+*   **155.1 Breach Raises The Alarm:** Verify that a `GEOFENCE_BREACH` from the tracker raises `AlarmType.GEOFENCE_BREACH` on the Monitor and sounds the siren, both as a `ViolationEvent` and as the status of a telemetry row (the path the relay client really uses). Automated by `GeofenceBreachAlarmTest` (ISSUE-NOV5.2-O11 Group 2, ISSUE-NOV8.13-O51).
+*   **155.2 Distance Alert Controls It:** Verify that `AlertSettings.distance` allows or silences the breach alarm. Automated by `MonitorAlarmsTest`.
+
+## Chapter 156 - Home Points Geofence, Monitor Defined, Sensor Enforced (Nov8.13)
+*The Nov8.12 Sensor anchored "home" to its own first fix (fixed 100 m, reset on each service start); the Monitor's Home Points were never wired (ISSUE-NOV8.13-O51). User decision 2026-11-08: the Sensor enforces the geofence, so the Monitor does no per-fix work (battery).*
+*   **156.1 Home Zone Logic:** Verify that `SentinelLogic.evaluateHomeZone` treats the tracker as home within the radius of any Home Point; reports `OUTSIDE` only when the near edge of the GPS error circle is beyond the radius of every point (hysteresis); raises `EXIT` only from `INSIDE`; sets the state without a transition on the first fix after a start or a geofence change; and is inactive without points. Automated by `HomeZoneTest` (7 tests).
+*   **156.2 Edits And Revisions:** Verify that `GeofenceConfig.withPoint`, `withoutPoint`, `withRadius` (kept within 50 to 500 m), and `cleared` change only what they name, and that `revisedAfter` always yields a newer revision, even after the clock went back. Automated by `HomeZoneTest.edits keep the radius in range and the revision always grows` and `CleanSetupActionsTest.clearHomePointsRemovesOnlyThePoints`.
+*   **156.3 Wire Format:** Verify that the geofence travels in the relay's existing `settings_update` / `settings_relay` event (`type = geofence`, `rev`, `radius`, `points`), survives the round trip, sends a cleared geofence as an empty list, and ignores other settings types and malformed payloads. No relay change (v6.044). Automated by `GeofenceWireTest` (3 tests).
+*   **156.4 Delivery:** Verify that the Monitor sends the stored geofence each time the tracker comes online (`viewerStatusFlow`) and each edit while it is online, and nothing while it is offline. Automated by `GeofenceSyncTest` (`geofenceDeliveries`). The Sensor stores a geofence only when its revision is newer (`SensorDataStore.saveGeofence`) and enforces the stored one after a restart.
+*   **156.5 OUT Markers:** Verify that trail rows with status `GEOFENCE_BREACH` and a position are the OUT markers. Automated by `GeofenceSyncTest.out markers are the breach rows with a position`.
+*   **156.6 On Device (A15, 2026-11-08, production relay):** With the A15 Sensor on a temporary ID and the A15 Monitor paired to it: `HOME` opens the editor; a map tap adds a Home Point (green square, radius circle) and the Sensor logs `REV_Geofence: Received 1 home points ... (stored: true)` within 0.4 s; the radius slider sends once on release (350 m); tapping a Home Point asks `Remove Home Point 1?` and removal arrives as 0 points; a restart re-sends the same revision, which the Sensor does not store again; no crash and no false breach. A real `EXIT` needs the tracker to move and is covered by 156.1 only.
+
 ---
-**Active Testing Chapters: 144 of 154**
+**Active Testing Chapters: 146 of 156**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

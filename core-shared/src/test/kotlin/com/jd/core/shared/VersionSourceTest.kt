@@ -2,7 +2,6 @@ package com.jd.core.shared
 
 import java.io.File
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -26,8 +25,10 @@ class VersionSourceTest {
         val versionName = gradleProperties.lines().firstOrNull { it.startsWith("appVersionName=") }?.substringAfter("=")
         val versionCode = gradleProperties.lines().firstOrNull { it.startsWith("appVersionCode=") }?.substringAfter("=")
 
-        assertEquals("Nov8.11", versionName, "gradle.properties appVersionName must be Nov8.11")
-        assertEquals("62", versionCode, "gradle.properties appVersionCode must be 62")
+        // The format is checked, not a fixed value: a test pinned to one version had to be edited each release,
+        // and Nov8.12 shipped without a version bump (ISSUE-NOV8.13-O53).
+        assertTrue(versionName != null && Regex("""[A-Z][a-z]+\d+\.\d+""").matches(versionName), "appVersionName must look like Nov8.13, was $versionName")
+        assertTrue((versionCode?.toIntOrNull() ?: 0) >= 64, "appVersionCode must be a number of at least 64 (Nov8.13), was $versionCode")
     }
 
     @Test

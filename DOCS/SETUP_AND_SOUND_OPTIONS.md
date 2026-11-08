@@ -4,7 +4,7 @@ This document details the revived setup, maintenance, phone capability guides, a
 
 ## 1. Maintenance & Clean Setup (`CleanSetupOverlay`)
 Accessible via configuration settings in both applications, `CleanSetupOverlay` provides administrators and operators with tools to maintain device state and clean local storage:
-- **Clear Home Points & Geofence**: Removes all defined geofence home points (Monitor/Viewer mode only).
+- **Clear Home Points & Geofence**: Removes all defined geofence home points (Monitor/Viewer mode only). The tracker receives the empty geofence; alarm settings stay unchanged (Nov8.13, ISSUE-NOV8.13-O54).
 - **Reset Operational Statistics**: Resets telemetry counters, distance metrics, and packet transmission logs.
 - **Trigger Full System Re-Initialization**: Resets internal database repositories and restarts foreground engine workers.
 

@@ -76,8 +76,10 @@ class SensorService : Service(), SensorEventListener {
     private var lastBatteryLevel = -1
     private var lastIsCharging = false
     private var lastTempCelsius = -1f
-    private var homeGeofence: SentinelLogic.Geofence? = null
-    private var geofenceState = SentinelLogic.GeofenceState.INSIDE
+    // The Monitor user's Home Points, enforced here so the Monitor does no per-fix work (ISSUE-NOV8.13-O51).
+    @Volatile private var geofence = GeofenceConfig() // Written by the geofence collector, read by the sensing loop.
+    private var geofenceState = SentinelLogic.GeofenceState.UNKNOWN // Sensing loop only.
+    @Volatile private var geofenceChanged = false
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -152,6 +154,7 @@ class SensorService : Service(), SensorEventListener {
         registerThermalListener()
         acquireWakeLock()
         setupBackfillListener()
+        setupGeofenceListener()
         registerSensors()
         startLocationUpdates()
         connectSignaling()
@@ -204,6 +207,22 @@ class SensorService : Service(), SensorEventListener {
                 if (!sent) {
                     SystemLogger.w("Backfill", "Send failed for ${request.requestId}. Remaining chunks dropped; the Monitor will ask again.")
                 }
+            }
+            .launchIn(serviceScope)
+    }
+
+    /** Stores each geofence the Monitor sends, and enforces the stored one, also after a restart while offline. */
+    private fun setupGeofenceListener() {
+        signalingClient.geofenceFlow
+            .onEach { config ->
+                val stored = sensorDataStore.saveGeofence(config)
+                SystemLogger.i("Geofence", "Received ${config.points.size} home points, radius ${config.radiusMeters} m, rev ${config.revision} (stored: $stored)")
+            }
+            .launchIn(serviceScope)
+        sensorDataStore.geofence
+            .onEach { config ->
+                geofence = config
+                geofenceChanged = true // The sensing loop restarts the state from the next fix, without a transition.
             }
             .launchIn(serviceScope)
     }
@@ -355,32 +374,22 @@ class SensorService : Service(), SensorEventListener {
                     update.bearing = loc.bearing
                     update.altitude = loc.altitude
 
-                    if (homeGeofence == null) {
-                        homeGeofence = SentinelLogic.Geofence(
-                            id = "HOME_ANCHOR",
-                            lat = loc.latitude,
-                            lng = loc.longitude,
-                            radiusMeters = 100.0
+                    if (geofenceChanged) {
+                        geofenceChanged = false
+                        geofenceState = SentinelLogic.GeofenceState.UNKNOWN
+                    }
+                    val zone = SentinelLogic.evaluateHomeZone(loc.latitude, loc.longitude, loc.accuracy, geofence, geofenceState)
+                    geofenceState = zone.currentState
+                    if (zone.transition == SentinelLogic.GeofenceTransition.EXIT) {
+                        update.status = GEOFENCE_BREACH_STATUS
+                        update.isCritical = true
+                        SystemLogger.w("SensorService", "Geofence breach: ${zone.distanceToCenter.toInt()} m from the nearest home point (radius ${geofence.radiusMeters.toInt()} m, accuracy ${loc.accuracy.toInt()} m)")
+                        val violation = ViolationEvent(
+                            type = GEOFENCE_BREACH_STATUS,
+                            location = update.snapshot(),
+                            nonce = java.util.UUID.randomUUID().toString()
                         )
-                        geofenceState = SentinelLogic.GeofenceState.INSIDE
-                    } else {
-                        val tempUpdate = LocationUpdate().apply {
-                            lat = loc.latitude
-                            lng = loc.longitude
-                        }
-                        val geofenceResult = SentinelLogic.evaluateGeofenceTransition(tempUpdate, homeGeofence!!, geofenceState)
-                        geofenceState = geofenceResult.currentState
-                        if (geofenceResult.transition == SentinelLogic.GeofenceTransition.EXIT) {
-                            update.status = "GEOFENCE_BREACH"
-                            update.isCritical = true
-                            SystemLogger.w("SensorService", "Geofence Breach detected! Distance: ${geofenceResult.distanceToCenter}m")
-                            val violation = ViolationEvent(
-                                type = "GEOFENCE_BREACH",
-                                location = update.snapshot(),
-                                nonce = java.util.UUID.randomUUID().toString()
-                            )
-                            serviceScope.launch { signalingClient.sendViolation(violation) }
-                        }
+                        serviceScope.launch { signalingClient.sendViolation(violation) }
                     }
 
                     movementCheck.check(

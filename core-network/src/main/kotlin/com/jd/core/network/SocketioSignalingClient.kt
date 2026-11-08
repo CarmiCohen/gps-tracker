@@ -2,6 +2,8 @@ package com.jd.core.network
 
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
+import com.jd.core.shared.GeofenceConfig
+import com.jd.core.shared.HomePoint
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.ViolationEvent
 import com.jd.core.shared.SystemLogger
@@ -57,6 +59,9 @@ class SocketioSignalingClient @Inject constructor(
 
     private val _backfillResponseFlow = MutableSharedFlow<BackfillResponse>(extraBufferCapacity = BURST_CAPACITY)
     override val backfillResponseFlow: SharedFlow<BackfillResponse> = _backfillResponseFlow.asSharedFlow()
+
+    private val _geofenceFlow = MutableSharedFlow<GeofenceConfig>(extraBufferCapacity = 16)
+    override val geofenceFlow: SharedFlow<GeofenceConfig> = _geofenceFlow.asSharedFlow()
 
     private var bytesSent: Long = 0
     private var currentDeviceId: String? = null
@@ -170,7 +175,13 @@ class SocketioSignalingClient @Inject constructor(
                     Timber.e(e, "Failed to parse backfill_response")
                 }
             }
-            
+
+            // The relay forwards settings_update to the room as settings_relay; the sender's echo is harmless.
+            on("settings_relay") { args ->
+                val data = args.getOrNull(0) as? JSONObject ?: return@on
+                GeofenceWire.decode(data)?.let { _geofenceFlow.tryEmit(it) }
+            }
+
             connect()
         }
     }
@@ -374,11 +385,56 @@ class SocketioSignalingClient @Inject constructor(
         return true
     }
 
+    override suspend fun sendGeofence(targetId: String, config: GeofenceConfig): Boolean {
+        if (!_isConnected.value) return false
+        val payload = GeofenceWire.encode(targetId, config)
+        socket?.emit("settings_update", payload)
+        bytesSent += payload.toString().length.toLong()
+        return true
+    }
+
     private companion object {
         /**
          * The most a peer can flush at once. Socket callbacks use tryEmit, which drops
          * silently when a flow buffer is full (ISSUE-NOV6.3-O32).
          */
         const val BURST_CAPACITY = 5000
+    }
+}
+
+/**
+ * Wire form of [GeofenceConfig] inside the relay's generic settings_update / settings_relay event
+ * (ISSUE-NOV8.13-O51); `type` keeps other settings kinds possible on the same event.
+ */
+internal object GeofenceWire {
+    const val TYPE = "geofence"
+
+    fun encode(targetId: String, config: GeofenceConfig): JSONObject = JSONObject().apply {
+        put("id", targetId)
+        put("type", TYPE)
+        put("rev", config.revision)
+        put("radius", config.radiusMeters)
+        put("points", JSONArray().apply {
+            config.points.forEach { p -> put(JSONObject().apply { put("lat", p.lat); put("lng", p.lng) }) }
+        })
+    }
+
+    /** Returns null for another settings type or a malformed payload. */
+    fun decode(data: JSONObject): GeofenceConfig? {
+        if (data.optString("type") != TYPE) return null
+        return try {
+            val arr = data.getJSONArray("points")
+            GeofenceConfig(
+                points = (0 until arr.length()).map { i ->
+                    val p = arr.getJSONObject(i)
+                    HomePoint(p.getDouble("lat"), p.getDouble("lng"))
+                },
+                radiusMeters = data.getDouble("radius"),
+                revision = data.getLong("rev")
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to parse geofence settings_relay")
+            null
+        }
     }
 }

@@ -112,6 +112,46 @@ data class BackfillResponse(
     val isComplete: Boolean
 )
 
+/** Telemetry status and violation type the Sensor sends when the tracker leaves all Home Points (ISSUE-NOV8.13-O51). */
+const val GEOFENCE_BREACH_STATUS = "GEOFENCE_BREACH"
+
+/** A user-defined Home Point; the tracker is home while it is within the geofence radius of any one of them. */
+@Serializable
+data class HomePoint(val lat: Double, val lng: Double)
+
+/**
+ * The geofence the Monitor user defines and the Sensor enforces (ISSUE-NOV8.13-O51).
+ * The Monitor edits it and sends it; the Sensor stores it and checks every fix, so the Monitor does no per-fix work.
+ * [revision] is the Monitor's edit time: a peer keeps only the newest revision, so a late copy never overwrites a newer one.
+ */
+@Serializable
+data class GeofenceConfig(
+    val points: List<HomePoint> = emptyList(),
+    val radiusMeters: Double = DEFAULT_RADIUS_METERS,
+    val revision: Long = 0L
+) {
+    val isActive: Boolean get() = points.isNotEmpty()
+
+    fun withPoint(point: HomePoint): GeofenceConfig = copy(points = points + point)
+
+    fun withoutPoint(index: Int): GeofenceConfig =
+        if (index in points.indices) copy(points = points.filterIndexed { i, _ -> i != index }) else this
+
+    fun withRadius(meters: Double): GeofenceConfig = copy(radiusMeters = meters.coerceIn(MIN_RADIUS_METERS, MAX_RADIUS_METERS))
+
+    fun cleared(): GeofenceConfig = copy(points = emptyList())
+
+    /** This config with a revision above [previous], at least [nowMs], so it wins even if the clock went back. */
+    fun revisedAfter(previous: GeofenceConfig, nowMs: Long): GeofenceConfig =
+        copy(revision = maxOf(nowMs, previous.revision + 1))
+
+    companion object {
+        const val DEFAULT_RADIUS_METERS = 100.0
+        const val MIN_RADIUS_METERS = 50.0
+        const val MAX_RADIUS_METERS = 500.0
+    }
+}
+
 /**
  * Master Alarming & Alert Setup Configuration (R747 Locality Authority & R872 Stealth)
  */

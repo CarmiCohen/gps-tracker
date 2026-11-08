@@ -121,7 +121,7 @@ fun alarmConditions(
     ) {
         add(AlarmType.GPS_SIGNAL_LOSS)
     }
-    if (violationType == "GEOFENCE_BREACH" || reading?.status == "GEOFENCE_BREACH") {
+    if (violationType == com.jd.core.shared.GEOFENCE_BREACH_STATUS || reading?.status == com.jd.core.shared.GEOFENCE_BREACH_STATUS) {
         add(AlarmType.GEOFENCE_BREACH)
     } else if ((reading != null && (reading.status == "JUMP" || reading.status == "OUTLIER")) || hasViolation) {
         add(AlarmType.GPS_JUMP)

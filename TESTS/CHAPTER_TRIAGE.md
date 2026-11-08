@@ -1,4 +1,4 @@
-# Chapter Triage - Nov8.10
+# Chapter Triage - Nov8.13
 
 Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`, and `TEST_FORENSIC_STRESS_PROTOCOL.md`, based on the running code and on tests executed for Nov5.2 on the A15 and updated in Nov8.10 (SIMP-NOV7.0-S1).
 
@@ -12,9 +12,9 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | **D** | The feature is not wired into the running apps, so it cannot pass; decision needed |
 | **N** | Obsolete since the app split; retirement proposed |
 
-**Summary:** 83 of 143 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
+**Summary:** 85 of 146 active chapters are verified at least in part (L or A) at Nov8.13 (83 of 144 after Nov8.11; chapters 155 and 156 added in Nov8.13). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
 
-**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapters 143 to 153 make 143 active chapters. Updated in Nov8.10 (SIMP-NOV7.0-S1): Chapter 153 added for Single Source Version Management (`VersionSourceTest`).
+**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapters 143 to 153 make 143 active chapters. Updated in Nov8.10 (SIMP-NOV7.0-S1): Chapter 153 added for Single Source Version Management (`VersionSourceTest`). Chapter 154 added in Nov8.11. Nov8.13: chapter 155 (owed by Nov8.12, which cited it without writing it, ISSUE-NOV8.13-O53) and chapter 156 (ISSUE-NOV8.13-O51) make 146 active chapters.
 
 ## Chapter 0 - Operational Forensic Audit
 | Item | Code | Notes |
@@ -24,7 +24,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 0.3 Tracker stealth | L | Sensor HUD shows no alarm or siren indicators |
 | 0.4 Back button | L | Service keeps running after Back |
 | 0.5 UI alignment | D | No scale bar on the live map; version is on the first screen only |
-| 0.6 Peer sync | L / D | `VWR` verified; geofence sync does not exist |
+| 0.6 Peer sync | L | `VWR` verified; geofence sync verified on the A15 in Nov8.13 (chapter 156.6) |
 | 0.7 Setup closure | L | `CLOSE (X)` works |
 | 0.8 ID isolation | L | Failed, fixed, and verified: no values from another device |
 | 0.9 Telemetry continuity | D | No ping, noise, or lux telemetry |
@@ -129,7 +129,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 144 Unknown telemetry values | A / T | `UnknownTelemetryTest` checks that `LocationUpdate` starts and resets at unknown speed, battery, and temperature; the `hasSpeed()` check in `SensorService` has no test |
 | 145 Alarm reach under DND and lock screen | A | Automated by `AlarmSetupPermissionTest` verifying DND Notification Policy Access and Full-Screen Intent permission intent helpers (ISSUE-NOV6.0-O23) |
 | 146 Automatic Sensor service start and stop | A / T | 146.2 and 146.3 automated by `SensorServiceStatusTest`; 146.1 automatic start and 146.4 protected stop have no test |
-| 147 Independent clean setup actions | A | Automated by `CleanSetupActionsTest` verifying clean setup maintenance actions (ISSUE-NOV7.1-O35, ISSUE-NOV6.0-O23) |
+| 147 Independent clean setup actions | A | 147.1 automated by `CleanSetupActionsTest.clearHomePointsRemovesOnlyThePoints` (Nov8.13: clears the points only, ISSUE-NOV8.13-O54). 147.2 and 147.3 tests rebuild the expected values by hand and do not call the ViewModel (ISSUE-NOV7.1-O35, ISSUE-NOV6.0-O23) |
 | 148 Local trail storage and pruning | A | Automated by `LocalTrailTest` verifying local trail entity ingestion, dual-trail separation, and 48-hour TTL pruning (ISSUE-NOV6.2-O29, ISSUE-NOV6.0-O23) |
 | 149 Unpaired tracker trail retention | A | Automated by `UnpairedTrailRetentionTest` verifying that tracker unpairing retains historical trail data in Room DB (ISSUE-NOV6.2-O30, ISSUE-NOV6.0-O23) |
 | 150 Tracking document integrity | A | 150.1 to 150.4 automated by `TrackingDocumentIntegrityTest` (ISSUE-NOV8.2-O46) |
@@ -137,6 +137,8 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 152 Async ForensicBuffer initialization | A | Automated by `SensorService` async init (ISSUE-NOV7.15-O41) |
 | 153 Single version source | A | Automated by `VersionSourceTest` (SIMP-NOV7.0-S1) |
 | 154 Trail persistence & pending identity collection | A | Automated by `TrailPersistenceIntegrityTest` (ISSUE-NOV4.3-O48, ISSUE-NOV4.3-O49) |
+| 155 Geofence breach alarm | A | 155.1 automated by `GeofenceBreachAlarmTest` (violation and telemetry status paths); 155.2 by `MonitorAlarmsTest` (ISSUE-NOV5.2-O11 Group 2) |
+| 156 Home Points geofence | L / A | 156.1 to 156.5 automated by `HomeZoneTest`, `GeofenceWireTest`, `GeofenceSyncTest`, `CleanSetupActionsTest`; 156.6 verified on the A15 through the production relay (add, radius, remove, re-send). A real `EXIT` on a moving tracker was not run (ISSUE-NOV8.13-O51) |
 
 ## TEST_FORENSIC_STRESS_PROTOCOL.md
 | Section | Code | Notes |

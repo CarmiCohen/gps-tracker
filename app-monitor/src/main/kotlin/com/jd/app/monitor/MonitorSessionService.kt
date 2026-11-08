@@ -63,6 +63,14 @@ class MonitorSessionService : Service() {
             val targetId = identityManager.targetId.first() ?: return@launch
             val selfId = identityManager.selfId.first()
             
+            // The tracker enforces the user's geofence; the Monitor only delivers it (ISSUE-NOV8.13-O51).
+            launch {
+                geofenceDeliveries(dataStore.geofence, signalingClient.viewerStatusFlow).collect { config ->
+                    val sent = signalingClient.sendGeofence(targetId, config)
+                    SystemLogger.i("MonitorService", "Geofence rev ${config.revision} (${config.points.size} points, ${config.radiusMeters.toInt()} m) sent to $targetId: $sent")
+                }
+            }
+
             // Get last sequence ID for initial backfill handshake (R-ID 768)
             val lastSeq = trailDao.getLastSequenceId(targetId) ?: 0L
 

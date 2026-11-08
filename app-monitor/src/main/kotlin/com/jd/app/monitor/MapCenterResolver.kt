@@ -6,6 +6,10 @@ data class MapPosition(val lat: Double, val lng: Double)
 fun knownPositions(trail: List<TrailEntity>): List<MapPosition> =
     trail.filter { it.lat != 0.0 || it.lng != 0.0 }.map { MapPosition(it.lat, it.lng) }
 
+/** Trail rows where the tracker reported leaving every Home Point, shown as OUT markers (ISSUE-NOV8.13-O51). */
+fun geofenceBreaches(trail: List<TrailEntity>): List<TrailEntity> =
+    trail.filter { it.status == com.jd.core.shared.GEOFENCE_BREACH_STATUS && (it.lat != 0.0 || it.lng != 0.0) }
+
 /**
  * Selects the device the map should center on, or null when no real position is known.
  * Explicit follow modes lock to their device. AUTO prefers the sensor while it is connected

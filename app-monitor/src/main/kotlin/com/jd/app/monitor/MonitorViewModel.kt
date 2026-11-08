@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.GeofenceConfig
+import com.jd.core.shared.HomePoint
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.atUiRate
@@ -95,20 +97,28 @@ class MonitorViewModel @Inject constructor(
         }
     }
 
-    /** Clears home points & geofence violation settings and acknowledges alarms (ISSUE-NOV7.1-O35). */
-    fun clearHomePointsAndGeofence() {
-        viewModelScope.launch {
-            val current = alertSettings.value
-            val cleared = current.copy(
-                distance = false,
-                jammerDetection = false,
-                tiltAlert = false,
-                liftAlert = false,
-                tamperAlert = false
-            )
-            dataStore.saveAlertSettings(cleared)
-            alarmEngine.acknowledge()
-        }
+    /** The user's Home Points and radius, enforced by the tracker (ISSUE-NOV8.13-O51). */
+    val geofence: StateFlow<GeofenceConfig> = dataStore.geofence
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GeofenceConfig())
+
+    fun addHomePoint(lat: Double, lng: Double) {
+        viewModelScope.launch { dataStore.editGeofence { it.withPoint(HomePoint(lat, lng)) } }
+    }
+
+    fun removeHomePoint(index: Int) {
+        viewModelScope.launch { dataStore.editGeofence { it.withoutPoint(index) } }
+    }
+
+    fun setGeofenceRadius(meters: Double) {
+        viewModelScope.launch { dataStore.editGeofence { it.withRadius(meters) } }
+    }
+
+    /**
+     * Removes every Home Point, which the tracker receives as an empty geofence (ISSUE-NOV7.1-O35, ISSUE-NOV8.13-O51).
+     * Alarm settings stay as they are, so Home Points added later raise breach alarms again (user decision 2026-11-08).
+     */
+    fun clearHomePoints() {
+        viewModelScope.launch { dataStore.editGeofence { it.cleared() } }
     }
 
     /** Resets operational statistics and clears stored trail history (ISSUE-NOV7.1-O35). */
@@ -127,6 +137,7 @@ class MonitorViewModel @Inject constructor(
             dataStore.saveAlertSettings(AlertSettings())
             dataStore.saveSirenType("Siren")
             dataStore.saveRelayUrl(RelayConfig.DEFAULT_URL)
+            dataStore.editGeofence { GeofenceConfig() }
             repository.clearTrail()
             _latestTelemetry.value = null
             alarmEngine.acknowledge()

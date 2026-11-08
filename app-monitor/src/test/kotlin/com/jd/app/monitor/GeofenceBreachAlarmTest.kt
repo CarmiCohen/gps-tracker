@@ -20,6 +20,8 @@ import org.junit.Test
  * Chapter 155 (ISSUE-NOV5.2-O11 Group 2): Geofence Breach Alarm Verification.
  * Verifies that when a GEOFENCE_BREACH violation event is received from the Sensor,
  * the Monitor alarm engine raises AlarmType.GEOFENCE_BREACH and sounds the siren.
+ * Chapter 156 (ISSUE-NOV8.13-O51): the relay client delivers the breach as the status of a telemetry row,
+ * so that path is verified too.
  */
 class GeofenceBreachAlarmTest {
 
@@ -62,6 +64,24 @@ class GeofenceBreachAlarmTest {
         val book = watch.awaitBook { it.needsSiren }
         assertEquals(listOf(AlarmType.GEOFENCE_BREACH), book.pending.map { it.type })
         assertTrue(book.needsSiren)
+        watch.job.cancel()
+    }
+
+    @Test
+    fun `geofence breach telemetry status raises geofence breach alarm`() = runBlocking {
+        val watch = Watch(this)
+        watch.settings.emit(AlertSettings())
+        watch.ready()
+
+        watch.telemetry.emit(
+            LocationUpdate(
+                deviceId = "T", lat = 32.003, lng = 34.0, accuracy = 5f, batteryLevel = 80, isCharging = true,
+                tempCelsius = 30f, status = com.jd.core.shared.GEOFENCE_BREACH_STATUS
+            )
+        )
+
+        val book = watch.awaitBook { it.needsSiren }
+        assertEquals(listOf(AlarmType.GEOFENCE_BREACH), book.pending.map { it.type })
         watch.job.cancel()
     }
 }

@@ -22,18 +22,19 @@ This document provides the definitive specification of all map capabilities, ren
 ---
 
 ## 3. Home-Points & Geofencing
-- **Home Points Rendering**: Displays Home Point markers on the map canvas with custom icon overlays.
-- **Add Home Point (`ADD`)**: Tapping anywhere on the map while in `ADD` mode inserts a new Home Point coordinate.
-- **Remove Home Point (`DEL`)**: Tapping an existing Home Point marker in `REMOVE` mode deletes that specific Home Point.
-- **Geofence Radius Circles**: Asynchronously calculates and renders metric boundary circles (`Polygon.pointsAsCircle`) around all active Home Points using background coroutine dispatching.
-- **Toggle Fence Visibility (`FENCE`)**: Dedicated `FENCE` toggle button allows users to show or hide geofence radius circles without deleting the underlying points.
-- **Home Points Persistence**: Serializes Home Points to `DataStore` preferences and syncs them across connected peer nodes via signaling events.
+*As built in Nov8.13 (ISSUE-NOV8.13-O51, SOT rule 1.394). The geofence is defined on the Monitor and enforced by the Sensor, so the Monitor does no per-fix work (user decision 2026-11-08, battery).*
+- **Edit Mode (`HOME`)**: The `HOME` button in the live map's control column opens the Home Point editor: a map tap adds a Home Point; tapping a Home Point asks `Remove Home Point N?` before removing it. The editor panel shows the point count, the radius, and a radius slider (50 to 500 m, steps of 10 m, default 100 m), stored once the slider is released. `DONE` or `HOME` closes it.
+- **Home Points Rendering**: Each Home Point is a green square with a green radius circle (`Polygon.pointsAsCircle`); taps inside a circle still reach the map.
+- **Home Points Persistence**: `GeofenceConfig` (points, radius, revision) in the Monitor DataStore; each edit stamps a newer revision.
+- **Delivery To The Sensor**: the Monitor sends the geofence through the relay's `settings_update` / `settings_relay` event on each edit and each time the tracker comes online (see `04_COMMUNICATION_PROTOCOL.md`). The Sensor keeps the newest revision and enforces it also while offline and after a restart.
+- **Enforcement (Sensor)**: `SentinelLogic.evaluateHomeZone` on each fix: home within the radius of any point; outside only when the fix's GPS error circle is beyond every radius; no breach on the first fix after a start or a change; `GEOFENCE_BREACH` on leaving home.
+- **Not built**: a `FENCE` toggle to hide the circles. The `ADD`/`DEL`/`FENCE` tools of the unused `MapComponents.kt` stack were never on screen (SIMP-NOV5.0-S1).
 
 ---
 
 ## 4. Violation Markers & Spatial Alerts
 - **Jump Alert Markers (`JUMP`)**: Renders distinct purple/pink markers on the map at coordinates where kinematic velocity anomalies or GPS position jumps occurred.
-- **Out-of-Range Markers (`OUT`)**: Renders bold red violation markers at exact spatial coordinates where geofence breakouts or boundary violations occurred.
+- **Out-of-Range Markers (`OUT`)**: Renders a red dot at each stored trail row with status `GEOFENCE_BREACH` (where the tracker left every Home Point), with the time as its info text (Nov8.13). The `OUT` visibility toggle below belongs to the unused stack and is not on the live map.
 - **Violation Visibility Toggles**:
   - `JUMP` Button: Toggles visibility of kinematic jump violation markers (`SetViolationsVisible`).
   - `OUT` Button: Toggles visibility of geofence breakout violation markers (`SetGeofenceViolationsVisible`).
@@ -76,3 +77,4 @@ This document provides the definitive specification of all map capabilities, ren
   - `FENCE`: Geofence circle visibility toggle.
   - `CLEAR`: One-tap trail purge and tracker re-centering.
 - **Absolute Stealth Rule (R872)**: Interactive geofence modification controls (`ADD` / `DEL`) are strictly hidden when running in Tracker mode to prevent unintended interactions or operational exposure.
+- *Nov8.13 note: the `MapToolsOverlay` panel above is not called by the running Monitor (SIMP-NOV5.0-S1). The live map's control column holds `IN`, `OUT`, `SENSOR`, `LOCAL`, and `HOME` (the Home Point editor, section 3); the Sensor has no map, so R872 holds. osmdroid's own zoom buttons are hidden.*
