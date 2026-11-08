@@ -1,8 +1,8 @@
 # Retired Test Chapters
 
-These chapters were removed from `TEST_PROCEDURE.md` because they no longer apply to the project. They are code N in `CHAPTER_TRIAGE.md`. The original wording is kept here for traceability.
+These chapters were removed from `TEST_PROCEDURE.md` because they no longer apply to the project. They were code N in the former `CHAPTER_TRIAGE.md` (merged into the `TEST_PROCEDURE.md` status lines in Nov8.102-Documentation). The original wording is kept here for traceability.
 
-Chapter numbers are not reused, so older references in `issues.md`, `test_results.md`, and baselines stay valid.
+Chapter numbers are not reused, so older references in `issues.md`, `ARCHIVE/test_results.md`, and baselines stay valid.
 
 | Chapter | Reason |
 | :--- | :--- |

@@ -2,12 +2,12 @@
 
 *Working file: open work only. Resolved issues are described once, in `STATUS/RESOLUTION_ARCHIVE.md`. The text this file held up to Nov8.14 (done Work Queue rows, Resolved Gaps Nov4.32 to Nov8.14, resolved gap texts) is in tag Nov8.14: `git show Nov8.14:DOCS/issues.md`. Older dashboard rows are in the Dashboard History at the end of the archive (Documentation Rule D2).*
 
-## 🎯 Next Resumption Focus: Work Queue after Nov8.101-Tooling, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov8.102-Documentation, solved one by one in the order below
 
 ### Work Queue
 Take one item at a time, and display it before fixing it (Rule 1). Row numbers are kept from earlier versions.
 
-**Next item: the user runs the Nov8.101-Tooling Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md`. Then SIMP-NOV8.100-S2 (item 50), which cuts the token cost of the work after it; then ISSUE-NOV5.2-O11 Group 4 (Microphone) or Group 5 (Lift), both decided "Build" and not built (item 8, High). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
+**Next item: the user runs the Nov8.102-Documentation Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md`. Then ISSUE-NOV5.2-O11 Group 4 (Microphone) or Group 5 (Lift), both decided "Build" and not built (item 8, High). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -18,7 +18,6 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 | 46 | ISSUE-NOV8.13-O56 | Every Sensor starts with the ID `T`, so two default Sensors share one relay room and receive each other's geofence and backfill requests | A decision: generate a unique Sensor ID, or require one at setup |
 | 47 | ISSUE-NOV8.13-O57 | `--warning-mode all` shows Gradle 9 deprecations ("Mutating the dependencies of configuration ... after it has been resolved") in every module | Find the build logic that mutates resolved configurations |
 | 48 | ISSUE-NOV8.14-O58 | The SOT shows rules 1.1 to 1.334 only as the placeholder `... (Rules 1.1 to 1.334 preserved)` | Trace the rules in git history and restore them, or record where they live |
-| 50 | SIMP-NOV8.100-S2 | Documentation cleanup: freeze the SOT baseline and verification-chapter lists (archive is their home); merge `CHAPTER_TRIAGE.md` codes into `TEST_PROCEDURE.md`; move stale files (`DOCS/Handover.md`, `TESTS/TESTS.md`, `test_results.md`, `VERIFICATION_MANIFEST.md`, `QA_VALIDATION_STATUS.md`) to an archive folder after checking each | Nothing; agreed 2026-11-08 |
 | 51 | ISSUE-NOV8.101-O59 | A Sensor started before its first screen connects as `PENDING_IDENTITY` | Generate the ID where it is read |
 
 ---
@@ -45,7 +44,7 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
   - **Group 6 (Remote Siren)**: Not required / Retire.
   - **Group 7 (Extra Sensors & Hardening)**: Extra sensors TBD; Advanced device hardening not required / Retire.
   - **Group 8 (Advanced Export & Map Tools)**: Not required / Retire.
-- **ISSUE-NOV5.0-O4 (Medium) - Test coverage gap, reduced in Nov5.2**: every chapter now has a status in `TESTS/CHAPTER_TRIAGE.md`. Still outstanding are the chapters needing a person (H) or the S21FE or a second viewer (S). `ProductionReadinessAuditTest` holds three math checks only; `TESTS/device_audit.cmd` now performs the real Davey and StackLog audit. Earlier "100% passing" entries covered unit tests only.
+- **ISSUE-NOV5.0-O4 (Medium) - Test coverage gap, reduced in Nov5.2**: every chapter now has a `**Status:**` line under its heading in `TESTS/TEST_PROCEDURE.md`. Still outstanding are the chapters needing a person (H) or the S21FE or a second viewer (S). `ProductionReadinessAuditTest` holds three math checks only; `TESTS/device_audit.cmd` now performs the real Davey and StackLog audit. Earlier "100% passing" entries covered unit tests only.
 - **ISSUE-NOV6.0-O26 (Medium) - The Sensor has never been run below API 35**: `minSdk` is 26, but the A15 runs API 36 and the only emulator image is API 36.1. ISSUE-NOV6.0-O25 was fixed by inspecting the compiled class, so neither the original crash nor the fix was observed on an older version. Gradle builds do not run lint on `core-shared`, so only `ForensicBufferApiLevelTest` guards this, and only for `ForensicBuffer`. Needs a device or an API 34 emulator image (chapter 121.6). **User decision, 2026-11-06: do not download an image below API 35 yet; keep this issue open as a reminder.**
 - **ISSUE-NOV8.13-O55 (Medium) - The Monitor's first frame misses the 500 ms limit**: Nov8.13 device audit on the A15: right after install, Monitor 2 Davey frames (711 and 783 ms, `Skipped 58 frames`, `Displayed +1.58s`); after a force stop, again 2 (744 and 774 ms, `+1.64s`). About 600 ms of the first frame is spent before drawing (`PerformTraversalsStart` to `DrawStart`). The Nov8.11 build in a separate worktree gave the same result (705/768 ms, 748/782 ms), so Nov8.13 did not cause it. This is the Monitor half of ISSUE-NOV7.15-O41, which Nov8.7 fixed for the Sensor only (earlier Monitor audits: 924/825 ms in Nov7.17, 834 ms in Nov7.19, 0 in Nov7.21). Likely suspects: the osmdroid `MapView` created in composition, and the first collection of several flows. Needs a Perfetto trace of the Monitor start. Sensor: 0 Davey.
 - **ISSUE-NOV5.4-O19 (Low) - Uncommitted changes in the nested repository**: `before splitting/gps-tracker` has uncommitted changes to `Handover.md`, `issues.md`, `STATUS/RESOLUTION_ARCHIVE.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, `TESTS/test_results.md`, and `relay-server`. **User decision, 2026-11-07: the folder is a frozen archive; nobody edits it, and its document changes stay uncommitted as they are.** The `relay-server/index.js` edit is already in the live `relay-server` (v6.044), so the user agreed to discard it by running `git restore index.js` there; after that, this issue is closed.
@@ -64,6 +63,7 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 ---
 
 ## 🚀 Strategic Simplification Ideas
+*   **SIMP-NOV8.102-S1**: Archive The Remaining Oct Test Files. `TESTS/handoverTesting.md` (an Oct17.11 handover), `TESTS/MAP_sot.md`, and `TESTS/Alarms.md` (Oct requirement lists) were last changed on 2026-11-01 and nothing refers to them. Check whether any requirement in the last two is missing from the SOT (relevant to ISSUE-NOV5.2-O11 Groups 4 and 5), then move all three to `ARCHIVE/`.
 *   **SIMP-NOV8.13-S1**: One Geofence Check. `SentinelLogic.evaluateGeofenceTransition` and `SentinelLogic.Geofence` (one fence, no accuracy) are now used only by `SentinelLogicTest`, `GeofenceIntegrityTest`, and `GeofenceForensicTest`; the apps use `evaluateHomeZone`. Moving those tests to `evaluateHomeZone` would leave one geofence rule.
 *   **SIMP-NOV8.13-S2**: One Violation Path. The Sensor sends each violation twice: as the status of a critical telemetry row and as a `violation_event`. The relay forwards the second as `violation_relay`, but `SocketioSignalingClient` has no listener, so `violationFlow` never emits and the Monitor alarms on the telemetry status alone. Either listen for `violation_relay` or remove `sendViolation`, `violationFlow`, and the relay handler.
 *   **SIMP-NOV7.21-S1**: One Fix Freshness Rule. The Sensor stops sending a fix after 15 s (`FIX_STALE_AFTER_MS`), while its own HUD keeps showing that fix with a growing age and drops its speed only after 35 s (`SPEED_VALID_MS` in `FixReading.kt`). One freshness rule in `core-ui`, used by `SensorService`, the Sensor HUD, and `SensorFixStore`, would keep the Sensor's screen and its telemetry from disagreeing. With it, `ForensicBuffer.writeTrace` could read `update.isCritical` itself and drop its separate `isCritical` parameter.
@@ -85,9 +85,9 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 
 ## 📊 Hardening Progress Dashboard
 *The newest rows only (at most 6); older rows are in the Dashboard History of `STATUS/RESOLUTION_ARCHIVE.md`. From Nov8.100-Documentation, Open and Ideas are counted from the lists in this file; earlier figures used a count that cannot be traced.*
+- **Nov8.102-Documentation: [SOT Count: 972 (Rules: 472), Open: H:1, M:3, L:9, Ideas: H:0, M:0, L:17, Testing: PASSED (Sub-items: 299), QA: 90]**
 - **Nov8.101-Tooling: [SOT Count: 971 (Rules: 471), Open: H:1, M:3, L:9, Ideas: H:0, M:0, L:16, Testing: PASSED (Sub-items: 296), QA: 88]**
 - **Nov8.100-Documentation: [SOT Count: 970 (Rules: 470), Open: H:1, M:3, L:8, Ideas: H:0, M:0, L:16, Testing: PASSED (Sub-items: 336), QA: 87]**
 - **Nov8.14: [SOT Count: 969 (Rules: 469), Open: H:1, M:2, L:15, Ideas: H:0, M:3, L:15, Testing: PASSED (Sub-items: 334), QA: 86]**
 - **Nov8.13: [SOT Count: 968 (Rules: 468), Open: H:1, M:3, L:15, Ideas: H:0, M:3, L:15, Testing: PASSED (Sub-items: 331), QA: 85]**
 - **Nov8.12: [SOT Count: 967 (Rules: 467), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 323), QA: 83]**
-- **Nov8.11: [SOT Count: 966 (Rules: 466), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 322), QA: 82]**

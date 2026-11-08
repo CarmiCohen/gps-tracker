@@ -5,6 +5,7 @@
 ---
 
 ## 0.1 Logcat Anomaly Monitoring
+**Status: L** - Now checked by `TESTS/device_audit.cmd`
 *   **Action:** Deploy the app and filter Logcat for `StackLog`, `Davey`, or `Exception`.
 *   **Verification:** 
     1. **Steady-State Enforcement**: Confirm zero `StackLog` leaks during steady-state operation. 
@@ -12,10 +13,12 @@
     3. Monitor for `Davey` events > 500ms during active 50Hz sensor bursts post-startup.
 
 ## 0.2 Event Log Continuity
+**Status: D** - No stay-alive pulse; the trail pruning worker is scheduled since Nov6.2
 *   **Action:** Observe "Stay-alive pulse" and "PRUNING" signatures in Logcat.
 *   **Verification:** Confirm pulses trigger every 30s. Confirm maintenance tasks execute without blocking the main thread.
 
 ## 0.3 Tracker Stealth & Authority Audit (Issue #Oct20.31-F1)
+**Status: L** - Sensor HUD shows no alarm or siren indicators
 *   **Action:** Deploy the app in Tracker Mode and inspect the UI, HUD, and Settings.
 *   **Verification:** **STEALTH BALANCE (Updated Oct21.06)**. 
     1. Confirm HUD contains NO **ALM** badge or **ALARM** indicators.
@@ -26,10 +29,12 @@
     6. Tracker must remain a pure telemetry provider; all logic/alarm authority resides exclusively on the Viewer.
 
 ## 0.4 Back Button Lifecycle (Issue #1424)
+**Status: L** - Service keeps running after Back
 *   **Action:** Tap the system "Return/Back" button while on the Viewer or Tracker screen.
 *   **Verification:** Confirm the app DOES NOT close or cease operations. It should either stay on the current screen (if it's the root) or navigate back correctly without process termination.
 
 ## 0.5 UI Alignment & Occlusion Audit (Issue #1425, #1426, #OCT20.33-F2)
+**Status: D** - No scale bar on the live map; version is on the first screen only
 *   **Action:** Inspect the Viewer UI in various orientations.
 *   **Verification:** 
     1. **Version Position**: Confirm the version string (e.g., `Oct28.23`) is at the absolute bottom-start edge and does NOT overlap with the Map Scale bar (R-ID 603).
@@ -38,6 +43,7 @@
     4. **Debug Suppression**: Confirm `UI_READY` label is suppressed in PLATINUM builds (R-ID 610).
 
 ## 0.6 Peer Sync & Connectivity Audit (Issue #ISSUE-OCT21.05-F2)
+**Status: L** - `VWR` verified; geofence sync verified on the A15 in Nov8.13 (chapter 156.6)
 *   **Action:** Connect a Viewer and a Tracker. 
 *   **Verification:** 
     1. **VWR Badge Consistency (R-ID 605)**: Confirm the **VWR** badge on the Tracker turns Green/Cyan within 10s of the Viewer starting. Red on Tracker while Green on Viewer is a failure (Asymmetry).
@@ -45,18 +51,21 @@
     3. **Manual Geofence Sync**: Confirm that adding/removing a point on the Viewer propagates to the Tracker map within 5 seconds.
 
 ## 0.7 Setup Closure & Exit Authority (Issue #ISSUE-OCT22.0-F2)
+**Status: L** - `CLOSE (X)` works
 *   **Action:** Open Setup. Attempt to close via UI button (X). If missing or failing, use system Back button.
 *   **Verification:** 
     1. UI Button (X) must exist and successfully close the overlay.
     2. System Back button must close the overlay ONLY and NOT cause the entire application to exit.
 
 ## 0.8 ID Isolation & Asymmetry Audit (Issue #ISSUE-OCT22.0-F3)
+**Status: L** - Failed, fixed, and verified: no values from another device
 *   **Action:** Configure mismatched IDs (e.g., Viewer: T2/V2 vs Tracker: T/V).
 *   **Verification:** 
     1. **Strict Isolation**: Viewer TRK badge must remain RED. Tracker VWR badge must remain RED.
     2. **Telemetry Suppression**: The Info screen must NOT show active/green values when no authorized connection exists.
 
 ## 0.9 Factory Default & Telemetry Continuity Audit (Issue #ISSUE-OCT22.0-F4)
+**Status: D** - No ping, noise, or lux telemetry
 *   **Action:** Load Factory Defaults on both units. Observe telemetry flow.
 *   **Verification:**
     1. **Ping Integrity**: Ping values must be visible on both devices' info pages once connected.

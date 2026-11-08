@@ -3,7 +3,9 @@
 # Figures: Rules = the SOT "Architectural Master Rules (N Rules)" header; SOT Count = 500 + Rules (the series since Oct28);
 #          Open = gaps in "### 2. Open Gaps" of DOCS/issues.md by (High)/(Medium)/(Low); Ideas = SIMP-* lines, by (High)/(Medium), else Low;
 #          Sub-items = numbered sub-items ("*   **N.M") in TESTS/TEST_PROCEDURE.md (from Nov8.101-Tooling; earlier values were hand counts);
-#          QA = the verified-chapter count of the "**Summary:** N of M" line in TESTS/CHAPTER_TRIAGE.md.
+#          QA = chapters of TESTS/TEST_PROCEDURE.md whose "**Status: <codes>**" line, right under the heading, includes L or A
+#          (from Nov8.102-Documentation, SIMP-NOV8.100-S2; earlier values came from the hand-written CHAPTER_TRIAGE.md summary).
+#          A chapter without a status line stops the script.
 param(
     [Parameter(Mandatory = $true)][string]$Version,
     [string]$Testing = "PASSED"
@@ -17,8 +19,18 @@ function First-Number([string[]]$lines, [string]$pattern, [string]$what) {
 }
 
 $rules = First-Number (Read-Doc "STATUS/SOT_MASTER_REQUIREMENTS.md") 'Architectural Master Rules \((\d+) Rules\)' "SOT rule-count header"
-$qa = First-Number (Read-Doc "TESTS/CHAPTER_TRIAGE.md") '^\*\*Summary:\*\* (\d+) of \d+' "Triage summary line"
-$subItems = @(Read-Doc "TESTS/TEST_PROCEDURE.md" | Where-Object { $_ -match '^\s*\*\s+\*\*\d+\.\d+' }).Count
+$procedure = @(Read-Doc "TESTS/TEST_PROCEDURE.md")
+$subItems = @($procedure | Where-Object { $_ -match '^\s*\*\s+\*\*\d+\.\d+' }).Count
+$qa = 0; $missing = @()
+for ($i = 0; $i -lt $procedure.Count; $i++) {
+    if ($procedure[$i] -match '^## Chapter (\d+) ' -and [int]$Matches[1] -gt 0) {
+        $chapter = $Matches[1]
+        if ($i + 1 -lt $procedure.Count -and $procedure[$i + 1] -match '^\*\*Status: ([LATHSDN](?: / [LATHSDN])*)\*\*') {
+            if ($Matches[1] -match '[LA]') { $qa++ }
+        } else { $missing += $chapter }
+    }
+}
+if ($missing.Count -gt 0) { throw "TEST_PROCEDURE.md chapters without a status line: $($missing -join ', ')" }
 
 $issues = Read-Doc "DOCS/issues.md"
 function Get-Section([string[]]$lines, [string]$startPattern) {

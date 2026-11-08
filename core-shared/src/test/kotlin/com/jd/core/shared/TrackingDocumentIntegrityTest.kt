@@ -13,7 +13,9 @@ import kotlin.test.assertTrue
  * so each resolved version must still be recorded in the archive, the SOT baseline, and a dashboard row, and the
  * oldest entries must survive. Since Nov8.100-Documentation the archive is the single home of resolved issues
  * (Documentation Rule D1), `issues.md` is a working file (D2), and `Handover.md` is short (D3); this test holds
- * those limits. The documents are declared as inputs of `:core-shared:test`, so editing one re-runs it.
+ * those limits. Since Nov8.102-Documentation (SIMP-NOV8.100-S2, chapter 160) the SOT baseline is frozen at
+ * Nov8.101-Tooling: it must hold every version up to then and nothing newer. The documents are declared as inputs of
+ * `:core-shared:test`, so editing one re-runs it.
  */
 class TrackingDocumentIntegrityTest {
 
@@ -46,7 +48,8 @@ class TrackingDocumentIntegrityTest {
     fun everyResolvedVersionIsRecordedInEveryTrackingDocument() {
         val archived = archivedVersions(archive)
         val sotBaseline = sotBaselineVersions(sot)
-        assertEquals(emptyList(), archived.filterNot { it in sotBaseline }, "versions missing from the SOT Core Hardening Baseline")
+        assertEquals(emptyList(), archived.filter { it <= SOT_FROZEN_AT }.filterNot { it in sotBaseline }, "versions missing from the SOT Core Hardening Baseline")
+        assertEquals(emptyList(), sotBaseline.filter { it > SOT_FROZEN_AT }, "the SOT Core Hardening Baseline is frozen at Nov8.101; record newer versions in the archive only (SIMP-NOV8.100-S2)")
 
         val dashboard = dashboardRows(issues) + dashboardRows(archive, ARCHIVE_DASHBOARD)
         assertEquals(emptyList(), archived.filterNot { v -> dashboard.any { v in it } }, "versions missing from the dashboard of issues.md and the archive's Dashboard History")
@@ -81,6 +84,15 @@ class TrackingDocumentIntegrityTest {
     }
 
     @Test
+    fun theFrozenSotBaselineRejectsANewerEntryAndIgnoresRuleText() {
+        val sotText = "*   **1.398 x**: the Core Hardening Baseline is frozen.\n- **Nov9.0**: in a rule, not the list\n" +
+            "## 🛡️ Core Hardening Baseline\n- **Nov8.102-Documentation**: x\n- **Nov8.101-Tooling**: x\n"
+        val baseline = sotBaselineVersions(sotText)
+        assertEquals(listOf(Version(8, 102), Version(8, 101)), baseline)
+        assertEquals(listOf(Version(8, 102)), baseline.filter { it > SOT_FROZEN_AT })
+    }
+
+    @Test
     fun versionNamesWithASuffixAreRead() {
         assertEquals(listOf(Version(8, 100)), archivedVersions("## ✅ Resolved Issues (Nov8.100-Documentation)\n"))
         assertEquals(listOf(Version(8, 100)), sotBaselineVersions("## 🛡️ Core Hardening Baseline\n- **Nov8.100-Documentation**: x\n"))
@@ -106,6 +118,7 @@ class TrackingDocumentIntegrityTest {
         const val MAX_DASHBOARD_ROWS = 6
         const val MAX_ISSUES_CHARS = 40_000
         const val MAX_HANDOVER_LINES = 70
+        val SOT_FROZEN_AT = Version(8, 101)
         const val NAME = """Nov(\d+)\.(\d+)(?:-[A-Za-z]\w*)?"""
         const val ISSUES_DASHBOARD = "Hardening Progress Dashboard"
         const val ARCHIVE_DASHBOARD = "Dashboard History"
@@ -122,7 +135,8 @@ class TrackingDocumentIntegrityTest {
     private fun archivedVersions(text: String) = versionsOf(text, Regex("""^## .*Resolved Issues \($NAME\)"""))
 
     private fun sotBaselineVersions(text: String) =
-        versionsOf(text.substringAfter("Core Hardening Baseline", missingDelimiterValue = "").substringBefore("\n## "), Regex("""^- \*\*$NAME\*\*"""))
+        // Match the heading line itself: SOT rules mention these words in their text (rule 1.398).
+        versionsOf(text.substringAfter("## 🛡️ Core Hardening Baseline", missingDelimiterValue = "").substringBefore("\n## "), Regex("""^- \*\*$NAME\*\*"""))
 
     /** Rows under the heading [title]: "Hardening Progress Dashboard" in issues.md, "Dashboard History" in the archive. */
     private fun dashboardRows(text: String, title: String = ISSUES_DASHBOARD): List<ClosedRange<Version>> {

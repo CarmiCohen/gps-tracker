@@ -11,6 +11,7 @@ This protocol contains high-load, destructive, and race-condition validation ste
 ---
 
 ## 1. High-Frequency IMU Rendering (JNI Drift Audit)
+**Status: D** - No burst control; no JNI layer
 *   **Goal**: Detect 8-byte boundary alignment drift in the JNI bridge.
 *   **Action**: 
     1. Open **Settings** -> **Diagnostics**.
@@ -22,6 +23,7 @@ This protocol contains high-load, destructive, and race-condition validation ste
 *   **Relates to**: #ISSUE-OCT16.9-F2 (JNI Buffer NaNG Regression).
 
 ## 2. Database Pressure & Pruning Stress
+**Status: D** - No pressure test control or export; trail pruning is scheduled since Nov6.2
 *   **Goal**: Verify atomic integrity of the `LogRepository` under saturation.
 *   **Action**: 
     1. Trigger the **100Hz Log Pressure Test** via Diagnostics.
@@ -31,6 +33,7 @@ This protocol contains high-load, destructive, and race-condition validation ste
     *   **Integrity**: The exported `.json` must remain valid and contain no corrupted entries.
 
 ## 3. Forensic Injection & Marker Latching
+**Status: D** - No injection button or markers
 *   **Goal**: Verify that software-injected violations (Jammer/Stall) are correctly geo-anchored.
 *   **Action**: 
     1. Tap the pink **TRIGGER FORENSIC STRESS TEST** button.
@@ -40,6 +43,7 @@ This protocol contains high-load, destructive, and race-condition validation ste
     *   Confirm `JAMMER SUSPICION` and `GPS STALL` markers persist with correct timestamps and the *last known* valid GPS coordinates.
 
 ## 4. UI Saturation & Rapid Orientation
+**Status: L / D** - Rotation verified; no 100Hz stream control
 *   **Goal**: Verify `UiStateMapper` and `SnapshotStateList` stability under layout stress.
 *   **Action**: 
     1. Enable **100Hz Telemetry Stream**.
@@ -49,6 +53,7 @@ This protocol contains high-load, destructive, and race-condition validation ste
     *   Confirm HUD ribbons and Map markers do not "flicker" or disappear during transitions.
 
 ## 5. GNSS Zombie / Temporal Saturation
+**Status: H** - Needs shielding and a clock change
 *   **Goal**: Verify Kalman filter stability when timestamps are erratic.
 *   **Action**: 
     1. Place device in a shielded box for 30s.

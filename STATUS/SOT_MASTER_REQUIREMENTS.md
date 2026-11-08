@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov8.101-Tooling)
+# SOT Master Requirements & Hardening Status (Nov8.102-Documentation)
 
-## 🏗️ Architectural Master Rules (471 Rules)
+## 🏗️ Architectural Master Rules (472 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -61,8 +61,10 @@
 *   **1.395 Git Tags Are The Baselines (R-ID 166)**: The baseline of each version MUST be its git tag, listed with its commit in `STATUS/BASELINE/INDEX.md` (newest first; the version being closed as `pending` until tagged). Documents MUST NOT be copied into baseline folders; the old copies stay frozen. `BaselineIndexTest` MUST pass (ISSUE-NOV8.5-O47, SIMP-NOV8.5-S1) (R-ID 166).
 *   **1.396 Lean Documentation Workflow (R-ID 167)**: The project documents MUST follow Documentation Rules D1 to D7 of `DEVELOPER_GUIDELINES.md`: one home per fact (`RESOLUTION_ARCHIVE.md`), `issues.md` as a working file (no Resolved Gaps, at most 6 dashboard rows, at most 40,000 characters), a `Handover.md` of at most 70 lines, git tags as baselines, the 10-step Completion Sequence, `chat_session.md` as a milestone log, and targeted reads. `TrackingDocumentIntegrityTest` and `BaselineIndexTest` MUST pass (user decision 2026-11-08) (R-ID 167).
 *   **1.397 Debug-Only Test Commands And One-Line Tooling (R-ID 168)**: adb test commands (Sensor ID, pairing, Home Points, state) MUST exist only in debug builds (`src/debug` receivers guarded by the `DUMP` permission), MUST be parsed strictly by `DebugCommand` with each app accepting only its own actions, and MUST answer with one `REV_DEBUG_CMD` logcat line. Device checks prefer these lines or a text-only `uiautomator` dump over screenshots; `TESTS/run_tests.ps1`, `device_check.ps1`, and `audit_line.ps1` print one summary line each (SIMP-NOV8.100-S1) (R-ID 168).
+*   **1.398 One Home For Chapter Status, Frozen SOT Lists (R-ID 169)**: Each `TEST_PROCEDURE.md` chapter MUST carry its status as one `**Status: <codes>** - <notes>` line right under its heading (codes L, A, T, H, S, D, N); there is no separate triage file, and `audit_line.ps1` MUST compute QA from these lines and stop when one is missing. The Core Hardening Baseline and Verification Chapters lists below are frozen at Nov8.101-Tooling: newer versions are recorded only in `RESOLUTION_ARCHIVE.md`, and `TrackingDocumentIntegrityTest` MUST reject a newer entry. Stale documents live in `ARCHIVE/` (SIMP-NOV8.100-S2) (R-ID 169).
 
 ## 🛡️ Core Hardening Baseline
+*Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*
 - **Nov8.101-Tooling**: Debug-only adb test commands and one-line test tooling (SIMP-NOV8.100-S1) - PASSED.
 - **Nov8.100-Documentation**: Lean Documentation Workflow (Documentation Rules D1 to D7) - PASSED.
 - **Nov8.14**: Git Tags Are The Baselines (ISSUE-NOV8.5-O47) and Nov8.12 Release Integrity (ISSUE-NOV8.13-O53) - PASSED.
@@ -125,6 +127,7 @@
 - **Nov4.22-addHUD**: Post-Revolution HUD Integration & LED Status Verification (GAP-REVOL52.0-G1) - PASSED.
 
 ## ✅ Verification Chapters
+*Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later audits are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*
 *   **Chapter 5.103 (Nov8.101-Tooling Audit)**: PASSED - see `RESOLUTION_ARCHIVE.md` (Nov8.101-Tooling); test chapter 159.
 *   **Chapter 5.102 (Nov8.100-Documentation Audit)**: PASSED - see `RESOLUTION_ARCHIVE.md` (Nov8.100-Documentation); test chapter 158.
 *   **Chapter 5.101 (Nov8.14 Audit)**: PASSED - `BaselineIndexTest` 5/5 with a deliberate break detected; all unit tests passing; no app code changed. Details in `RESOLUTION_ARCHIVE.md` (Nov8.14).
