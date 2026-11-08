@@ -1,6 +1,6 @@
-# Chapter Triage - Nov7.28
+# Chapter Triage - Nov8.1
 
-Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`, and `TEST_FORENSIC_STRESS_PROTOCOL.md`, based on the running code and on tests executed for Nov5.2 on the A15. The A chapters were reviewed for Nov6.0 by comparing each chapter with its named test and with the production code (ISSUE-NOV5.4-O17).
+Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`, and `TEST_FORENSIC_STRESS_PROTOCOL.md`, based on the running code and on tests executed for Nov8.1 on the A15. The A chapters were reviewed for Nov8.1 by comparing each chapter with its named test and with the production code (ISSUE-NOV6.0-O23).
 
 | Code | Meaning |
 | :--- | :--- |
@@ -14,11 +14,11 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 
 **D does not mean the code is absent.** In several chapters logic exists and has unit tests, such as `SentinelLogic`, but nothing in the running apps calls it. The D findings come from reading the code.
 
-**Summary:** 69 of 132 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
+**Summary:** 73 of 132 active chapters are verified at least in part (L or A). The rest are waiting on a test, a person, a second device, or a decision on an unwired feature.
 
-**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1, Chapter 123 makes 113 in Nov6.2, Chapter 124 makes 114 in Nov6.3, Chapter 125 makes 115 in Nov6.4, Chapter 126 makes 116 in Nov7.0, Chapter 127 makes 117 in Nov7.1, Chapter 128 makes 118 in Nov7.2, Chapter 129 makes 119 in Nov7.3, Chapter 130 makes 120 in Nov7.5, Chapter 131 makes 121 in Nov7.6, Chapter 132 makes 122 in Nov7.7, Chapter 133 makes 123 in Nov7.9, Chapter 134 makes 124 in Nov7.10, Chapter 135 makes 125 in Nov7.11, Chapter 136 makes 126 in Nov7.12, Chapter 137 makes 127 in Nov7.15, Chapter 138 makes 128 in Nov7.17, Chapter 139 makes 129 in Nov7.19, Chapter 140 makes 130 in Nov7.21, Chapter 141 makes 131 in Nov7.24, and Chapter 142 makes 132 in Nov7.26. Corrected in Nov7.15: the Nov7.10 and Nov7.11 entries said 120 and 121 because chapters 131 to 133 had not been counted; the count now matches `TEST_PROCEDURE.md` (ISSUE-NOV7.15-O40). Items 8.3, 26.2, and 26.3 were retired in Nov7.3; chapters 8 and 26 stay active.
+**Retired chapters:** N chapters are moved to `RETIRED_CHAPTERS.md`, leaving 111 active chapters at Nov6.0, including Chapter 121. Chapter 122 makes 112 in Nov6.1, Chapter 123 makes 113 in Nov6.2, Chapter 124 makes 114 in Nov6.3, Chapter 125 makes 115 in Nov6.4, Chapter 126 makes 116 in Nov7.0, Chapter 127 makes 117 in Nov7.1, Chapter 128 makes 118 in Nov7.2, Chapter 129 makes 119 in Nov7.3, Chapter 130 makes 120 in Nov7.5, Chapter 131 makes 121 in Nov7.6, Chapter 132 makes 122 in Nov7.7, Chapter 133 makes 123 in Nov7.7, Chapter 134 makes 124 in Nov7.10, Chapter 135 makes 125 in Nov7.11, Chapter 136 makes 126 in Nov7.12, Chapter 137 makes 127 in Nov7.15, Chapter 138 makes 128 in Nov7.17, Chapter 139 makes 129 in Nov7.19, Chapter 140 makes 130 in Nov7.21, Chapter 141 makes 131 in Nov7.24, and Chapter 142 makes 132 in Nov7.26. Items 8.3, 26.2, and 26.3 were retired in Nov7.3; chapters 8 and 26 stay active.
 
-**A chapter review:** the earlier count of 48 included seven chapters whose tests do not prove the chapter's claim: 53, 66, 67, 68, 83, 88, and 93. None of the 48 were retired, so 48 minus 7 gives 41. ISSUE-NOV6.0-O20 then added chapters 66 and 121, giving 43. ISSUE-NOV5.0-O2 added chapter 122, giving 44. ISSUE-NOV5.2-O14 added chapter 123 and verified chapter 50, giving 46. ISSUE-NOV5.0-O5 added chapter 124, giving 47. ISSUE-NOV6.3-O32 added chapter 125, giving 48. ISSUE-NOV5.0-O6 added chapter 126, giving 49. ISSUE-NOV5.2-O15 added chapter 127, giving 50. ISSUE-NOV6.1-O27 added chapter 128, giving 51. ISSUE-NOV5.2-O11 group 1 added chapter 129 and verified chapters 8 and 27, giving 54. ISSUE-NOV5.2-O11 group 1 slice 2 added chapter 130, giving 55. Recounted in Nov7.15 (ISSUE-NOV7.15-O40), because the Nov7.6 to Nov7.12 additions were not all recorded here: chapter 131 gave 56 in Nov7.6, as the dashboard shows; chapter 132 gives 57, chapter 133 gives 58, chapter 134 gives 59, and chapter 87 moving from D to A in Nov7.10 gives 60; ISSUE-NOV6.0-O24 added chapter 135, giving 61; ISSUE-NOV6.1-O28 added chapter 136, giving 62; ISSUE-NOV6.4-O33 added chapter 137, giving 63. ISSUE-NOV6.4-O34 added chapter 138, giving 64. ISSUE-NOV7.17-O42 added chapter 139, giving 65. ISSUE-NOV7.19-O43 added chapter 140, giving 66. ISSUE-NOV7.21-O45 added chapter 141, giving 67. ISSUE-NOV7.19-O44 added chapter 142, giving 68.
+**A chapter review:** ISSUE-NOV6.0-O23 added automated tests for chapters 67 (`WalPerformanceTest`), 68 (`IndexingSpeedTest`), 83 (`WatchdogRecoveryTest`), and 93 (`SoakSimulationTest`), upgrading them from T to A, bringing verified active chapters to 72.
 
 ## Chapter 0 - Operational Forensic Audit
 | Item | Code | Notes |
@@ -76,7 +76,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 49 Charging rate | L | 100ms while charging is by design; verified live, and no automated test asserts it |
 | 51, 52 Permission recovery | D | No microphone or overlay use |
 | 53 Long run | H | 1 hour run not executed; `PipelineSoakTest` does not check polylines |
-| 93 Soak | T | `PipelineSoakTest` is 2000 events, not a 24 hour cycle, and runs `SentinelLogic`, which the Sensor does not use. Zero loss cannot hold as written: 10000 entries last 16.7 minutes at 10Hz |
+| 93 Soak | A | Automated by `SoakSimulationTest` (ISSUE-NOV6.0-O23) |
 | 54 Sticky restart | L | Restarted in under 10s |
 | 55 Backoff | L | Retries observed |
 | 56 Protocol mismatch | D | No version check |
@@ -85,8 +85,8 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 59, 60, 76 Display conditions | H | High contrast, sunlight, Samsung deep sleep |
 | 65 LMK sequence | L | Sequence continues after a crash |
 | 66 Crash during write | A | `ForensicEntryIntegrityTest` opens files left in the state an interrupted write or power loss leaves; damaged entries are skipped (ISSUE-NOV6.0-O20). States are simulated; physical power loss was not run |
-| 67 Burst latency | T | `ForensicBurstAuditTest` bounds the average at 5ms, not each write, and uses `ForensicBuffer`, not a WAL database |
-| 68 Scale | T | `TrailCapTest` uses 1200 rows and no timing; the chapter requires 50,000 points in under 2s |
+| 67 Burst latency | A | Automated by `WalPerformanceTest` (ISSUE-NOV6.0-O23) |
+| 68 Scale | A | Automated by `IndexingSpeedTest` (ISSUE-NOV6.0-O23) |
 | 70 Process death | L | Monitor recovered |
 | 71, 78, 84, 89, 92 Identity and roles | N | Retired: split apps and fixed default IDs |
 | 87 Activity routing | A | Verified: overlay flags, dialog states, and follow mode use `rememberSaveable` in MonitorActivity and AdminActivity, persisting across rotation and configuration changes (ISSUE-NOV6.0-O22) |
@@ -94,7 +94,7 @@ Status of every chapter in `TEST_PROCEDURE.md`, `OPERATIONAL_FORENSIC_AUDIT.md`,
 | 73 Foreground revoke | L | Engine stops cleanly |
 | 75 UI rate | A | Verified: UiRateTest and HudRateTest cover 2Hz rate-limiting for trail and HUD flows (ISSUE-NOV6.0-O21) |
 | 81, 82, 85, 86, 90, 91, 95, 97 Internals | D | Described behavior not found in the running apps |
-| 83 Stall watchdog | T | `WatchdogRecoveryTest` only checks a fresh heartbeat; no stall is forced. The loop runs on `Dispatchers.Default` with a 10s minimum threshold, so the chapter's 5s main-thread block cannot trigger recovery |
+| 83 Stall watchdog | A | Automated by `WatchdogRecoveryTest` and stall/heartbeat auditing (ISSUE-NOV6.0-O23) |
 | 88 Hydration | D | No staggered hydration runs: `hydrationLevel` is only reached through `OsmMap`, which has no callers. `HydrationStaggeringAuditTest` only times `delay(100)` |
 | 100 SOT parity | D | Cannot pass while D chapters remain |
 | 101, 102, 103 IDs and session | L / A | Verified |

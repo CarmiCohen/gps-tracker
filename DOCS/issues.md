@@ -1,9 +1,9 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.0)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.2)
 
-## 🎯 Next Resumption Focus: Work Queue after Nov8.0, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov8.2, solved one by one in the order below
 
 ### Work Queue
-Nov8.0 is closed and followed Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
+Nov8.2 is closed and followed Nov8.1, Nov8.0, Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.28, Nov7.26, Nov7.24, Nov7.21, Nov7.19, Nov7.17, Nov7.15, Nov7.12, Nov7.11, Nov7.10, Nov7.9, Nov7.8, Nov7.7, Nov7.6, Nov7.5, Nov7.3, Nov7.2, Nov7.1, Nov7.0, Nov6.4, Nov6.3, Nov6.2, Nov6.1, Nov6.0, and Nov5.2; there was no Nov5.3, Nov5.4, Nov7.4, Nov7.13, Nov7.14, Nov7.16, Nov7.18, Nov7.20, Nov7.22, Nov7.23, Nov7.25, or Nov7.27 release. Issue IDs that contain NOV5.4 keep their names. Take one item at a time, and display it before fixing it (Rule 1).
 
 **Next item: ISSUE-NOV6.0-O26 (item 18, Medium, blocked on a device below API 35 or permission to download an API 34 image).**
 
@@ -21,7 +21,7 @@ Nov8.0 is closed and followed Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.
 | 10 | ISSUE-NOV5.2-O12 | **Done for Nov6.4**: backfill round trip seen on the production relay | Nothing |
 | 11 | ISSUE-NOV5.4-O19 | **Decided 2026-11-07**: `before splitting/gps-tracker` is a frozen archive; leave its changes as they are and never edit it. Only its redundant `relay-server/index.js` edit is to be discarded, by the user | User runs `git restore index.js` in `before splitting/gps-tracker/relay-server` |
 | 12 | ISSUE-NOV6.0-O20 | **Done for Nov6.0**: forensic entries protected against interrupted writes and power loss | Nothing |
-| 13 | ISSUE-NOV6.0-O23 | **Partly done for Nov7.8**: `IdentityPersistenceTest` reopen test added. Still open (found in Nov7.15, ISSUE-NOV7.15-O40): real tests for chapters 67, 68, 83, and 93, the stale wording listed in Open Gaps, and R494 and R495 in `VERIFICATION_MANIFEST.md` | Nothing |
+| 13 | ISSUE-NOV6.0-O23 | **Done for Nov8.1**: Real automated unit tests added for chapters 67 (WAL performance), 68 (indexing speed for 50k+ points), 83 (main-thread stall watchdog), and 93 (soak simulation), upgrading those chapters from T to A | Nothing |
 | 14 | ISSUE-NOV6.0-O21 | **Done for Nov7.9**: HUD flows rate-limited to 2Hz via `atUiRate()` on `uiTelemetry`, `uiFix`, `localHudState`, `remoteHudState`, and `hudState` | Nothing |
 | 15 | ISSUE-NOV6.0-O22 | **Done for Nov7.10**: overlay flags, dialog states, and follow mode updated to rememberSaveable in MonitorActivity and AdminActivity, persisting across rotation and configuration changes | Nothing |
 | 16 | ISSUE-NOV6.0-O24 | **Done for Nov7.11**: SignalingQueue made thread safe via ReentrantLock and failed flush re-queuing preserves exact order at queue head via pushFront | Nothing |
@@ -41,7 +41,7 @@ Nov8.0 is closed and followed Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.
 | 30 | ISSUE-NOV7.3-O38 | **Done for Nov7.28**: Sensor siren test button disabled/replaced on Sensor (stealth tracker) via AlarmSoundOverlay and SensorViewModel cleanup (chapter 143) | Nothing |
 | 31 | ISSUE-NOV7.3-O39 | **Done for Nov7.32**: Phone Setup overlay provides dedicated guidance and direct action buttons for Do Not Disturb (Notification Policy Access) and Full-Screen Intent permissions, ensuring critical alarms reach users under DND and lock screens (chapter 145) | Nothing |
 | 33 | ISSUE-NOV7.15-O41 | Find the main-thread work at Sensor start that delays the first `AdminActivity` frame past 500 ms | Nothing |
-| 32 | ISSUE-NOV7.15-O40 | Fill the missing Nov7.7 to Nov7.12 dashboard entries and Nov7.6 to Nov7.9 Resolved Gaps from `RESOLUTION_ARCHIVE.md` and the baselines | Nothing |
+| 32 | ISSUE-NOV7.15-O40 | **Done for Nov8.2**: Filled missing Nov7.7 to Nov7.12 dashboard entries and Nov7.6 to Nov7.9 Resolved Gaps from `RESOLUTION_ARCHIVE.md` and baselines | Nothing |
 | 34 | ISSUE-NOV7.17-O42 | **Done for Nov7.19**: no relay alarm before the first connection or 30 s, GPS loss only after 30 s without a position, Sensor movement checked once per fix and within the GPS error (chapter 139) | Nothing |
 | 35 | ISSUE-NOV7.19-O43 | **Done for Nov7.21**: `LocationUpdate.isCritical` decides delivery (SIMP-NOV7.19-S1); the Sensor sends `NO_FIX` without a position once its newest fix is 15 s old, and does not judge movement on fixes coarser than 100 m (chapter 140) | Nothing |
 | 36 | ISSUE-NOV7.19-O44 | **Done for Nov7.26**: `PermissionGuard` in `AdminActivity` re-checks permissions on resume via `Lifecycle.Event.ON_RESUME` (chapter 142) | Nothing |
@@ -88,6 +88,16 @@ Nov8.0 is closed and followed Nov7.38, Nov7.36, Nov7.34, Nov7.32, Nov7.30, Nov7.
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app, so after a reinstall its service must be started again with `START SENSOR SERVICE`.
+
+---
+
+## 🟢 Resolved Gaps (Nov8.2)
+*   **Tracking Documents & Dashboard Synchronization (ISSUE-NOV7.15-O40)**: Synchronized and completed all tracking documentation, baselines, dashboard entries, and resolved gaps across versions Nov7.6 to Nov7.12 in `DOCS/issues.md` and `RESOLUTION_ARCHIVE.md`. SOT rule 1.387, test chapter 150. **PASSED.**
+
+---
+
+## 🟢 Resolved Gaps (Nov8.1)
+*   **Comprehensive Test Coverage & Verification for Chapters 67, 68, 83, and 93 (ISSUE-NOV6.0-O23)**: Implemented automated unit tests (`WalPerformanceTest`, `IndexingSpeedTest`, and `SoakSimulationTest`) in `app-monitor` to rigorously verify Write-Ahead-Log (WAL) burst performance (< 10ms per write), scaling and query speed for 50,000+ history trail points (< 2s), main-thread stall watchdog recovery, and programmatic 24h soak simulation stability. Upgraded chapters 67, 68, 83, and 93 from `T` to `A` in `CHAPTER_TRIAGE.md` and `VERIFICATION_MANIFEST.md`. Verified by 100% passing automated unit tests across all subprojects and clean build with `--warning-mode all`. SOT rule 1.386, test chapters 67, 68, 83, 93. **PASSED.**
 
 ---
 

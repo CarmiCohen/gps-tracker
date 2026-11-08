@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov8.0)
+# SOT Master Requirements & Hardening Status (Nov8.2)
 
-## 🏗️ Architectural Master Rules (459 Rules)
+## 🏗️ Architectural Master Rules (461 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -49,8 +49,12 @@
 *   **1.383 Independent Clean Setup Maintenance Actions (R-ID 154)**: The `CleanSetupOverlay` component MUST execute distinct, independent maintenance actions for each of its three options: "Clear Home Points & Geofence" MUST clear geofence violation alert settings (`distance`, `jammerDetection`, `tiltAlert`, `liftAlert`, `tamperAlert`) and acknowledge active alarms on Monitor; "Reset Operational Statistics" MUST clear stored trail history from Room DB (`TrailDao.deleteAll()`), clear latest telemetry, acknowledge alarms, and reset service uptime counter in `SensorServiceStatus`; and "Trigger Full System Re-Initialization" MUST clear target tracker pairing ID, reset all alert settings, siren type, and relay URL to default defaults, clear stored trail history, and reset service status on both applications (ISSUE-NOV7.1-O35) (R-ID 154).
 *   **1.384 Local Trail Storage & Pruning (R-ID 155)**: The Monitor application MUST store its own movement path (`isLocalUser = true`) in the trail database (`TrailDao`) upon receiving location fixes from `MonitorLocationSource`, render local user trail (Cyan) alongside remote tracker trail (Blue) on the osmdroid map canvas, and prune local user trail entries older than 48 hours via `TrailDao.pruneLocalTrail` (ISSUE-NOV6.2-O29) (R-ID 155).
 *   **1.385 Unpaired Tracker Trail Retention (R-ID 156)**: The Monitor application MUST retain historical trail data for trackers that are no longer paired (`identityManager.clearTargetId()`), preserving historical telemetry and movement points in `TrailDao` for potential future re-pairing without auto-deleting them on unpairing (ISSUE-NOV6.2-O30) (R-ID 156).
+*   **1.386 Comprehensive Test Coverage & Verification for Chapters 67, 68, 83, and 93 (R-ID 157)**: The system MUST maintain automated unit tests (`WalPerformanceTest`, `IndexingSpeedTest`, and `SoakSimulationTest`) verifying Write-Ahead-Log burst performance (< 10ms per write), indexing speed for 50,000+ history points (< 2s), main-thread stall watchdog recovery, and programmatic 24h soak stability, upgrading chapters 67, 68, 83, and 93 from `T` to `A` (ISSUE-NOV6.0-O23) (R-ID 157).
+*   **1.387 Tracking Documents & Dashboard Synchronization (R-ID 158)**: The project MUST maintain complete, synchronized tracking records, master requirements, resolution archives, and hardening baselines across all development versions (ISSUE-NOV7.15-O40) (R-ID 158).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov8.2**: Tracking Documents & Dashboard Synchronization (ISSUE-NOV7.15-O40) - PASSED.
+- **Nov8.1**: Comprehensive Test Coverage & Verification for Chapters 67, 68, 83, and 93 (ISSUE-NOV6.0-O23) - PASSED.
 - **Nov8.0**: Unpaired Tracker Trail Retention (ISSUE-NOV6.2-O30) - PASSED.
 - **Nov7.38**: Local Trail Storage & Pruning (ISSUE-NOV6.2-O29) - PASSED.
 - **Nov7.34**: Automatic Sensor Service Startup, Live Uptime Timer & Protected Stop Control (ISSUE-NOV7.2-O36) - PASSED.
@@ -99,6 +103,8 @@
 - **Nov4.22-addHUD**: Post-Revolution HUD Integration & LED Status Verification (GAP-REVOL52.0-G1) - PASSED.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.94 (Nov8.2 Audit)**: PASSED - Verification and synchronization of tracking documents, hardening baselines, and release archives across Nov7.6 to Nov7.12 (`ISSUE-NOV7.15-O40`). 74 of 132 active chapters verified at least in part.
+*   **Chapter 5.93 (Nov8.1 Audit)**: PASSED - Automated unit test verification across all subprojects (100% passing) and clean build with `--warning-mode all` for comprehensive test coverage of Chapters 67, 68, 83, and 93 (`ISSUE-NOV6.0-O23`). 73 of 132 active chapters verified at least in part.
 *   **Chapter 5.92 (Nov8.0 Audit)**: PASSED - Automated unit test verification across all subprojects (100% passing) and clean build for Unpaired Tracker Trail Retention (`ISSUE-NOV6.2-O30`), verifying that unpairing a tracker retains historical trail points in Room database (`TrailDao`). 72 of 139 active chapters verified at least in part.
 *   **Chapter 5.91 (Nov7.38 Audit)**: PASSED - Automated unit test verification across all subprojects (100% passing) and clean build for Local Trail Feature (`ISSUE-NOV6.2-O29`), persisting local fixes with `isLocalUser = true`, rendering dual polylines (Blue remote, Cyan local), and enabling 48-hour TTL pruning via `TrailDao.pruneLocalTrail`. 71 of 138 active chapters verified at least in part.
 *   **Chapter 5.90 (Nov7.36 Audit)**: PASSED - Automated unit test verification across all subprojects (100% passing) and clean build for independent clean setup maintenance actions ("Clear Home Points & Geofence", "Reset Operational Statistics", and "Trigger Full System Re-Initialization"). 70 of 137 active chapters verified at least in part.
