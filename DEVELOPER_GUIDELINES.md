@@ -20,7 +20,7 @@ The following rules **MUST** be followed strictly for every task:
     *   Use `replace_text` for targeted updates in large files to prevent truncation.
     *   Never use summaries or placeholders when using `write_file`.
     *   **Git Hygiene**: Ensure no temporary files (`*.tmp`, `chat_session.md`) are committed to the repository.
-9.  **Archival Integrity**: Ensure that all archived rules, historical baselines, and sunset requirements are explicitly preserved in their respective archive files. Pruning active files MUST NOT result in the loss of historical forensic data.
+9.  **Archival Integrity**: Ensure that all archived rules, historical baselines, and sunset requirements are explicitly preserved in their respective archive files. Pruning active files MUST NOT result in the loss of historical forensic data. The baseline of a version is its git tag, listed in `STATUS/BASELINE/INDEX.md`; the old copies in the `STATUS/BASELINE/<version>/` folders are frozen and are never edited or deleted (ISSUE-NOV8.5-O47).
 10. **Completion Adherence**: Execute the **Completion Sequence** in strict order after finishing an issue.
 11. **Interruption Protocol**: If the session must be terminated before an issue is resolved, execute the **Interruption Sequence** immediately.
 12. **Strict Termination**: Once a termination sequence is finished, do not implement anything else. **STOP ALL PROCESSING.**
@@ -39,7 +39,7 @@ Perform these steps in strict sequence once an issue is resolved:
 2.  **Forensic Audit**: Run the forensic audit suite (`ProductionReadinessAuditTest`) and verify zero Davey events > 500ms and zero StackLog leaks on target hardware (A15).
 3.  **State Tracking Update**: Synchronize `issues.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, and `STATUS/RESOLUTION_ARCHIVE.md`. Ensure all resolved issues are assigned correct version IDs.
 4.  **Dashboard Synchronization**: Update the **Hardening Progress Dashboard** in `issues.md` with the latest **Audit Baseline** entry, prefixed with the current **Version Name** (e.g., `Oct28.26`).
-5.  **App Build & Versioning**: Rebuild the application (including `platinum` and `release` variants) and increment the `versionName` in `app/build.gradle`.
+5.  **App Build & Versioning**: Rebuild the application (including `platinum` and `release` variants) and increment `appVersionName` and `appVersionCode` in `gradle.properties`, the single version source (SIMP-NOV7.0-S1).
 6.  **Simplicity Audit**: Evaluate potential architectural simplifications. Document these in the "Strategic Simplification Ideas" section of `issues.md`.
 7.  **Forensic Integrity Check (Rule 8)**: Rigorously verify all modified `.md` and `.xml` files. **Rigorously verify that all version titles and headers (e.g., in Handover.md, issues.md, SOT_MASTER_REQUIREMENTS.md) match the version being closed.**
 8.  **Audit Recalculation**: Display final metrics in the format:  
@@ -49,7 +49,7 @@ Perform these steps in strict sequence once an issue is resolved:
     *   **Git Release Block**: Generate a Git command block at the **very top**. The commit message **MUST BE EXHAUSTIVE** and summarize **ALL** issues resolved in this version (consult `RESOLUTION_ARCHIVE.md`). **Issue IDs from any `chat_session.md` MUST be included.**
     *   **Release Integrity (CRITICAL)**: The Git block **MUST** include `git tag [Version Name]` and `git push origin main --tags` to ensure the version is anchored in the repository history. **Each command (add, commit, tag, push) MUST be on a separate line (do not use && for concatenation).**
     *   **Resumption Focus**: Update `## 🎯 Next Resumption Focus`.
-10. **Baseline Synchronization (R-ID 744)**: Create the directory `STATUS/BASELINE/[Version Name]/` and copy all final forensic documents (`issues.md`, `Handover.md`, `SOT_MASTER_REQUIREMENTS.md`, `RESOLUTION_ARCHIVE.md`) into it.
+10. **Baseline Index (R-ID 744)**: Add the row `| [Version Name] | pending | |` at the top of the table in `STATUS/BASELINE/INDEX.md`. Do not copy documents: the git tag of the Git block is the baseline (ISSUE-NOV8.5-O47). `BaselineIndexTest` must pass.
 11. **Resumption Verification**: If the session was resumed from a `chat_session.md`, verify that all "Planned Remediation" tasks identified in that export are fully addressed and documented.
 12. **Cleanup**: Remove `chat_session.md` from the project root.
 13. **Final Git Command Block Preparation**: Prepare a single, ready-to-use Git command block for the user. This block **MUST** include all necessary commands in sequence: `git add .`, `git commit -m "[Exhaustive Message]"`, `git tag [Version Name]`, and `git push origin main --tags`. 
@@ -86,3 +86,5 @@ Perform these steps when starting a session if `chat_session.md` exists:
 2.  **State Verification**: Verify if the `Planned Remediation` steps in the export were already partially implemented.
 3.  **Issue Validation**: Ensure the `## 🎯 Next Resumption Focus` in `issues.md` aligns with the export.
 4.  **Traceability Hook**: Reference the specific Issue ID from the export in the first action performed.
+
+At the start of every session, also: if the top row of `STATUS/BASELINE/INDEX.md` says `pending` and its tag now exists, replace `pending` with `git rev-parse --short=7 <tag>^{commit}`; if the tag does not exist, the previous Git block was not run, so tell the user before doing anything else.

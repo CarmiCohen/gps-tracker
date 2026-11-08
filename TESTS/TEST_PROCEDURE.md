@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov8.13 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov8.14 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -601,8 +601,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **156.5 OUT Markers:** Verify that trail rows with status `GEOFENCE_BREACH` and a position are the OUT markers. Automated by `GeofenceSyncTest.out markers are the breach rows with a position`.
 *   **156.6 On Device (A15, 2026-11-08, production relay):** With the A15 Sensor on a temporary ID and the A15 Monitor paired to it: `HOME` opens the editor; a map tap adds a Home Point (green square, radius circle) and the Sensor logs `REV_Geofence: Received 1 home points ... (stored: true)` within 0.4 s; the radius slider sends once on release (350 m); tapping a Home Point asks `Remove Home Point 1?` and removal arrives as 0 points; a restart re-sends the same revision, which the Sensor does not store again; no crash and no false breach. A real `EXIT` needs the tracker to move and is covered by 156.1 only.
 
+## Chapter 157 - Baseline Index (Nov8.14)
+*   **157.1 Complete Index:** Verify that every version in `RESOLUTION_ARCHIVE.md` and the dashboard has a row in `STATUS/BASELINE/INDEX.md`, rows are unique, and the newest comes first. Automated by `BaselineIndexTest` (ISSUE-NOV8.5-O47).
+*   **157.2 Tags Match:** Verify that each tagged row's commit equals `git rev-parse --short=7 <tag>^{commit}` and that rows marked `No tag` have no tag. Automated by `BaselineIndexTest.everyTagPointsAtTheIndexedCommit` and `aMovedOrMissingTagIsDetected`; deliberate break: the old Nov8.11 hash failed.
+*   **157.3 Pending Row:** Verify that only the newest row may say `pending`, and only until its tag exists. Automated by `BaselineIndexTest.onlyTheNewestRowMayBePendingAndOnlyUntilItIsTagged`.
+
 ---
-**Active Testing Chapters: 146 of 156**
+**Active Testing Chapters: 147 of 157**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
