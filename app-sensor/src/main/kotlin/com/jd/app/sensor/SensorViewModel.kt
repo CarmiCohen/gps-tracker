@@ -41,6 +41,9 @@ class SensorViewModel @Inject constructor(
     /** What the noise detection is doing, reported by [SensorService] (ISSUE-NOV5.2-O11 Group 4). */
     val microphoneState: StateFlow<MicrophoneState> = serviceStatus.microphone
 
+    /** Whether tilt and lift are armed, reported by [SensorService] (ISSUE-NOV5.2-O11 Group 5). */
+    val motionState: StateFlow<MotionState> = serviceStatus.motion
+
     private val _ticker = flow {
         while (true) {
             emit(System.currentTimeMillis())

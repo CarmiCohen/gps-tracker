@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov8.103-Microphone - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov9.0-LiftTilt - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -140,7 +140,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **27.2 High Temp:** Trigger thermal event; verify `High Temp` alert.
 
 ## Chapter 28 - Advanced Tamper Escalation
-**Status: D** - Sensor violations are never sent or received
+**Status: A / D** - Lift built in Nov9.0-LiftTilt (20 cm by accelerometer, 0.8 m by barometer): `MotionSentinelTest`, `MotionAlarmTest`; a real pickup is chapter 162.4. Shock and proximity are not built (`Tamper / Vibration Sensor` switch, ISSUE-NOV5.2-O11 Group 7)
 *   **28.1 Shock & Lift:** Simulate >0.8G shock or >0.8m lift. Verify triggers.
 *   **28.2 Proximity:** Trigger proximity breach; verify alert.
 
@@ -202,7 +202,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **42.1 Orientation Audit:** Rotate to Landscape; verify HUD ribbons do not overlap map controls.
 
 ## Chapter 43 - Barometric Lift Precision (R76)
-**Status: D** - Only accelerometer and gravity are registered
+**Status: A / S** - Barometric lift built in Nov9.0-LiftTilt and automated in `MotionSentinelTest` (1 m in 5 s alerts; weather drift and a door slam do not); needs a phone with a barometer (the A15 has none)
 *   **43.1 Lift Verification:** Raise device 1m rapidly; verify `LIFT_ALERT` triggers before GPS.
 
 ## Chapter 44 - Magnetometer & Compass Interference (R87)
@@ -783,8 +783,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **161.3 Only The Sensor Listens:** Verify that `app-monitor` has no microphone class or permission and the Sensor declares `RECORD_AUDIO` and the `microphone` service type (`MonitorMicrophoneGuardTest`), and on the A15 that a denied permission shows `Microphone: Audio Denied` and granting it through `GRANT MICROPHONE` shows `Microphone: Listening` with the service holding the microphone type (`dumpsys activity services com.jd.app.sensor`).
 *   **161.4 Real Noise:** With the Sensor listening in a quiet room for 5 s, clap or knock next to the phone once. Verify `REV_SensorService: Acoustic alert` on the Sensor and `Tracker noise detected` with the siren on the paired Monitor.
 
+## Chapter 162 - Sensor Tilt And Lift Alarms (Nov9.0-LiftTilt)
+**Status: A / L / H** - 162.1 to 162.3 automated and on the A15; 162.4 needs a person next to the A15, not run (ISSUE-NOV5.2-O11 Group 5, SOT 1.400)
+*   **162.1 Detection:** Verify arming after 30 s of rest; a tilt over the slider's angle (15° at 0.5, 5° at 1.0) for 0.5 s alerts once and one under it does not; a 32 cm pickup is a lift and a 9.6 cm rise, a knock, or a sideways shove are not; one alert per disturbance, re-armed at the new place after the next rest; barometric 1 m alerts while weather drift and a door slam do not; the gravity estimate gives a real vibration value without a gravity sensor. Automated by `MotionSentinelTest`.
+*   **162.2 Monitor Alarms:** Verify that `TILT_ALERT` and `LIFT_ALERT` raise `Tracker tilted` and `Tracker lifted` (not a GPS jump), that `Tilt Angle Detection Sensor`, `Lift / Height Change Sensor`, and Global Mute silence them, and that a lift violation event raises the alarm too. Automated by `MotionAlarmTest`.
+*   **162.3 Arming On The A15:** Start the Sensor and leave the A15 lying still. Verify `REV_Motion` reports the sensors (A15: no gravity sensor, no barometer), `Tilt and lift armed` 30 s later, the screen line `Tilt & Lift: Armed (accelerometer)`, the debug `STATE` answer `motionArmed=true`, and no tilt or lift alert over 5 minutes at rest.
+*   **162.4 Real Tilt And Pickup:** With the A15 armed, tip it on its side; verify `Tracker tilted` on the Monitor. Let it rest 30 s on the table again, then pick it up about 30 cm without turning it much; verify `Tracker lifted`.
+
 ---
-**Active Testing Chapters: 151 of 161**
+**Active Testing Chapters: 152 of 162**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

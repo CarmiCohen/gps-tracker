@@ -118,6 +118,12 @@ const val GEOFENCE_BREACH_STATUS = "GEOFENCE_BREACH"
 /** Telemetry status and violation type the Sensor sends when its microphone hears a sudden loud noise (ISSUE-NOV5.2-O11 Group 4). */
 const val ACOUSTIC_ALERT_STATUS = "ACOUSTIC_ALERT"
 
+/** Telemetry status and violation type the Sensor sends when the resting tracker is tilted (ISSUE-NOV5.2-O11 Group 5). */
+const val TILT_ALERT_STATUS = "TILT_ALERT"
+
+/** Telemetry status and violation type the Sensor sends when the resting tracker is lifted (ISSUE-NOV5.2-O11 Group 5). */
+const val LIFT_ALERT_STATUS = "LIFT_ALERT"
+
 /** A user-defined Home Point; the tracker is home while it is within the geofence radius of any one of them. */
 @Serializable
 data class HomePoint(val lat: Double, val lng: Double)

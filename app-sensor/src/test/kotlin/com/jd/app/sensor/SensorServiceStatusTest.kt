@@ -80,6 +80,22 @@ class SensorServiceStatusTest {
         assertEquals("Microphone: Open the Sensor app to start listening", microphoneStatusText(MicrophoneState.NEEDS_APP_OPEN))
     }
 
+    /** Chapter 162 (ISSUE-NOV5.2-O11 Group 5): the tilt and lift line. */
+    @Test
+    fun motionLineShowsArmedStateAndSensorsAndIsOffWhenStopped() {
+        val status = SensorServiceStatus()
+        assertEquals("Tilt & Lift: Off", motionStatusText(status.motion.value))
+
+        status.setMotion(MotionState(isRunning = true))
+        assertEquals("Tilt & Lift: Arms after the phone rests 30 s", motionStatusText(status.motion.value))
+        status.setMotion(MotionState(isRunning = true, isArmed = true))
+        assertEquals("Tilt & Lift: Armed (accelerometer)", motionStatusText(status.motion.value))
+        assertEquals("Tilt & Lift: Armed (accelerometer + barometer)", motionStatusText(MotionState(true, true, true)))
+
+        status.markStopped()
+        assertEquals(MotionState(), status.motion.value)
+    }
+
     @Test
     fun microphoneIsAskedForButNotRequired() {
         assertEquals(android.Manifest.permission.RECORD_AUDIO, OPTIONAL_MICROPHONE_PERMISSION)

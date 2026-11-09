@@ -29,6 +29,7 @@ class DebugCommandReceiver : BroadcastReceiver() {
     interface Deps {
         fun identityManager(): ForensicIdentityManager
         fun dataStore(): SensorDataStore
+        fun serviceStatus(): SensorServiceStatus
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -53,6 +54,10 @@ class DebugCommandReceiver : BroadcastReceiver() {
             is DebugCommand.Rejected -> return "REJECTED ${command.reason}"
             else -> Unit
         }
-        return "OK $command self=${identity.selfId.first()} relay=${RelayConfig.resolve(deps.dataStore().relayUrl.first())}"
+        val status = deps.serviceStatus()
+        val motion = status.motion.value
+        // Microphone and motion states let a remote check confirm the Sensor listens and is armed (Nov9.0-LiftTilt).
+        return "OK $command self=${identity.selfId.first()} relay=${RelayConfig.resolve(deps.dataStore().relayUrl.first())}" +
+            " mic=${status.microphone.value} motionArmed=${motion.isArmed} barometer=${motion.hasBarometer}"
     }
 }

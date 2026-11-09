@@ -72,6 +72,7 @@ class AdminActivity : ComponentActivity() {
                 val isServiceRunning by viewModel.isServiceRunning.collectAsStateWithLifecycle()
                 val serviceUptimeText by viewModel.serviceUptimeText.collectAsStateWithLifecycle()
                 val microphoneState by viewModel.microphoneState.collectAsStateWithLifecycle()
+                val motionState by viewModel.motionState.collectAsStateWithLifecycle()
                 val logs by SystemLogger.logs.collectAsStateWithLifecycle()
                 val scope = rememberCoroutineScope()
                 val context = LocalContext.current
@@ -210,6 +211,7 @@ class AdminActivity : ComponentActivity() {
                                     isServiceRunning = isServiceRunning,
                                     serviceUptimeText = serviceUptimeText,
                                     microphoneState = microphoneState,
+                                    motionState = motionState,
                                     trackerId = trackerId,
                                     relayUrl = relayUrl,
                                     logs = logs,
@@ -504,6 +506,7 @@ fun SensorAdminConsole(
     isServiceRunning: Boolean,
     serviceUptimeText: String,
     microphoneState: MicrophoneState,
+    motionState: MotionState,
     trackerId: String,
     relayUrl: String,
     logs: List<SystemLogger.LogEntry>, 
@@ -618,6 +621,11 @@ fun SensorAdminConsole(
                     Text("GRANT MICROPHONE")
                 }
             }
+            Text(
+                text = motionStatusText(motionState),
+                fontSize = 12.sp,
+                color = if (motionState.isArmed) Color(0xFF10B981) else Color(0xFFF59E0B)
+            )
 
             Card(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -725,6 +733,7 @@ fun SensorAdminConsole(
                     Text(serviceStatusText(isServiceRunning, serviceUptimeText))
                     Text(relayStatusText(hudState.isRelayConnected))
                     Text(microphoneStatusText(microphoneState))
+                    Text(motionStatusText(motionState))
                 }
             },
             confirmButton = {

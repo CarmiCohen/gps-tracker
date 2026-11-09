@@ -17,6 +17,9 @@ import com.jd.core.shared.AlertSettings
  * Revived Alarming & Alert Setup Overlays (R747 Locality Authority & R872 Stealth)
  */
 
+/** Shown on the Monitor instead of the tilt slider: the Sensor detects tilt with its own (ISSUE-NOV5.2-O11 Group 5). */
+const val TILT_SENSITIVITY_ON_SENSOR_NOTE = "The tilt angle is set on the Sensor (Tilt Sensitivity Threshold)"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlertManagementOverlay(
@@ -187,11 +190,17 @@ fun AlertManagementOverlay(
             AlarmToggle("Tilt Angle Detection Sensor", draftAlertSettings.tiltAlert) {
                 onUpdateAlertSettings(draftAlertSettings.copy(tiltAlert = it))
             }
-            if (draftAlertSettings.tiltAlert) {
+            // The Sensor detects tilt with its own slider (user decision, 2026-11-09); the Monitor's switch only gates the alarm.
+            if (isTracker) {
                 SensitivitySlider(
                     label = "Tilt Sensitivity Threshold",
                     value = draftAlertSettings.tiltSensitivity,
                     onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(tiltSensitivity = it)) }
+                )
+            } else if (draftAlertSettings.tiltAlert) {
+                Text(
+                    TILT_SENSITIVITY_ON_SENSOR_NOTE,
+                    color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
                 )
             }
 

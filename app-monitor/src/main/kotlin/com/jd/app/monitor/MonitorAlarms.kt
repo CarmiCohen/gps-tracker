@@ -45,7 +45,9 @@ enum class AlarmType(val title: String) {
     GPS_SIGNAL_LOSS("Tracker GPS signal loss"),
     GPS_JUMP("Tracker GPS jump"),
     GEOFENCE_BREACH("Geofence boundary breach"),
-    ACOUSTIC_ALERT("Tracker noise detected")
+    ACOUSTIC_ALERT("Tracker noise detected"),
+    TILT_ALERT("Tracker tilted"),
+    LIFT_ALERT("Tracker lifted")
 }
 
 fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) {
@@ -59,6 +61,8 @@ fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) 
     AlarmType.GPS_JUMP -> jammerDetection
     AlarmType.GEOFENCE_BREACH -> distance
     AlarmType.ACOUSTIC_ALERT -> acousticAlert // "Acoustic / Microphone Noise Sensor"; the Sensor listens either way.
+    AlarmType.TILT_ALERT -> tiltAlert // "Tilt Angle Detection Sensor"; the angle is set on the Sensor.
+    AlarmType.LIFT_ALERT -> liftAlert // "Lift / Height Change Sensor"
 }
 
 /** The newest telemetry from the paired tracker. [receivedAtMs] is Monitor time, so the clocks of the two phones never meet. */
@@ -125,9 +129,8 @@ fun alarmConditions(
     }
     // The Sensor sends each violation twice: as a violation event and as the status of its telemetry row.
     val flagged = setOfNotNull(violationType, reading?.status)
-    if (com.jd.core.shared.GEOFENCE_BREACH_STATUS in flagged) add(AlarmType.GEOFENCE_BREACH)
-    if (com.jd.core.shared.ACOUSTIC_ALERT_STATUS in flagged) add(AlarmType.ACOUSTIC_ALERT)
-    val isOtherViolation = hasViolation && violationType !in NON_GPS_VIOLATIONS
+    flagged.mapNotNullTo(this) { SENSOR_VIOLATION_ALARMS[it] }
+    val isOtherViolation = hasViolation && violationType !in SENSOR_VIOLATION_ALARMS
     if ("JUMP" in flagged || "OUTLIER" in flagged || isOtherViolation) add(AlarmType.GPS_JUMP)
     if (reading == null) return@buildSet
     if (!reading.isCharging) add(AlarmType.POWER_DISCONNECTED)
@@ -138,7 +141,12 @@ fun alarmConditions(
 }
 
 /** Violation types with an alarm of their own; any other violation is a GPS jump. */
-private val NON_GPS_VIOLATIONS = setOf(com.jd.core.shared.GEOFENCE_BREACH_STATUS, com.jd.core.shared.ACOUSTIC_ALERT_STATUS)
+private val SENSOR_VIOLATION_ALARMS = mapOf(
+    com.jd.core.shared.GEOFENCE_BREACH_STATUS to AlarmType.GEOFENCE_BREACH,
+    com.jd.core.shared.ACOUSTIC_ALERT_STATUS to AlarmType.ACOUSTIC_ALERT,
+    com.jd.core.shared.TILT_ALERT_STATUS to AlarmType.TILT_ALERT,
+    com.jd.core.shared.LIFT_ALERT_STATUS to AlarmType.LIFT_ALERT
+)
 
 /** One raised alarm. [isActive] is false once its condition has cleared. */
 data class Alarm(

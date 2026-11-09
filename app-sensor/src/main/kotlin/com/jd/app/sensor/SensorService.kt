@@ -16,6 +16,8 @@ import android.hardware.SensorManager
 import android.location.Location
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
@@ -63,9 +65,16 @@ class SensorService : Service(), SensorEventListener {
     private val movementCheck = MovementCheck()
     private var isReportingNoFix = false // Sensing loop only; logs each change between a current fix and NO_FIX.
 
-    // Raw IMU caches
+    // Raw IMU caches, written on the motion sensor thread.
     private var lastAccel = DoubleArray(3)
     private var lastGravity = DoubleArray(3)
+    // Tilt and lift of the resting tracker (ISSUE-NOV5.2-O11 Group 5); its gravity estimate also replaces the gravity
+    // sensor that phones like the A15 lack, whose vibration value was always 0 before Nov9.0.
+    private val motionSentinel = MotionSentinel()
+    private var motionThread: HandlerThread? = null
+    private var hasGravitySensor = false
+    private var hasBarometer = false
+    private var publishedMotionArmed: Boolean? = null // Motion sensor thread only.
     
     // Adaptive Sampling & Throttling State
     private var currentIntervalMs = 1000L
@@ -80,8 +89,8 @@ class SensorService : Service(), SensorEventListener {
     @Volatile private var geofence = GeofenceConfig() // Written by the geofence collector, read by the sensing loop.
     private var geofenceState = SentinelLogic.GeofenceState.UNKNOWN // Sensing loop only.
     @Volatile private var geofenceChanged = false
-    // Set by the audio thread, sent by the next sensing tick with the current position (ISSUE-NOV5.2-O11 Group 4).
-    @Volatile private var pendingAcousticAlert: String? = null
+    // Noise, tilt, and lift found on their own threads, each sent by a following sensing tick with the current position.
+    private val pendingAlerts = java.util.concurrent.ConcurrentLinkedQueue<PendingAlert>()
     private val acousticMonitor = AcousticMonitor(
         onAlert = { level, floor -> onAcousticAlert(level, floor) },
         onState = { serviceStatus.setMicrophone(it) }
@@ -161,6 +170,7 @@ class SensorService : Service(), SensorEventListener {
         acquireWakeLock()
         setupBackfillListener()
         setupGeofenceListener()
+        watchTiltSensitivity()
         registerSensors()
         startLocationUpdates()
         connectSignaling()
@@ -295,22 +305,45 @@ class SensorService : Service(), SensorEventListener {
         ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
     private fun onAcousticAlert(levelDbfs: Double, floorDbfs: Double) {
-        pendingAcousticAlert = "level ${levelDbfs.toInt()} dBFS, background ${floorDbfs.toInt()} dBFS"
+        queueAlert(ACOUSTIC_ALERT_STATUS, "Acoustic alert: level ${levelDbfs.toInt()} dBFS, background ${floorDbfs.toInt()} dBFS")
+    }
+
+    private fun queueAlert(status: String, logLine: String) {
+        pendingAlerts.add(PendingAlert(status, logLine))
         orchestrator.preemptLoop("sensing_loop") // Sent now, not after up to 10 s of a slow sampling interval.
     }
 
+    /** The Sensor's own `Tilt Sensitivity Threshold` slider sets the tilt angle (user decision, 2026-11-09). */
+    private fun watchTiltSensitivity() {
+        sensorDataStore.alertSettings
+            .onEach { settings ->
+                val degrees = tiltThresholdForSensitivity(settings.tiltSensitivity)
+                if (degrees != motionSentinel.tiltThresholdDegrees) SystemLogger.i("Motion", "Tilt limit ${degrees.toInt()} deg")
+                motionSentinel.tiltThresholdDegrees = degrees
+            }
+            .launchIn(serviceScope)
+    }
+
+    /**
+     * The accelerometer runs at about 50 Hz (`SENSOR_DELAY_GAME`), which the lift integration needs; the barometer, where
+     * there is one, at the normal rate. Events arrive on their own thread, not the main one.
+     */
     private fun registerSensors() {
         val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         val gravity = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)
-        
-        val delay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            SensorManager.SENSOR_DELAY_NORMAL 
-        } else {
-            SensorManager.SENSOR_DELAY_FASTEST
-        }
-        
-        accel?.let { sensorManager.registerListener(this, it, delay) }
-        gravity?.let { sensorManager.registerListener(this, it, delay) }
+        val pressure = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
+        hasGravitySensor = gravity != null
+        hasBarometer = pressure != null
+        val handler = Handler(HandlerThread("MotionSensors").also { it.start(); motionThread = it }.looper)
+
+        accel?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME, handler) }
+        gravity?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME, handler) }
+        pressure?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler) }
+        serviceStatus.setMotion(MotionState(isRunning = accel != null, hasBarometer = hasBarometer))
+        SystemLogger.i(
+            "Motion",
+            "Accelerometer: ${accel != null}, gravity sensor: $hasGravitySensor, barometer: $hasBarometer. Tilt and lift arm after ${MOTION_ARM_AFTER_STILL_MS / 1000} s of rest"
+        )
     }
 
     private fun startLocationUpdates() {
@@ -344,17 +377,32 @@ class SensorService : Service(), SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent) {
+        val eventMs = event.timestamp / 1_000_000L // Monotonic sensor time.
         when (event.sensor.type) {
             Sensor.TYPE_ACCELEROMETER -> {
                 lastAccel[0] = event.values[0].toDouble()
                 lastAccel[1] = event.values[1].toDouble()
                 lastAccel[2] = event.values[2].toDouble()
+                motionSentinel.onAccelerometer(lastAccel[0], lastAccel[1], lastAccel[2], eventMs)?.let(::onMotionAlert)
+                if (motionSentinel.isArmed != publishedMotionArmed) {
+                    publishedMotionArmed = motionSentinel.isArmed
+                    serviceStatus.setMotion(MotionState(isRunning = true, isArmed = motionSentinel.isArmed, hasBarometer = hasBarometer))
+                    SystemLogger.i("Motion", if (motionSentinel.isArmed) "Tilt and lift armed" else "Tilt and lift waiting for the phone to rest")
+                }
             }
             Sensor.TYPE_GRAVITY -> {
                 lastGravity[0] = event.values[0].toDouble()
                 lastGravity[1] = event.values[1].toDouble()
                 lastGravity[2] = event.values[2].toDouble()
             }
+            Sensor.TYPE_PRESSURE -> motionSentinel.onPressure(event.values[0].toDouble(), eventMs)?.let(::onMotionAlert)
+        }
+    }
+
+    private fun onMotionAlert(alert: MotionSentinel.Alert) {
+        when (alert.kind) {
+            MotionSentinel.Kind.TILT -> queueAlert(TILT_ALERT_STATUS, "Tilt alert: ${alert.detail}")
+            MotionSentinel.Kind.LIFT -> queueAlert(LIFT_ALERT_STATUS, "Lift alert: ${alert.detail}")
         }
     }
 
@@ -370,9 +418,10 @@ class SensorService : Service(), SensorEventListener {
             initJob?.join()
             val update = PoolRegistry.locationUpdatePool.acquire()
             try {
+                val gravity = if (hasGravitySensor) lastGravity else motionSentinel.gravity() ?: lastGravity
                 val worldAccel = SensingEngine.rotateToWorldSpace(
                     lastAccel[0], lastAccel[1], lastAccel[2],
-                    lastGravity[0], lastGravity[1], lastGravity[2]
+                    gravity[0], gravity[1], gravity[2]
                 )
                 
                 update.sensorSnapshot.vibration = worldAccel[0].toFloat()
@@ -412,15 +461,10 @@ class SensorService : Service(), SensorEventListener {
                     val zone = SentinelLogic.evaluateHomeZone(loc.latitude, loc.longitude, loc.accuracy, geofence, geofenceState)
                     geofenceState = zone.currentState
                     if (zone.transition == SentinelLogic.GeofenceTransition.EXIT) {
-                        update.status = GEOFENCE_BREACH_STATUS
-                        update.isCritical = true
-                        SystemLogger.w("SensorService", "Geofence breach: ${zone.distanceToCenter.toInt()} m from the nearest home point (radius ${geofence.radiusMeters.toInt()} m, accuracy ${loc.accuracy.toInt()} m)")
-                        val violation = ViolationEvent(
-                            type = GEOFENCE_BREACH_STATUS,
-                            location = update.snapshot(),
-                            nonce = java.util.UUID.randomUUID().toString()
+                        reportViolation(
+                            update, GEOFENCE_BREACH_STATUS,
+                            "Geofence breach: ${zone.distanceToCenter.toInt()} m from the nearest home point (radius ${geofence.radiusMeters.toInt()} m, accuracy ${loc.accuracy.toInt()} m)"
                         )
-                        serviceScope.launch { signalingClient.sendViolation(violation) }
                     }
 
                     movementCheck.check(
@@ -430,31 +474,13 @@ class SensorService : Service(), SensorEventListener {
                 }
 
                 if (validation != null && validation.status != SentinelLogic.SentinelStatus.VALID) {
-                    update.status = validation.status.name
-                    update.isCritical = true
-                    SystemLogger.w("SensorService", "Violation detected: ${validation.status} - ${validation.reason}")
-                    // Built before launching: the pooled update is zeroed on release, before the launched send runs.
-                    val violation = ViolationEvent(
-                        type = validation.status.name,
-                        location = update.snapshot(),
-                        nonce = java.util.UUID.randomUUID().toString()
-                    )
-                    serviceScope.launch { signalingClient.sendViolation(violation) }
+                    reportViolation(update, validation.status.name, "Violation detected: ${validation.status} - ${validation.reason}")
                 }
 
-                // A tick that already carries a violation keeps it; the noise follows on the next tick.
-                val acoustic = pendingAcousticAlert
-                if (acoustic != null && !update.isCritical) {
-                    pendingAcousticAlert = null
-                    update.status = ACOUSTIC_ALERT_STATUS
-                    update.isCritical = true
-                    SystemLogger.w("SensorService", "Acoustic alert: $acoustic")
-                    val violation = ViolationEvent(
-                        type = ACOUSTIC_ALERT_STATUS,
-                        location = update.snapshot(),
-                        nonce = java.util.UUID.randomUUID().toString()
-                    )
-                    serviceScope.launch { signalingClient.sendViolation(violation) }
+                // A tick that already carries a violation keeps it; a queued alert follows on the next tick.
+                if (!update.isCritical) {
+                    pendingAlerts.poll()?.let { reportViolation(update, it.status, it.logLine) }
+                    if (pendingAlerts.isNotEmpty()) orchestrator.preemptLoop("sensing_loop")
                 }
                 
                 forensicBuffer.writeTrace(update, isCritical = update.isCritical)
@@ -469,6 +495,16 @@ class SensorService : Service(), SensorEventListener {
                 PoolRegistry.locationUpdatePool.release(update)
             }
         }
+    }
+
+    /** Marks [update] as violation [status] and sends the violation event. */
+    private fun reportViolation(update: LocationUpdate, status: String, logLine: String) {
+        update.status = status
+        update.isCritical = true
+        SystemLogger.w("SensorService", logLine)
+        // Built before launching: the pooled update is zeroed on release, before the launched send runs.
+        val violation = ViolationEvent(type = status, location = update.snapshot(), nonce = java.util.UUID.randomUUID().toString())
+        serviceScope.launch { signalingClient.sendViolation(violation) }
     }
 
     private fun startWatchdog() {
@@ -560,6 +596,8 @@ class SensorService : Service(), SensorEventListener {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private data class PendingAlert(val status: String, val logLine: String)
+
     companion object {
         const val ACTION_STOP_SERVICE = "com.jd.app.sensor.ACTION_STOP_SERVICE"
         private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L
@@ -574,6 +612,7 @@ class SensorService : Service(), SensorEventListener {
         serviceStatus.markStopped()
         if (isInitialized) {
             sensorManager.unregisterListener(this)
+            motionThread?.quitSafely()
             fusedLocationClient.removeLocationUpdates(locationCallback)
             try { unregisterReceiver(batteryReceiver) } catch (e: Exception) {}
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

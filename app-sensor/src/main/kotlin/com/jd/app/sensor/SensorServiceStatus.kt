@@ -26,6 +26,13 @@ class SensorServiceStatus @Inject constructor() {
         microphoneState.value = state
     }
 
+    private val motionState = MutableStateFlow(MotionState())
+    val motion: StateFlow<MotionState> = motionState.asStateFlow()
+
+    fun setMotion(state: MotionState) {
+        motionState.value = state
+    }
+
     fun markRunning(startTimeMs: Long = currentElapsedRealtime()) {
         startTime.value = startTimeMs
         running.value = true
@@ -35,6 +42,7 @@ class SensorServiceStatus @Inject constructor() {
         startTime.value = 0L
         running.value = false
         microphoneState.value = MicrophoneState.OFF
+        motionState.value = MotionState()
     }
 
     fun resetUptime(nowMs: Long = currentElapsedRealtime()) {
@@ -90,6 +98,16 @@ enum class MicrophoneState {
     SILENCED,
     /** The phone has no usable microphone, or it failed. */
     UNAVAILABLE
+}
+
+/** What tilt and lift detection is doing (ISSUE-NOV5.2-O11 Group 5). [isRunning] is false while the service is stopped. */
+data class MotionState(val isRunning: Boolean = false, val isArmed: Boolean = false, val hasBarometer: Boolean = false)
+
+/** The tilt and lift line of the Sensor Setup dialog. */
+fun motionStatusText(state: MotionState): String = "Tilt & Lift: " + when {
+    !state.isRunning -> "Off"
+    state.isArmed -> "Armed (" + (if (state.hasBarometer) "accelerometer + barometer" else "accelerometer") + ")"
+    else -> "Arms after the phone rests ${com.jd.core.shared.MOTION_ARM_AFTER_STILL_MS / 1000} s"
 }
 
 /** The microphone line of the Sensor Setup dialog. */
