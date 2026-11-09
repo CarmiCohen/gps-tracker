@@ -48,6 +48,7 @@ enum class AlarmType(val title: String) {
     ACOUSTIC_ALERT("Tracker noise detected"),
     TILT_ALERT("Tracker tilted"),
     LIFT_ALERT("Tracker lifted"),
+    VIBRATION_ALERT("Tracker vibration detected"),
     NOISE_DETECTION_OFF("Tracker noise detection off")
 }
 
@@ -64,6 +65,7 @@ fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) 
     AlarmType.ACOUSTIC_ALERT -> acousticAlert // "Acoustic / Microphone Noise Sensor"; the Sensor listens either way.
     AlarmType.TILT_ALERT -> tiltAlert // "Tilt Angle Detection Sensor"; the angle is set on the Sensor.
     AlarmType.LIFT_ALERT -> liftAlert // "Lift / Height Change Sensor"
+    AlarmType.VIBRATION_ALERT -> tamperAlert // "Tamper / Vibration Sensor"; the limit is set on the Sensor.
     AlarmType.NOISE_DETECTION_OFF -> acousticAlert // A noise alarm the Sensor cannot raise (ISSUE-NOV8.103-O60).
 }
 
@@ -150,7 +152,8 @@ private val SENSOR_VIOLATION_ALARMS = mapOf(
     com.jd.core.shared.GEOFENCE_BREACH_STATUS to AlarmType.GEOFENCE_BREACH,
     com.jd.core.shared.ACOUSTIC_ALERT_STATUS to AlarmType.ACOUSTIC_ALERT,
     com.jd.core.shared.TILT_ALERT_STATUS to AlarmType.TILT_ALERT,
-    com.jd.core.shared.LIFT_ALERT_STATUS to AlarmType.LIFT_ALERT
+    com.jd.core.shared.LIFT_ALERT_STATUS to AlarmType.LIFT_ALERT,
+    com.jd.core.shared.VIBRATION_ALERT_STATUS to AlarmType.VIBRATION_ALERT
 )
 
 /** One raised alarm. [isActive] is false once its condition has cleared. */

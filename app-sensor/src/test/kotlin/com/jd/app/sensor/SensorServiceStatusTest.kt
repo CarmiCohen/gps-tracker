@@ -120,17 +120,26 @@ class SensorServiceStatusTest {
         assertEquals("Location after a restart: Needs a tap on the notification", backgroundLocationStatusText(false))
     }
 
-    /** Chapter 162 (ISSUE-NOV5.2-O11 Group 5): the tilt and lift line. */
+    /** Chapters 162 and 164 (ISSUE-NOV5.2-O11 Groups 5 and 7): the tilt, lift, and vibration line. */
     @Test
     fun motionLineShowsArmedStateAndSensorsAndIsOffWhenStopped() {
         val status = SensorServiceStatus()
-        assertEquals("Tilt & Lift: Off", motionStatusText(status.motion.value))
+        assertEquals("Tilt, Lift & Vibration: Off", motionStatusText(status.motion.value))
 
         status.setMotion(MotionState(isRunning = true))
-        assertEquals("Tilt & Lift: Arms after the phone rests 30 s", motionStatusText(status.motion.value))
-        status.setMotion(MotionState(isRunning = true, isArmed = true))
-        assertEquals("Tilt & Lift: Armed (accelerometer)", motionStatusText(status.motion.value))
-        assertEquals("Tilt & Lift: Armed (accelerometer + barometer)", motionStatusText(MotionState(true, true, true)))
+        assertEquals("Tilt, Lift & Vibration: Arms after the phone rests 30 s", motionStatusText(status.motion.value))
+        status.setMotion(MotionState(isRunning = true, isArmed = true, isVibrationArmed = true))
+        assertEquals("Tilt, Lift & Vibration: Armed (accelerometer)", motionStatusText(status.motion.value))
+        assertEquals("Tilt, Lift & Vibration: Armed (accelerometer + barometer)", motionStatusText(MotionState(true, true, true, true)))
+        // Each re-arms on its own: a knock leaves tilt and lift armed, a tilt leaves vibration armed.
+        assertEquals(
+            "Tilt, Lift & Vibration: Tilt and lift armed, vibration after the phone rests 30 s",
+            motionStatusText(MotionState(isRunning = true, isArmed = true))
+        )
+        assertEquals(
+            "Tilt, Lift & Vibration: Vibration armed, tilt and lift after the phone rests 30 s",
+            motionStatusText(MotionState(isRunning = true, isVibrationArmed = true))
+        )
 
         status.markStopped()
         assertEquals(MotionState(), status.motion.value)

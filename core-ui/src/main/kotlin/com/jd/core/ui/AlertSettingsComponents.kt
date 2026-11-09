@@ -20,6 +20,9 @@ import com.jd.core.shared.AlertSettings
 /** Shown on the Monitor instead of the tilt slider: the Sensor detects tilt with its own (ISSUE-NOV5.2-O11 Group 5). */
 const val TILT_SENSITIVITY_ON_SENSOR_NOTE = "The tilt angle is set on the Sensor (Tilt Sensitivity Threshold)"
 
+/** Shown on the Monitor instead of the vibration slider: the Sensor detects vibration with its own (ISSUE-NOV5.2-O11 Group 7). */
+const val VIBRATION_SENSITIVITY_ON_SENSOR_NOTE = "The vibration limit is set on the Sensor (Vibration Sensitivity Threshold)"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlertManagementOverlay(
@@ -179,11 +182,17 @@ fun AlertManagementOverlay(
             AlarmToggle("Tamper / Vibration Sensor", draftAlertSettings.tamperAlert) {
                 onUpdateAlertSettings(draftAlertSettings.copy(tamperAlert = it))
             }
-            if (draftAlertSettings.tamperAlert) {
+            // Like tilt, the Sensor detects vibration with its own slider; the Monitor's switch only gates the alarm.
+            if (isTracker) {
                 SensitivitySlider(
                     label = "Vibration Sensitivity Threshold",
                     value = draftAlertSettings.vibrationSensitivity,
                     onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(vibrationSensitivity = it)) }
+                )
+            } else if (draftAlertSettings.tamperAlert) {
+                Text(
+                    VIBRATION_SENSITIVITY_ON_SENSOR_NOTE,
+                    color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
                 )
             }
 

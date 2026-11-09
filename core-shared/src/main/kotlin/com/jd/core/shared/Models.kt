@@ -126,6 +126,9 @@ const val TILT_ALERT_STATUS = "TILT_ALERT"
 /** Telemetry status and violation type the Sensor sends when the resting tracker is lifted (ISSUE-NOV5.2-O11 Group 5). */
 const val LIFT_ALERT_STATUS = "LIFT_ALERT"
 
+/** Telemetry status and violation type the Sensor sends when the resting tracker is knocked or shaken (ISSUE-NOV5.2-O11 Group 7). */
+const val VIBRATION_ALERT_STATUS = "VIBRATION_ALERT"
+
 /** A user-defined Home Point; the tracker is home while it is within the geofence radius of any one of them. */
 @Serializable
 data class HomePoint(val lat: Double, val lng: Double)

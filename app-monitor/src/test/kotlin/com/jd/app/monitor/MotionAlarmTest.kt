@@ -4,6 +4,7 @@ import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.LIFT_ALERT_STATUS
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.TILT_ALERT_STATUS
+import com.jd.core.shared.VIBRATION_ALERT_STATUS
 import com.jd.core.shared.ViolationEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -22,6 +23,7 @@ import org.junit.Test
 /**
  * Chapter 162 (ISSUE-NOV5.2-O11 Group 5): a tilt or lift the Sensor reports raises the Monitor's `Tracker tilted` or
  * `Tracker lifted` alarm, switched by `Tilt Angle Detection Sensor` (`tiltAlert`) and `Lift / Height Change Sensor` (`liftAlert`).
+ * Chapter 164 (Group 7): a vibration raises `Tracker vibration detected`, switched by `Tamper / Vibration Sensor` (`tamperAlert`).
  */
 class MotionAlarmTest {
 
@@ -96,9 +98,41 @@ class MotionAlarmTest {
         val noTilt = AlertSettings(tiltAlert = false)
         assertFalse(noTilt.allows(AlarmType.TILT_ALERT))
         assertTrue(noTilt.allows(AlarmType.LIFT_ALERT))
+        assertTrue(noTilt.allows(AlarmType.VIBRATION_ALERT))
         val noLift = AlertSettings(liftAlert = false)
         assertFalse(noLift.allows(AlarmType.LIFT_ALERT))
         assertTrue(noLift.allows(AlarmType.TILT_ALERT))
+        assertTrue(noLift.allows(AlarmType.VIBRATION_ALERT))
+        val noVibration = AlertSettings(tamperAlert = false)
+        assertFalse(noVibration.allows(AlarmType.VIBRATION_ALERT))
+        assertTrue(noVibration.allows(AlarmType.TILT_ALERT))
+        assertTrue(noVibration.allows(AlarmType.LIFT_ALERT))
         assertFalse(AlertSettings(globalMute = true).allows(AlarmType.TILT_ALERT))
+        assertFalse(AlertSettings(globalMute = true).allows(AlarmType.VIBRATION_ALERT))
+    }
+
+    @Test
+    fun `a vibration status raises the vibration alarm, not a GPS jump`() {
+        assertEquals(listOf(AlarmType.VIBRATION_ALERT), pendingFor(VIBRATION_ALERT_STATUS))
+        assertEquals("Tracker vibration detected", AlarmType.VIBRATION_ALERT.title)
+    }
+
+    @Test
+    fun `a switched off vibration alarm stays silent`() {
+        assertTrue(pendingFor(VIBRATION_ALERT_STATUS, AlertSettings(tamperAlert = false)).isEmpty())
+    }
+
+    /** A rough pickup: the Sensor sends the vibration and the lift on successive ticks; both alarms are raised. */
+    @Test
+    fun `a vibration and a lift are raised together`() = runBlocking {
+        val watch = Watch(this)
+        watch.settings.emit(AlertSettings())
+        watch.ready()
+        watch.violations.emit(ViolationEvent(type = VIBRATION_ALERT_STATUS, location = LocationUpdate(deviceId = "T"), nonce = "v1"))
+        watch.awaitBook { book -> book.pending.any { it.type == AlarmType.VIBRATION_ALERT } }
+        watch.violations.emit(ViolationEvent(type = LIFT_ALERT_STATUS, location = LocationUpdate(deviceId = "T"), nonce = "l1"))
+        val book = watch.awaitBook { book -> book.pending.any { it.type == AlarmType.LIFT_ALERT } }
+        assertEquals(setOf(AlarmType.VIBRATION_ALERT, AlarmType.LIFT_ALERT), book.pending.map { it.type }.toSet())
+        watch.job.cancel()
     }
 }

@@ -69,13 +69,14 @@ class SensorService : Service(), SensorEventListener {
     // Raw IMU caches, written on the motion sensor thread.
     private var lastAccel = DoubleArray(3)
     private var lastGravity = DoubleArray(3)
-    // Tilt and lift of the resting tracker (ISSUE-NOV5.2-O11 Group 5); its gravity estimate also replaces the gravity
-    // sensor that phones like the A15 lack, whose vibration value was always 0 before Nov9.0.
+    // Tilt, lift (ISSUE-NOV5.2-O11 Group 5), and vibration (Group 7) of the resting tracker; its gravity estimate also
+    // replaces the gravity sensor that phones like the A15 lack, whose vibration value was always 0 before Nov9.0.
     private val motionSentinel = MotionSentinel()
     private var motionThread: HandlerThread? = null
     private var hasGravitySensor = false
     private var hasBarometer = false
     private var publishedMotionArmed: Boolean? = null // Motion sensor thread only.
+    private var publishedVibrationArmed: Boolean? = null // Motion sensor thread only.
     
     // Adaptive Sampling & Throttling State
     private var currentIntervalMs = 1000L
@@ -171,7 +172,7 @@ class SensorService : Service(), SensorEventListener {
         acquireWakeLock()
         setupBackfillListener()
         setupGeofenceListener()
-        watchTiltSensitivity()
+        watchMotionSensitivity()
         registerSensors()
         startLocationUpdates()
         connectSignaling()
@@ -366,13 +367,21 @@ class SensorService : Service(), SensorEventListener {
         orchestrator.preemptLoop("sensing_loop") // Sent now, not after up to 10 s of a slow sampling interval.
     }
 
-    /** The Sensor's own `Tilt Sensitivity Threshold` slider sets the tilt angle (user decision, 2026-11-09). */
-    private fun watchTiltSensitivity() {
+    /**
+     * The Sensor's own `Tilt Sensitivity Threshold` and `Vibration Sensitivity Threshold` sliders set the tilt angle and
+     * the vibration limit (user decision for tilt, 2026-11-09; vibration follows it, ISSUE-NOV5.2-O11 Group 7).
+     */
+    private fun watchMotionSensitivity() {
         sensorDataStore.alertSettings
             .onEach { settings ->
                 val degrees = tiltThresholdForSensitivity(settings.tiltSensitivity)
                 if (degrees != motionSentinel.tiltThresholdDegrees) SystemLogger.i("Motion", "Tilt limit ${degrees.toInt()} deg")
                 motionSentinel.tiltThresholdDegrees = degrees
+                val vibration = vibrationThresholdForSensitivity(settings.vibrationSensitivity)
+                if (vibration != motionSentinel.vibrationThreshold) {
+                    SystemLogger.i("Motion", "Vibration limit ${"%.2f".format(java.util.Locale.US, vibration / STANDARD_GRAVITY)} g")
+                }
+                motionSentinel.vibrationThreshold = vibration
             }
             .launchIn(serviceScope)
     }
@@ -436,11 +445,16 @@ class SensorService : Service(), SensorEventListener {
                 lastAccel[0] = event.values[0].toDouble()
                 lastAccel[1] = event.values[1].toDouble()
                 lastAccel[2] = event.values[2].toDouble()
-                motionSentinel.onAccelerometer(lastAccel[0], lastAccel[1], lastAccel[2], eventMs)?.let(::onMotionAlert)
+                motionSentinel.onAccelerometer(lastAccel[0], lastAccel[1], lastAccel[2], eventMs).forEach(::onMotionAlert)
                 if (motionSentinel.isArmed != publishedMotionArmed) {
                     publishedMotionArmed = motionSentinel.isArmed
-                    serviceStatus.setMotion(MotionState(isRunning = true, isArmed = motionSentinel.isArmed, hasBarometer = hasBarometer))
+                    publishMotion()
                     SystemLogger.i("Motion", if (motionSentinel.isArmed) "Tilt and lift armed" else "Tilt and lift waiting for the phone to rest")
+                }
+                if (motionSentinel.isVibrationArmed != publishedVibrationArmed) {
+                    publishedVibrationArmed = motionSentinel.isVibrationArmed
+                    publishMotion()
+                    SystemLogger.i("Motion", if (motionSentinel.isVibrationArmed) "Vibration armed" else "Vibration waiting for the phone to rest")
                 }
             }
             Sensor.TYPE_GRAVITY -> {
@@ -452,10 +466,17 @@ class SensorService : Service(), SensorEventListener {
         }
     }
 
+    private fun publishMotion() {
+        serviceStatus.setMotion(
+            MotionState(isRunning = true, isArmed = motionSentinel.isArmed, hasBarometer = hasBarometer, isVibrationArmed = motionSentinel.isVibrationArmed)
+        )
+    }
+
     private fun onMotionAlert(alert: MotionSentinel.Alert) {
         when (alert.kind) {
             MotionSentinel.Kind.TILT -> queueAlert(TILT_ALERT_STATUS, "Tilt alert: ${alert.detail}")
             MotionSentinel.Kind.LIFT -> queueAlert(LIFT_ALERT_STATUS, "Lift alert: ${alert.detail}")
+            MotionSentinel.Kind.VIBRATION -> queueAlert(VIBRATION_ALERT_STATUS, "Vibration alert: ${alert.detail}")
         }
     }
 

@@ -135,14 +135,28 @@ fun restartNotificationTitle(refused: RefusedAccess): String? = when {
 fun backgroundLocationStatusText(isAllowedAllTheTime: Boolean): String = "Location after a restart: " +
     if (isAllowedAllTheTime) "Automatic (allowed all the time)" else "Needs a tap on the notification"
 
-/** What tilt and lift detection is doing (ISSUE-NOV5.2-O11 Group 5). [isRunning] is false while the service is stopped. */
-data class MotionState(val isRunning: Boolean = false, val isArmed: Boolean = false, val hasBarometer: Boolean = false)
+/**
+ * What tilt and lift (ISSUE-NOV5.2-O11 Group 5) and vibration (Group 7) detection is doing. [isRunning] is false while
+ * the service is stopped. [isArmed] is tilt and lift; vibration arms on its own, so a knock leaves tilt and lift armed.
+ */
+data class MotionState(
+    val isRunning: Boolean = false,
+    val isArmed: Boolean = false,
+    val hasBarometer: Boolean = false,
+    val isVibrationArmed: Boolean = false
+)
 
-/** The tilt and lift line of the Sensor Setup dialog. */
-fun motionStatusText(state: MotionState): String = "Tilt & Lift: " + when {
-    !state.isRunning -> "Off"
-    state.isArmed -> "Armed (" + (if (state.hasBarometer) "accelerometer + barometer" else "accelerometer") + ")"
-    else -> "Arms after the phone rests ${com.jd.core.shared.MOTION_ARM_AFTER_STILL_MS / 1000} s"
+/** The motion line of the Sensor Setup dialog. */
+fun motionStatusText(state: MotionState): String {
+    val rest = "after the phone rests ${com.jd.core.shared.MOTION_ARM_AFTER_STILL_MS / 1000} s"
+    return "Tilt, Lift & Vibration: " + when {
+        !state.isRunning -> "Off"
+        state.isArmed && state.isVibrationArmed ->
+            "Armed (" + (if (state.hasBarometer) "accelerometer + barometer" else "accelerometer") + ")"
+        state.isArmed -> "Tilt and lift armed, vibration $rest"
+        state.isVibrationArmed -> "Vibration armed, tilt and lift $rest"
+        else -> "Arms $rest"
+    }
 }
 
 /** The microphone line of the Sensor Setup dialog. */

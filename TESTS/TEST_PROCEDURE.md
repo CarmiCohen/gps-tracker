@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov9.1-MicOnStartup - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov9.2-Vibration - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -140,7 +140,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **27.2 High Temp:** Trigger thermal event; verify `High Temp` alert.
 
 ## Chapter 28 - Advanced Tamper Escalation
-**Status: A / D** - Lift built in Nov9.0-LiftTilt (20 cm by accelerometer, 0.8 m by barometer): `MotionSentinelTest`, `MotionAlarmTest`; a real pickup is chapter 162.4. Shock and proximity are not built (`Tamper / Vibration Sensor` switch, ISSUE-NOV5.2-O11 Group 7)
+**Status: A / D** - Lift built in Nov9.0-LiftTilt (20 cm by accelerometer, 0.8 m by barometer): `MotionSentinelTest`, `MotionAlarmTest`; a real pickup is chapter 162.4. Shock built in Nov9.2-Vibration (0.5 g by default, `Tamper / Vibration Sensor`): chapter 164. Proximity retired with ISSUE-NOV5.2-O11 Group 7
 *   **28.1 Shock & Lift:** Simulate >0.8G shock or >0.8m lift. Verify triggers.
 *   **28.2 Proximity:** Trigger proximity breach; verify alert.
 
@@ -797,8 +797,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **163.3 Reboot Without "Allow All The Time":** Reboot the A15 with the Sensor running. Verify (about 1.5 min after boot) that the service runs with types `0x201`, the notification `Tracking off - tap to enable`, and, with the Monitor open, `Tracker noise detection off` at once and `Tracker GPS signal loss` after 30 s. Tap the notification (twice on a Samsung lock screen): verify types `0x289`, `Microphone: Listening`, a GPS fix, the notification gone, the Sensor app not opened, and both Monitor alarms `(cleared)`.
 *   **163.4 Reboot With "Allow All The Time":** On the Sensor screen tap `ALLOW LOCATION ALL THE TIME`, choose "Allow all the time", and verify the line `Location after a restart: Automatic (allowed all the time)`. Reboot: verify types `0x209` (location kept, a fix within seconds), only `Noise detection off - tap to enable`, and a tap restoring `0x289`.
 
+## Chapter 164 - Sensor Vibration Alarm (Nov9.2-Vibration)
+**Status: A / L / H** - 164.1 to 164.3 automated and on the A15; 164.4 needs a person next to the A15, not run (ISSUE-NOV5.2-O11 Group 7, SOT 1.402)
+*   **164.1 Detection:** Verify the slider limits (0.82 g at 0.1, 0.5 g at 0.5, 0.1 g at 1.0); a knock alerts once as vibration and leaves tilt and lift armed; a 0.2 g jolt alerts only at 1.0; resting noise never alerts at 1.0; vibration re-arms after the next 30 s rest; a phone bumped every 2 s never arms; a rough pickup gives vibration and lift; a tilt leaves vibration armed. Automated by `MotionSentinelTest`.
+*   **164.2 Monitor Alarm:** Verify that `VIBRATION_ALERT` raises `Tracker vibration detected` (not a GPS jump), that `Tamper / Vibration Sensor` and Global Mute silence it and no other switch does, and that a vibration and a lift are raised together. Automated by `MotionAlarmTest`; the Setup line `Tilt, Lift & Vibration: ...` by `SensorServiceStatusTest`.
+*   **164.3 Arming On The A15:** Start the Sensor and leave the A15 lying still. Verify `REV_Motion: Vibration armed` 30 s later, the debug `STATE` answer `vibrationArmed=true`, and no vibration alert over 5 minutes at rest.
+*   **164.4 Real Knock:** With the A15 armed and the Monitor open, knock once firmly on the phone or the table next to it. Verify `REV_SensorService: Vibration alert` on the Sensor and `Tracker vibration detected` with the siren on the Monitor; a gentle pickup after the next 30 s rest gives `Tracker lifted` without a vibration alarm.
+
 ---
-**Active Testing Chapters: 153 of 163**
+**Active Testing Chapters: 154 of 164**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
