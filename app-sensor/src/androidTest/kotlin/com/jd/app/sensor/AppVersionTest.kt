@@ -22,7 +22,8 @@ class AppVersionTest {
         val version = getAppVersionName(context)
 
         assertEquals(context.packageManager.getPackageInfo(context.packageName, 0).versionName, version)
-        assertTrue("Unexpected version $version", Regex("Nov\\d+\\.\\d+").matches(version))
+        // The format of VersionSourceTest: names like Nov9.2-Vibration carry a suffix since Nov8.100 (Nov9.3).
+        assertTrue("Unexpected version $version", Regex("""[A-Z][a-z]+\d+\.\d+(-[A-Za-z]\w*)?""").matches(version))
     }
 
     @Test

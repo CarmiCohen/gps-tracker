@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov9.2-Vibration - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov9.3-MonitorStart - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -570,7 +570,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **125.7 Outage On Hardware:** Through a private relay, never the production relay, cut only the Sensor for 60 seconds at the 10Hz charging rate. Pull the Monitor database after recovery and verify that no hole remains. Repeat with the Monitor on a second phone through the production relay when one is available.
 
 ## Chapter 126 - Real Version Strings (Nov7.0)
-**Status: L / A** - 126.1 and 126.2 automated; 126.3 verified on the A15 through the production relay. The `--` case has automated proof only
+**Status: L / A** - 126.1 and 126.2 automated (126.2 failed on suffixed names from Nov8.100 until Nov9.3, ISSUE-NOV9.3-O63); 126.3 verified on the A15 through the production relay. The `--` case has automated proof only
 *   **126.1 No Version In Code:** Verify that no string in the production Kotlin sources of any module holds a release version, and that comments may still name one. Automated by `VersionLiteralGuardTest`. Run it with `--rerun`, because Gradle does not track the scanned files as inputs of the test.
 *   **126.2 Version From The Package:** Verify that the shown version is the installed `versionName`, and that a package that cannot be read shows `--` and no invented version. Automated by `AppVersionTest`.
 *   **126.3 Version On Hardware:** Install both apps on the A15. Verify that the Sensor first screen, the Sensor Setup dialog, the Monitor pairing screen, and the Monitor Setup dialog all show the `versionName` from the build file, and that the Sensor logs `onCreate called. Version:` with that same version when its service starts.
@@ -804,8 +804,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **164.3 Arming On The A15:** Start the Sensor and leave the A15 lying still. Verify `REV_Motion: Vibration armed` 30 s later, the debug `STATE` answer `vibrationArmed=true`, and no vibration alert over 5 minutes at rest.
 *   **164.4 Real Knock:** With the A15 armed and the Monitor open, knock once firmly on the phone or the table next to it. Verify `REV_SensorService: Vibration alert` on the Sensor and `Tracker vibration detected` with the siren on the Monitor; a gentle pickup after the next 30 s rest gives `Tracker lifted` without a vibration alarm.
 
+## Chapter 165 - Startup Frames Audited On The Release Build (Nov9.3-MonitorStart)
+**Status: A / L** - 165.1 automated; 165.2 and 165.3 run on the A15 (ISSUE-NOV8.13-O55, SOT 1.403)
+*   **165.1 Audit Premises:** Verify that neither app makes a build debuggable or adds an application ID suffix, that `install_release.ps1` signs the `assembleRelease` output with the debug key and installs with `install -r`, and that Completion step 1 names the script and the `installDebug` restore. Automated by `ReleaseAuditBuildTest`.
+*   **165.2 Release Cold Start (A15):** After `assembleRelease`, run `TESTS/install_release.ps1`; verify `RELEASE sensor INSTALLED` and `RELEASE monitor INSTALLED`, that each app keeps its ID, pairing, and Home Points, and that a cold start of each gives `device_audit.cmd` 0 Davey frames over 500 ms, 0 StackLog, 0 fatal (Nov9.3: Sensor 388 ms, Monitor 457 ms).
+*   **165.3 Restore:** Run `gradlew :app-sensor:installDebug :app-monitor:installDebug`; verify `dumpsys package` shows `DEBUGGABLE`, the debug `STATE` answers the saved state, and the Sensor service runs after one tap on `System Idle`.
+
 ---
-**Active Testing Chapters: 154 of 164**
+**Active Testing Chapters: 155 of 165**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

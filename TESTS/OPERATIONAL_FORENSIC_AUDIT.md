@@ -6,7 +6,7 @@
 
 ## 0.1 Logcat Anomaly Monitoring
 **Status: L** - Now checked by `TESTS/device_audit.cmd`
-*   **Action:** Deploy the app and filter Logcat for `StackLog`, `Davey`, or `Exception`.
+*   **Action:** Deploy the release build (`TESTS/install_release.ps1`; a debug build runs in ART's interpreter, so its startup frames are not audited, ISSUE-NOV8.13-O55), cold-start the app, and filter Logcat for `StackLog`, `Davey`, or `Exception`.
 *   **Verification:** 
     1. **Steady-State Enforcement**: Confirm zero `StackLog` leaks during steady-state operation. 
     2. **Startup Performance**: Confirm zero `Davey` events > 500ms and zero `StackLog` signatures during the first 10 seconds of startup. Any detection of these signatures constitutes an audit failure on budget hardware (A15).

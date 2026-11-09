@@ -10,7 +10,8 @@ No copies are made any more. User decision, 2026-11-08 (option C).
 
 | Version | Commit | Notes |
 | :--- | :--- | :--- |
-| Nov9.2-Vibration | pending | |
+| Nov9.3-MonitorStart | pending | |
+| Nov9.2-Vibration | 7a26409 | |
 | Nov9.1-MicOnStartup | cc81ffc | |
 | Nov9.0-LiftTilt | b1f1d38 | |
 | Nov8.103-Microphone | e9dd12e | followed by untagged c7f34b8 (CLAUDE.md effort rule, Handover next-version name) |

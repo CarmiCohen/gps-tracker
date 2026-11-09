@@ -27,6 +27,7 @@ Each script prints one summary line; run them with `powershell -NoProfile -Execu
     *   Sensor: `-App sensor -Command SET_ID -Id T`, `-Command STATE` (ID, relay, and since Nov9.0-LiftTilt `mic=`, `motionArmed=`, `barometer=`).
     *   Monitor: `-App monitor -Command PAIR -Id T`, `UNPAIR`, `ADD_HOME -Lat 32.65 -Lng 35.30`, `CLEAR_HOME`, `STATE` (prints the pairing and every Home Point, so they can be restored).
     *   The commands exist only in debug builds (`src/debug` receivers, guarded by the `DUMP` permission that only the adb shell holds). They write the same stores as the UI, so the running app reacts as to a user change.
+*   **`install_release.ps1 [-Apps sensor,monitor]`** (Nov9.3-MonitorStart, ISSUE-NOV8.13-O55): after `assembleRelease`, signs each release APK with the debug key and installs it over the debug app (data and pairing kept), printing `RELEASE <app> INSTALLED|FAILED`. The device audit's frame check runs on these builds: a debug build runs in ART's interpreter (Monitor first frame 726 ms debug, about 0.45 s release on the A15). The debug commands above do not exist in them; restore the debug builds with `gradlew :app-sensor:installDebug :app-monitor:installDebug`.
 
 ---
 *Established on Oct 14, 2024. Hardened on Oct 20, 2024 (Oct20.0). Updated Nov 1, 2024 (Nov1.4) to permit status updates. Updated Nov 1, 2024 (Nov1.8) to mandate immediate remediation prior to termination.*
