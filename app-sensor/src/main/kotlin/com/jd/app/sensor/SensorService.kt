@@ -72,6 +72,8 @@ class SensorService : Service(), SensorEventListener {
     // Tilt, lift (ISSUE-NOV5.2-O11 Group 5), and vibration (Group 7) of the resting tracker; its gravity estimate also
     // replaces the gravity sensor that phones like the A15 lack, whose vibration value was always 0 before Nov9.0.
     private val motionSentinel = MotionSentinel()
+    // The phone's own ringing shakes it like a knock (ISSUE-NOV9.2-O62): vibration alerts pause while it rings.
+    private var ownVibrationWatch: OwnVibrationWatch? = null
     private var motionThread: HandlerThread? = null
     private var hasGravitySensor = false
     private var hasBarometer = false
@@ -401,6 +403,10 @@ class SensorService : Service(), SensorEventListener {
         accel?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME, handler) }
         gravity?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME, handler) }
         pressure?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler) }
+        ownVibrationWatch = OwnVibrationWatch(this) { isOwn ->
+            motionSentinel.isOwnVibrationActive = isOwn
+            SystemLogger.i("Motion", if (isOwn) "Phone ringing or notifying: vibration ignored" else "Phone quiet: vibration detected again")
+        }.also { it.start(serviceScope, handler) }
         serviceStatus.setMotion(MotionState(isRunning = accel != null, hasBarometer = hasBarometer))
         SystemLogger.i(
             "Motion",
@@ -692,6 +698,7 @@ class SensorService : Service(), SensorEventListener {
         serviceStatus.markStopped()
         if (isInitialized) {
             sensorManager.unregisterListener(this)
+            ownVibrationWatch?.stop()
             motionThread?.quitSafely()
             fusedLocationClient.removeLocationUpdates(locationCallback)
             try { unregisterReceiver(batteryReceiver) } catch (e: Exception) {}

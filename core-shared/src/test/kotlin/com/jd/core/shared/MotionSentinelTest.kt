@@ -57,6 +57,21 @@ class MotionSentinelTest {
     /** A knock: 0.1 s of 6 m/s² and back, about 0.6 g. */
     private fun Phone.knock() = feed(200) { t -> doubleArrayOf(0.0, 0.0, g + if (t < 100) 6.0 else -6.0) }
 
+    /** A sideways jolt of [ms2] for 0.1 s and back; about [ms2] / 9.81 g. */
+    private fun Phone.jolt(ms2: Double) = feed(200) { t -> doubleArrayOf(if (t < 100) ms2 else 0.0, 0.0, g) }
+
+    /** The phone's own motor: ±1.1 m/s² (0.11 g, as measured on the A15 during a call) alternating every sample. */
+    private fun Phone.ownMotor(durationMs: Long) {
+        var flip = false
+        feed(durationMs) { flip = !flip; doubleArrayOf(if (flip) 1.1 else -1.1, 0.0, g) }
+    }
+
+    /** Tipped over [overMs], not in one jolt, then resting at [angleDeg]. */
+    private fun Phone.tiltSlowly(angleDeg: Double, overMs: Long = 2_000) {
+        feed(overMs) { t -> tilted(angleDeg * t / overMs) }
+        rest(2_000, angleDeg)
+    }
+
     @Test
     fun armsOnlyAfterResting30Seconds() {
         val phone = Phone()
@@ -71,7 +86,7 @@ class MotionSentinelTest {
     @Test
     fun aTiltOver15DegreesAlertsOnce() {
         val phone = armedPhone()
-        phone.rest(2_000, angleDeg = 20.0)
+        phone.tiltSlowly(20.0)
         assertEquals(listOf(MotionSentinel.Kind.TILT), phone.alerts.map { it.kind })
         assertFalse("One disturbance, one alert: disarmed until it rests again", phone.sentinel.isArmed)
     }
@@ -79,8 +94,9 @@ class MotionSentinelTest {
     @Test
     fun aTiltUnder15DegreesDoesNotAlert() {
         val phone = armedPhone()
-        phone.rest(5_000, angleDeg = 10.0)
-        assertTrue(phone.alerts.isEmpty())
+        phone.tiltSlowly(10.0)
+        phone.rest(3_000, angleDeg = 10.0)
+        assertTrue("${phone.alerts}", phone.alerts.isEmpty())
     }
 
     @Test
@@ -89,7 +105,7 @@ class MotionSentinelTest {
         assertEquals(5.0, tiltThresholdForSensitivity(1.0f), 1e-6)
         assertEquals(23.0, tiltThresholdForSensitivity(0.1f), 1e-6)
         val phone = armedPhone(sensitivity = 1.0f)
-        phone.rest(2_000, angleDeg = 10.0)
+        phone.tiltSlowly(10.0)
         assertEquals(listOf(MotionSentinel.Kind.TILT), phone.alerts.map { it.kind })
     }
 
@@ -99,8 +115,14 @@ class MotionSentinelTest {
         // Up at 2 m/s² for 0.4 s, then braking for 0.4 s: a·T² = 32 cm.
         phone.feed(800) { t -> doubleArrayOf(0.0, 0.0, g + if (t < 400) 2.0 else -2.0) }
         phone.rest(1_000)
-        assertEquals("A smooth pickup (0.2 g) is no vibration", listOf(MotionSentinel.Kind.LIFT), phone.alerts.map { it.kind })
-        assertTrue(phone.alerts.single().detail.startsWith("accelerometer"))
+        assertEquals(listOf(MotionSentinel.Kind.LIFT), phone.tiltOrLift.map { it.kind })
+        assertTrue(phone.tiltOrLift.single().detail.startsWith("accelerometer"))
+        // Its 0.2 g start is over the 0.13 g default (Nov9.4): a pickup is a vibration too, not at the lowest setting.
+        assertEquals(setOf(MotionSentinel.Kind.VIBRATION, MotionSentinel.Kind.LIFT), phone.alerts.map { it.kind }.toSet())
+        val calm = armedPhone(vibrationSensitivity = 0.1f)
+        calm.feed(800) { t -> doubleArrayOf(0.0, 0.0, g + if (t < 400) 2.0 else -2.0) }
+        calm.rest(1_000)
+        assertEquals(listOf(MotionSentinel.Kind.LIFT), calm.alerts.map { it.kind })
     }
 
     @Test
@@ -128,10 +150,65 @@ class MotionSentinelTest {
 
     @Test
     fun theSliderSetsTheVibrationLimit() {
-        assertEquals(0.5 * STANDARD_GRAVITY, vibrationThresholdForSensitivity(0.5f), 1e-6)
+        assertEquals(0.13 * STANDARD_GRAVITY, vibrationThresholdForSensitivity(0.5f), 1e-6)
         assertEquals(0.1 * STANDARD_GRAVITY, vibrationThresholdForSensitivity(1.0f), 1e-6)
         assertEquals(0.82 * STANDARD_GRAVITY, vibrationThresholdForSensitivity(0.1f), 1e-6)
+        assertEquals("Halfway down", (0.82 + 0.13) / 2 * STANDARD_GRAVITY, vibrationThresholdForSensitivity(0.3f), 1e-6)
         assertEquals("Out of range is clamped", 0.1 * STANDARD_GRAVITY, vibrationThresholdForSensitivity(5f), 1e-6)
+        var previous = Double.MAX_VALUE
+        for (step in 1..10) {
+            val limit = vibrationThresholdForSensitivity(step / 10f)
+            assertTrue("More sensitive to the right: $step", limit < previous)
+            previous = limit
+        }
+    }
+
+    /** Values measured on the A15 in Nov9.4: a hard knock on the table 0.15 g, its own ringing 0.11 g (ISSUE-NOV9.2-O62). */
+    @Test
+    fun theDefaultCatchesAHardTableKnockButNotTheOwnRinging() {
+        val table = armedPhone()
+        table.jolt(0.15 * g)
+        table.rest(1_000)
+        assertEquals(listOf(MotionSentinel.Kind.VIBRATION), table.alerts.map { it.kind })
+        val ringing = armedPhone()
+        ringing.ownMotor(5_000)
+        ringing.rest(1_000)
+        assertTrue("Even unreported, 0.11 g is under the default: ${ringing.alerts}", ringing.alerts.isEmpty())
+    }
+
+    @Test
+    fun theOwnRingingNeverAlertsAndLeavesVibrationArmed() {
+        val phone = armedPhone(vibrationSensitivity = 1.0f)
+        phone.sentinel.isOwnVibrationActive = true
+        phone.ownMotor(10_000)
+        phone.knock() // A knock during the ringing cannot be told from it.
+        phone.sentinel.isOwnVibrationActive = false
+        phone.rest(OWN_VIBRATION_TAIL_MS + 200)
+        assertTrue("${phone.alerts}", phone.alerts.isEmpty())
+        assertTrue("Still armed after the call", phone.sentinel.isVibrationArmed)
+        phone.knock()
+        phone.rest(1_000)
+        assertEquals("A knock after the call alerts at once", listOf(MotionSentinel.Kind.VIBRATION), phone.alerts.map { it.kind })
+    }
+
+    @Test
+    fun ringingReportedLateStillCancelsTheAlert() {
+        val phone = armedPhone(vibrationSensitivity = 1.0f)
+        phone.ownMotor(VIBRATION_HOLD_MS - 60) // The motor starts before Android reports the ringing.
+        phone.sentinel.isOwnVibrationActive = true
+        phone.ownMotor(3_000)
+        phone.sentinel.isOwnVibrationActive = false
+        phone.rest(2_000)
+        assertTrue("${phone.alerts}", phone.alerts.isEmpty())
+        assertTrue(phone.sentinel.isVibrationArmed)
+    }
+
+    @Test
+    fun withoutTheReportTheOwnMotorAlertsAtTheHighestSensitivity() {
+        val phone = armedPhone(vibrationSensitivity = 1.0f)
+        phone.ownMotor(1_000)
+        phone.rest(1_000)
+        assertEquals("The A15 measurement this version fixes", listOf(MotionSentinel.Kind.VIBRATION), phone.alerts.map { it.kind })
     }
 
     @Test
@@ -141,21 +218,21 @@ class MotionSentinelTest {
         phone.knock()
         phone.rest(2_000)
         assertEquals(listOf(MotionSentinel.Kind.VIBRATION), phone.alerts.map { it.kind })
-        assertTrue(phone.alerts.single().detail, phone.alerts.single().detail.endsWith("(limit 0.50 g)"))
+        assertTrue(phone.alerts.single().detail, phone.alerts.single().detail.endsWith("(limit 0.13 g)"))
         assertFalse("One disturbance, one alert", phone.sentinel.isVibrationArmed)
         assertTrue("A knock leaves tilt and lift armed", phone.sentinel.isArmed)
     }
 
     @Test
     fun aLightJoltAlertsOnlyAtHighSensitivity() {
-        // 2 m/s² (0.2 g) sideways for 0.1 s and back.
-        val jolt: (Long) -> DoubleArray = { t -> doubleArrayOf(if (t < 100) 2.0 else 0.0, 0.0, g) }
+        // 0.115 g sideways for 0.1 s and back: between the 0.13 g default and the 0.1 g of the highest setting.
         val normal = armedPhone()
-        normal.feed(200, jolt)
+        normal.jolt(0.115 * g)
         normal.rest(2_000)
         assertTrue("${normal.alerts}", normal.alerts.isEmpty())
         val sensitive = armedPhone(vibrationSensitivity = 1.0f)
-        sensitive.feed(200, jolt)
+        sensitive.jolt(0.115 * g)
+        sensitive.rest(1_000)
         assertEquals(listOf(MotionSentinel.Kind.VIBRATION), sensitive.alerts.map { it.kind })
     }
 
@@ -176,6 +253,7 @@ class MotionSentinelTest {
         phone.rest(MOTION_ARM_AFTER_STILL_MS + 1_000)
         assertTrue(phone.sentinel.isVibrationArmed)
         phone.knock()
+        phone.rest(1_000)
         assertEquals(listOf(MotionSentinel.Kind.VIBRATION, MotionSentinel.Kind.VIBRATION), phone.alerts.map { it.kind })
     }
 
@@ -210,7 +288,7 @@ class MotionSentinelTest {
     @Test
     fun aTiltLeavesVibrationArmed() {
         val phone = armedPhone()
-        phone.rest(2_000, angleDeg = 20.0)
+        phone.tiltSlowly(20.0)
         assertEquals(listOf(MotionSentinel.Kind.TILT), phone.alerts.map { it.kind })
         assertTrue(phone.sentinel.isVibrationArmed)
     }

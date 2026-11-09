@@ -24,6 +24,10 @@ import kotlin.math.sqrt
  * - **Vibration**: one sample differs from the estimated gravity by at least [vibrationThreshold] (a knock, a shove, a
  *   shake). It arms after the same rest but on its own ([isVibrationArmed]): a vibration alert does not disarm tilt and
  *   lift, so a rough pickup gives both, and switching one alarm off on the Monitor never hides the other.
+ * - **Own vibration**: while the phone itself rings or vibrates ([isOwnVibrationActive]) and [OWN_VIBRATION_TAIL_MS]
+ *   after, no vibration alerts and vibration stays armed (ISSUE-NOV9.2-O62). A vibration alert is held for
+ *   [VIBRATION_HOLD_MS] and dropped if the phone's own vibration is reported meanwhile, since the motor may start a
+ *   little before Android reports the ringing.
  *
  * Times are monotonic milliseconds (sensor event time). Not thread-safe: one sensor thread owns it; [gravity],
  * [isArmed], and [isVibrationArmed] may be read from any thread.
@@ -40,6 +44,9 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
     /** The deviation from gravity in m/s² that alerts, from the Sensor's own `Vibration Sensitivity Threshold` slider. */
     @Volatile var vibrationThreshold: Double = vibrationThresholdForSensitivity(DEFAULT_VIBRATION_SENSITIVITY)
 
+    /** True while the phone itself rings, plays a notification, or is in a call: its own motor shakes it (ISSUE-NOV9.2-O62). */
+    @Volatile var isOwnVibrationActive = false
+
     @Volatile private var gravitySnapshot: DoubleArray? = null
     @Volatile var isArmed = false
         private set
@@ -51,6 +58,9 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
     private var gz = 0.0
     private var lastSampleMs = -1L
     private var lastMotionMs = 0L
+    private var ownVibrationSeenMs: Long? = null
+    private var heldVibration: Alert? = null
+    private var heldVibrationSinceMs = 0L
 
     private var refX = 0.0
     private var refY = 0.0
@@ -105,14 +115,29 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
 
         val deviation = norm(x - gx, y - gy, z - gz)
         val isMoving = deviation > STILL_MAX_DEVIATION
-        val vibrationAlert = if (isVibrationArmed && vibration >= vibrationThreshold) {
-            isVibrationArmed = false
-            Alert(Kind.VIBRATION, "${"%.2f".format(java.util.Locale.US, vibration / STANDARD_GRAVITY)} g (limit ${"%.2f".format(java.util.Locale.US, vibrationThreshold / STANDARD_GRAVITY)} g)")
-        } else null
+        val vibrationAlert = checkVibration(vibration, nowMs)
         if (isMoving || vibrationAlert != null) lastMotionMs = nowMs
         val hasRested = nowMs - lastMotionMs >= armAfterStillMs
         if (hasRested) isVibrationArmed = true
         return listOfNotNull(vibrationAlert, tiltOrLift(x, y, z, nowMs, dt, isMoving, hasRested))
+    }
+
+    /** A vibration alert, held [VIBRATION_HOLD_MS] first; none while the phone's own motor runs (ISSUE-NOV9.2-O62). */
+    private fun checkVibration(vibration: Double, nowMs: Long): Alert? {
+        if (isOwnVibrationActive) ownVibrationSeenMs = nowMs
+        if (ownVibrationSeenMs?.let { nowMs - it <= OWN_VIBRATION_TAIL_MS } == true) {
+            heldVibration = null // Its own ringing, not a knock: vibration stays armed.
+            return null
+        }
+        if (heldVibration == null && isVibrationArmed && vibration >= vibrationThreshold) {
+            heldVibration = Alert(Kind.VIBRATION, "${"%.2f".format(java.util.Locale.US, vibration / STANDARD_GRAVITY)} g (limit ${"%.2f".format(java.util.Locale.US, vibrationThreshold / STANDARD_GRAVITY)} g)")
+            heldVibrationSinceMs = nowMs
+        }
+        val held = heldVibration ?: return null
+        if (nowMs - heldVibrationSinceMs < VIBRATION_HOLD_MS) return null
+        heldVibration = null
+        isVibrationArmed = false
+        return held
     }
 
     private fun tiltOrLift(x: Double, y: Double, z: Double, nowMs: Long, dt: Double, isMoving: Boolean, hasRested: Boolean): Alert? {
@@ -247,12 +272,23 @@ const val STANDARD_GRAVITY = 9.80665
 
 const val DEFAULT_VIBRATION_SENSITIVITY = 0.5f
 
+/** A vibration alert waits this long, so the phone's own ringing reported a little late still cancels it. */
+const val VIBRATION_HOLD_MS = 200L
+
+/** Vibration stays ignored this long after the phone's own ringing or notification ends (the motor runs down). */
+const val OWN_VIBRATION_TAIL_MS = 1_000L
+
 /**
- * The `Vibration Sensitivity Threshold` slider (0.1 to 1.0) as a deviation from gravity in m/s²: 0.1 gives 0.82 g (about
- * the old spec's 0.8 G shock), 0.5 gives 0.5 g (a knock on the phone), 1.0 gives 0.1 g (a light tap on the table).
+ * The `Vibration Sensitivity Threshold` slider (0.1 to 1.0) as a deviation from gravity in m/s², linear between three
+ * points measured on the A15 in Nov9.4 (ISSUE-NOV9.2-O62): 0.1 gives 0.82 g (a hard blow, about the old spec's 0.8 G
+ * shock), 0.5 gives 0.13 g (a hard knock on the table; knocks on the phone are 0.18 g and more), 1.0 gives 0.1 g (the
+ * most a resting phone is known not to reach). The phone's own ringing (0.11 g) is ignored, not limited.
  */
-fun vibrationThresholdForSensitivity(sensitivity: Float): Double =
-    (0.9 - 0.8 * sensitivity.coerceIn(0.1f, 1.0f)) * STANDARD_GRAVITY
+fun vibrationThresholdForSensitivity(sensitivity: Float): Double {
+    val s = sensitivity.coerceIn(0.1f, 1.0f).toDouble()
+    val g = if (s <= 0.5) 0.82 + (0.13 - 0.82) * (s - 0.1) / 0.4 else 0.13 + (0.10 - 0.13) * (s - 0.5) / 0.5
+    return g * STANDARD_GRAVITY
+}
 
 /** The barometric height change that counts as a lift (the old spec's 0.8 m). */
 const val LIFT_BARO_MIN_M = 0.8

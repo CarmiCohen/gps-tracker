@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov9.3-MonitorStart - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov9.4-OwnVibration - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -777,14 +777,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **160.3 Stale Files Archived:** Verify that `ARCHIVE/README.md` lists each moved file and that no active document refers to `CHAPTER_TRIAGE.md` or to the old paths of the moved files, apart from frozen history (the SOT Verification Chapters, the archive).
 
 ## Chapter 161 - Sensor Microphone Noise Alarm (Nov8.103-Microphone)
-**Status: A / L / H** - 161.1 to 161.3 automated and on the A15; 161.4 needs a person next to the A15, not run (ISSUE-NOV5.2-O11 Group 4, SOT 1.399)
+**Status: A / L / H** - 161.1 to 161.3 automated and on the A15; 161.4 run by a person on the A15 in Nov9.4, passed (ISSUE-NOV5.2-O11 Group 4, SOT 1.399)
 *   **161.1 Detection:** Verify that a level 30 dB above the learned background (and at least -50 dBFS) alerts once, a smaller jump or one during the 3 s warm-up does not, a lasting noise becomes background without new alerts, and an all-zero frame is no sound. Automated by `AcousticDetectorTest`.
 *   **161.2 Monitor Alarm:** Verify that an `ACOUSTIC_ALERT` telemetry status or violation raises `Tracker noise detected` (not a GPS jump), that it stays until acknowledged, that the `Acoustic / Microphone Noise Sensor` switch and Global Mute silence it, and that it and a geofence breach are raised together. Automated by `AcousticAlarmTest`.
 *   **161.3 Only The Sensor Listens:** Verify that `app-monitor` has no microphone class or permission and the Sensor declares `RECORD_AUDIO` and the `microphone` service type (`MonitorMicrophoneGuardTest`), and on the A15 that a denied permission shows `Microphone: Audio Denied` and granting it through `GRANT MICROPHONE` shows `Microphone: Listening` with the service holding the microphone type (`dumpsys activity services com.jd.app.sensor`).
 *   **161.4 Real Noise:** With the Sensor listening in a quiet room for 5 s, clap or knock next to the phone once. Verify `REV_SensorService: Acoustic alert` on the Sensor and `Tracker noise detected` with the siren on the paired Monitor.
 
 ## Chapter 162 - Sensor Tilt And Lift Alarms (Nov9.0-LiftTilt)
-**Status: A / L / H** - 162.1 to 162.3 automated and on the A15; 162.4 needs a person next to the A15, not run (ISSUE-NOV5.2-O11 Group 5, SOT 1.400)
+**Status: A / L / H** - 162.1 to 162.3 automated and on the A15; 162.4 run by a person on the A15 in Nov9.4, passed (a tip-over also knocks the table: vibration comes with the tilt) (ISSUE-NOV5.2-O11 Group 5, SOT 1.400)
 *   **162.1 Detection:** Verify arming after 30 s of rest; a tilt over the slider's angle (15° at 0.5, 5° at 1.0) for 0.5 s alerts once and one under it does not; a 32 cm pickup is a lift and a 9.6 cm rise, a knock, or a sideways shove are not; one alert per disturbance, re-armed at the new place after the next rest; barometric 1 m alerts while weather drift and a door slam do not; the gravity estimate gives a real vibration value without a gravity sensor. Automated by `MotionSentinelTest`.
 *   **162.2 Monitor Alarms:** Verify that `TILT_ALERT` and `LIFT_ALERT` raise `Tracker tilted` and `Tracker lifted` (not a GPS jump), that `Tilt Angle Detection Sensor`, `Lift / Height Change Sensor`, and Global Mute silence them, and that a lift violation event raises the alarm too. Automated by `MotionAlarmTest`.
 *   **162.3 Arming On The A15:** Start the Sensor and leave the A15 lying still. Verify `REV_Motion` reports the sensors (A15: no gravity sensor, no barometer), `Tilt and lift armed` 30 s later, the screen line `Tilt & Lift: Armed (accelerometer)`, the debug `STATE` answer `motionArmed=true`, and no tilt or lift alert over 5 minutes at rest.
@@ -798,11 +798,11 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **163.4 Reboot With "Allow All The Time":** On the Sensor screen tap `ALLOW LOCATION ALL THE TIME`, choose "Allow all the time", and verify the line `Location after a restart: Automatic (allowed all the time)`. Reboot: verify types `0x209` (location kept, a fix within seconds), only `Noise detection off - tap to enable`, and a tap restoring `0x289`.
 
 ## Chapter 164 - Sensor Vibration Alarm (Nov9.2-Vibration)
-**Status: A / L / H** - 164.1 to 164.3 automated and on the A15; 164.4 needs a person next to the A15, not run (ISSUE-NOV5.2-O11 Group 7, SOT 1.402)
-*   **164.1 Detection:** Verify the slider limits (0.82 g at 0.1, 0.5 g at 0.5, 0.1 g at 1.0); a knock alerts once as vibration and leaves tilt and lift armed; a 0.2 g jolt alerts only at 1.0; resting noise never alerts at 1.0; vibration re-arms after the next 30 s rest; a phone bumped every 2 s never arms; a rough pickup gives vibration and lift; a tilt leaves vibration armed. Automated by `MotionSentinelTest`.
+**Status: A / L / H** - 164.1 to 164.3 automated and on the A15; 164.4 failed at the old 0.5 g default and passed with Nov9.4's 0.13 g on the A15 (ISSUE-NOV5.2-O11 Group 7, ISSUE-NOV9.2-O62, SOT 1.402, 1.404)
+*   **164.1 Detection:** Verify the slider limits (0.82 g at 0.1, 0.13 g at 0.5, 0.1 g at 1.0, Nov9.4); a knock alerts once as vibration and leaves tilt and lift armed; a 0.115 g jolt alerts only at 1.0; resting noise never alerts at 1.0; vibration re-arms after the next 30 s rest; a phone bumped every 2 s never arms; a rough pickup gives vibration and lift; a tilt leaves vibration armed. Automated by `MotionSentinelTest`.
 *   **164.2 Monitor Alarm:** Verify that `VIBRATION_ALERT` raises `Tracker vibration detected` (not a GPS jump), that `Tamper / Vibration Sensor` and Global Mute silence it and no other switch does, and that a vibration and a lift are raised together. Automated by `MotionAlarmTest`; the Setup line `Tilt, Lift & Vibration: ...` by `SensorServiceStatusTest`.
 *   **164.3 Arming On The A15:** Start the Sensor and leave the A15 lying still. Verify `REV_Motion: Vibration armed` 30 s later, the debug `STATE` answer `vibrationArmed=true`, and no vibration alert over 5 minutes at rest.
-*   **164.4 Real Knock:** With the A15 armed and the Monitor open, knock once firmly on the phone or the table next to it. Verify `REV_SensorService: Vibration alert` on the Sensor and `Tracker vibration detected` with the siren on the Monitor; a gentle pickup after the next 30 s rest gives `Tracker lifted` without a vibration alarm.
+*   **164.4 Real Knock:** With the A15 armed and the Monitor open, knock once firmly on the phone or the table next to it. Verify `REV_SensorService: Vibration alert` on the Sensor and `Tracker vibration detected` with the siren on the Monitor (Nov9.4: a hard table knock 0.46 g; a gentle one under 0.13 g gives noise only). Since Nov9.4 a pickup gives `Tracker lifted` and usually a vibration too.
 
 ## Chapter 165 - Startup Frames Audited On The Release Build (Nov9.3-MonitorStart)
 **Status: A / L** - 165.1 automated; 165.2 and 165.3 run on the A15 (ISSUE-NOV8.13-O55, SOT 1.403)
@@ -810,8 +810,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **165.2 Release Cold Start (A15):** After `assembleRelease`, run `TESTS/install_release.ps1`; verify `RELEASE sensor INSTALLED` and `RELEASE monitor INSTALLED`, that each app keeps its ID, pairing, and Home Points, and that a cold start of each gives `device_audit.cmd` 0 Davey frames over 500 ms, 0 StackLog, 0 fatal (Nov9.3: Sensor 388 ms, Monitor 457 ms).
 *   **165.3 Restore:** Run `gradlew :app-sensor:installDebug :app-monitor:installDebug`; verify `dumpsys package` shows `DEBUGGABLE`, the debug `STATE` answers the saved state, and the Sensor service runs after one tap on `System Idle`.
 
+## Chapter 166 - The Sensor Phone's Own Ringing Is No Knock (Nov9.4-OwnVibration)
+**Status: A / L / H** - 166.1 and 166.2 automated; 166.3 run by a person on the A15 (ISSUE-NOV9.2-O62, SOT 1.404)
+*   **166.1 What Counts As Own Ringing:** Verify that the audio mode `MODE_RINGTONE`, or a playing ringtone, notification, notification event, or alarm, counts as the phone's own ringing, and that a quiet phone, music, or a call in progress do not. Automated by `OwnVibrationWatchTest`.
+*   **166.2 Vibration Ignored While Ringing:** Verify that while the phone's own ringing is reported, and 1 s after, no vibration alerts and vibration stays armed, so a knock after the call alerts at once; that a ringing reported up to 200 ms late still cancels the held alert; that without the report the 0.11 g motor alerts at 1.0 but not at the 0.13 g default, while a 0.15 g table knock alerts at the default. Automated by `MotionSentinelTest`.
+*   **166.3 A Call On The A15:** With the Sensor armed (`Vibration armed`) and the slider at 0.5, call the A15 for about 10 s without touching it. Verify `REV_Motion: Phone ringing or notifying: vibration ignored`, then `Phone quiet: vibration detected again`, no `Vibration alert` and vibration still armed (the ringtone's noise alert is ISSUE-NOV9.4-O66). Nov9.4: ringing 19:49:32 to 19:49:47, no vibration alert.
+
 ---
-**Active Testing Chapters: 155 of 165**
+**Active Testing Chapters: 156 of 166**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

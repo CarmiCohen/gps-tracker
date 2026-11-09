@@ -1,17 +1,16 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov9.3-MonitorStart)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov9.4-OwnVibration)
 
 *Working file: open work only. Resolved issues are described once, in `STATUS/RESOLUTION_ARCHIVE.md`. The text this file held up to Nov8.14 (done Work Queue rows, Resolved Gaps Nov4.32 to Nov8.14, resolved gap texts) is in tag Nov8.14: `git show Nov8.14:DOCS/issues.md`. Older dashboard rows are in the Dashboard History at the end of the archive (Documentation Rule D2).*
 
-## 🎯 Next Resumption Focus: Work Queue after Nov9.3-MonitorStart, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov9.4-OwnVibration, solved one by one in the order below
 
 ### Work Queue
 Take one item at a time, and display it before fixing it (Rule 1). Row numbers are kept from earlier versions.
 
-**Next item: the user runs the Nov9.3-MonitorStart Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). When the user is next to the A15: chapters 161.4 (clap), 162.4 (tip it over, then pick it up), and 164.4 (knock). Otherwise the next row of the queue (item 46, ISSUE-NOV8.13-O56). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
+**Next item: the user runs the Nov9.4-OwnVibration Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). Then item 46, ISSUE-NOV8.13-O56 (a decision), or item 55, ISSUE-NOV9.3-O64 (a small test fix). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
-| 8 | ISSUE-NOV5.2-O11 | Groups 1 to 5 and 7 built (4 Microphone Nov8.103, 5 Tilt and Lift Nov9.0, 7 Vibration Nov9.2); Groups 6 and 8 not required. Only the person checks remain: chapters 161.4, 162.4, and 164.4 | A person next to the A15 (`/effort low`); then close the issue |
 | 11 | ISSUE-NOV5.4-O19 | `before splitting/gps-tracker` is a frozen archive; only its redundant `relay-server/index.js` edit is to be discarded, by the user | User runs `git restore index.js` in `before splitting/gps-tracker/relay-server` |
 | 18 | ISSUE-NOV6.0-O26 | Run the Sensor on a device or emulator below API 35 | A device, or user permission to download an API 34 emulator image |
 | 46 | ISSUE-NOV8.13-O56 | Every Sensor starts with the ID `T`, so two default Sensors share one relay room and receive each other's geofence and backfill requests | A decision: generate a unique Sensor ID, or require one at setup |
@@ -19,8 +18,12 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 | 48 | ISSUE-NOV8.14-O58 | The SOT shows rules 1.1 to 1.334 only as the placeholder `... (Rules 1.1 to 1.334 preserved)` | Trace the rules in git history and restore them, or record where they live |
 | 51 | ISSUE-NOV8.101-O59 | A Sensor started before its first screen connects as `PENDING_IDENTITY` | Generate the ID where it is read |
 | 53 | ISSUE-NOV9.1-O61 | Raising `targetSdk` to 35 would stop the Sensor from starting at boot (`dataSync` is forbidden from `BOOT_COMPLETED`) | Change the boot start types before any `targetSdk` raise |
-| 54 | ISSUE-NOV9.2-O62 | The Sensor phone's own vibration motor (a call or notification) may count as a vibration alert at a high slider setting | Measure on the A15 with a person: a call at slider 1.0 and 0.5 |
 | 55 | ISSUE-NOV9.3-O64 | `MapJitterAuditTest` leaves the real Monitor paired to its test ID and adds 50 rows | Save and restore the pairing in the test, delete its rows |
+| 56 | ISSUE-NOV9.4-O66 | The Sensor phone's own ringtone raises `Tracker noise detected` | Pause the noise alarm while `OwnVibrationWatch` reports ringing, like vibration |
+| 57 | ISSUE-NOV9.4-O69 | In a quiet room the noise alarm fired every one to two minutes | A person at the A15 noting what each alert was; then decide on the 30 dB jump |
+| 58 | ISSUE-NOV9.4-O67 | The sensitivity sliders are mirrored on a right-to-left phone and show only a percentage | Show the limit itself (degrees, g) or which end is more sensitive |
+| 59 | ISSUE-NOV9.4-O68 | Each slider drag writes about 30 `Vibration limit` log lines and saves the settings at every step | Save on release (`onValueChangeFinished`) |
+| 60 | ISSUE-NOV9.4-O65 | A notification that only vibrates, without sound, is not seen by `OwnVibrationWatch` | Decide: accept (most phones notify with sound), or a notification listener (special access) |
 
 ---
 
@@ -37,15 +40,6 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 - **Status**: Monitored. No crashes or functional failures observed.
 
 ### 2. Open Gaps
-- **ISSUE-NOV5.2-O11 (High) - Documented features are not wired into the running apps**: many chapters and SOT rules marked PASSED describe behavior the apps cannot perform. **Decisions (2026-11-08)**: 
-  - **Group 1 (Alarms & Sirens)**: Built (Slices 1–3).
-  - **Group 2 (Geofencing)**: Built (Nov8.12); rebuilt on the user's Home Points, Sensor enforced, in Nov8.13 (ISSUE-NOV8.13-O51).
-  - **Group 3 (`SentinelLogic`)**: Built on Sensor.
-  - **Group 4 (Microphone / Audio)**: Built (Nov8.103-Microphone): Sensor only, Monitor alarm `Tracker noise detected`; the real-noise check (chapter 161.4) is pending.
-  - **Group 5 (Lift / Tilt detection)**: Built (Nov9.0-LiftTilt): accelerometer on every phone, barometer where present, Monitor alarms `Tracker tilted` and `Tracker lifted`; the real tilt and pickup check (chapter 162.4) is pending.
-  - **Group 6 (Remote Siren)**: Not required / Retire.
-  - **Group 7 (Extra Sensors & Hardening)**: Built (Nov9.2-Vibration): the `Tamper / Vibration Sensor` switch, Sensor only, limit from the Sensor's own slider, Monitor alarm `Tracker vibration detected`; the real knock check (chapter 164.4) is pending. Other extra sensors and advanced device hardening not required / Retire.
-  - **Group 8 (Advanced Export & Map Tools)**: Not required / Retire.
 - **ISSUE-NOV5.0-O4 (Medium) - Test coverage gap, reduced in Nov5.2**: every chapter now has a `**Status:**` line under its heading in `TESTS/TEST_PROCEDURE.md`. Still outstanding are the chapters needing a person (H) or the S21FE or a second viewer (S). `ProductionReadinessAuditTest` holds three math checks only; `TESTS/device_audit.cmd` now performs the real Davey and StackLog audit. Earlier "100% passing" entries covered unit tests only.
 - **ISSUE-NOV6.0-O26 (Medium) - The Sensor has never been run below API 35**: `minSdk` is 26, but the A15 runs API 36 and the only emulator image is API 36.1. ISSUE-NOV6.0-O25 was fixed by inspecting the compiled class, so neither the original crash nor the fix was observed on an older version. Gradle builds do not run lint on `core-shared`, so only `ForensicBufferApiLevelTest` guards this, and only for `ForensicBuffer`. Needs a device or an API 34 emulator image (chapter 121.6). **User decision, 2026-11-06: do not download an image below API 35 yet; keep this issue open as a reminder.**
 - **ISSUE-NOV5.4-O19 (Low) - Uncommitted changes in the nested repository**: `before splitting/gps-tracker` has uncommitted changes to `Handover.md`, `issues.md`, `STATUS/RESOLUTION_ARCHIVE.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, `TESTS/test_results.md`, and `relay-server`. **User decision, 2026-11-07: the folder is a frozen archive; nobody edits it, and its document changes stay uncommitted as they are.** The `relay-server/index.js` edit is already in the live `relay-server` (v6.044), so the user agreed to discard it by running `git restore index.js` there; after that, this issue is closed.
@@ -57,13 +51,17 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 - **ISSUE-NOV8.13-O57 (Low) - Gradle 9 deprecations under `--warning-mode all`**: every module prints "Mutating the dependencies of configuration ... after it has been resolved or consumed. This will fail with an error in Gradle 9.0". These predate Nov8.13; the "clean `--warning-mode all` build" claims of earlier versions did not hold. Also seen: `w:` redundant-initializer warnings in `CleanSetupActionsTest`, and the kapt line "options were not recognized by any processor".
 - **ISSUE-NOV8.101-O59 (Low) - A Sensor started before its first screen has no ID**: `ForensicIdentityManager.selfId` reads `PENDING_IDENTITY` until `AdminActivity` calls `ensureIdentityGenerated`. Found in Nov8.101-Tooling: the A15 Sensor, reinstalled by an instrumented run, still had no ID. `BootReceiver` or any start that skips the first screen would connect to the relay as `PENDING_IDENTITY`. Generating the ID where it is read (in `ForensicIdentityManager` itself, or in `SensorService` before connecting) would close it.
 - **ISSUE-NOV9.1-O61 (Low) - The boot start depends on `targetSdk` 34**: since Nov9.1 a Sensor refused location and the microphone at boot keeps running with the `dataSync` and `remoteMessaging` types. Android 15 forbids starting a `dataSync` foreground service from `BOOT_COMPLETED` for apps targeting API 35+, so raising `targetSdk` would make the last fallback fail and the Sensor would again not run after a reboot. Before any raise, drop `dataSync` from the boot start (keep `remoteMessaging`, or `location` with "Allow all the time") and repeat chapter 163.3.
-- **ISSUE-NOV9.2-O62 (Low) - The Sensor phone's own vibration may count as tampering**: since Nov9.2 one accelerometer sample 0.5 g off gravity (0.1 g at the highest slider setting) raises `Tracker vibration detected`. A call, alarm clock, or notification that vibrates the resting Sensor phone may reach that, most likely at a high setting. Not measured: it needs a person to call the A15. If it does, either keep the Sensor phone on silent without vibration (an Operational Note) or ignore vibration while the phone's ringer vibrates.
+- **ISSUE-NOV9.4-O66 (Low) - The Sensor phone's own ringtone raises the noise alarm**: every call to the A15 in Nov9.4 gave `Acoustic alert` (−41 to −20 dBFS over about −73 dBFS) and `Tracker noise detected` on the Monitor. `OwnVibrationWatch` already knows when the phone rings or notifies; `AcousticMonitor` could pause its alerts then, as `MotionSentinel` does for vibration.
+- **ISSUE-NOV9.4-O69 (Low) - Frequent noise alarms in a quiet room**: between 18:08 and 19:17 on 2026-11-09 the A15 raised a noise alert every one to two minutes (−42 to −25 dBFS over −74 to −65 dBFS) while a person was testing next to it; what made each sound was not noted. If speech or ordinary room sounds reach the 30 dB jump, the alarm is too sensitive for daily use. Needs a person to note the causes over a quiet quarter of an hour.
+- **ISSUE-NOV9.4-O67 (Low) - The sensitivity sliders are hard to read**: on the A15 (right-to-left language) Android mirrors the `Tilt` and `Vibration Sensitivity Threshold` sliders, so the most sensitive end is on the left, and the label shows only a percentage (`10%` is the least sensitive). Showing the limit itself (`15°`, `0.13 g`) would make both clear.
+- **ISSUE-NOV9.4-O68 (Low) - A slider drag floods the log and the settings store**: each drag of a sensitivity slider saves `AlertSettings` at every step, so the Sensor logs about 30 `REV_Motion: Vibration limit` lines per drag. Saving when the finger lifts (`onValueChangeFinished`) would write and log once.
+- **ISSUE-NOV9.4-O65 (Low) - A vibrate-only notification can still count as a knock**: `OwnVibrationWatch` sees the phone's own ringing from the audio mode and from playing ringtones, notifications, and alarms; a notification that vibrates without sound changes neither. At the 0.13 g default the motor (0.11 g on the A15) stays under the limit, so this matters only at the highest settings. A notification listener would see them, but needs the user to grant special access.
 - **ISSUE-NOV9.3-O64 (Low) - An instrumented test changes the real Monitor pairing**: `MapJitterAuditTest` calls `setTargetId` with a 64-hex test ID and inserts 50 rows into the installed Monitor's database, and restores neither. Found in Nov9.3 when all instrumented tests ran on the A15 with `am instrument` (which keeps app data); the pairing had to be set back to `T`. Saving the pairing in `@Before` and restoring it (and deleting the rows) in `@After` would close it.
 - **ISSUE-NOV8.14-O58 (Low) - SOT rules 1.1 to 1.334 are a placeholder**: the SOT lists them only as `... (Rules 1.1 to 1.334 preserved)`, which predates the Nov7 series and has not been traced (split from ISSUE-NOV8.5-O47).
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app; reinstall it with `:app-sensor:installDebug`, then one tap on its `System Idle` screen starts the service. Running an installed test APK with `adb shell am instrument` keeps the app and its data but force-stops it; the same tap restarts it with the microphone (Nov8.103).
-- **Both apps on one phone**: the Sensor microphone can hear the Monitor siren; the noise alarm stays one pending alarm until acknowledged.
+- **Both apps on one phone**: the Sensor microphone can hear the Monitor siren; the noise alarm stays one pending alarm until acknowledged. Since Nov9.4 the siren is also the phone's own sound to `OwnVibrationWatch`, so vibration is ignored while it plays (`REV_Motion: Phone ringing or notifying`); knock tests wait until the siren stops. An incoming call's screen also stays in front of the Monitor's alarm screen.
 - **Remote check of the Sensor**: `device_check.ps1 -App sensor -Command STATE` answers `mic=`, `motionArmed=`, `vibrationArmed=` (Nov9.2), `refusedLocation=`, and `refusedMic=`; a resting A15 arms 30 s after the Sensor starts (Nov9.0), counted from the last touch, so the tap that starts the service delays it.
 - **Reboot test on the A15** (Nov9.1): the boot broadcast reaches the Sensor about 1.5 min after `adb reboot`; `dumpsys activity services com.jd.app.sensor` shows the held types (`0x289` all, `0x209` without the microphone, `0x201` neither). On the Samsung lock screen the first tap on a notification only selects it; the second opens it. The A15 now has "Allow all the time" location, so a reboot keeps location; revoke it in the app's location settings to repeat chapter 163.3. The Monitor is not started at boot.
 - **Debug `PAIR` while paired** (Nov9.3): the Monitor's session reads its target once, so `PAIR` from one tracker to another leaves the session on the old one. Run `UNPAIR` first, then `PAIR`, with the Monitor screen in front (not under the notification shade), and look for `REV_MonitorService: Connecting to relay ... for target <id>`.
@@ -99,9 +97,9 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 
 ## 📊 Hardening Progress Dashboard
 *The newest rows only (at most 6); older rows are in the Dashboard History of `STATUS/RESOLUTION_ARCHIVE.md`. From Nov8.100-Documentation, Open and Ideas are counted from the lists in this file; earlier figures used a count that cannot be traced.*
+- **Nov9.4-OwnVibration: [SOT Count: 978 (Rules: 478), Open: H:0, M:2, L:16, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 321), QA: 100]**
 - **Nov9.3-MonitorStart: [SOT Count: 977 (Rules: 477), Open: H:1, M:2, L:12, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 318), QA: 99]**
 - **Nov9.2-Vibration: [SOT Count: 976 (Rules: 476), Open: H:1, M:3, L:11, Ideas: H:0, M:0, L:20, Testing: PASSED (Sub-items: 315), QA: 98]**
 - **Nov9.1-MicOnStartup: [SOT Count: 975 (Rules: 475), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:20, Testing: PASSED (Sub-items: 311), QA: 97]**
 - **Nov9.0-LiftTilt: [SOT Count: 974 (Rules: 474), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:19, Testing: PASSED (Sub-items: 307), QA: 96]**
 - **Nov8.103-Microphone: [SOT Count: 973 (Rules: 473), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:18, Testing: PASSED (Sub-items: 303), QA: 93]**
-- **Nov8.102-Documentation: [SOT Count: 972 (Rules: 472), Open: H:1, M:3, L:9, Ideas: H:0, M:0, L:17, Testing: PASSED (Sub-items: 299), QA: 90]**
