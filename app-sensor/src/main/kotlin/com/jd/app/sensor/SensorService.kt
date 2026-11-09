@@ -407,7 +407,8 @@ class SensorService : Service(), SensorEventListener {
         pressure?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler) }
         ownVibrationWatch = OwnVibrationWatch(this) { isOwn ->
             motionSentinel.isOwnVibrationActive = isOwn
-            SystemLogger.i("Motion", if (isOwn) "Phone ringing or notifying: vibration ignored" else "Phone quiet: vibration detected again")
+            acousticMonitor.isOwnSoundActive = isOwn
+            SystemLogger.i("Motion", if (isOwn) "Phone ringing or notifying: vibration and noise ignored" else "Phone quiet: vibration and noise detected again")
         }.also { it.start(serviceScope, handler) }
         serviceStatus.setMotion(MotionState(isRunning = accel != null, hasBarometer = hasBarometer))
         SystemLogger.i(

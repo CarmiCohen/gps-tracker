@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov9.6)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov9.7)
 
 *Working file: open work only. Resolved issues are described once, in `STATUS/RESOLUTION_ARCHIVE.md`. The text this file held up to Nov8.14 (done Work Queue rows, Resolved Gaps Nov4.32 to Nov8.14, resolved gap texts) is in tag Nov8.14: `git show Nov8.14:DOCS/issues.md`. Older dashboard rows are in the Dashboard History at the end of the archive (Documentation Rule D2).*
 
-## 🎯 Next Resumption Focus: Work Queue after Nov9.6, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov9.7, solved one by one in the order below
 
 ### Work Queue
 Take one item at a time, and display it before fixing it (Rule 1). Row numbers are kept from earlier versions.
 
-**Next item: the user runs the Nov9.6 Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). Nov9.6 was closed without any test run (user instruction), so the next version's step 1 also covers it (compile `MapJitterAuditTest`, chapter 168). Then item 56, ISSUE-NOV9.4-O66. ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
+**Next item: the user runs the Nov9.7 Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). Nov9.6 and Nov9.7 were closed with a compile check only (user instruction), so the next version's step 1 also covers chapters 168.1 and 169.1 on the A15. Then item 57, ISSUE-NOV9.4-O69 (needs a person at the A15; otherwise item 58). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -16,7 +16,6 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 | 47 | ISSUE-NOV8.13-O57 | `--warning-mode all` shows Gradle 9 deprecations ("Mutating the dependencies of configuration ... after it has been resolved") in every module | Find the build logic that mutates resolved configurations |
 | 48 | ISSUE-NOV8.14-O58 | The SOT shows rules 1.1 to 1.334 only as the placeholder `... (Rules 1.1 to 1.334 preserved)` | Trace the rules in git history and restore them, or record where they live |
 | 53 | ISSUE-NOV9.1-O61 | Raising `targetSdk` to 35 would stop the Sensor from starting at boot (`dataSync` is forbidden from `BOOT_COMPLETED`) | Change the boot start types before any `targetSdk` raise |
-| 56 | ISSUE-NOV9.4-O66 | The Sensor phone's own ringtone raises `Tracker noise detected` | Pause the noise alarm while `OwnVibrationWatch` reports ringing, like vibration |
 | 57 | ISSUE-NOV9.4-O69 | In a quiet room the noise alarm fired every one to two minutes | A person at the A15 noting what each alert was; then decide on the 30 dB jump |
 | 58 | ISSUE-NOV9.4-O67 | The sensitivity sliders are mirrored on a right-to-left phone and show only a percentage | Show the limit itself (degrees, g) or which end is more sensitive |
 | 59 | ISSUE-NOV9.4-O68 | Each slider drag writes about 30 `Vibration limit` log lines and saves the settings at every step | Save on release (`onValueChangeFinished`) |
@@ -46,7 +45,6 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 - **ISSUE-NOV5.1-O10 (Low) - Relay writes its cache synchronously per update**: `saveCache()` runs `writeFileSync` for each item in `location_batch`, which may limit throughput at high telemetry rates. The cache may also be lost on redeploy unless Render uses a persistent disk.
 - **ISSUE-NOV8.13-O57 (Low) - Gradle 9 deprecations under `--warning-mode all`**: every module prints "Mutating the dependencies of configuration ... after it has been resolved or consumed. This will fail with an error in Gradle 9.0". These predate Nov8.13; the "clean `--warning-mode all` build" claims of earlier versions did not hold. Also seen: `w:` redundant-initializer warnings in `CleanSetupActionsTest`, and the kapt line "options were not recognized by any processor".
 - **ISSUE-NOV9.1-O61 (Low) - The boot start depends on `targetSdk` 34**: since Nov9.1 a Sensor refused location and the microphone at boot keeps running with the `dataSync` and `remoteMessaging` types. Android 15 forbids starting a `dataSync` foreground service from `BOOT_COMPLETED` for apps targeting API 35+, so raising `targetSdk` would make the last fallback fail and the Sensor would again not run after a reboot. Before any raise, drop `dataSync` from the boot start (keep `remoteMessaging`, or `location` with "Allow all the time") and repeat chapter 163.3.
-- **ISSUE-NOV9.4-O66 (Low) - The Sensor phone's own ringtone raises the noise alarm**: every call to the A15 in Nov9.4 gave `Acoustic alert` (−41 to −20 dBFS over about −73 dBFS) and `Tracker noise detected` on the Monitor. `OwnVibrationWatch` already knows when the phone rings or notifies; `AcousticMonitor` could pause its alerts then, as `MotionSentinel` does for vibration.
 - **ISSUE-NOV9.4-O69 (Low) - Frequent noise alarms in a quiet room**: between 18:08 and 19:17 on 2026-11-09 the A15 raised a noise alert every one to two minutes (−42 to −25 dBFS over −74 to −65 dBFS) while a person was testing next to it; what made each sound was not noted. If speech or ordinary room sounds reach the 30 dB jump, the alarm is too sensitive for daily use. Needs a person to note the causes over a quiet quarter of an hour.
 - **ISSUE-NOV9.4-O67 (Low) - The sensitivity sliders are hard to read**: on the A15 (right-to-left language) Android mirrors the `Tilt` and `Vibration Sensitivity Threshold` sliders, so the most sensitive end is on the left, and the label shows only a percentage (`10%` is the least sensitive). Showing the limit itself (`15°`, `0.13 g`) would make both clear.
 - **ISSUE-NOV9.4-O68 (Low) - A slider drag floods the log and the settings store**: each drag of a sensitivity slider saves `AlertSettings` at every step, so the Sensor logs about 30 `REV_Motion: Vibration limit` lines per drag. Saving when the finger lifts (`onValueChangeFinished`) would write and log once.
@@ -91,9 +89,9 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 
 ## 📊 Hardening Progress Dashboard
 *The newest rows only (at most 6); older rows are in the Dashboard History of `STATUS/RESOLUTION_ARCHIVE.md`. From Nov8.100-Documentation, Open and Ideas are counted from the lists in this file; earlier figures used a count that cannot be traced.*
+- **Nov9.7: [SOT Count: 981 (Rules: 481), Open: H:0, M:2, L:12, Ideas: H:0, M:0, L:22, Testing: NOT RUN (Sub-items: 324), QA: 103]**
 - **Nov9.6: [SOT Count: 980 (Rules: 480), Open: H:0, M:2, L:13, Ideas: H:0, M:0, L:22, Testing: NOT RUN (Sub-items: 323), QA: 102]**
 - **Nov9.5-DefaultId: [SOT Count: 979 (Rules: 479), Open: H:0, M:2, L:14, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 322), QA: 101]**
 - **Nov9.4-OwnVibration: [SOT Count: 978 (Rules: 478), Open: H:0, M:2, L:16, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 321), QA: 100]**
 - **Nov9.3-MonitorStart: [SOT Count: 977 (Rules: 477), Open: H:1, M:2, L:12, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 318), QA: 99]**
 - **Nov9.2-Vibration: [SOT Count: 976 (Rules: 476), Open: H:1, M:3, L:11, Ideas: H:0, M:0, L:20, Testing: PASSED (Sub-items: 315), QA: 98]**
-- **Nov9.1-MicOnStartup: [SOT Count: 975 (Rules: 475), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:20, Testing: PASSED (Sub-items: 311), QA: 97]**

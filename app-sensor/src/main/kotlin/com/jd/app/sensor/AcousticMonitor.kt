@@ -28,6 +28,12 @@ class AcousticMonitor(
     private var thread: Thread? = null
     @Volatile private var isRunning = false
 
+    /**
+     * True while the phone itself rings, notifies, or plays an alarm ([OwnVibrationWatch]); its own sound is no
+     * intruder, so no alert is raised (ISSUE-NOV9.4-O66). The detector still sees the levels.
+     */
+    @Volatile var isOwnSoundActive = false
+
     /** Starts listening; does nothing while already listening. */
     fun start(context: Context) {
         synchronized(lock) {
@@ -106,7 +112,7 @@ class AcousticMonitor(
                 silentSinceMs = null
                 report(MicrophoneState.LISTENING)
                 val floor = detector.floorDbfs
-                if (detector.onLevel(level, nowMs) && floor != null) onAlert(level, floor)
+                if (detector.onLevel(level, nowMs) && floor != null && !isOwnSoundActive) onAlert(level, floor)
             }
         } catch (e: Exception) {
             SystemLogger.e("Acoustic", "Microphone error: ${e.message}")

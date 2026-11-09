@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov9.6)
+# SOT Master Requirements & Hardening Status (Nov9.7)
 
-## 🏗️ Architectural Master Rules (480 Rules)
+## 🏗️ Architectural Master Rules (481 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -70,6 +70,7 @@
 *   **1.404 The Sensor Phone's Own Ringing Is No Knock**: While the Sensor phone itself rings (audio mode `MODE_RINGTONE`) or plays a ringtone, notification, or alarm, and 1 s after, the Sensor MUST NOT raise a vibration alert and MUST keep vibration armed; a call in progress MUST NOT pause it. The default vibration limit (slider 0.5) is 0.13 g, 0.82 g at 0.1 and 0.10 g at 1.0 (ISSUE-NOV9.2-O62).
 *   **1.405 Default IDs Unless Assigned**: Each app MUST connect with its stored ID; when none is stored, the Sensor and Monitor services MUST create the default (`T`, `V`) themselves before connecting, never connecting as `PENDING_IDENTITY`, and MUST NOT replace an assigned ID (ISSUE-NOV8.101-O59, ISSUE-NOV8.13-O56).
 *   **1.406 Instrumented Tests Leave The Installed App As It Was**: An instrumented test that changes the installed app's pairing or stored rows MUST save the pairing before it runs and restore it, and delete its own rows, after it runs, since `am instrument` keeps app data (ISSUE-NOV9.3-O64).
+*   **1.407 The Sensor Phone's Own Sound Is No Noise Alarm**: While `OwnVibrationWatch` reports the Sensor phone's own ringing, notification, or alarm, `AcousticMonitor` MUST raise no noise alert, as `MotionSentinel` raises no vibration alert (ISSUE-NOV9.4-O66).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

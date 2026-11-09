@@ -2,6 +2,10 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov9.7)
+- **The Sensor Phone's Own Ringtone Raised The Noise Alarm (ISSUE-NOV9.4-O66, Low)**: every call to the A15 in Nov9.4 gave `Acoustic alert` and `Tracker noise detected` on the Monitor. **Fix**: `AcousticMonitor.isOwnSoundActive` (volatile) is set by `SensorService` from the same `OwnVibrationWatch` callback that sets `MotionSentinel.isOwnVibrationActive`; while it is set, a detected jump raises no alert (the detector still sees the levels, so its background stays current). The log line is now `REV_Motion: Phone ringing or notifying: vibration and noise ignored` / `Phone quiet: vibration and noise detected again`. **Remaining risk**: the noise has no tail like vibration's 1 s, so a ringtone still fading after `Phone quiet` could alert; to be seen on a real call (chapter 169.1).
+- **Verification (Nov9.7)**: minimal by user instruction (2026-11-09: "make only minimal quick tests"): `:app-sensor:compileDebugKotlin` and `:app-monitor:compileDebugAndroidTestKotlin` compile clean (the latter covers Nov9.6's `MapJitterAuditTest`), plus the `:core-shared:test` integrity check. No other unit tests, no release builds, no device audit, no call on the A15 (chapters 168.1, 169.1 not run). SOT rule 1.407, test chapter 169. **NOT VERIFIED on device.**
+
 ## ✅ Resolved Issues (Nov9.6)
 - **An Instrumented Test Changed The Real Monitor Pairing (ISSUE-NOV9.3-O64, Low)**: `MapJitterAuditTest` set a 64-hex test ID as the target and inserted 50 rows into the installed Monitor's database, restoring neither, so a run with `am instrument` (which keeps app data) left the Monitor unpaired from `T`. **Fix** (test-only): `@Before` saves `identityManager.targetId`; `@After` restores it (or clears it if there was none) and deletes the test tracker's rows with `TrailDao.pruneOldestRows(testId, 0)`. 
 - **Verification (Nov9.6)**: **NOT RUN** by user instruction (2026-11-09: "make no tests at all"): no unit tests, no builds, no device audit, no integrity check (Completion steps 1 and 8). The change is test-only, so app behaviour is unchanged, but the edited test was not even compiled. SOT rule 1.406, test chapter 168 (not yet run). **NOT VERIFIED.**
@@ -243,6 +247,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov9.1-MicOnStartup: [SOT Count: 975 (Rules: 475), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:20, Testing: PASSED (Sub-items: 311), QA: 97]**
 - **Nov9.0-LiftTilt: [SOT Count: 974 (Rules: 474), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:19, Testing: PASSED (Sub-items: 307), QA: 96]**
 - **Nov8.103-Microphone: [SOT Count: 973 (Rules: 473), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:18, Testing: PASSED (Sub-items: 303), QA: 93]**
 - **Nov8.102-Documentation: [SOT Count: 972 (Rules: 472), Open: H:1, M:3, L:9, Ideas: H:0, M:0, L:17, Testing: PASSED (Sub-items: 299), QA: 90]**
