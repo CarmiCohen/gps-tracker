@@ -38,6 +38,9 @@ class SensorViewModel @Inject constructor(
 
     val serviceStartTimeMillis: StateFlow<Long> = serviceStatus.startTimeMillis
 
+    /** What the noise detection is doing, reported by [SensorService] (ISSUE-NOV5.2-O11 Group 4). */
+    val microphoneState: StateFlow<MicrophoneState> = serviceStatus.microphone
+
     private val _ticker = flow {
         while (true) {
             emit(System.currentTimeMillis())

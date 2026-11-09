@@ -34,7 +34,7 @@ The audio synthesis and siren behavior configuration overlay provides:
 - **Siren**: `SirenPlayer` synthesizes the `Siren`, `Chimes`, and `Pulse` waves and follows the Siren & Audio settings. `Force Maximum` raises the alarm stream to maximum and restores it afterwards.
 - **Stealth**: the Sensor has no audio or vibration code, and `SensorStealthGuardTest` keeps it that way.
 - **Not built yet**: communication alarms, Sensor-detected violations, geofence, microphone, lift, and the remote siren. See `DOCS/issues.md`.
-- **Built since**: GPS jump (Nov7.7), GPS signal loss and relay and internet alarms (Nov7.x), and the geofence breach (`Geofence boundary breach`, switch `Geofence Boundary Breach` = `AlertSettings.distance`): Nov8.12, rebuilt in Nov8.13 so the Sensor checks the user's Home Points (ISSUE-NOV8.13-O51). Microphone, lift, and the remote siren are still not built.
+- **Built since**: GPS jump (Nov7.7), GPS signal loss and relay and internet alarms (Nov7.x), and the geofence breach (`Geofence boundary breach`, switch `Geofence Boundary Breach` = `AlertSettings.distance`): Nov8.12, rebuilt in Nov8.13 so the Sensor checks the user's Home Points (ISSUE-NOV8.13-O51). Microphone noise (`Tracker noise detected`, switch `Acoustic / Microphone Noise Sensor`): Nov8.103-Microphone, detected by the Sensor only (SOT 1.399). Lift and the remote siren are still not built.
 
 ## 4. Persistence & DataStore Storage
 - `AlertSettings` and `sirenType` are serialized and persisted securely via `SensorDataStore` and `MonitorDataStore` using `kotlinx.serialization` across application restarts and reboots.

@@ -80,6 +80,12 @@ class SensorService : Service(), SensorEventListener {
     @Volatile private var geofence = GeofenceConfig() // Written by the geofence collector, read by the sensing loop.
     private var geofenceState = SentinelLogic.GeofenceState.UNKNOWN // Sensing loop only.
     @Volatile private var geofenceChanged = false
+    // Set by the audio thread, sent by the next sensing tick with the current position (ISSUE-NOV5.2-O11 Group 4).
+    @Volatile private var pendingAcousticAlert: String? = null
+    private val acousticMonitor = AcousticMonitor(
+        onAlert = { level, floor -> onAcousticAlert(level, floor) },
+        onState = { serviceStatus.setMicrophone(it) }
+    )
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -237,8 +243,9 @@ class SensorService : Service(), SensorEventListener {
         SystemLogger.i("SensorService", "onStartCommand received. Handling FGS activation...")
         
         if (hasRequiredPermissions()) {
-            startForegroundServiceInternal()
+            val canUseMicrophone = startForegroundServiceInternal()
             initializeServiceComponents()
+            updateMicrophone(canUseMicrophone)
             
             if (!isMuzzled) {
                 startSensingLoop()
@@ -266,6 +273,30 @@ class SensorService : Service(), SensorEventListener {
         } else true
 
         return locationGranted && notificationGranted && networkStateGranted && fgsLocationGranted
+    }
+
+    /** Listens while the foreground service holds the microphone type; every start command re-checks, so opening the app resumes it. */
+    private fun updateMicrophone(canUseMicrophone: Boolean) {
+        when {
+            canUseMicrophone -> acousticMonitor.start(this)
+            !hasMicrophonePermission() -> {
+                acousticMonitor.stop()
+                serviceStatus.setMicrophone(MicrophoneState.NO_PERMISSION)
+            }
+            else -> {
+                acousticMonitor.stop()
+                serviceStatus.setMicrophone(MicrophoneState.NEEDS_APP_OPEN)
+                SystemLogger.w("Acoustic", "Started in the background: Android allows the microphone only after the Sensor app is opened")
+            }
+        }
+    }
+
+    private fun hasMicrophonePermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    private fun onAcousticAlert(levelDbfs: Double, floorDbfs: Double) {
+        pendingAcousticAlert = "level ${levelDbfs.toInt()} dBFS, background ${floorDbfs.toInt()} dBFS"
+        orchestrator.preemptLoop("sensing_loop") // Sent now, not after up to 10 s of a slow sampling interval.
     }
 
     private fun registerSensors() {
@@ -410,6 +441,21 @@ class SensorService : Service(), SensorEventListener {
                     )
                     serviceScope.launch { signalingClient.sendViolation(violation) }
                 }
+
+                // A tick that already carries a violation keeps it; the noise follows on the next tick.
+                val acoustic = pendingAcousticAlert
+                if (acoustic != null && !update.isCritical) {
+                    pendingAcousticAlert = null
+                    update.status = ACOUSTIC_ALERT_STATUS
+                    update.isCritical = true
+                    SystemLogger.w("SensorService", "Acoustic alert: $acoustic")
+                    val violation = ViolationEvent(
+                        type = ACOUSTIC_ALERT_STATUS,
+                        location = update.snapshot(),
+                        nonce = java.util.UUID.randomUUID().toString()
+                    )
+                    serviceScope.launch { signalingClient.sendViolation(violation) }
+                }
                 
                 forensicBuffer.writeTrace(update, isCritical = update.isCritical)
                 signalingClient.sendTelemetry(update)
@@ -462,7 +508,12 @@ class SensorService : Service(), SensorEventListener {
         }
     }
 
-    private fun startForegroundServiceInternal() {
+    /**
+     * Starts the foreground service and returns whether it holds the microphone type. Android 11+ gives a background
+     * service the microphone only through that type, and Android 14+ refuses the type to a service started in the
+     * background (after a reboot): then the service runs without it until the Sensor app is opened.
+     */
+    private fun startForegroundServiceInternal(): Boolean {
         val pendingIntent = PendingIntent.getActivity(this, 0, Intent(this, AdminActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(this, SensorApp.CHANNEL_ID)
             .setContentTitle("System Maintenance")
@@ -480,9 +531,19 @@ class SensorService : Service(), SensorEventListener {
                     type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
                     type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
                 }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasMicrophonePermission()) {
+                    try {
+                        startForeground(1, notification, type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                        return true
+                    } catch (e: Exception) {
+                        SystemLogger.w("SensorService", "Microphone service type refused: ${e.message}")
+                    }
+                }
                 startForeground(1, notification, type)
+                return Build.VERSION.SDK_INT < Build.VERSION_CODES.R && hasMicrophonePermission()
             } else {
                 startForeground(1, notification)
+                return hasMicrophonePermission()
             }
         } catch (e: Exception) {
             SystemLogger.e("SensorService", "Fatal FGS start error: ${e.message}")
@@ -493,6 +554,7 @@ class SensorService : Service(), SensorEventListener {
                     stopSelf()
                 }
             }
+            return false
         }
     }
 
@@ -505,6 +567,7 @@ class SensorService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         SystemLogger.i("SensorService", "onDestroy called. Cleaning up...")
+        acousticMonitor.stop()
         serviceScope.cancel()
         orchestrator.cancelAll()
         fixStore.clear()

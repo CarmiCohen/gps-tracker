@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov8.102-Documentation)
+# SOT Master Requirements & Hardening Status (Nov8.103-Microphone)
 
-## 🏗️ Architectural Master Rules (472 Rules)
+## 🏗️ Architectural Master Rules (473 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -62,6 +62,7 @@
 *   **1.396 Lean Documentation Workflow (R-ID 167)**: The project documents MUST follow Documentation Rules D1 to D7 of `DEVELOPER_GUIDELINES.md`: one home per fact (`RESOLUTION_ARCHIVE.md`), `issues.md` as a working file (no Resolved Gaps, at most 6 dashboard rows, at most 40,000 characters), a `Handover.md` of at most 70 lines, git tags as baselines, the 10-step Completion Sequence, `chat_session.md` as a milestone log, and targeted reads. `TrackingDocumentIntegrityTest` and `BaselineIndexTest` MUST pass (user decision 2026-11-08) (R-ID 167).
 *   **1.397 Debug-Only Test Commands And One-Line Tooling (R-ID 168)**: adb test commands (Sensor ID, pairing, Home Points, state) MUST exist only in debug builds (`src/debug` receivers guarded by the `DUMP` permission), MUST be parsed strictly by `DebugCommand` with each app accepting only its own actions, and MUST answer with one `REV_DEBUG_CMD` logcat line. Device checks prefer these lines or a text-only `uiautomator` dump over screenshots; `TESTS/run_tests.ps1`, `device_check.ps1`, and `audit_line.ps1` print one summary line each (SIMP-NOV8.100-S1) (R-ID 168).
 *   **1.398 One Home For Chapter Status, Frozen SOT Lists (R-ID 169)**: Each `TEST_PROCEDURE.md` chapter MUST carry its status as one `**Status: <codes>** - <notes>` line right under its heading (codes L, A, T, H, S, D, N); there is no separate triage file, and `audit_line.ps1` MUST compute QA from these lines and stop when one is missing. The Core Hardening Baseline and Verification Chapters lists below are frozen at Nov8.101-Tooling: newer versions are recorded only in `RESOLUTION_ARCHIVE.md`, and `TrackingDocumentIntegrityTest` MUST reject a newer entry. Stale documents live in `ARCHIVE/` (SIMP-NOV8.100-S2) (R-ID 169).
+*   **1.399 Sensor Microphone Noise Alarm (R-ID 170)**: Only the Sensor MAY open a microphone; the Monitor MUST NOT declare or use one. With `RECORD_AUDIO` granted (asked, not required), the Sensor MUST listen through a `microphone`-type foreground service, compute only sound levels (no audio stored or sent), and report a jump of at least 30 dB above the learned background (and at least -50 dBFS, at most once per 10 s) as status and violation `ACOUSTIC_ALERT` with the current position. When Android withholds the microphone (no permission, a background start after a reboot, a silenced microphone), the Sensor MUST say so on its screen and MUST take the microphone when its app is opened. The Monitor MUST raise `Tracker noise detected` for it, switched by `Acoustic / Microphone Noise Sensor` (ISSUE-NOV5.2-O11 Group 4) (R-ID 170).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

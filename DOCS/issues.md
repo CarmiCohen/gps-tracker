@@ -1,17 +1,18 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.101-Tooling)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov8.103-Microphone)
 
 *Working file: open work only. Resolved issues are described once, in `STATUS/RESOLUTION_ARCHIVE.md`. The text this file held up to Nov8.14 (done Work Queue rows, Resolved Gaps Nov4.32 to Nov8.14, resolved gap texts) is in tag Nov8.14: `git show Nov8.14:DOCS/issues.md`. Older dashboard rows are in the Dashboard History at the end of the archive (Documentation Rule D2).*
 
-## 🎯 Next Resumption Focus: Work Queue after Nov8.102-Documentation, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov8.103-Microphone, solved one by one in the order below
 
 ### Work Queue
 Take one item at a time, and display it before fixing it (Rule 1). Row numbers are kept from earlier versions.
 
-**Next item: the user runs the Nov8.102-Documentation Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md`. Then ISSUE-NOV5.2-O11 Group 4 (Microphone) or Group 5 (Lift), both decided "Build" and not built (item 8, High). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
+**Next item: the user runs the Nov8.103-Microphone Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md`. When the user is next to the A15: chapter 161.4 (clap near the phone, expect `Tracker noise detected`). Then ISSUE-NOV5.2-O11 Group 5 (Lift), decided "Build" and not built (item 8, High). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
-| 8 | ISSUE-NOV5.2-O11 | Groups 1 (Alarms), 2 (Geofencing, Nov8.13), and 3 (`SentinelLogic`) built. Group 4 (Microphone) and Group 5 (Lift) are decided "Build" but **not built**: only the settings toggles exist (`acousticAlert`, `liftAlert`, `tiltAlert`). Groups 6 to 8 not required | Build Group 4 and Group 5 |
+| 8 | ISSUE-NOV5.2-O11 | Groups 1 (Alarms), 2 (Geofencing, Nov8.13), 3 (`SentinelLogic`), and 4 (Microphone, Nov8.103; chapter 161.4 real noise pending) built. Group 5 (Lift) is decided "Build" but **not built**: only the settings toggles exist (`liftAlert`, `tiltAlert`). Groups 6 to 8 not required | Build Group 5; run chapter 161.4 next to the A15 |
+| 52 | ISSUE-NOV8.103-O60 | After a reboot the Sensor's noise detection stays off until someone opens the Sensor app (Android 14+ rule) | A decision: accept and document, or show a notification asking to open the app |
 | 11 | ISSUE-NOV5.4-O19 | `before splitting/gps-tracker` is a frozen archive; only its redundant `relay-server/index.js` edit is to be discarded, by the user | User runs `git restore index.js` in `before splitting/gps-tracker/relay-server` |
 | 18 | ISSUE-NOV6.0-O26 | Run the Sensor on a device or emulator below API 35 | A device, or user permission to download an API 34 emulator image |
 | 45 | ISSUE-NOV8.13-O55 | The Monitor's first frame takes 705 to 783 ms on the A15 (2 Davey frames over 500 ms per cold start), identical on the Nov8.11 build | A Perfetto trace of the Monitor start, then moving the work off the first frame |
@@ -39,7 +40,7 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
   - **Group 1 (Alarms & Sirens)**: Built (Slices 1–3).
   - **Group 2 (Geofencing)**: Built (Nov8.12); rebuilt on the user's Home Points, Sensor enforced, in Nov8.13 (ISSUE-NOV8.13-O51).
   - **Group 3 (`SentinelLogic`)**: Built on Sensor.
-  - **Group 4 (Microphone / Audio)**: Build. **Not built yet** (checked in Nov8.13).
+  - **Group 4 (Microphone / Audio)**: Built (Nov8.103-Microphone): Sensor only, Monitor alarm `Tracker noise detected`; the real-noise check (chapter 161.4) is pending.
   - **Group 5 (Lift / Tilt detection)**: Build. **Not built yet** (checked in Nov8.13).
   - **Group 6 (Remote Siren)**: Not required / Retire.
   - **Group 7 (Extra Sensors & Hardening)**: Extra sensors TBD; Advanced device hardening not required / Retire.
@@ -55,14 +56,17 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 - **ISSUE-NOV8.13-O56 (Low) - Every Sensor defaults to the ID `T`**: `ForensicIdentity.DEFAULT_TRACKER_ID` is `T`. Two Sensors left at the default join the same relay room, so a Monitor paired to `T` sends its geofence and backfill requests to both, and receives both trails.
 - **ISSUE-NOV8.13-O57 (Low) - Gradle 9 deprecations under `--warning-mode all`**: every module prints "Mutating the dependencies of configuration ... after it has been resolved or consumed. This will fail with an error in Gradle 9.0". These predate Nov8.13; the "clean `--warning-mode all` build" claims of earlier versions did not hold. Also seen: `w:` redundant-initializer warnings in `CleanSetupActionsTest`, and the kapt line "options were not recognized by any processor".
 - **ISSUE-NOV8.101-O59 (Low) - A Sensor started before its first screen has no ID**: `ForensicIdentityManager.selfId` reads `PENDING_IDENTITY` until `AdminActivity` calls `ensureIdentityGenerated`. Found in Nov8.101-Tooling: the A15 Sensor, reinstalled by an instrumented run, still had no ID. `BootReceiver` or any start that skips the first screen would connect to the relay as `PENDING_IDENTITY`. Generating the ID where it is read (in `ForensicIdentityManager` itself, or in `SensorService` before connecting) would close it.
+- **ISSUE-NOV8.103-O60 (Low) - No noise detection after a reboot until the Sensor app is opened**: Android 14+ refuses the `microphone` foreground-service type to a service started in the background, and `BootReceiver` starts `SensorService` in the background. The service runs on without the microphone and shows `Microphone: Open the Sensor app to start listening`; opening the app restores it. A tracker that reboots unattended therefore stops detecting noise. Options: accept it, or post a notification asking to open the app.
 - **ISSUE-NOV8.14-O58 (Low) - SOT rules 1.1 to 1.334 are a placeholder**: the SOT lists them only as `... (Rules 1.1 to 1.334 preserved)`, which predates the Nov7 series and has not been traced (split from ISSUE-NOV8.5-O47).
 
 ### 3. Operational Notes
-- **Sensor service restart**: instrumented test runs uninstall the Sensor app; reinstall it with `:app-sensor:installDebug`, then one tap on its `System Idle` screen starts the service.
+- **Sensor service restart**: instrumented test runs uninstall the Sensor app; reinstall it with `:app-sensor:installDebug`, then one tap on its `System Idle` screen starts the service. Running an installed test APK with `adb shell am instrument` keeps the app and its data but force-stops it; the same tap restarts it with the microphone (Nov8.103).
+- **Both apps on one phone**: the Sensor microphone can hear the Monitor siren; the noise alarm stays one pending alarm until acknowledged.
 
 ---
 
 ## 🚀 Strategic Simplification Ideas
+*   **SIMP-NOV8.103-S1**: One Violation Report In The Sensing Loop. `SensorService`'s sensing loop now builds a `ViolationEvent`, sets the status and `isCritical`, and launches `sendViolation` in three places (geofence, movement, noise), and a movement verdict silently overwrites a geofence status on the same tick. One `report(status, reason)` helper with an explicit priority would keep them consistent; with SIMP-NOV8.13-S2 it could also drop the unused violation event.
 *   **SIMP-NOV8.102-S1**: Archive The Remaining Oct Test Files. `TESTS/handoverTesting.md` (an Oct17.11 handover), `TESTS/MAP_sot.md`, and `TESTS/Alarms.md` (Oct requirement lists) were last changed on 2026-11-01 and nothing refers to them. Check whether any requirement in the last two is missing from the SOT (relevant to ISSUE-NOV5.2-O11 Groups 4 and 5), then move all three to `ARCHIVE/`.
 *   **SIMP-NOV8.13-S1**: One Geofence Check. `SentinelLogic.evaluateGeofenceTransition` and `SentinelLogic.Geofence` (one fence, no accuracy) are now used only by `SentinelLogicTest`, `GeofenceIntegrityTest`, and `GeofenceForensicTest`; the apps use `evaluateHomeZone`. Moving those tests to `evaluateHomeZone` would leave one geofence rule.
 *   **SIMP-NOV8.13-S2**: One Violation Path. The Sensor sends each violation twice: as the status of a critical telemetry row and as a `violation_event`. The relay forwards the second as `violation_relay`, but `SocketioSignalingClient` has no listener, so `violationFlow` never emits and the Monitor alarms on the telemetry status alone. Either listen for `violation_relay` or remove `sendViolation`, `violationFlow`, and the relay handler.
@@ -85,9 +89,9 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 
 ## 📊 Hardening Progress Dashboard
 *The newest rows only (at most 6); older rows are in the Dashboard History of `STATUS/RESOLUTION_ARCHIVE.md`. From Nov8.100-Documentation, Open and Ideas are counted from the lists in this file; earlier figures used a count that cannot be traced.*
+- **Nov8.103-Microphone: [SOT Count: 973 (Rules: 473), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:18, Testing: PASSED (Sub-items: 303), QA: 93]**
 - **Nov8.102-Documentation: [SOT Count: 972 (Rules: 472), Open: H:1, M:3, L:9, Ideas: H:0, M:0, L:17, Testing: PASSED (Sub-items: 299), QA: 90]**
 - **Nov8.101-Tooling: [SOT Count: 971 (Rules: 471), Open: H:1, M:3, L:9, Ideas: H:0, M:0, L:16, Testing: PASSED (Sub-items: 296), QA: 88]**
 - **Nov8.100-Documentation: [SOT Count: 970 (Rules: 470), Open: H:1, M:3, L:8, Ideas: H:0, M:0, L:16, Testing: PASSED (Sub-items: 336), QA: 87]**
 - **Nov8.14: [SOT Count: 969 (Rules: 469), Open: H:1, M:2, L:15, Ideas: H:0, M:3, L:15, Testing: PASSED (Sub-items: 334), QA: 86]**
 - **Nov8.13: [SOT Count: 968 (Rules: 468), Open: H:1, M:3, L:15, Ideas: H:0, M:3, L:15, Testing: PASSED (Sub-items: 331), QA: 85]**
-- **Nov8.12: [SOT Count: 967 (Rules: 467), Open: H:1, M:1, L:13, Ideas: H:0, M:3, L:13, Testing: PASSED (Sub-items: 323), QA: 83]**

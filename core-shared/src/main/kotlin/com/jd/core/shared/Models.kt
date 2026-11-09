@@ -115,6 +115,9 @@ data class BackfillResponse(
 /** Telemetry status and violation type the Sensor sends when the tracker leaves all Home Points (ISSUE-NOV8.13-O51). */
 const val GEOFENCE_BREACH_STATUS = "GEOFENCE_BREACH"
 
+/** Telemetry status and violation type the Sensor sends when its microphone hears a sudden loud noise (ISSUE-NOV5.2-O11 Group 4). */
+const val ACOUSTIC_ALERT_STATUS = "ACOUSTIC_ALERT"
+
 /** A user-defined Home Point; the tracker is home while it is within the geofence radius of any one of them. */
 @Serializable
 data class HomePoint(val lat: Double, val lng: Double)

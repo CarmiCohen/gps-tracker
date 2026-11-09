@@ -71,6 +71,7 @@ class AdminActivity : ComponentActivity() {
                 val hudState by viewModel.hudState.collectAsStateWithLifecycle()
                 val isServiceRunning by viewModel.isServiceRunning.collectAsStateWithLifecycle()
                 val serviceUptimeText by viewModel.serviceUptimeText.collectAsStateWithLifecycle()
+                val microphoneState by viewModel.microphoneState.collectAsStateWithLifecycle()
                 val logs by SystemLogger.logs.collectAsStateWithLifecycle()
                 val scope = rememberCoroutineScope()
                 val context = LocalContext.current
@@ -114,13 +115,16 @@ class AdminActivity : ComponentActivity() {
                                     initialAutoStartTriggered = true
                                     if (!isServiceRunning) {
                                         SystemLogger.i("AdminActivity", "Auto-starting SensorService on launch...")
-                                        val intent = Intent(context, SensorService::class.java)
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                            context.startForegroundService(intent)
-                                        } else {
-                                            context.startService(intent)
-                                        }
+                                        startSensorService(context)
                                     }
+                                }
+                            }
+                            // A service started at boot may not use the microphone until the app is in the foreground:
+                            // a start command from here lets it take the microphone (ISSUE-NOV5.2-O11 Group 4).
+                            LaunchedEffect(isServiceRunning, microphoneState) {
+                                if (isServiceRunning && microphoneState == MicrophoneState.NEEDS_APP_OPEN) {
+                                    SystemLogger.i("AdminActivity", "App opened: letting SensorService start the microphone")
+                                    startSensorService(context)
                                 }
                             }
                             if (showAlertsOverlay) {
@@ -205,6 +209,7 @@ class AdminActivity : ComponentActivity() {
                                     hudState = hudState,
                                     isServiceRunning = isServiceRunning,
                                     serviceUptimeText = serviceUptimeText,
+                                    microphoneState = microphoneState,
                                     trackerId = trackerId,
                                     relayUrl = relayUrl,
                                     logs = logs,
@@ -240,6 +245,22 @@ class AdminActivity : ComponentActivity() {
         startActivity(intent)
     }
 }
+
+/** Starts [SensorService], or sends a running one a new start command. */
+fun startSensorService(context: android.content.Context) {
+    val intent = Intent(context, SensorService::class.java)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        context.startForegroundService(intent)
+    } else {
+        context.startService(intent)
+    }
+}
+
+/**
+ * Asked together with the required permissions, but not required: without it the Sensor runs without noise
+ * detection and shows "Microphone: Audio Denied" (ISSUE-NOV5.2-O11 Group 4).
+ */
+internal const val OPTIONAL_MICROPHONE_PERMISSION = Manifest.permission.RECORD_AUDIO
 
 internal fun getRequiredSensorPermissions(sdkInt: Int = Build.VERSION.SDK_INT): List<String> {
     return mutableListOf(
@@ -289,8 +310,8 @@ fun PermissionGuard(content: @Composable () -> Unit) {
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        allGranted = permissions.values.all { it }
+    ) {
+        allGranted = checkSensorPermissions(context, requiredPermissions)
     }
 
     if (!allGranted) {
@@ -300,7 +321,7 @@ fun PermissionGuard(content: @Composable () -> Unit) {
             verticalArrangement = Arrangement.Center
         ) {
             Text("Permissions Required", style = MaterialTheme.typography.headlineSmall)
-            Button(onClick = { launcher.launch(requiredPermissions.toTypedArray()) }) {
+            Button(onClick = { launcher.launch((requiredPermissions + OPTIONAL_MICROPHONE_PERMISSION).toTypedArray()) }) {
                 Text("Grant Permissions")
             }
         }
@@ -482,6 +503,7 @@ fun SensorAdminConsole(
     hudState: HudState,
     isServiceRunning: Boolean,
     serviceUptimeText: String,
+    microphoneState: MicrophoneState,
     trackerId: String,
     relayUrl: String,
     logs: List<SystemLogger.LogEntry>, 
@@ -493,6 +515,9 @@ fun SensorAdminConsole(
     var showSetupDialog by rememberSaveable { mutableStateOf(false) }
     var showToolsOverlay by rememberSaveable { mutableStateOf(false) }
     var showStopConfirmDialog by rememberSaveable { mutableStateOf(false) }
+    val microphoneLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted && isServiceRunning) startSensorService(context) // The service takes the microphone on its next start command.
+    }
 
     if (showToolsOverlay) {
         com.jd.core.ui.ToolsOverlay(
@@ -583,6 +608,17 @@ fun SensorAdminConsole(
                 Text("WHITELIST BATTERY")
             }
 
+            Text(
+                text = microphoneStatusText(microphoneState),
+                fontSize = 12.sp,
+                color = if (microphoneState == MicrophoneState.LISTENING) Color(0xFF10B981) else Color(0xFFF59E0B)
+            )
+            if (microphoneState == MicrophoneState.NO_PERMISSION) {
+                Button(onClick = { microphoneLauncher.launch(OPTIONAL_MICROPHONE_PERMISSION) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("GRANT MICROPHONE")
+                }
+            }
+
             Card(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 colors = CardDefaults.cardColors(
@@ -616,14 +652,7 @@ fun SensorAdminConsole(
                         }
                     } else {
                         Button(
-                            onClick = {
-                                val intent = Intent(context, SensorService::class.java)
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    context.startForegroundService(intent)
-                                } else {
-                                    context.startService(intent)
-                                }
-                            },
+                            onClick = { startSensorService(context) },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
                         ) {
                             Text("START SERVICE")
@@ -695,6 +724,7 @@ fun SensorAdminConsole(
                     Text("App Version: ${getAppVersionName(context)}")
                     Text(serviceStatusText(isServiceRunning, serviceUptimeText))
                     Text(relayStatusText(hudState.isRelayConnected))
+                    Text(microphoneStatusText(microphoneState))
                 }
             },
             confirmButton = {

@@ -44,7 +44,8 @@ enum class AlarmType(val title: String) {
     LOCAL_INTERNET_OFFLINE("Monitor internet lost"),
     GPS_SIGNAL_LOSS("Tracker GPS signal loss"),
     GPS_JUMP("Tracker GPS jump"),
-    GEOFENCE_BREACH("Geofence boundary breach")
+    GEOFENCE_BREACH("Geofence boundary breach"),
+    ACOUSTIC_ALERT("Tracker noise detected")
 }
 
 fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) {
@@ -57,6 +58,7 @@ fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) 
     AlarmType.GPS_SIGNAL_LOSS -> signalLoss
     AlarmType.GPS_JUMP -> jammerDetection
     AlarmType.GEOFENCE_BREACH -> distance
+    AlarmType.ACOUSTIC_ALERT -> acousticAlert // "Acoustic / Microphone Noise Sensor"; the Sensor listens either way.
 }
 
 /** The newest telemetry from the paired tracker. [receivedAtMs] is Monitor time, so the clocks of the two phones never meet. */
@@ -121,11 +123,12 @@ fun alarmConditions(
     ) {
         add(AlarmType.GPS_SIGNAL_LOSS)
     }
-    if (violationType == com.jd.core.shared.GEOFENCE_BREACH_STATUS || reading?.status == com.jd.core.shared.GEOFENCE_BREACH_STATUS) {
-        add(AlarmType.GEOFENCE_BREACH)
-    } else if ((reading != null && (reading.status == "JUMP" || reading.status == "OUTLIER")) || hasViolation) {
-        add(AlarmType.GPS_JUMP)
-    }
+    // The Sensor sends each violation twice: as a violation event and as the status of its telemetry row.
+    val flagged = setOfNotNull(violationType, reading?.status)
+    if (com.jd.core.shared.GEOFENCE_BREACH_STATUS in flagged) add(AlarmType.GEOFENCE_BREACH)
+    if (com.jd.core.shared.ACOUSTIC_ALERT_STATUS in flagged) add(AlarmType.ACOUSTIC_ALERT)
+    val isOtherViolation = hasViolation && violationType !in NON_GPS_VIOLATIONS
+    if ("JUMP" in flagged || "OUTLIER" in flagged || isOtherViolation) add(AlarmType.GPS_JUMP)
     if (reading == null) return@buildSet
     if (!reading.isCharging) add(AlarmType.POWER_DISCONNECTED)
     val batteryLimit = if (AlarmType.LOW_BATTERY in active) LOW_BATTERY_CLEARS_AT else LOW_BATTERY_BELOW
@@ -133,6 +136,9 @@ fun alarmConditions(
     val temperatureLimit = if (AlarmType.HIGH_TEMPERATURE in active) HIGH_TEMPERATURE_CLEARS_AT else HIGH_TEMPERATURE_ABOVE
     if (reading.tempCelsius > 0f && reading.tempCelsius > temperatureLimit) add(AlarmType.HIGH_TEMPERATURE)
 }
+
+/** Violation types with an alarm of their own; any other violation is a GPS jump. */
+private val NON_GPS_VIOLATIONS = setOf(com.jd.core.shared.GEOFENCE_BREACH_STATUS, com.jd.core.shared.ACOUSTIC_ALERT_STATUS)
 
 /** One raised alarm. [isActive] is false once its condition has cleared. */
 data class Alarm(

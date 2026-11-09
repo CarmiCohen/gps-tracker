@@ -19,6 +19,13 @@ class SensorServiceStatus @Inject constructor() {
     private val startTime = MutableStateFlow(0L)
     val startTimeMillis: StateFlow<Long> = startTime.asStateFlow()
 
+    private val microphoneState = MutableStateFlow(MicrophoneState.OFF)
+    val microphone: StateFlow<MicrophoneState> = microphoneState.asStateFlow()
+
+    fun setMicrophone(state: MicrophoneState) {
+        microphoneState.value = state
+    }
+
     fun markRunning(startTimeMs: Long = currentElapsedRealtime()) {
         startTime.value = startTimeMs
         running.value = true
@@ -27,6 +34,7 @@ class SensorServiceStatus @Inject constructor() {
     fun markStopped() {
         startTime.value = 0L
         running.value = false
+        microphoneState.value = MicrophoneState.OFF
     }
 
     fun resetUptime(nowMs: Long = currentElapsedRealtime()) {
@@ -68,4 +76,29 @@ fun serviceStatusText(isRunning: Boolean, uptimeText: String = ""): String {
 /** The relay line of the Sensor Setup dialog. */
 fun relayStatusText(isConnected: Boolean): String =
     "Relay Connection: ${if (isConnected) "Connected" else "Disconnected"}"
+
+/** What the Sensor's noise detection is doing (ISSUE-NOV5.2-O11 Group 4). */
+enum class MicrophoneState {
+    /** The service is not running. */
+    OFF,
+    /** RECORD_AUDIO is not granted. */
+    NO_PERMISSION,
+    /** The service was started in the background (after a reboot), where Android forbids the microphone until the Sensor app is opened. */
+    NEEDS_APP_OPEN,
+    LISTENING,
+    /** The microphone delivers only zeros: Android or another app has silenced it. */
+    SILENCED,
+    /** The phone has no usable microphone, or it failed. */
+    UNAVAILABLE
+}
+
+/** The microphone line of the Sensor Setup dialog. */
+fun microphoneStatusText(state: MicrophoneState): String = "Microphone: " + when (state) {
+    MicrophoneState.OFF -> "Off"
+    MicrophoneState.NO_PERMISSION -> "Audio Denied"
+    MicrophoneState.NEEDS_APP_OPEN -> "Open the Sensor app to start listening"
+    MicrophoneState.LISTENING -> "Listening"
+    MicrophoneState.SILENCED -> "Silenced by the system"
+    MicrophoneState.UNAVAILABLE -> "Not available"
+}
 

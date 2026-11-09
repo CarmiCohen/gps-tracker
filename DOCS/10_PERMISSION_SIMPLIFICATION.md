@@ -11,7 +11,7 @@ To maximize battery life and user privacy, the Monitor app is stripped of all no
 
 ### ❌ Removed Permissions (Code Shortened)
 - `ACCESS_BACKGROUND_LOCATION`: Not needed; the Monitor only tracks in the foreground.
-- `RECORD_AUDIO`: No microphone access required.
+- `RECORD_AUDIO`: No microphone access required; only the Sensor listens (SOT 1.399, `MonitorMicrophoneGuardTest`).
 - `RECEIVE_BOOT_COMPLETED`: The Monitor does not need to start automatically.
 - `WAKE_LOCK`: No background processing allowed.
 
@@ -25,6 +25,7 @@ The Sensor retains powerful permissions but removes all UI-related overhead.
 - `FOREGROUND_SERVICE`: For persistent sensing.
 - `RECEIVE_BOOT_COMPLETED`: To ensure automatic start after power loss.
 - `WAKE_LOCK`: To maintain sensing loops while the screen is off.
+- `RECORD_AUDIO` (asked, optional) & `FOREGROUND_SERVICE_MICROPHONE`: noise detection (Nov8.103-Microphone, SOT 1.399).
 
 ### ❌ Removed Permissions (Code Shortened)
 - `QUERY_ALL_PACKAGES`: Not needed for a headless service.

@@ -64,6 +64,28 @@ class SensorServiceStatusTest {
         assertEquals("Relay Connection: Disconnected", relayStatusText(false))
     }
 
+    /** Chapter 161 (ISSUE-NOV5.2-O11 Group 4) and chapter 51: the microphone line, with "Audio Denied" without the permission. */
+    @Test
+    fun microphoneLineFollowsTheServiceAndIsOffWhenStopped() {
+        val status = SensorServiceStatus()
+        assertEquals(MicrophoneState.OFF, status.microphone.value)
+
+        status.markRunning(1000L)
+        status.setMicrophone(MicrophoneState.LISTENING)
+        assertEquals("Microphone: Listening", microphoneStatusText(status.microphone.value))
+
+        status.markStopped()
+        assertEquals(MicrophoneState.OFF, status.microphone.value)
+        assertEquals("Microphone: Audio Denied", microphoneStatusText(MicrophoneState.NO_PERMISSION))
+        assertEquals("Microphone: Open the Sensor app to start listening", microphoneStatusText(MicrophoneState.NEEDS_APP_OPEN))
+    }
+
+    @Test
+    fun microphoneIsAskedForButNotRequired() {
+        assertEquals(android.Manifest.permission.RECORD_AUDIO, OPTIONAL_MICROPHONE_PERMISSION)
+        assertFalse(getRequiredSensorPermissions(android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE).contains(OPTIONAL_MICROPHONE_PERMISSION))
+    }
+
     @Test
     fun noLineClaimsAnInventedReadyState() {
         listOf(serviceStatusText(true), serviceStatusText(false), relayStatusText(true), relayStatusText(false))

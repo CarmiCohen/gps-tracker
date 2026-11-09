@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov8.102-Documentation - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov8.103-Microphone - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -62,7 +62,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **8.2 Siren Authority (Viewer):** Confirm Viewer triggers full-screen Red Alert and a siren that sounds until acknowledged (user decision, 2026-11-07; chapter 129).
 
 ## Chapter 9 - Acoustic & Tamper Escalation
-**Status: D** - Sensor violations are never sent or received
+**Status: A / H** - 9.1 built in Nov8.103-Microphone as a 30 dB jump above the background, not an absolute 85 dB (phones measure dBFS): `AcousticDetectorTest`, `AcousticAlarmTest`; a real noise is chapter 161.4. 9.2 is the acknowledge of chapter 129
 *   **9.1 Acoustic Breach:** Produce noise (>85dB). Verify `ACOUSTIC_ALERT` triggers.
 *   **9.2 Siren Override:** Silence active siren; verify `ACK` event is logged.
 
@@ -230,7 +230,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **50.1 Background Audit:** Ensure background cleanup tasks run successfully every 15 minutes.
 
 ## Chapter 51 - Denied Microphone Recovery (Rule 1.15)
-**Status: D** - No microphone or overlay use
+**Status: L** - Nov8.103-Microphone on the A15: denied shows `Microphone: Audio Denied` and `GRANT MICROPHONE`; granting through it gives `Listening`. A revoke while running was not done (Android restarts the app)
 *   **51.1 Revocation Audit:** Revoke Microphone permission at runtime. Verify HUD shows "Audio Denied".
 
 ## Chapter 52 - Denied Overlay Recovery (Rule 1.16)
@@ -282,7 +282,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **63.1 Floor Audit:** Observe floor for 300s. Verify convergence without oscillation.
 
 ## Chapter 64 - Acoustic Duty Cycle Latency
-**Status: D** - Only accelerometer and gravity are registered
+**Status: D** - The Sensor microphone listens continuously since Nov8.103-Microphone; there is no duty cycle, decision needed (retire, or build one for battery)
 *   **64.1 Power-Save Audit:** Verify no missed breaches during microphone cycling.
 
 ## Chapter 65 - High-Memory Pressure Service Restart
@@ -776,8 +776,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **160.2 One Status Line Per Chapter:** Verify that every chapter from 1 has a `**Status: <codes>**` line right under its heading, and that QA counts the chapters whose codes include L or A. Checked by `TESTS/audit_line.ps1`, which stops naming any chapter without one; at Nov8.102-Documentation it counted 150 chapters, QA 90 (chapters 1 to 159 give 89, where the hand-written triage summary said 88; chapter 160 is new).
 *   **160.3 Stale Files Archived:** Verify that `ARCHIVE/README.md` lists each moved file and that no active document refers to `CHAPTER_TRIAGE.md` or to the old paths of the moved files, apart from frozen history (the SOT Verification Chapters, the archive).
 
+## Chapter 161 - Sensor Microphone Noise Alarm (Nov8.103-Microphone)
+**Status: A / L / H** - 161.1 to 161.3 automated and on the A15; 161.4 needs a person next to the A15, not run (ISSUE-NOV5.2-O11 Group 4, SOT 1.399)
+*   **161.1 Detection:** Verify that a level 30 dB above the learned background (and at least -50 dBFS) alerts once, a smaller jump or one during the 3 s warm-up does not, a lasting noise becomes background without new alerts, and an all-zero frame is no sound. Automated by `AcousticDetectorTest`.
+*   **161.2 Monitor Alarm:** Verify that an `ACOUSTIC_ALERT` telemetry status or violation raises `Tracker noise detected` (not a GPS jump), that it stays until acknowledged, that the `Acoustic / Microphone Noise Sensor` switch and Global Mute silence it, and that it and a geofence breach are raised together. Automated by `AcousticAlarmTest`.
+*   **161.3 Only The Sensor Listens:** Verify that `app-monitor` has no microphone class or permission and the Sensor declares `RECORD_AUDIO` and the `microphone` service type (`MonitorMicrophoneGuardTest`), and on the A15 that a denied permission shows `Microphone: Audio Denied` and granting it through `GRANT MICROPHONE` shows `Microphone: Listening` with the service holding the microphone type (`dumpsys activity services com.jd.app.sensor`).
+*   **161.4 Real Noise:** With the Sensor listening in a quiet room for 5 s, clap or knock next to the phone once. Verify `REV_SensorService: Acoustic alert` on the Sensor and `Tracker noise detected` with the siren on the paired Monitor.
+
 ---
-**Active Testing Chapters: 150 of 160**
+**Active Testing Chapters: 151 of 161**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
