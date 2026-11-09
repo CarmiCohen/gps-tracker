@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov9.4-OwnVibration)
+# SOT Master Requirements & Hardening Status (Nov9.5-DefaultId)
 
-## 🏗️ Architectural Master Rules (478 Rules)
+## 🏗️ Architectural Master Rules (479 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -68,6 +68,7 @@
 *   **1.402 Sensor Vibration Alarm (R-ID 173)**: The Sensor MUST detect a knock or shake of the resting tracker from the accelerometer: one sample that differs from the gravity estimate by at least the limit set by the Sensor's own `Vibration Sensitivity Threshold` (rule 1.404; until Nov9.4 (0.9 − 0.8 × the slider) g). Vibration MUST arm after 30 s of rest, independently of tilt and lift: its alert (`VIBRATION_ALERT` with the current position) MUST disarm only vibration until the next rest, and MUST NOT disarm tilt or lift, nor be disarmed by them. The Monitor MUST raise `Tracker vibration detected`, switched by `Tamper / Vibration Sensor`, and MUST NOT offer its own vibration slider (ISSUE-NOV5.2-O11 Group 7) (R-ID 173).
 *   **1.403 Startup Frames Are Audited On Release Builds**: The device audit's startup-frame check (zero Davey frames over 500 ms) MUST run on the non-debuggable release builds, installed over the debug apps with `TESTS/install_release.ps1` (signed with the debug key, data kept), and the debug builds MUST be restored afterwards; release builds MUST stay non-debuggable and keep the debug build's application ID (ISSUE-NOV8.13-O55).
 *   **1.404 The Sensor Phone's Own Ringing Is No Knock**: While the Sensor phone itself rings (audio mode `MODE_RINGTONE`) or plays a ringtone, notification, or alarm, and 1 s after, the Sensor MUST NOT raise a vibration alert and MUST keep vibration armed; a call in progress MUST NOT pause it. The default vibration limit (slider 0.5) is 0.13 g, 0.82 g at 0.1 and 0.10 g at 1.0 (ISSUE-NOV9.2-O62).
+*   **1.405 Default IDs Unless Assigned**: Each app MUST connect with its stored ID; when none is stored, the Sensor and Monitor services MUST create the default (`T`, `V`) themselves before connecting, never connecting as `PENDING_IDENTITY`, and MUST NOT replace an assigned ID (ISSUE-NOV8.101-O59, ISSUE-NOV8.13-O56).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

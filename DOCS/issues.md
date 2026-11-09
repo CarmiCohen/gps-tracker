@@ -1,22 +1,20 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov9.4-OwnVibration)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov9.5-DefaultId)
 
 *Working file: open work only. Resolved issues are described once, in `STATUS/RESOLUTION_ARCHIVE.md`. The text this file held up to Nov8.14 (done Work Queue rows, Resolved Gaps Nov4.32 to Nov8.14, resolved gap texts) is in tag Nov8.14: `git show Nov8.14:DOCS/issues.md`. Older dashboard rows are in the Dashboard History at the end of the archive (Documentation Rule D2).*
 
-## 🎯 Next Resumption Focus: Work Queue after Nov9.4-OwnVibration, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov9.5-DefaultId, solved one by one in the order below
 
 ### Work Queue
 Take one item at a time, and display it before fixing it (Rule 1). Row numbers are kept from earlier versions.
 
-**Next item: the user runs the Nov9.4-OwnVibration Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). Then item 46, ISSUE-NOV8.13-O56 (a decision), or item 55, ISSUE-NOV9.3-O64 (a small test fix). ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
+**Next item: the user runs the Nov9.5-DefaultId Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). Then item 55, ISSUE-NOV9.3-O64 (a small test fix), then item 56, ISSUE-NOV9.4-O66. ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
 | 11 | ISSUE-NOV5.4-O19 | `before splitting/gps-tracker` is a frozen archive; only its redundant `relay-server/index.js` edit is to be discarded, by the user | User runs `git restore index.js` in `before splitting/gps-tracker/relay-server` |
 | 18 | ISSUE-NOV6.0-O26 | Run the Sensor on a device or emulator below API 35 | A device, or user permission to download an API 34 emulator image |
-| 46 | ISSUE-NOV8.13-O56 | Every Sensor starts with the ID `T`, so two default Sensors share one relay room and receive each other's geofence and backfill requests | A decision: generate a unique Sensor ID, or require one at setup |
 | 47 | ISSUE-NOV8.13-O57 | `--warning-mode all` shows Gradle 9 deprecations ("Mutating the dependencies of configuration ... after it has been resolved") in every module | Find the build logic that mutates resolved configurations |
 | 48 | ISSUE-NOV8.14-O58 | The SOT shows rules 1.1 to 1.334 only as the placeholder `... (Rules 1.1 to 1.334 preserved)` | Trace the rules in git history and restore them, or record where they live |
-| 51 | ISSUE-NOV8.101-O59 | A Sensor started before its first screen connects as `PENDING_IDENTITY` | Generate the ID where it is read |
 | 53 | ISSUE-NOV9.1-O61 | Raising `targetSdk` to 35 would stop the Sensor from starting at boot (`dataSync` is forbidden from `BOOT_COMPLETED`) | Change the boot start types before any `targetSdk` raise |
 | 55 | ISSUE-NOV9.3-O64 | `MapJitterAuditTest` leaves the real Monitor paired to its test ID and adds 50 rows | Save and restore the pairing in the test, delete its rows |
 | 56 | ISSUE-NOV9.4-O66 | The Sensor phone's own ringtone raises `Tracker noise detected` | Pause the noise alarm while `OwnVibrationWatch` reports ringing, like vibration |
@@ -47,9 +45,7 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 - **ISSUE-NOV5.0-O7 (Low) - Zero-position rows are still stored and sent**: the sensor sends `(0,0)` until its first fix and the Monitor stores those rows. They are now filtered at display time only.
 - **ISSUE-NOV5.1-O9 (Low) - Relay cold start exceeds the app connection timeout**: the relay took 21-22s to answer after idling, longer than the 20s `setTimeout`. A relay restart recovered in about 4s. Nov6.2 saw recovery once on production. The relay's state before that timeout was not measured, so it is probably, not certainly, a cold start.
 - **ISSUE-NOV5.1-O10 (Low) - Relay writes its cache synchronously per update**: `saveCache()` runs `writeFileSync` for each item in `location_batch`, which may limit throughput at high telemetry rates. The cache may also be lost on redeploy unless Render uses a persistent disk.
-- **ISSUE-NOV8.13-O56 (Low) - Every Sensor defaults to the ID `T`**: `ForensicIdentity.DEFAULT_TRACKER_ID` is `T`. Two Sensors left at the default join the same relay room, so a Monitor paired to `T` sends its geofence and backfill requests to both, and receives both trails.
 - **ISSUE-NOV8.13-O57 (Low) - Gradle 9 deprecations under `--warning-mode all`**: every module prints "Mutating the dependencies of configuration ... after it has been resolved or consumed. This will fail with an error in Gradle 9.0". These predate Nov8.13; the "clean `--warning-mode all` build" claims of earlier versions did not hold. Also seen: `w:` redundant-initializer warnings in `CleanSetupActionsTest`, and the kapt line "options were not recognized by any processor".
-- **ISSUE-NOV8.101-O59 (Low) - A Sensor started before its first screen has no ID**: `ForensicIdentityManager.selfId` reads `PENDING_IDENTITY` until `AdminActivity` calls `ensureIdentityGenerated`. Found in Nov8.101-Tooling: the A15 Sensor, reinstalled by an instrumented run, still had no ID. `BootReceiver` or any start that skips the first screen would connect to the relay as `PENDING_IDENTITY`. Generating the ID where it is read (in `ForensicIdentityManager` itself, or in `SensorService` before connecting) would close it.
 - **ISSUE-NOV9.1-O61 (Low) - The boot start depends on `targetSdk` 34**: since Nov9.1 a Sensor refused location and the microphone at boot keeps running with the `dataSync` and `remoteMessaging` types. Android 15 forbids starting a `dataSync` foreground service from `BOOT_COMPLETED` for apps targeting API 35+, so raising `targetSdk` would make the last fallback fail and the Sensor would again not run after a reboot. Before any raise, drop `dataSync` from the boot start (keep `remoteMessaging`, or `location` with "Allow all the time") and repeat chapter 163.3.
 - **ISSUE-NOV9.4-O66 (Low) - The Sensor phone's own ringtone raises the noise alarm**: every call to the A15 in Nov9.4 gave `Acoustic alert` (−41 to −20 dBFS over about −73 dBFS) and `Tracker noise detected` on the Monitor. `OwnVibrationWatch` already knows when the phone rings or notifies; `AcousticMonitor` could pause its alerts then, as `MotionSentinel` does for vibration.
 - **ISSUE-NOV9.4-O69 (Low) - Frequent noise alarms in a quiet room**: between 18:08 and 19:17 on 2026-11-09 the A15 raised a noise alert every one to two minutes (−42 to −25 dBFS over −74 to −65 dBFS) while a person was testing next to it; what made each sound was not noted. If speech or ordinary room sounds reach the 30 dB jump, the alarm is too sensitive for daily use. Needs a person to note the causes over a quiet quarter of an hour.
@@ -97,9 +93,9 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 
 ## 📊 Hardening Progress Dashboard
 *The newest rows only (at most 6); older rows are in the Dashboard History of `STATUS/RESOLUTION_ARCHIVE.md`. From Nov8.100-Documentation, Open and Ideas are counted from the lists in this file; earlier figures used a count that cannot be traced.*
+- **Nov9.5-DefaultId: [SOT Count: 979 (Rules: 479), Open: H:0, M:2, L:14, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 322), QA: 101]**
 - **Nov9.4-OwnVibration: [SOT Count: 978 (Rules: 478), Open: H:0, M:2, L:16, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 321), QA: 100]**
 - **Nov9.3-MonitorStart: [SOT Count: 977 (Rules: 477), Open: H:1, M:2, L:12, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 318), QA: 99]**
 - **Nov9.2-Vibration: [SOT Count: 976 (Rules: 476), Open: H:1, M:3, L:11, Ideas: H:0, M:0, L:20, Testing: PASSED (Sub-items: 315), QA: 98]**
 - **Nov9.1-MicOnStartup: [SOT Count: 975 (Rules: 475), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:20, Testing: PASSED (Sub-items: 311), QA: 97]**
 - **Nov9.0-LiftTilt: [SOT Count: 974 (Rules: 474), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:19, Testing: PASSED (Sub-items: 307), QA: 96]**
-- **Nov8.103-Microphone: [SOT Count: 973 (Rules: 473), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:18, Testing: PASSED (Sub-items: 303), QA: 93]**

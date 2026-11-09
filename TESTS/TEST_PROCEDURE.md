@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov9.4-OwnVibration - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov9.5-DefaultId - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -816,8 +816,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **166.2 Vibration Ignored While Ringing:** Verify that while the phone's own ringing is reported, and 1 s after, no vibration alerts and vibration stays armed, so a knock after the call alerts at once; that a ringing reported up to 200 ms late still cancels the held alert; that without the report the 0.11 g motor alerts at 1.0 but not at the 0.13 g default, while a 0.15 g table knock alerts at the default. Automated by `MotionSentinelTest`.
 *   **166.3 A Call On The A15:** With the Sensor armed (`Vibration armed`) and the slider at 0.5, call the A15 for about 10 s without touching it. Verify `REV_Motion: Phone ringing or notifying: vibration ignored`, then `Phone quiet: vibration detected again`, no `Vibration alert` and vibration still armed (the ringtone's noise alert is ISSUE-NOV9.4-O66). Nov9.4: ringing 19:49:32 to 19:49:47, no vibration alert.
 
+## Chapter 167 - Default IDs Unless Assigned (Nov9.5-DefaultId)
+**Status: A** - automated (ISSUE-NOV8.101-O59, ISSUE-NOV8.13-O56, SOT 1.405)
+*   **167.1 ID Created Before Connecting:** Verify that `SensorService` and `MonitorSessionService` create their default ID before reading `selfId`, and that the default is written only when no ID is stored. Automated by `IdentityAtConnectTest`.
+
 ---
-**Active Testing Chapters: 156 of 166**
+**Active Testing Chapters: 157 of 167**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

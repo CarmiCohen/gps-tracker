@@ -6,6 +6,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
+import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.SystemLogger
 import dagger.hilt.android.AndroidEntryPoint
@@ -61,6 +62,7 @@ class MonitorSessionService : Service() {
         if (signalingJob?.isActive == true) return
         signalingJob = serviceScope.launch {
             val targetId = identityManager.targetId.first() ?: return@launch
+            identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_MONITOR) // ISSUE-NOV8.101-O59
             val selfId = identityManager.selfId.first()
             
             // The tracker enforces the user's geofence; the Monitor only delivers it (ISSUE-NOV8.13-O51).

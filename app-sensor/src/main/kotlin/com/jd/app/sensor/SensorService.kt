@@ -186,6 +186,8 @@ class SensorService : Service(), SensorEventListener {
 
     private fun connectSignaling() {
         serviceScope.launch {
+            // A Sensor started at boot, before its first screen, still connects as `T` (ISSUE-NOV8.101-O59).
+            identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_SENSOR)
             kotlinx.coroutines.flow.combine(identityManager.selfId, sensorDataStore.relayUrl) { selfId, rawUrl ->
                 val url = RelayConfig.resolve(rawUrl)
                 selfId to url
