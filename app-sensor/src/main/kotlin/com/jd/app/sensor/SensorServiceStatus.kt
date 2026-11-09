@@ -33,6 +33,14 @@ class SensorServiceStatus @Inject constructor() {
         motionState.value = state
     }
 
+    private val refused = MutableStateFlow(RefusedAccess())
+    /** What Android refused the running service at its last start command (ISSUE-NOV8.103-O60). */
+    val refusedAccess: StateFlow<RefusedAccess> = refused.asStateFlow()
+
+    fun setRefusedAccess(access: RefusedAccess) {
+        refused.value = access
+    }
+
     fun markRunning(startTimeMs: Long = currentElapsedRealtime()) {
         startTime.value = startTimeMs
         running.value = true
@@ -43,6 +51,7 @@ class SensorServiceStatus @Inject constructor() {
         running.value = false
         microphoneState.value = MicrophoneState.OFF
         motionState.value = MotionState()
+        refused.value = RefusedAccess()
     }
 
     fun resetUptime(nowMs: Long = currentElapsedRealtime()) {
@@ -97,8 +106,34 @@ enum class MicrophoneState {
     /** The microphone delivers only zeros: Android or another app has silenced it. */
     SILENCED,
     /** The phone has no usable microphone, or it failed. */
-    UNAVAILABLE
+    UNAVAILABLE;
+
+    /**
+     * The running service cannot detect noise, which every telemetry row tells the Monitor (ISSUE-NOV8.103-O60).
+     * [OFF] is not reported: the service is stopped, or is starting and has not opened the microphone yet.
+     */
+    val isNoiseDetectionOff: Boolean get() = this != OFF && this != LISTENING
 }
+
+/**
+ * The while-in-use access Android refused the service because it was started in the background, after a reboot
+ * (ISSUE-NOV8.103-O60). [microphone] counts only when RECORD_AUDIO is granted. A notification tap or opening the Sensor
+ * app sends a start command that Android allows to take both.
+ */
+data class RefusedAccess(val location: Boolean = false, val microphone: Boolean = false) {
+    val isAny: Boolean get() = location || microphone
+}
+
+/** The title of the tap-to-enable notification, or null when nothing was refused (user decision, 2026-11-09). */
+fun restartNotificationTitle(refused: RefusedAccess): String? = when {
+    refused.location -> "Tracking off - tap to enable"
+    refused.microphone -> "Noise detection off - tap to enable"
+    else -> null
+}
+
+/** The background location line of the Sensor screen and Setup dialog ("Allow all the time", ISSUE-NOV8.103-O60). */
+fun backgroundLocationStatusText(isAllowedAllTheTime: Boolean): String = "Location after a restart: " +
+    if (isAllowedAllTheTime) "Automatic (allowed all the time)" else "Needs a tap on the notification"
 
 /** What tilt and lift detection is doing (ISSUE-NOV5.2-O11 Group 5). [isRunning] is false while the service is stopped. */
 data class MotionState(val isRunning: Boolean = false, val isArmed: Boolean = false, val hasBarometer: Boolean = false)
@@ -114,7 +149,7 @@ fun motionStatusText(state: MotionState): String = "Tilt & Lift: " + when {
 fun microphoneStatusText(state: MicrophoneState): String = "Microphone: " + when (state) {
     MicrophoneState.OFF -> "Off"
     MicrophoneState.NO_PERMISSION -> "Audio Denied"
-    MicrophoneState.NEEDS_APP_OPEN -> "Open the Sensor app to start listening"
+    MicrophoneState.NEEDS_APP_OPEN -> "Off after a restart: tap its notification or open the Sensor app"
     MicrophoneState.LISTENING -> "Listening"
     MicrophoneState.SILENCED -> "Silenced by the system"
     MicrophoneState.UNAVAILABLE -> "Not available"

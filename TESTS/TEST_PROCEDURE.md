@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov9.0-LiftTilt - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov9.1-MicOnStartup - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -790,8 +790,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **162.3 Arming On The A15:** Start the Sensor and leave the A15 lying still. Verify `REV_Motion` reports the sensors (A15: no gravity sensor, no barometer), `Tilt and lift armed` 30 s later, the screen line `Tilt & Lift: Armed (accelerometer)`, the debug `STATE` answer `motionArmed=true`, and no tilt or lift alert over 5 minutes at rest.
 *   **162.4 Real Tilt And Pickup:** With the A15 armed, tip it on its side; verify `Tracker tilted` on the Monitor. Let it rest 30 s on the table again, then pick it up about 30 cm without turning it much; verify `Tracker lifted`.
 
+## Chapter 163 - The Sensor Survives A Reboot (Nov9.1-MicOnStartup)
+**Status: A / L** - 163.1 and 163.2 automated; 163.3 and 163.4 run on the A15 with three reboots (ISSUE-NOV8.103-O60, SOT 1.401)
+*   **163.1 States And Notification:** Verify that `NO_PERMISSION`, `NEEDS_APP_OPEN`, `SILENCED`, and `UNAVAILABLE` count as noise detection off and `OFF` and `LISTENING` do not; that refused location titles the notification `Tracking off - tap to enable` and a refused microphone alone `Noise detection off - tap to enable`; that a stopped service clears what was refused; and the `Location after a restart` line. Automated by `SensorServiceStatusTest`.
+*   **163.2 Monitor Warning:** Verify that `noiseOff` crosses the wire and a row without it means on (`SignalingBatchTest`), and that a row with it raises `Tracker noise detection off`, which clears when the Sensor listens again, stays until acknowledged, and is silenced by `Acoustic / Microphone Noise Sensor` and Global Mute (`NoiseDetectionOffAlarmTest`).
+*   **163.3 Reboot Without "Allow All The Time":** Reboot the A15 with the Sensor running. Verify (about 1.5 min after boot) that the service runs with types `0x201`, the notification `Tracking off - tap to enable`, and, with the Monitor open, `Tracker noise detection off` at once and `Tracker GPS signal loss` after 30 s. Tap the notification (twice on a Samsung lock screen): verify types `0x289`, `Microphone: Listening`, a GPS fix, the notification gone, the Sensor app not opened, and both Monitor alarms `(cleared)`.
+*   **163.4 Reboot With "Allow All The Time":** On the Sensor screen tap `ALLOW LOCATION ALL THE TIME`, choose "Allow all the time", and verify the line `Location after a restart: Automatic (allowed all the time)`. Reboot: verify types `0x209` (location kept, a fix within seconds), only `Noise detection off - tap to enable`, and a tap restoring `0x289`.
+
 ---
-**Active Testing Chapters: 152 of 162**
+**Active Testing Chapters: 153 of 163**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

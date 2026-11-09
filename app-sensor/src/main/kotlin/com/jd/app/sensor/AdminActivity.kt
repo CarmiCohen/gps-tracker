@@ -72,6 +72,7 @@ class AdminActivity : ComponentActivity() {
                 val isServiceRunning by viewModel.isServiceRunning.collectAsStateWithLifecycle()
                 val serviceUptimeText by viewModel.serviceUptimeText.collectAsStateWithLifecycle()
                 val microphoneState by viewModel.microphoneState.collectAsStateWithLifecycle()
+                val refusedAccess by viewModel.refusedAccess.collectAsStateWithLifecycle()
                 val motionState by viewModel.motionState.collectAsStateWithLifecycle()
                 val logs by SystemLogger.logs.collectAsStateWithLifecycle()
                 val scope = rememberCoroutineScope()
@@ -120,11 +121,11 @@ class AdminActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                            // A service started at boot may not use the microphone until the app is in the foreground:
-                            // a start command from here lets it take the microphone (ISSUE-NOV5.2-O11 Group 4).
-                            LaunchedEffect(isServiceRunning, microphoneState) {
-                                if (isServiceRunning && microphoneState == MicrophoneState.NEEDS_APP_OPEN) {
-                                    SystemLogger.i("AdminActivity", "App opened: letting SensorService start the microphone")
+                            // A service started at boot may be refused location and the microphone until the app is in the
+                            // foreground: a start command from here lets it take both (ISSUE-NOV8.103-O60).
+                            LaunchedEffect(isServiceRunning, refusedAccess) {
+                                if (isServiceRunning && refusedAccess.isAny) {
+                                    SystemLogger.i("AdminActivity", "App opened: letting SensorService take location and microphone")
                                     startSensorService(context)
                                 }
                             }
@@ -263,6 +264,17 @@ fun startSensorService(context: android.content.Context) {
  * detection and shows "Microphone: Audio Denied" (ISSUE-NOV5.2-O11 Group 4).
  */
 internal const val OPTIONAL_MICROPHONE_PERMISSION = Manifest.permission.RECORD_AUDIO
+
+/**
+ * "Allow all the time" location: asked on its own after the required permissions (Android 11+ shows it only in the
+ * app's location settings), but not required. With it, a Sensor restarted after a reboot tracks at once; without it,
+ * tracking waits for a tap on its notification (ISSUE-NOV8.103-O60, user decision 2026-11-09). Before Android 10 every
+ * location grant includes the background.
+ */
+@android.annotation.SuppressLint("InlinedApi") // A string constant, read only from Android 10 on.
+internal fun hasBackgroundLocation(context: android.content.Context, sdkInt: Int = Build.VERSION.SDK_INT): Boolean =
+    sdkInt < Build.VERSION_CODES.Q ||
+        context.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
 
 internal fun getRequiredSensorPermissions(sdkInt: Int = Build.VERSION.SDK_INT): List<String> {
     return mutableListOf(
@@ -521,6 +533,18 @@ fun SensorAdminConsole(
     val microphoneLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && isServiceRunning) startSensorService(context) // The service takes the microphone on its next start command.
     }
+    var isAllowedAllTheTime by remember { mutableStateOf(hasBackgroundLocation(context)) }
+    val backgroundLocationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        isAllowedAllTheTime = hasBackgroundLocation(context)
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) { // The user may change it in the system settings.
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) isAllowedAllTheTime = hasBackgroundLocation(context)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     if (showToolsOverlay) {
         com.jd.core.ui.ToolsOverlay(
@@ -619,6 +643,19 @@ fun SensorAdminConsole(
             if (microphoneState == MicrophoneState.NO_PERMISSION) {
                 Button(onClick = { microphoneLauncher.launch(OPTIONAL_MICROPHONE_PERMISSION) }, modifier = Modifier.fillMaxWidth()) {
                     Text("GRANT MICROPHONE")
+                }
+            }
+            Text(
+                text = backgroundLocationStatusText(isAllowedAllTheTime),
+                fontSize = 12.sp,
+                color = if (isAllowedAllTheTime) Color(0xFF10B981) else Color(0xFFF59E0B)
+            )
+            if (!isAllowedAllTheTime) {
+                Button(
+                    onClick = { backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("ALLOW LOCATION ALL THE TIME")
                 }
             }
             Text(
@@ -733,6 +770,7 @@ fun SensorAdminConsole(
                     Text(serviceStatusText(isServiceRunning, serviceUptimeText))
                     Text(relayStatusText(hudState.isRelayConnected))
                     Text(microphoneStatusText(microphoneState))
+                    Text(backgroundLocationStatusText(isAllowedAllTheTime))
                     Text(motionStatusText(motionState))
                 }
             },

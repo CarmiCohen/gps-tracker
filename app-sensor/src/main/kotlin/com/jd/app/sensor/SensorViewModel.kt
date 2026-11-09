@@ -41,6 +41,9 @@ class SensorViewModel @Inject constructor(
     /** What the noise detection is doing, reported by [SensorService] (ISSUE-NOV5.2-O11 Group 4). */
     val microphoneState: StateFlow<MicrophoneState> = serviceStatus.microphone
 
+    /** What a background start was refused; opening the app restores it (ISSUE-NOV8.103-O60). */
+    val refusedAccess: StateFlow<RefusedAccess> = serviceStatus.refusedAccess
+
     /** Whether tilt and lift are armed, reported by [SensorService] (ISSUE-NOV5.2-O11 Group 5). */
     val motionState: StateFlow<MotionState> = serviceStatus.motion
 

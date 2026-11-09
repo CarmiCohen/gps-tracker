@@ -30,6 +30,8 @@ data class LocationUpdate(
     var isThermalThrottled: Boolean = false,
     var cumulativeBytesSent: Long = 0L,
     var status: String = "VALID", // What the reading means (VALID, NO_FIX, JUMP, ...); delivery never depends on it
+    /** The Sensor's noise detection is off: no microphone after a restart, denied, silenced, or failed (ISSUE-NOV8.103-O60). */
+    var isNoiseDetectionOff: Boolean = false,
     /** Sent at once, never dropped or deduplicated while queued (SIMP-NOV7.19-S1). Local to the sender, not on the wire. */
     var isCritical: Boolean = false,
     var sensorSnapshot: SensorSnapshot = SensorSnapshot()
@@ -42,7 +44,7 @@ data class LocationUpdate(
         timestamp = 0L; monotonicNanos = 0L; serverArrivalTs = 0L; sequenceId = 0L
         isCharging = false; batteryLevel = -1; gsmSignalDbm = 0; networkType = "--"
         isBuffered = false; isHistoricalLkg = false; tempCelsius = -1f
-        isThermalThrottled = false; cumulativeBytesSent = 0L; status = "VALID"; isCritical = false
+        isThermalThrottled = false; cumulativeBytesSent = 0L; status = "VALID"; isNoiseDetectionOff = false; isCritical = false
         sensorSnapshot.reset()
     }
 }

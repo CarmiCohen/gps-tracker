@@ -58,6 +58,7 @@ class DebugCommandReceiver : BroadcastReceiver() {
         val motion = status.motion.value
         // Microphone and motion states let a remote check confirm the Sensor listens and is armed (Nov9.0-LiftTilt).
         return "OK $command self=${identity.selfId.first()} relay=${RelayConfig.resolve(deps.dataStore().relayUrl.first())}" +
-            " mic=${status.microphone.value} motionArmed=${motion.isArmed} barometer=${motion.hasBarometer}"
+            " mic=${status.microphone.value} motionArmed=${motion.isArmed} barometer=${motion.hasBarometer}" +
+            " refusedLocation=${status.refusedAccess.value.location} refusedMic=${status.refusedAccess.value.microphone}" // Nov9.1
     }
 }

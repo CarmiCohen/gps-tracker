@@ -77,7 +77,47 @@ class SensorServiceStatusTest {
         status.markStopped()
         assertEquals(MicrophoneState.OFF, status.microphone.value)
         assertEquals("Microphone: Audio Denied", microphoneStatusText(MicrophoneState.NO_PERMISSION))
-        assertEquals("Microphone: Open the Sensor app to start listening", microphoneStatusText(MicrophoneState.NEEDS_APP_OPEN))
+        assertEquals(
+            "Microphone: Off after a restart: tap its notification or open the Sensor app",
+            microphoneStatusText(MicrophoneState.NEEDS_APP_OPEN)
+        )
+    }
+
+    /** Chapter 163 (ISSUE-NOV8.103-O60): which microphone states tell the Monitor that noise detection is off. */
+    @Test
+    fun noiseDetectionIsReportedOffOnlyWhenTheRunningServiceCannotListen() {
+        val off = MicrophoneState.entries.filter { it.isNoiseDetectionOff }.toSet()
+        assertEquals(
+            setOf(MicrophoneState.NO_PERMISSION, MicrophoneState.NEEDS_APP_OPEN, MicrophoneState.SILENCED, MicrophoneState.UNAVAILABLE),
+            off
+        )
+        // OFF is a stopped or starting service, which sends no row or has not opened the microphone yet.
+        assertFalse(MicrophoneState.OFF.isNoiseDetectionOff)
+        assertFalse(MicrophoneState.LISTENING.isNoiseDetectionOff)
+    }
+
+    /** Chapter 163 (ISSUE-NOV8.103-O60): what a background start was refused picks the tap-to-enable notification. */
+    @Test
+    fun refusedAccessPicksTheRestartNotificationAndClearsWhenStopped() {
+        assertEquals("Tracking off - tap to enable", restartNotificationTitle(RefusedAccess(location = true, microphone = true)))
+        assertEquals("Tracking off - tap to enable", restartNotificationTitle(RefusedAccess(location = true)))
+        assertEquals("Noise detection off - tap to enable", restartNotificationTitle(RefusedAccess(microphone = true)))
+        assertEquals(null, restartNotificationTitle(RefusedAccess()))
+        assertFalse(RefusedAccess().isAny)
+
+        val status = SensorServiceStatus()
+        status.markRunning(1000L)
+        status.setRefusedAccess(RefusedAccess(location = true, microphone = true))
+        assertTrue(status.refusedAccess.value.isAny)
+        status.markStopped()
+        assertEquals(RefusedAccess(), status.refusedAccess.value)
+    }
+
+    /** Chapter 163 (ISSUE-NOV8.103-O60): the "Allow all the time" line. */
+    @Test
+    fun backgroundLocationLineTellsWhetherARestartNeedsATap() {
+        assertEquals("Location after a restart: Automatic (allowed all the time)", backgroundLocationStatusText(true))
+        assertEquals("Location after a restart: Needs a tap on the notification", backgroundLocationStatusText(false))
     }
 
     /** Chapter 162 (ISSUE-NOV5.2-O11 Group 5): the tilt and lift line. */

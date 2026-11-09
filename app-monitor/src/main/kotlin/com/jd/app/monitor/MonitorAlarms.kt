@@ -47,7 +47,8 @@ enum class AlarmType(val title: String) {
     GEOFENCE_BREACH("Geofence boundary breach"),
     ACOUSTIC_ALERT("Tracker noise detected"),
     TILT_ALERT("Tracker tilted"),
-    LIFT_ALERT("Tracker lifted")
+    LIFT_ALERT("Tracker lifted"),
+    NOISE_DETECTION_OFF("Tracker noise detection off")
 }
 
 fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) {
@@ -63,6 +64,7 @@ fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) 
     AlarmType.ACOUSTIC_ALERT -> acousticAlert // "Acoustic / Microphone Noise Sensor"; the Sensor listens either way.
     AlarmType.TILT_ALERT -> tiltAlert // "Tilt Angle Detection Sensor"; the angle is set on the Sensor.
     AlarmType.LIFT_ALERT -> liftAlert // "Lift / Height Change Sensor"
+    AlarmType.NOISE_DETECTION_OFF -> acousticAlert // A noise alarm the Sensor cannot raise (ISSUE-NOV8.103-O60).
 }
 
 /** The newest telemetry from the paired tracker. [receivedAtMs] is Monitor time, so the clocks of the two phones never meet. */
@@ -75,7 +77,8 @@ data class TrackerReading(
     val lat: Double = 0.0,
     val lng: Double = 0.0,
     val accuracy: Float = 0f,
-    val status: String = "VALID"
+    val status: String = "VALID",
+    val isNoiseDetectionOff: Boolean = false
 )
 
 fun LocationUpdate.toTrackerReading(receivedAtMs: Long) =
@@ -88,7 +91,8 @@ fun LocationUpdate.toTrackerReading(receivedAtMs: Long) =
         lat = lat,
         lng = lng,
         accuracy = accuracy,
-        status = status
+        status = status,
+        isNoiseDetectionOff = isNoiseDetectionOff
     )
 
 fun TrackerReading.hasGpsSignal(): Boolean =
@@ -134,6 +138,7 @@ fun alarmConditions(
     if ("JUMP" in flagged || "OUTLIER" in flagged || isOtherViolation) add(AlarmType.GPS_JUMP)
     if (reading == null) return@buildSet
     if (!reading.isCharging) add(AlarmType.POWER_DISCONNECTED)
+    if (reading.isNoiseDetectionOff) add(AlarmType.NOISE_DETECTION_OFF)
     val batteryLimit = if (AlarmType.LOW_BATTERY in active) LOW_BATTERY_CLEARS_AT else LOW_BATTERY_BELOW
     if (reading.batteryLevel >= 0 && reading.batteryLevel < batteryLimit) add(AlarmType.LOW_BATTERY)
     val temperatureLimit = if (AlarmType.HIGH_TEMPERATURE in active) HIGH_TEMPERATURE_CLEARS_AT else HIGH_TEMPERATURE_ABOVE

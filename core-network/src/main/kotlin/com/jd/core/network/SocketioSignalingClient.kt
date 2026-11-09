@@ -252,7 +252,8 @@ class SocketioSignalingClient @Inject constructor(
             speed = data.optDouble("spd", 0.0).toFloat(),
             batteryLevel = data.optInt("batt", 0),
             isCharging = data.optBoolean("chg", false),
-            tempCelsius = data.optDouble("temp", 0.0).toFloat()
+            tempCelsius = data.optDouble("temp", 0.0).toFloat(),
+            isNoiseDetectionOff = data.optBoolean("noiseOff", false) // Absent from Sensors before Nov9.1: no warning.
         ).apply {
             sensorSnapshot.vibration = data.optDouble("vib", 0.0).toFloat()
         }
@@ -316,6 +317,7 @@ class SocketioSignalingClient @Inject constructor(
                 put("batt", update.batteryLevel)
                 put("chg", update.isCharging)
                 put("temp", update.tempCelsius)
+                put("noiseOff", update.isNoiseDetectionOff) // Live rows only; the buffer does not keep it, so backfill omits it.
             })
         }
 

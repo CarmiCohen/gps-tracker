@@ -104,6 +104,38 @@ class SignalingBatchTest {
         }
     }
 
+    /** Chapter 163 (ISSUE-NOV8.103-O60): the noise detection flag crosses the wire; a row without it (an older Sensor) means on. */
+    @Test
+    fun testNoiseDetectionFlagRoundTripsAndDefaultsToOn() = runTest {
+        val fakeSocket = FakeSocket()
+        val client = SocketioSignalingClient(FakeSocketFactory(fakeSocket), StandardTestDispatcher(testScheduler))
+
+        try {
+            client.connect("http://localhost", "test-device", "secret")
+            fakeSocket.simulateConnect()
+            runCurrent()
+
+            val update = pooledUpdate(1L).apply { isNoiseDetectionOff = true; isCritical = true }
+            client.sendTelemetry(update)
+            update.reset()
+            runCurrent()
+
+            val sent = (fakeSocket.emittedEvents.first { it.first == "location_batch" }.second as JSONArray).getJSONObject(0)
+            assertTrue(sent.getBoolean("noiseOff"))
+
+            val received = async(start = CoroutineStart.UNDISPATCHED) { client.telemetryFlow.first() }
+            fakeSocket.listeners["location_relay"]!!.forEach { it.call(sent) }
+            assertTrue(received.await().isNoiseDetectionOff)
+
+            sent.remove("noiseOff")
+            val older = async(start = CoroutineStart.UNDISPATCHED) { client.telemetryFlow.first() }
+            fakeSocket.listeners["location_relay"]!!.forEach { it.call(sent) }
+            assertFalse(older.await().isNoiseDetectionOff)
+        } finally {
+            client.disconnect()
+        }
+    }
+
     @Test
     fun testRecycledUpdateSurvivesOfflineQueue() = runTest {
         val fakeSocket = FakeSocket()

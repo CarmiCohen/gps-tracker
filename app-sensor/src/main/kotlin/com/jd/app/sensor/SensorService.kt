@@ -1,6 +1,7 @@
 package com.jd.app.sensor
 
 import android.Manifest
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
@@ -251,11 +252,20 @@ class SensorService : Service(), SensorEventListener {
         }
 
         SystemLogger.i("SensorService", "onStartCommand received. Handling FGS activation...")
+        if (intent?.action == ACTION_RESTORE_ACCESS) {
+            // A notification tap lets a background-started service take location and microphone (ISSUE-NOV8.103-O60).
+            SystemLogger.i("SensorService", "Restart notification tapped: taking location and microphone")
+        }
         
         if (hasRequiredPermissions()) {
-            val canUseMicrophone = startForegroundServiceInternal()
+            val start = startForegroundServiceInternal()
+            if (start == null) {
+                SystemLogger.e("SensorService", "No foreground service type allowed. Self-stopping.")
+                stopSelf()
+                return START_NOT_STICKY
+            }
             initializeServiceComponents()
-            updateMicrophone(canUseMicrophone)
+            applyForegroundStart(start)
             
             if (!isMuzzled) {
                 startSensingLoop()
@@ -285,7 +295,22 @@ class SensorService : Service(), SensorEventListener {
         return locationGranted && notificationGranted && networkStateGranted && fgsLocationGranted
     }
 
-    /** Listens while the foreground service holds the microphone type; every start command re-checks, so opening the app resumes it. */
+    /**
+     * Applies what this start command obtained. Every start command re-checks, so opening the app or tapping the
+     * restart notification restores what a background start was refused; a start command that is still refused posts the
+     * notification again, so a tap that did not help leaves it in place (ISSUE-NOV8.103-O60).
+     */
+    private fun applyForegroundStart(start: ForegroundStart) {
+        val refused = RefusedAccess(location = !start.hasLocation, microphone = !start.hasMicrophone && hasMicrophonePermission())
+        // Requested again once location is regained, so the updates resume at once.
+        if (start.hasLocation && serviceStatus.refusedAccess.value.location) startLocationUpdates()
+        serviceStatus.setRefusedAccess(refused)
+        if (refused.location) SystemLogger.w("SensorService", "Started in the background without location: tracking resumes after a notification tap or opening the Sensor app")
+        updateMicrophone(start.hasMicrophone)
+        updateRestartNotification(refused)
+    }
+
+    /** Listens while the foreground service holds the microphone type. */
     private fun updateMicrophone(canUseMicrophone: Boolean) {
         when {
             canUseMicrophone -> acousticMonitor.start(this)
@@ -296,8 +321,36 @@ class SensorService : Service(), SensorEventListener {
             else -> {
                 acousticMonitor.stop()
                 serviceStatus.setMicrophone(MicrophoneState.NEEDS_APP_OPEN)
-                SystemLogger.w("Acoustic", "Started in the background: Android allows the microphone only after the Sensor app is opened")
+                SystemLogger.w("Acoustic", "Started in the background: Android allows the microphone only after a notification tap or opening the Sensor app")
             }
+        }
+    }
+
+    /** "Tracking off" or "Noise detection off - tap to enable": the tap starts this service from a notification, which may take both. */
+    private fun updateRestartNotification(refused: RefusedAccess) {
+        val manager = getSystemService(NotificationManager::class.java)
+        val title = restartNotificationTitle(refused) ?: return manager.cancel(RESTART_NOTIFICATION_ID)
+        val restore = PendingIntent.getForegroundService(
+            this, RESTART_NOTIFICATION_ID,
+            Intent(this, SensorService::class.java).setAction(ACTION_RESTORE_ACCESS),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val notification = NotificationCompat.Builder(this, SensorApp.WARNING_CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(
+                if (refused.location) "Location and noise detection stopped when the phone restarted"
+                else "The microphone stopped when the phone restarted"
+            )
+            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setContentIntent(restore)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+        try {
+            manager.notify(RESTART_NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            SystemLogger.e("SensorService", "Restart notification failed: ${e.message}")
         }
     }
 
@@ -432,6 +485,7 @@ class SensorService : Service(), SensorEventListener {
                 update.batteryLevel = lastBatteryLevel
                 update.isCharging = lastIsCharging
                 update.tempCelsius = lastTempCelsius
+                update.isNoiseDetectionOff = serviceStatus.microphone.value.isNoiseDetectionOff // ISSUE-NOV8.103-O60
                 
                 val hasPhysicalMotion = update.sensorSnapshot.vibration > 0.12f
                 // A fix older than FIX_STALE_AFTER_MS is no longer the current position: send NO_FIX without one.
@@ -545,11 +599,13 @@ class SensorService : Service(), SensorEventListener {
     }
 
     /**
-     * Starts the foreground service and returns whether it holds the microphone type. Android 11+ gives a background
-     * service the microphone only through that type, and Android 14+ refuses the type to a service started in the
-     * background (after a reboot): then the service runs without it until the Sensor app is opened.
+     * Starts the foreground service and returns which while-in-use types it holds, or null if Android allowed none.
+     * Android 11+ gives a background service the microphone only through its type, and Android 14+ refuses the location
+     * and microphone types to a service started in the background (after a reboot) unless the app may use location all
+     * the time (location only). The service then runs on with the types it was allowed, connected to the relay, until
+     * a notification tap or opening the Sensor app restores the rest (ISSUE-NOV8.103-O60).
      */
-    private fun startForegroundServiceInternal(): Boolean {
+    private fun startForegroundServiceInternal(): ForegroundStart? {
         val pendingIntent = PendingIntent.getActivity(this, 0, Intent(this, AdminActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(this, SensorApp.CHANNEL_ID)
             .setContentTitle("System Maintenance")
@@ -560,52 +616,55 @@ class SensorService : Service(), SensorEventListener {
             .setOngoing(true)
             .build()
             
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
-                    type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasMicrophonePermission()) {
-                    try {
-                        startForeground(1, notification, type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-                        return true
-                    } catch (e: Exception) {
-                        SystemLogger.w("SensorService", "Microphone service type refused: ${e.message}")
-                    }
-                }
-                startForeground(1, notification, type)
-                return Build.VERSION.SDK_INT < Build.VERSION_CODES.R && hasMicrophonePermission()
-            } else {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return try {
                 startForeground(1, notification)
-                return hasMicrophonePermission()
+                ForegroundStart(hasLocation = true, hasMicrophone = hasMicrophonePermission())
+            } catch (e: Exception) {
+                SystemLogger.e("SensorService", "Foreground service start failed: ${e.message}")
+                null
             }
-        } catch (e: Exception) {
-            SystemLogger.e("SensorService", "Fatal FGS start error: ${e.message}")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                try {
-                    startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-                } catch (e2: Exception) {
-                    stopSelf()
-                }
-            }
-            return false
         }
+        var base = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) base = base or ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+        val location = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        val microphone = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasMicrophonePermission()) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+        // The full set first, then without the microphone, then without location: each refusal throws before anything changes.
+        val attempts = listOfNotNull((base or location or microphone).takeIf { microphone != 0 }, base or location, base)
+        for (type in attempts) {
+            try {
+                startForeground(1, notification, type)
+                return ForegroundStart(
+                    hasLocation = type and location != 0,
+                    // Before Android 11 the microphone needs no service type.
+                    hasMicrophone = if (microphone != 0) type and microphone != 0 else Build.VERSION.SDK_INT < Build.VERSION_CODES.R && hasMicrophonePermission()
+                )
+            } catch (e: Exception) {
+                SystemLogger.w("SensorService", "Foreground service type 0x${type.toString(16)} refused: ${e.message}")
+            }
+        }
+        return null
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     private data class PendingAlert(val status: String, val logLine: String)
 
+    /** The while-in-use service types a start command obtained (ISSUE-NOV8.103-O60). */
+    private class ForegroundStart(val hasLocation: Boolean, val hasMicrophone: Boolean)
+
     companion object {
         const val ACTION_STOP_SERVICE = "com.jd.app.sensor.ACTION_STOP_SERVICE"
+        /** Sent by a tap on the restart notification (ISSUE-NOV8.103-O60). */
+        const val ACTION_RESTORE_ACCESS = "com.jd.app.sensor.ACTION_RESTORE_ACCESS"
+        private const val RESTART_NOTIFICATION_ID = 2 // The foreground service notification is 1.
         private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L
     }
 
     override fun onDestroy() {
         SystemLogger.i("SensorService", "onDestroy called. Cleaning up...")
         acousticMonitor.stop()
+        getSystemService(NotificationManager::class.java).cancel(RESTART_NOTIFICATION_ID)
         serviceScope.cancel()
         orchestrator.cancelAll()
         fixStore.clear()

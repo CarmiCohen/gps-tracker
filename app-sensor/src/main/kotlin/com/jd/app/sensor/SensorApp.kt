@@ -17,6 +17,8 @@ class SensorApp : Application() {
 
     companion object {
         const val CHANNEL_ID = "sensor_service_channel"
+        /** Warnings the Sensor user must act on, such as noise detection off after a restart (ISSUE-NOV8.103-O60). */
+        const val WARNING_CHANNEL_ID = "sensor_warning_channel"
     }
 
     override fun onCreate() {
@@ -42,8 +44,14 @@ class SensorApp : Application() {
                 "GPS Sensor Service Channel",
                 NotificationManager.IMPORTANCE_LOW
             )
+            val warningChannel = NotificationChannel(
+                WARNING_CHANNEL_ID,
+                "GPS Sensor Warnings",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(serviceChannel)
+            manager.createNotificationChannel(warningChannel)
         }
     }
 }
