@@ -1,34 +1,30 @@
 ```
 git add .
-git commit -m "Nov9.5-DefaultId - DEFAULT IDS UNLESS ASSIGNED (ISSUE-NOV8.101-O59, ISSUE-NOV8.13-O56)
+git commit -m "Nov9.6 - INSTRUMENTED TEST RESTORES THE MONITOR PAIRING (ISSUE-NOV9.3-O64)
 
-- O59: a Sensor started at boot connected as PENDING_IDENTITY; both services now create their default ID (T, V) before connecting.
-- O56 closed by user decision: a Sensor keeps T unless it was given another ID (already the behaviour; no code change).
-- Index row Nov9.4-OwnVibration filled (a855940). SOT 1.405, chapter 167, IdentityAtConnectTest.
-- TESTS: run_tests passed (0 failures), ProductionReadinessAuditTest 3/3 on the A15, release audit clean.
-- VERSION: Nov9.5-DefaultId, versionCode 75."
-git tag Nov9.5-DefaultId
+- O64: MapJitterAuditTest saves the Monitor pairing in @Before; @After restores it and deletes its 50 test rows.
+- Index row Nov9.5-DefaultId filled (f8956f5). SOT 1.406, chapter 168.
+- TESTS: NOT RUN by user instruction (no unit tests, builds, device audit, or integrity check).
+- VERSION: Nov9.6, versionCode 76."
+git tag Nov9.6
 git push origin main --tags
 ```
 
-# Project Handover - Version Nov9.5-DefaultId (Default IDs Unless Assigned)
+# Project Handover - Version Nov9.6 (Instrumented Test Restores The Monitor Pairing)
 
 ## ▶️ Resumption State (Read First)
-- **Git**: run the block above as one commit, then the tag; next session, replace `pending` in the top row of `STATUS/BASELINE/INDEX.md` with `git rev-parse --short=7 Nov9.5-DefaultId^{commit}`.
-- **User decisions (2026-11-09)**: a Sensor keeps the default ID `T` unless it was already given another ID (no generated or required IDs). Version name from the user. `//` from the user means "continue".
-- **Phones**: A15 (`R58X40GV2AR`) has the Nov9.5 debug builds (built before the version bump, versionCode 74); Monitor `V` paired to `T`. The Sensor service needs one tap on `System Idle` after the last install. S21FE in personal use; never test on it.
-- **Test tips**: `DOCS/issues.md` Operational Notes; `TESTS/TEST_GUIDELINES.md` section 4. Rebuild the release APKs after a version bump before `install_release.ps1`, or Android refuses a downgrade.
+- **Git**: run the block above as one commit, then the tag; next session, replace `pending` in the top row of `STATUS/BASELINE/INDEX.md` with `git rev-parse --short=7 Nov9.6^{commit}`.
+- **User decisions (2026-11-09)**: Nov9.6 closed with no tests at all (user instruction). Version name from the user. `//` from the user means "continue".
+- **Phones**: A15 (`R58X40GV2AR`) unchanged since Nov9.5 (debug builds, versionCode 74; Monitor `V` paired to `T`). S21FE in personal use; never test on it.
+- **Test tips**: `DOCS/issues.md` Operational Notes; `TESTS/TEST_GUIDELINES.md` section 4. Rebuild the release APKs after a version bump before `install_release.ps1`.
 
-## 🟢 Status: PASSED (Nov9.5-DefaultId)
-- ISSUE-NOV8.101-O59 fixed, ISSUE-NOV8.13-O56 closed by decision. Details: `STATUS/RESOLUTION_ARCHIVE.md`.
-- `run_tests.ps1 test assembleDebug assembleRelease`: 0 failures; warnings only the known O57 Gradle lines. `ProductionReadinessAuditTest` 3/3 on the A15.
-- Release audit: Sensor 299 ms, Monitor 595 ms, 0 Davey, StackLog, fatal.
-- O59 was not reproduced on the A15: its Sensor already has `T`, and clearing it would unpair the Monitor; covered by `IdentityAtConnectTest`.
+## ⚠️ Status: NOT VERIFIED (Nov9.6)
+- ISSUE-NOV9.3-O64 fixed (test-only change). Details: `STATUS/RESOLUTION_ARCHIVE.md`.
+- No unit tests, builds, device audit, or `:core-shared:test` integrity check were run; the edited `MapJitterAuditTest` was not compiled. `audit_line.ps1` prints `PASSED` unconditionally; the dashboard row says `NOT RUN`.
 
-**Audit line**: Nov9.5-DefaultId: [SOT Count: 979 (Rules: 479), Open: H:0, M:2, L:14, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 322), QA: 101]
+**Audit line**: Nov9.6: [SOT Count: 980 (Rules: 480), Open: H:0, M:2, L:13, Ideas: H:0, M:0, L:22, Testing: NOT RUN (Sub-items: 323), QA: 102]
 
 ## 🎯 Next Resumption Focus
 1. Fill the `pending` index row with the tag's commit (`/effort low`).
-2. Item 55, ISSUE-NOV9.3-O64: a small test fix (`/effort low`).
-3. Item 56, ISSUE-NOV9.4-O66: pause the noise alarm while the phone rings, reusing `OwnVibrationWatch` (`/effort medium`).
-4. Then the Work Queue in `DOCS/issues.md`.
+2. Item 56, ISSUE-NOV9.4-O66: pause the noise alarm while the phone rings, reusing `OwnVibrationWatch` (`/effort medium`). Its step 1 also covers Nov9.6: compile and run the tests, `:core-shared:test` integrity, and chapter 168 on the A15.
+3. Then the Work Queue in `DOCS/issues.md`.

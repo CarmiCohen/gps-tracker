@@ -2,6 +2,10 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov9.6)
+- **An Instrumented Test Changed The Real Monitor Pairing (ISSUE-NOV9.3-O64, Low)**: `MapJitterAuditTest` set a 64-hex test ID as the target and inserted 50 rows into the installed Monitor's database, restoring neither, so a run with `am instrument` (which keeps app data) left the Monitor unpaired from `T`. **Fix** (test-only): `@Before` saves `identityManager.targetId`; `@After` restores it (or clears it if there was none) and deletes the test tracker's rows with `TrailDao.pruneOldestRows(testId, 0)`. 
+- **Verification (Nov9.6)**: **NOT RUN** by user instruction (2026-11-09: "make no tests at all"): no unit tests, no builds, no device audit, no integrity check (Completion steps 1 and 8). The change is test-only, so app behaviour is unchanged, but the edited test was not even compiled. SOT rule 1.406, test chapter 168 (not yet run). **NOT VERIFIED.**
+
 ## ✅ Resolved Issues (Nov9.5-DefaultId)
 - **Every Sensor Defaults To `T` (ISSUE-NOV8.13-O56, Low, closed by decision)**: two Sensors left at the default ID `T` share one relay room. **User decision (2026-11-09)**: keep the simple default; a Sensor starts as `T` unless it was already given another ID. The code already did this: `ForensicIdentityManager.ensureIdentityGenerated` writes the role's default (`ForensicIdentity.getDefaultId`) only when no `forensic_id` is stored, and `setSelfId` keeps an assigned ID across restarts; only `resetIdentity` returns it to `T`. Giving a second Sensor its own ID is left to the person setting it up. No code change.
 - **A Sensor Started Before Its First Screen Had No ID (ISSUE-NOV8.101-O59, Low)**: `selfId` reads `PENDING_IDENTITY` until an ID is stored, and only `AdminActivity` and `MonitorActivity` created one, so a Sensor started by `BootReceiver` (or reinstalled and started without its screen) connected to the relay as `PENDING_IDENTITY`. **Fix**: `SensorService.connectSignaling` calls `ensureIdentityGenerated(PREFIX_SENSOR)` before it reads `selfId`, and `MonitorSessionService.startSignaling` does the same with `PREFIX_MONITOR`; an existing ID is untouched. **Tests**: `IdentityAtConnectTest` (2, new, `core-shared`): both services create their ID before reading it, and the default is written only when no ID is stored. Not reproduced on the A15: its Sensor already has the ID `T`, and clearing it would unpair the Monitor.
@@ -239,6 +243,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov9.0-LiftTilt: [SOT Count: 974 (Rules: 474), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:19, Testing: PASSED (Sub-items: 307), QA: 96]**
 - **Nov8.103-Microphone: [SOT Count: 973 (Rules: 473), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:18, Testing: PASSED (Sub-items: 303), QA: 93]**
 - **Nov8.102-Documentation: [SOT Count: 972 (Rules: 472), Open: H:1, M:3, L:9, Ideas: H:0, M:0, L:17, Testing: PASSED (Sub-items: 299), QA: 90]**
 - **Nov8.101-Tooling: [SOT Count: 971 (Rules: 471), Open: H:1, M:3, L:9, Ideas: H:0, M:0, L:16, Testing: PASSED (Sub-items: 296), QA: 88]**

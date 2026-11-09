@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov9.5-DefaultId)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov9.6)
 
 *Working file: open work only. Resolved issues are described once, in `STATUS/RESOLUTION_ARCHIVE.md`. The text this file held up to Nov8.14 (done Work Queue rows, Resolved Gaps Nov4.32 to Nov8.14, resolved gap texts) is in tag Nov8.14: `git show Nov8.14:DOCS/issues.md`. Older dashboard rows are in the Dashboard History at the end of the archive (Documentation Rule D2).*
 
-## 🎯 Next Resumption Focus: Work Queue after Nov9.5-DefaultId, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov9.6, solved one by one in the order below
 
 ### Work Queue
 Take one item at a time, and display it before fixing it (Rule 1). Row numbers are kept from earlier versions.
 
-**Next item: the user runs the Nov9.5-DefaultId Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). Then item 55, ISSUE-NOV9.3-O64 (a small test fix), then item 56, ISSUE-NOV9.4-O66. ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
+**Next item: the user runs the Nov9.6 Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). Nov9.6 was closed without any test run (user instruction), so the next version's step 1 also covers it (compile `MapJitterAuditTest`, chapter 168). Then item 56, ISSUE-NOV9.4-O66. ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -16,7 +16,6 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 | 47 | ISSUE-NOV8.13-O57 | `--warning-mode all` shows Gradle 9 deprecations ("Mutating the dependencies of configuration ... after it has been resolved") in every module | Find the build logic that mutates resolved configurations |
 | 48 | ISSUE-NOV8.14-O58 | The SOT shows rules 1.1 to 1.334 only as the placeholder `... (Rules 1.1 to 1.334 preserved)` | Trace the rules in git history and restore them, or record where they live |
 | 53 | ISSUE-NOV9.1-O61 | Raising `targetSdk` to 35 would stop the Sensor from starting at boot (`dataSync` is forbidden from `BOOT_COMPLETED`) | Change the boot start types before any `targetSdk` raise |
-| 55 | ISSUE-NOV9.3-O64 | `MapJitterAuditTest` leaves the real Monitor paired to its test ID and adds 50 rows | Save and restore the pairing in the test, delete its rows |
 | 56 | ISSUE-NOV9.4-O66 | The Sensor phone's own ringtone raises `Tracker noise detected` | Pause the noise alarm while `OwnVibrationWatch` reports ringing, like vibration |
 | 57 | ISSUE-NOV9.4-O69 | In a quiet room the noise alarm fired every one to two minutes | A person at the A15 noting what each alert was; then decide on the 30 dB jump |
 | 58 | ISSUE-NOV9.4-O67 | The sensitivity sliders are mirrored on a right-to-left phone and show only a percentage | Show the limit itself (degrees, g) or which end is more sensitive |
@@ -52,7 +51,6 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 - **ISSUE-NOV9.4-O67 (Low) - The sensitivity sliders are hard to read**: on the A15 (right-to-left language) Android mirrors the `Tilt` and `Vibration Sensitivity Threshold` sliders, so the most sensitive end is on the left, and the label shows only a percentage (`10%` is the least sensitive). Showing the limit itself (`15°`, `0.13 g`) would make both clear.
 - **ISSUE-NOV9.4-O68 (Low) - A slider drag floods the log and the settings store**: each drag of a sensitivity slider saves `AlertSettings` at every step, so the Sensor logs about 30 `REV_Motion: Vibration limit` lines per drag. Saving when the finger lifts (`onValueChangeFinished`) would write and log once.
 - **ISSUE-NOV9.4-O65 (Low) - A vibrate-only notification can still count as a knock**: `OwnVibrationWatch` sees the phone's own ringing from the audio mode and from playing ringtones, notifications, and alarms; a notification that vibrates without sound changes neither. At the 0.13 g default the motor (0.11 g on the A15) stays under the limit, so this matters only at the highest settings. A notification listener would see them, but needs the user to grant special access.
-- **ISSUE-NOV9.3-O64 (Low) - An instrumented test changes the real Monitor pairing**: `MapJitterAuditTest` calls `setTargetId` with a 64-hex test ID and inserts 50 rows into the installed Monitor's database, and restores neither. Found in Nov9.3 when all instrumented tests ran on the A15 with `am instrument` (which keeps app data); the pairing had to be set back to `T`. Saving the pairing in `@Before` and restoring it (and deleting the rows) in `@After` would close it.
 - **ISSUE-NOV8.14-O58 (Low) - SOT rules 1.1 to 1.334 are a placeholder**: the SOT lists them only as `... (Rules 1.1 to 1.334 preserved)`, which predates the Nov7 series and has not been traced (split from ISSUE-NOV8.5-O47).
 
 ### 3. Operational Notes
@@ -93,9 +91,9 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 
 ## 📊 Hardening Progress Dashboard
 *The newest rows only (at most 6); older rows are in the Dashboard History of `STATUS/RESOLUTION_ARCHIVE.md`. From Nov8.100-Documentation, Open and Ideas are counted from the lists in this file; earlier figures used a count that cannot be traced.*
+- **Nov9.6: [SOT Count: 980 (Rules: 480), Open: H:0, M:2, L:13, Ideas: H:0, M:0, L:22, Testing: NOT RUN (Sub-items: 323), QA: 102]**
 - **Nov9.5-DefaultId: [SOT Count: 979 (Rules: 479), Open: H:0, M:2, L:14, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 322), QA: 101]**
 - **Nov9.4-OwnVibration: [SOT Count: 978 (Rules: 478), Open: H:0, M:2, L:16, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 321), QA: 100]**
 - **Nov9.3-MonitorStart: [SOT Count: 977 (Rules: 477), Open: H:1, M:2, L:12, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 318), QA: 99]**
 - **Nov9.2-Vibration: [SOT Count: 976 (Rules: 476), Open: H:1, M:3, L:11, Ideas: H:0, M:0, L:20, Testing: PASSED (Sub-items: 315), QA: 98]**
 - **Nov9.1-MicOnStartup: [SOT Count: 975 (Rules: 475), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:20, Testing: PASSED (Sub-items: 311), QA: 97]**
-- **Nov9.0-LiftTilt: [SOT Count: 974 (Rules: 474), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:19, Testing: PASSED (Sub-items: 307), QA: 96]**

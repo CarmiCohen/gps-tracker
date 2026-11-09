@@ -10,7 +10,8 @@ No copies are made any more. User decision, 2026-11-08 (option C).
 
 | Version | Commit | Notes |
 | :--- | :--- | :--- |
-| Nov9.5-DefaultId | pending | |
+| Nov9.6 | pending | |
+| Nov9.5-DefaultId | f8956f5 | |
 | Nov9.4-OwnVibration | a855940 | |
 | Nov9.3-MonitorStart | 5569bcf | |
 | Nov9.2-Vibration | 7a26409 | |

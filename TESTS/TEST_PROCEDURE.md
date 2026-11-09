@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov9.5-DefaultId - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov9.6 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -820,8 +820,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: A** - automated (ISSUE-NOV8.101-O59, ISSUE-NOV8.13-O56, SOT 1.405)
 *   **167.1 ID Created Before Connecting:** Verify that `SensorService` and `MonitorSessionService` create their default ID before reading `selfId`, and that the default is written only when no ID is stored. Automated by `IdentityAtConnectTest`.
 
+## Chapter 168 - Instrumented Tests Leave The Installed App As It Was (Nov9.6)
+**Status: L** - not yet run; instrumented on the A15 (ISSUE-NOV9.3-O64, SOT 1.406); Nov9.6 was closed without any test run by user instruction
+*   **168.1 Pairing And Rows Restored:** Note the Monitor's pairing (`T`), run `MapJitterAuditTest` with `am instrument` on the A15, then verify the Monitor is still paired to `T` and holds no rows of the test ID `0123...cdef`.
+
 ---
-**Active Testing Chapters: 157 of 167**
+**Active Testing Chapters: 158 of 168**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
