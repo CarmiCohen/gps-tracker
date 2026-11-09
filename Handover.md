@@ -29,5 +29,5 @@ git push origin main --tags
 ## 🎯 Next Resumption Focus
 1. Fill the `pending` index row (after the Git block).
 2. Next to the A15: chapter 161.4, clap once near the phone; expect `Tracker noise detected` on the Monitor.
-3. ISSUE-NOV5.2-O11 Group 5 (Lift), High.
+3. ISSUE-NOV5.2-O11 Group 5 (Lift and Tilt), High, as version **Nov9.0-LiftTilt** (user's name); `/effort high`.
 4. ISSUE-NOV8.103-O60: decide on the after-reboot microphone (accept, or a notification).
