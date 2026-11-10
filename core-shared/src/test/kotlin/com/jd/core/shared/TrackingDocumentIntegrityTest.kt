@@ -64,6 +64,18 @@ class TrackingDocumentIntegrityTest {
         assertTrue("- **Nov4.22-addHUD**" in sot, "the SOT lost its oldest hardening baseline entry")
     }
 
+    /**
+     * Chapter 176 (ISSUE-NOV8.14-O58): whole-file rewrites silently dropped SOT rules 1.304 to 1.340 behind a
+     * "preserved" placeholder. The rules this repository holds, 1.304 up to the newest, must form one unbroken run.
+     */
+    @Test
+    fun sotRulesFormAnUnbrokenRunFromTheFirstRuleOfThisRepository() {
+        val numbers = Regex("""^\*\s+\*\*1\.(\d+) """, RegexOption.MULTILINE).findAll(sot).map { it.groupValues[1].toInt() }.toList()
+        assertEquals(numbers.sorted(), numbers, "SOT rules 1.x are not in ascending order")
+        assertEquals((FIRST_REPOSITORY_RULE..numbers.max()).toList(), numbers, "SOT rules 1.x are missing or repeated")
+        assertTrue("preserved)" !in sot, "the SOT must hold its rules, not a placeholder for them")
+    }
+
     @Test
     fun versionsAreUniqueAndNewestFirst() {
         val archived = archivedVersions(archive)
@@ -118,6 +130,8 @@ class TrackingDocumentIntegrityTest {
         const val MAX_DASHBOARD_ROWS = 6
         const val MAX_ISSUES_CHARS = 40_000
         const val MAX_HANDOVER_LINES = 70
+        /** Rules 1.1 to 1.303 predate this repository; the SOT records where they live (ISSUE-NOV8.14-O58). */
+        const val FIRST_REPOSITORY_RULE = 304
         val SOT_FROZEN_AT = Version(8, 101)
         const val NAME = """Nov(\d+)\.(\d+)(?:-[A-Za-z]\w*)?"""
         const val ISSUES_DASHBOARD = "Hardening Progress Dashboard"

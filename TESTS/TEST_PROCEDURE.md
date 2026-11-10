@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov10.4 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov10.5-Documentation - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -853,8 +853,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: A** - 175.1 passed on the PC in Nov10.4: no "Mutating" line with AGP 8.5.2 (ISSUE-NOV8.13-O57, SOT 1.413)
 *   **175.1 No Mutating Warning:** Run `powershell -File TESTS/run_tests.ps1 test assembleDebug assembleRelease` and search `build/run_tests.log` for `Mutating the dependencies of configuration`. Verify there is none; the only expected deprecation is `Configuration.fileCollection(Spec)` from kapt (ISSUE-NOV10.4-O72).
 
+## Chapter 176 - The SOT Holds Its Rules (Nov10.5-Documentation)
+**Status: A** - `TrackingDocumentIntegrityTest.sotRulesFormAnUnbrokenRunFromTheFirstRuleOfThisRepository` passed in Nov10.5-Documentation (ISSUE-NOV8.14-O58, SOT 1.414)
+*   **176.1 Unbroken Rule Run:** Run `:core-shared:test`. Verify that the SOT's `1.x` rules run from 1.304 to the newest in ascending order with none missing or repeated, and that no `preserved)` placeholder stands for rules. Against the Nov10.4 SOT (rules 1.341 to 1.413 only) it fails.
+
 ---
-**Active Testing Chapters: 164 of 175**
+**Active Testing Chapters: 165 of 176**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

@@ -1,19 +1,18 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov10.3)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov10.5-Documentation)
 
 *Working file: open work only. Resolved issues are described once, in `STATUS/RESOLUTION_ARCHIVE.md`. The text this file held up to Nov8.14 (done Work Queue rows, Resolved Gaps Nov4.32 to Nov8.14, resolved gap texts) is in tag Nov8.14: `git show Nov8.14:DOCS/issues.md`. Older dashboard rows are in the Dashboard History at the end of the archive (Documentation Rule D2).*
 
-## 🎯 Next Resumption Focus: Work Queue after Nov10.4, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov10.5-Documentation, solved one by one in the order below
 
 ### Work Queue
 Take one item at a time, and display it before fixing it (Rule 1). Row numbers are kept from earlier versions.
 
-**Next item: the user runs the Nov10.4 Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). Then item 48, ISSUE-NOV8.14-O58. Items 53 (ISSUE-NOV9.1-O61) and 62 (ISSUE-NOV10.1-O71) are very low priority, user decisions 2026-11-10. ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
+**Next item: the user runs the Nov10.5-Documentation Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). Then the next open gap by priority (the Medium ones first), or SIMP-NOV10.5-S1. Items 53 (ISSUE-NOV9.1-O61) and 62 (ISSUE-NOV10.1-O71) are very low priority, user decisions 2026-11-10. ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
 | 11 | ISSUE-NOV5.4-O19 | `before splitting/gps-tracker` is a frozen archive; only its redundant `relay-server/index.js` edit is to be discarded, by the user | User runs `git restore index.js` in `before splitting/gps-tracker/relay-server` |
 | 18 | ISSUE-NOV6.0-O26 | Run the Sensor on a device or emulator below API 35 | A device, or user permission to download an API 34 emulator image |
-| 48 | ISSUE-NOV8.14-O58 | The SOT shows rules 1.1 to 1.334 only as the placeholder `... (Rules 1.1 to 1.334 preserved)` | Trace the rules in git history and restore them, or record where they live |
 | 53 | ISSUE-NOV9.1-O61 | Raising `targetSdk` to 35 would stop the Sensor from starting at boot (`dataSync` is forbidden from `BOOT_COMPLETED`) | Change the boot start types before any `targetSdk` raise |
 | 62 | ISSUE-NOV10.1-O71 | A silent notification's ignore window lasted 2.2 s on the A15, not the coded 3 s | Find why `Phone quiet` comes early (shell notification with sound? handler timing?) |
 
@@ -42,7 +41,6 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 - **ISSUE-NOV10.4-O72 (Low) - Kotlin 1.9.24's kapt uses a Gradle 9 deprecated API**: every build under `--warning-mode all` prints "The Configuration.fileCollection(Spec) method has been deprecated", from `Kapt3GradleSubplugin` (Kotlin 1.9.24). It needs a Kotlin Gradle plugin upgrade (with the matching Compose compiler and KSP), or a move from kapt to KSP. Also still printed: the kapt line "options were not recognized by any processor" and unused-parameter `w:` lines (`MapOverlayManager`, `DeviceSetup`, `AlarmStealthTest`). Split from ISSUE-NOV8.13-O57 (Nov10.4).
 - **ISSUE-NOV9.1-O61 (Low) - The boot start depends on `targetSdk` 34**: since Nov9.1 a Sensor refused location and the microphone at boot keeps running with the `dataSync` and `remoteMessaging` types. Android 15 forbids starting a `dataSync` foreground service from `BOOT_COMPLETED` for apps targeting API 35+, so raising `targetSdk` would make the last fallback fail and the Sensor would again not run after a reboot. Before any raise, drop `dataSync` from the boot start (keep `remoteMessaging`, or `location` with "Allow all the time") and repeat chapter 163.3. **User decision, 2026-11-10: very low priority.**
 - **ISSUE-NOV10.1-O71 (Low) - The silent notification window ends after 2.2 s, not 3 s**: on 2026-11-10 at 09:45 on the A15, with notification access granted, a notification posted by `adb shell cmd notification post` gave `Phone ringing or notifying` at 38.665 and `Phone quiet` at 40.865, while `OwnVibrationWatch.NOTIFICATION_VIBRATION_MS` is 3 s. Cause not investigated; one guess is that the shell notification's sound started the ignore through the playback check first. **User decision, 2026-11-10: very low priority; leave it and take more important items first.**
-- **ISSUE-NOV8.14-O58 (Low) - SOT rules 1.1 to 1.334 are a placeholder**: the SOT lists them only as `... (Rules 1.1 to 1.334 preserved)`, which predates the Nov7 series and has not been traced (split from ISSUE-NOV8.5-O47).
 
 ### 3. Operational Notes
 - **Sensor service restart**: instrumented test runs uninstall the Sensor app; reinstall it with `:app-sensor:installDebug`, then one tap on its `System Idle` screen starts the service. Running an installed test APK with `adb shell am instrument` keeps the app and its data but force-stops it; the same tap restarts it with the microphone (Nov8.103).
@@ -56,6 +54,7 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 ---
 
 ## 🚀 Strategic Simplification Ideas
+*   **SIMP-NOV10.5-S1**: Retire Stale SOT Rules. Rules 1.304 to 1.340, restored verbatim in Nov10.5-Documentation (ISSUE-NOV8.14-O58), were never reviewed against the code: 1.333 names `gps-relay-server.onrender.com` in `MonitorSessionService`, while the default is `RelayConfig.DEFAULT_URL` (`gps-survival-relay.onrender.com`); 1.336 and 1.339 pin the version names Nov4.25 and Nov4.29. Check each rule from 1.304 on against the code and mark superseded ones as retired (keeping the number), instead of deleting them.
 *   **SIMP-NOV9.3-S1**: Faster Release Starts. The release builds are unminified and ship no baseline profile, so a fresh install starts on JIT only (Monitor about 0.45 s on the A15). Adding `androidx.profileinstaller` would let the baseline profiles the Compose libraries already ship be compiled ahead of time; R8 would come later, with keep rules for Hilt, Room, and osmdroid.
 *   **SIMP-NOV9.3-S2**: Keep The Virtual Peer. The Nov9.3 reciprocal simulation used a small Node script (Socket.IO v4 over the built-in WebSocket: a virtual viewer and a virtual tracker against the production relay), kept outside the repository. As `TESTS/virtual_peer.mjs` with a one-line summary, a one-phone session could repeat it instead of rewriting it.
 *   **SIMP-NOV9.1-S1**: One Telemetry Encoder. `SocketioSignalingClient` builds the telemetry JSON twice, in `sendTelemetryBatch` and `sendBackfillResponse`, and parses it once; Nov9.1 added `noiseOff` to the live copy only. One `encodeTelemetry(update)` next to `parseLocationUpdate` would keep the fields in step (the buffer decides what a backfilled row can carry).
@@ -83,9 +82,9 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 
 ## 📊 Hardening Progress Dashboard
 *The newest rows only (at most 6); older rows are in the Dashboard History of `STATUS/RESOLUTION_ARCHIVE.md`. From Nov8.100-Documentation, Open and Ideas are counted from the lists in this file; earlier figures used a count that cannot be traced.*
+- **Nov10.5-Documentation: [SOT Count: 988 (Rules: 488), Open: H:0, M:2, L:8, Ideas: H:0, M:0, L:23, Testing: PASSED (Sub-items: 332), QA: 110]**
 - **Nov10.4: [SOT Count: 987 (Rules: 487), Open: H:0, M:2, L:9, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 331), QA: 109]**
 - **Nov10.3: [SOT Count: 986 (Rules: 486), Open: H:0, M:2, L:9, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 330), QA: 108]**
 - **Nov10.2: [SOT Count: 985 (Rules: 485), Open: H:0, M:2, L:10, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 329), QA: 107]**
 - **Nov10.1: [SOT Count: 984 (Rules: 484), Open: H:0, M:2, L:11, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 328), QA: 106]**
 - **Nov10.0: [SOT Count: 983 (Rules: 483), Open: H:0, M:2, L:11, Ideas: H:0, M:0, L:22, Testing: PARTIAL (Sub-items: 326), QA: 105]**
-- **Nov9.8: [SOT Count: 982 (Rules: 482), Open: H:0, M:2, L:12, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 325), QA: 104]**
