@@ -2,6 +2,10 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov10.3)
+- **The Release Install Hid Its Failure Reason (ISSUE-NOV9.8-O70, Low)**: a native tool's stderr reaches PowerShell (under `2>&1`) as `ErrorRecord`s whose default text is `System.Management.Automation.RemoteException`, and `TESTS/install_release.ps1` printed only the last raw record, so Nov9.8 saw `RELEASE sensor FAILED System.Management.Automation.RemoteException` where adb had said `INSTALL_FAILED_VERSION_DOWNGRADE`. **Fix**: a `Lines` filter turns each record into its plain message (an `ErrorRecord`'s `Exception.Message`) and drops blank lines; `Reason` picks the last line matching `INSTALL_FAILED|Failure|error|Exception`, else the last line. Install success now also needs adb's exit code 0; a signing failure prints `apksigner`'s reason too. **Test**: `ReleaseAuditBuildTest.installScriptReportsTheRealFailureReason`; chapter 174 (on the PC: `-Serial NOSUCHDEVICE -Apps sensor` printed `RELEASE sensor FAILED adb.exe: device 'NOSUCHDEVICE' not found`, exit 1).
+- **Verification (Nov10.3)**: tooling and documentation only (D5): `:core-shared:test`; no builds or device audit. Index row Nov10.2 filled (c9cac4e).
+
 ## ✅ Resolved Issues (Nov10.2)
 - **Frequent Noise Alarms In A Quiet Room (ISSUE-NOV9.4-O69, Low)**: closed without a code change. On the A15 on 2026-11-10, four alerts between 12:48 and 12:50 (−36 to −27 dBFS over −71 to −67 dBFS) were the user's own coughing and small noises; an empty room from 14:21:37 to 14:34:56 (13 min 19 s, telemetry every 10 s, longest gap 20 s) gave **zero** alerts. Every known alert came from a person's sound, so the alarm reports presence as intended. **User decision (2026-11-10)**: keep the 30 dB jump. A first empty-room run (13:01 to 13:19) was lost because the A15's main logcat buffer rolled over within about 28 minutes; long runs now stream `logcat -s REV_*` to a PC file from the start (`DOCS/issues.md` Operational Notes). The Monitor on the same phone had stored nothing since 2026-11-09 22:59: it receives only while open, and Samsung freezes it in the background. **Test**: chapter 173.
 - **Chapter 169.1 Passed (ISSUE-NOV9.4-O66, Nov9.7)**: two calls to the A15 with the Sensor listening. 12:51:45.3 ringing → 46.4 `Phone ringing or notifying`; 12:52:00.9 call ended → 01.3 `Phone quiet`; 14:34:56.5 → 57.3 and 14:35:20.2 → 20.6. No `Acoustic alert` during or after either call. The first ring sounds about 1 s before the ignore starts; no alert came from it.
@@ -264,6 +268,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov9.6: [SOT Count: 980 (Rules: 480), Open: H:0, M:2, L:13, Ideas: H:0, M:0, L:22, Testing: NOT RUN (Sub-items: 323), QA: 102]**
 - **Nov9.5-DefaultId: [SOT Count: 979 (Rules: 479), Open: H:0, M:2, L:14, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 322), QA: 101]**
 - **Nov9.4-OwnVibration: [SOT Count: 978 (Rules: 478), Open: H:0, M:2, L:16, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 321), QA: 100]**
 - **Nov9.3-MonitorStart: [SOT Count: 977 (Rules: 477), Open: H:1, M:2, L:12, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 318), QA: 99]**

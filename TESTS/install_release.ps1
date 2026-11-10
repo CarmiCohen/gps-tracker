@@ -13,14 +13,21 @@ $signer = Get-ChildItem (Join-Path $sdk "build-tools") -Directory | Sort-Object 
     Select-Object -Last 1 | ForEach-Object { Join-Path $_.FullName "apksigner.bat" }
 $keystore = Join-Path $env:USERPROFILE ".android\debug.keystore"
 $exit = 0
+# A native tool's stderr reaches PowerShell as ErrorRecords whose text prints as "RemoteException" (ISSUE-NOV9.8-O70):
+# turn every line into its plain message, and report the line that names the reason (e.g. INSTALL_FAILED_VERSION_DOWNGRADE).
+function Lines { process { $t = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { "$_" }; if ($t.Trim()) { $t.Trim() } } }
+function Reason([string[]]$out) {
+    $hit = $out | Where-Object { $_ -match 'INSTALL_FAILED|Failure|error|Exception' } | Select-Object -Last 1
+    if ($hit) { $hit } elseif ($out) { $out[-1] } else { "(no output)" }
+}
 foreach ($app in $Apps) {
     $dir = Join-Path $root "app-$app\build\outputs\apk\release"
     $unsigned = Join-Path $dir "app-$app-release-unsigned.apk"
     $signed = Join-Path $dir "app-$app-release-debugkey.apk"
     if (-not (Test-Path $unsigned)) { "RELEASE $app FAILED no $unsigned (run assembleRelease first)"; $exit = 1; continue }
-    & $signer sign --ks $keystore --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey --out $signed $unsigned 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { "RELEASE $app FAILED signing"; $exit = 1; continue }
-    $result = (adb -s $Serial install -r $signed 2>&1 | Select-Object -Last 1)
-    if ("$result" -match '^Success') { "RELEASE $app INSTALLED on $Serial" } else { "RELEASE $app FAILED $result"; $exit = 1 }
+    $out = @(& $signer sign --ks $keystore --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey --out $signed $unsigned 2>&1 | Lines)
+    if ($LASTEXITCODE -ne 0) { "RELEASE $app FAILED signing: $(Reason $out)"; $exit = 1; continue }
+    $out = @(adb -s $Serial install -r $signed 2>&1 | Lines)
+    if ($LASTEXITCODE -eq 0 -and ($out -match '^Success')) { "RELEASE $app INSTALLED on $Serial" } else { "RELEASE $app FAILED $(Reason $out)"; $exit = 1 }
 }
 exit $exit

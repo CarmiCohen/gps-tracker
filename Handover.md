@@ -1,31 +1,29 @@
 ```
 git add .
-git commit -m "Nov10.2 - AN EMPTY ROOM RAISES NO NOISE ALARM (ISSUE-NOV9.4-O69)
+git commit -m "Nov10.3 - THE RELEASE INSTALL NAMES ITS FAILURE (ISSUE-NOV9.8-O70)
 
-- O69 closed, no code change: empty room 13 min, zero alerts; known alerts were the user's coughs; 30 dB jump kept (user decision).
-- Chapter 169.1 (ISSUE-NOV9.4-O66) passed twice on the A15 with real calls.
-- Index row Nov10.1 filled (0b29095). SOT 1.411, chapter 173; long-run logcat note.
-- TESTS: documentation only, :core-shared:test.
-- VERSION: Nov10.2, versionCode 81."
-git tag Nov10.2
+- O70: install_release.ps1 prints adb's or apksigner's own message instead of RemoteException.
+- Index row Nov10.2 filled (c9cac4e). SOT 1.412, chapter 174.
+- TESTS: tooling and documentation only, :core-shared:test.
+- VERSION: Nov10.3, versionCode 82."
+git tag Nov10.3
 git push origin main --tags
 ```
 
-# Project Handover - Version Nov10.2 (An Empty Room Raises No Noise Alarm)
+# Project Handover - Version Nov10.3 (The Release Install Names Its Failure)
 
 ## ▶️ Resumption State (Read First)
-- **Git**: run the block above as one commit, then the tag; next session, replace `pending` in the top row of `STATUS/BASELINE/INDEX.md` with `git rev-parse --short=7 Nov10.2^{commit}`.
+- **Git**: run the block above as one commit, then the tag; next session, replace `pending` in the top row of `STATUS/BASELINE/INDEX.md` with `git rev-parse --short=7 Nov10.3^{commit}`.
 - **User decisions (2026-11-10)**: keep the 30 dB noise jump; O69 closed. `//` from the user means "continue".
-- **Phones**: A15 (`R58X40GV2AR`): Sensor and Monitor debug builds (versionCode 79), Sensor service running; Sensor permissions granted again today except background location ("Allow all the time"). S21FE in personal use; never test on it.
-- **Test tips**: `DOCS/issues.md` Operational Notes (new: long runs must stream logcat to a PC file; the Monitor records only while open); `TESTS/TEST_GUIDELINES.md` section 4.
+- **Phones**: A15 (`R58X40GV2AR`): Sensor and Monitor debug builds (versionCode 79), Sensor service running; background location not "Allow all the time". Not touched in Nov10.3. S21FE in personal use; never test on it.
+- **Test tips**: `DOCS/issues.md` Operational Notes; `TESTS/TEST_GUIDELINES.md` section 4. `install_release.ps1` failures now name their reason (chapter 174).
 
-## 🟢 Status: PASSED (Nov10.2)
-- ISSUE-NOV9.4-O69 closed (no code change); chapter 169.1 (ISSUE-NOV9.4-O66) passed twice. Details: `STATUS/RESOLUTION_ARCHIVE.md`.
-- Documentation only: `:core-shared:test`; no builds or device audit (D5).
+## 🟢 Status: PASSED (Nov10.3)
+- ISSUE-NOV9.8-O70 resolved: `TESTS/install_release.ps1` reports the tool's own failure message. Details: `STATUS/RESOLUTION_ARCHIVE.md`.
+- Tooling and documentation only: `:core-shared:test`; no builds or device audit (D5).
 
-**Audit line**: Nov10.2: [SOT Count: 985 (Rules: 485), Open: H:0, M:2, L:10, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 329), QA: 107]
+**Audit line**: Nov10.3: [SOT Count: 986 (Rules: 486), Open: H:0, M:2, L:9, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 330), QA: 108]
 
 ## 🎯 Next Resumption Focus
 1. Fill the `pending` index row with the tag's commit (`/effort low`).
-2. Item 61, ISSUE-NOV9.8-O70 (`install_release.ps1` error text; `/effort medium`).
-3. Item 62, ISSUE-NOV10.1-O71 (2.2 s window; `/effort high`).
+2. Item 62, ISSUE-NOV10.1-O71 (2.2 s window; `/effort high`).

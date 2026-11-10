@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov10.2 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov10.3 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -845,8 +845,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: L** - 173.1 passed on the A15 in Nov10.2: 13 min, zero alerts (ISSUE-NOV9.4-O69, SOT 1.411)
 *   **173.1 Empty Room:** With the Sensor listening, the person types `go` and leaves; 30 s later clear logcat and stream `adb logcat -v time -s REV_SensorService:* REV_Motion:* Telecom:I` to a PC file (the A15's buffer rolls over in under 30 min). After about 15 min the person calls the A15 as the end mark. Verify no `Acoustic alert` before the ringing, and `Telemetry sent` lines without gaps.
 
+## Chapter 174 - The Release Install Names Its Failure (Nov10.3)
+**Status: A** - `ReleaseAuditBuildTest.installScriptReportsTheRealFailureReason` passed; 174.1 passed on the PC in Nov10.3 (ISSUE-NOV9.8-O70, SOT 1.412)
+*   **174.1 Failure Reason:** After `assembleRelease`, run `powershell -File TESTS/install_release.ps1 -Serial NOSUCHDEVICE -Apps sensor`. Verify it prints `RELEASE sensor FAILED adb.exe: device 'NOSUCHDEVICE' not found` (not `RemoteException`) and exits 1. No phone is touched.
+
 ---
-**Active Testing Chapters: 162 of 173**
+**Active Testing Chapters: 163 of 174**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

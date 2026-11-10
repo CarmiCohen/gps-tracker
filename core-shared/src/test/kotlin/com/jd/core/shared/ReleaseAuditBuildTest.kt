@@ -37,6 +37,19 @@ class ReleaseAuditBuildTest {
         assertTrue("install -r" in script, "install_release.ps1 must replace the app in place, keeping its data and pairing")
     }
 
+    /**
+     * Chapter 174 (ISSUE-NOV9.8-O70): adb's stderr reaches PowerShell as ErrorRecords that print as
+     * `RemoteException`; the script must report their messages, so a failure names its reason
+     * (for example INSTALL_FAILED_VERSION_DOWNGRADE).
+     */
+    @Test
+    fun installScriptReportsTheRealFailureReason() {
+        val script = read("TESTS/install_release.ps1")
+        assertTrue("ErrorRecord" in script && "Exception.Message" in script, "install_release.ps1 must convert stderr ErrorRecords to their messages")
+        assertTrue("INSTALL_FAILED" in script, "install_release.ps1 must pick the line naming the install failure")
+        assertFalse(Regex("""install -r \S+ 2>&1 \| Select-Object -Last 1""").containsMatchIn(script), "install_release.ps1 must not print only the raw last record")
+    }
+
     @Test
     fun completionSequenceAuditsTheReleaseBuild() {
         val guidelines = read("DEVELOPER_GUIDELINES.md")
