@@ -101,7 +101,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **18.2 Temporal Authority:** Set Viewer time -2m; verify HUD remains Green.
 
 ## Chapter 19 - Multi-Peer Consistency
-**Status: S** - Needs extra devices
+**Status: L** - Failed in Nov10.7 (A15 Sensor, Monitors on the A15 and the S21FE, production relay): of three noise alarms the S21FE was 11.2 s, 17.0 s, and 0.24 s behind the A15 Monitor, with both phones on LTE at about 25 ms to the relay (ISSUE-NOV10.7-O73)
 *   **19.1 Parallel Sync:** Connect two Viewers; verify simultaneous HUD updates (<2s delta).
 
 ## Chapter 20 - Hard Reboot Continuity
@@ -560,7 +560,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **124.2 Relay Lost On Hardware:** With the dialog open on the A15, cut the network. Verify that the status changes to `Disconnected` together with `SRV`, and returns to `Connected` after the network returns.
 
 ## Chapter 125 - Backfill Gap Recovery (Nov6.4)
-**Status: L / A** - 125.1 to 125.6 automated; 125.7 verified on the A15 through a private relay, with one hole. Production relay and two phones not run
+**Status: L / A** - 125.1 to 125.6 automated; 125.7 verified on the A15 through a private relay, with one hole. In Nov10.7, with the Monitor on the S21FE (release build) through the production relay, a 64 s cut of the Sensor left no new hole in the Monitor log (no database pull)
 *   **125.1 Holes Come From The Table:** Verify that every hole between stored rows is listed, newest first, ignoring other trackers and local rows, and that a scan of a full table stays under one second. Automated by `BackfillGapRecoveryTest.gapsAreListedNewestFirst`, `aContinuousTrailHasNoGaps`, `otherTrackersAndLocalRowsAreIgnored`, and `scanningTheFullTableStaysFast`.
 *   **125.2 More Holes Than The Limit:** With more holes than the 10-request limit, verify that only 10 requests are in flight, and that every hole is refilled as slots free. Automated by `everyHoleIsRefilledWhenThereAreMoreThanTheLimit` and `BackfillLedgerTest.gapsOverTheLimitWaitAndAreRequestedWhenASlotFrees`.
 *   **125.3 Failed And Unanswered Requests:** Verify that a request that could not be sent is made again by a later scan, and that an unanswered request is released after 30 seconds without a chunk and asked again. Automated by `aFailedRequestIsNotForgotten`, `BackfillLedgerTest.anUnansweredRequestIsReleasedAndAskedAgain`, and `eachChunkRestartsTheTimeout`.
@@ -634,7 +634,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **136.2 Stale GPS Fix Fallback:** Verify that a coarse Network fix is accepted when the GPS fix is older than 2 minutes (120s), providing fallback positioning when GPS signal is lost. Automated by `MonitorLocationSourceTest.coarseNetworkFixAcceptedWhenGpsFixIsStale`.
 
 ## Chapter 137 - Backfill Answer Stops On Send Failure (Nov7.15)
-**Status: A** - 137.1 to 137.3 automated by `BackfillResponderTest`; 137.4, the Monitor asking again after a real network cut, was not run on hardware
+**Status: A / L** - 137.1 to 137.3 automated by `BackfillResponderTest`; 137.4 passed in Nov10.7 (A15 Sensor, S21FE Monitor, production relay) with the cut 0.3 s after the request, before any chunk: the Monitor asked again 4 s after the Sensor reconnected, without a restart. A cut in the middle of an answer was not achieved
 *   **137.1 Complete Answer:** Verify that a backfill range of 120 rows is sent as chunks of 50, 50, and 20 in sequence order, and that only the last chunk carries `isComplete`. Automated by `BackfillResponderTest.allChunksSent_onlyLastIsComplete` and `singleChunk_isComplete` (ISSUE-NOV6.4-O33).
 *   **137.2 Stop On Failed Chunk:** Verify that when `sendBackfillResponse` fails for a chunk, no later chunk of that request is sent and the completion chunk is never sent, so the Monitor does not count the range as answered. Automated by `BackfillResponderTest.failedMiddleChunk_stopsAndNeverSendsComplete`, `failedFirstChunk_sendsNothingElse`, and `failedLastChunk_reportsFailure`.
 *   **137.3 Empty Range:** Verify that a request for a range the Sensor no longer holds is answered with one empty completion chunk, and that a failed send of it is reported. Automated by `BackfillResponderTest.emptyRange_sendsOneCompleteResponse` and `emptyRange_failedSendReported`.

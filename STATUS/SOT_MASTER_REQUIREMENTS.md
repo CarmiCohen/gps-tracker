@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov10.6-Documentation)
+# SOT Master Requirements & Hardening Status (Nov10.7)
 
-## 🏗️ Architectural Master Rules (489 Rules)
+## 🏗️ Architectural Master Rules (490 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -116,6 +116,7 @@
 *   **1.413 The Build Mutates No Resolved Configuration**: a build under `--warning-mode all` MUST print no "Mutating the dependencies of configuration" deprecation; the Android Gradle Plugin stays at 8.5.2 or later, since 8.2.2's classpath alignment caused it (ISSUE-NOV8.13-O57).
 *   **1.414 The SOT Holds Its Rules**: the SOT MUST list every rule from 1.304 to the newest in one unbroken ascending run, with no placeholder standing for rules; rules 1.1 to 1.303 predate this repository, and the SOT states where they live (ISSUE-NOV8.14-O58).
 *   **1.415 A Superseded Rule Is Retired In Place**: a SOT rule that the code no longer follows, or that only records one version's milestone, MUST be marked `*(Retired <Version>, <ID>: <reason>)*` after its title, keeping its number and text, never deleted or renumbered; rules 1.304 to 1.340 were checked against the code and 1.318, 1.333, 1.336 and 1.339 retired (SIMP-NOV10.5-S1).
+*   **1.416 Every Viewer Hears An Alarm Together**: two Monitors paired to the same tracker, both open on screen, MUST each raise a Sensor alarm within 2 s of the other; Nov10.7 measured 11.2 s and 17.0 s on the S21FE for two of three noise alarms (chapter 19, ISSUE-NOV10.7-O73).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*
