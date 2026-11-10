@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov10.1 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov10.2 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -825,7 +825,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **168.1 Pairing And Rows Restored:** Note the Monitor's pairing (`T`), run `MapJitterAuditTest` with `am instrument` on the A15, then verify the Monitor is still paired to `T` and holds no rows of the test ID `0123...cdef`.
 
 ## Chapter 169 - The Sensor Phone's Own Sound Is No Noise Alarm (Nov9.7)
-**Status: L** - not yet run; person check on the A15 (ISSUE-NOV9.4-O66, SOT 1.407); Nov9.7 was closed with a compile check only by user instruction
+**Status: L** - 169.1 passed twice on the A15 in Nov10.2 (ISSUE-NOV9.4-O66, SOT 1.407)
 *   **169.1 A Call On The A15:** With the Sensor listening, call the A15 for about 10 s without touching it. Verify `REV_Motion: Phone ringing or notifying: vibration and noise ignored`, then `Phone quiet: vibration and noise detected again`, and no `Acoustic alert` or `Tracker noise detected`, also in the seconds after the ringing stops.
 
 ## Chapter 170 - Sensitivity Sliders Show The Limit Itself (Nov9.8)
@@ -841,8 +841,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **172.1 Granted:** Grant access (`adb shell cmd notification allow_listener com.jd.app.sensor/com.jd.app.sensor.SilentNotificationListener`), start the Sensor service, and verify `REV_Motion: Notification access granted`. Post `adb shell cmd notification post -S bigtext o65test "test"` and verify `Phone ringing or notifying` then, about 3 s later, `Phone quiet`. Swipe the notification away.
 *   **172.2 Not granted:** Revoke with `disallow_listener`, restart the service, and verify `Notification access not granted`; Phone Setup section 9 opens Android's Notification access page.
 
+## Chapter 173 - An Empty Room Raises No Noise Alarm (Nov10.2)
+**Status: L** - 173.1 passed on the A15 in Nov10.2: 13 min, zero alerts (ISSUE-NOV9.4-O69, SOT 1.411)
+*   **173.1 Empty Room:** With the Sensor listening, the person types `go` and leaves; 30 s later clear logcat and stream `adb logcat -v time -s REV_SensorService:* REV_Motion:* Telecom:I` to a PC file (the A15's buffer rolls over in under 30 min). After about 15 min the person calls the A15 as the end mark. Verify no `Acoustic alert` before the ringing, and `Telemetry sent` lines without gaps.
+
 ---
-**Active Testing Chapters: 161 of 172**
+**Active Testing Chapters: 162 of 173**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
