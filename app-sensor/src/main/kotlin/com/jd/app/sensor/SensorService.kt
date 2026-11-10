@@ -379,7 +379,7 @@ class SensorService : Service(), SensorEventListener {
         sensorDataStore.alertSettings
             .onEach { settings ->
                 val degrees = tiltThresholdForSensitivity(settings.tiltSensitivity)
-                if (degrees != motionSentinel.tiltThresholdDegrees) SystemLogger.i("Motion", "Tilt limit ${degrees.toInt()} deg")
+                if (degrees != motionSentinel.tiltThresholdDegrees) SystemLogger.i("Motion", "Tilt limit ${kotlin.math.round(degrees).toInt()} deg") // Rounded like the slider label.
                 motionSentinel.tiltThresholdDegrees = degrees
                 val vibration = vibrationThresholdForSensitivity(settings.vibrationSensitivity)
                 if (vibration != motionSentinel.vibrationThreshold) {

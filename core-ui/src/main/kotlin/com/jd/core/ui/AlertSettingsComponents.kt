@@ -190,7 +190,7 @@ fun AlertManagementOverlay(
                     label = "Vibration Sensitivity Threshold",
                     value = draftAlertSettings.vibrationSensitivity,
                     limitLabel = ::vibrationLimitLabel,
-                    onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(vibrationSensitivity = it)) }
+                    onValueCommitted = { onUpdateAlertSettings(draftAlertSettings.copy(vibrationSensitivity = it)) }
                 )
             } else if (draftAlertSettings.tamperAlert) {
                 Text(
@@ -208,7 +208,7 @@ fun AlertManagementOverlay(
                     label = "Tilt Sensitivity Threshold",
                     value = draftAlertSettings.tiltSensitivity,
                     limitLabel = ::tiltLimitLabel,
-                    onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(tiltSensitivity = it)) }
+                    onValueCommitted = { onUpdateAlertSettings(draftAlertSettings.copy(tiltSensitivity = it)) }
                 )
             } else if (draftAlertSettings.tiltAlert) {
                 Text(
@@ -382,19 +382,23 @@ fun AlarmToggle(
 /**
  * Shows the limit the Sensor applies, not a percentage, and names both ends (ISSUE-NOV9.4-O67). The end labels sit in
  * a Row, which follows the layout direction like the Slider, so on a right-to-left phone they mirror together with it.
+ * While dragging, the position lives only in this composable (the label follows it); [onValueCommitted] runs once,
+ * when the finger lifts, so a drag saves the settings and moves the Sensor's limit once (ISSUE-NOV9.4-O68).
  */
 @Composable
 fun SensitivitySlider(
     label: String,
     value: Float,
     limitLabel: (Float) -> String,
-    onValueChange: (Float) -> Unit
+    onValueCommitted: (Float) -> Unit
 ) {
+    var position by remember(value) { mutableFloatStateOf(value) }
     Column(modifier = Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 8.dp)) {
-        Text(text = "$label: alert above ${limitLabel(value)}", color = Slate500, fontSize = 11.sp)
+        Text(text = "$label: alert above ${limitLabel(position)}", color = Slate500, fontSize = 11.sp)
         Slider(
-            value = value,
-            onValueChange = onValueChange,
+            value = position,
+            onValueChange = { position = it },
+            onValueChangeFinished = { if (position != value) onValueCommitted(position) },
             valueRange = 0.1f..1.0f,
             modifier = Modifier.fillMaxWidth(),
             colors = SliderDefaults.colors(thumbColor = ViewerCyan, activeTrackColor = ViewerCyan)

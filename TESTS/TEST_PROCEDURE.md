@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov9.8 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov10.0 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -832,8 +832,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: L / A** - `MotionSentinelTest.theSlidersShowTheLimitItself`; 170.1 passed on the A15 in Nov9.8 (ISSUE-NOV9.4-O67, SOT 1.408)
 *   **170.1 Limit And Ends On The Sensor:** Open the Sensor's `ALERTS SETUP`. Verify the labels read `Vibration Sensitivity Threshold: alert above 0.13 g` and `Tilt Sensitivity Threshold: alert above 15°` at the defaults, that `Less sensitive` and `More sensitive` sit under the matching ends (mirrored on a right-to-left phone), and that moving the tilt slider to `More sensitive` shows `5°` with `REV_Motion: Tilt limit 5 deg`. Set it back to `15°`.
 
+## Chapter 171 - A Slider Drag Saves Once (Nov10.0)
+**Status: L** - 171.1 passed on the A15 in Nov10.0 (ISSUE-NOV9.4-O68, SOT 1.409)
+*   **171.1 One Log Line Per Drag:** On the Sensor's `ALERTS SETUP`, clear logcat and drag the tilt slider across most of its track. Verify the label follows the finger and exactly one `REV_Motion: Tilt limit` line appears, after the finger lifts, with the angle the label shows. Set it back to `15°`.
+
 ---
-**Active Testing Chapters: 159 of 170**
+**Active Testing Chapters: 160 of 171**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

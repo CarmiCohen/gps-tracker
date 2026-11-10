@@ -2,6 +2,10 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov10.0)
+- **A Slider Drag Flooded The Log And The Settings Store (ISSUE-NOV9.4-O68, Low)**: each step of a sensitivity slider drag saved `AlertSettings`, so the Sensor logged about 30 `REV_Motion: Tilt limit` / `Vibration limit` lines per drag and moved its limit at every step. **Fix**: `SensitivitySlider` (`core-ui/AlertSettingsComponents.kt`) keeps the drag position in its own state (`remember(value)`), so the label follows the finger, and calls `onValueCommitted` once from `onValueChangeFinished`, only when the value changed. Also, the `Tilt limit` log line now rounds the angle like the slider label (it truncated: label `7°`, log `6 deg`; `SensorService.watchMotionSensitivity`).
+- **Verification (Nov10.0)**: minimal by user instruction (2026-11-10, "make minimal tests to save tokens"): `:app-sensor:installDebug` builds clean; on the A15 one drag of the tilt slider gave exactly one `Tilt limit` line (both directions); the limit was set back to 15° (`Tilt limit 15 deg`); `:core-shared:test` integrity run. No full unit tests, release builds, or device audit. SOT rule 1.409, test chapter 171.
+
 ## ✅ Resolved Issues (Nov9.8)
 - **The Sensitivity Sliders Were Hard To Read (ISSUE-NOV9.4-O67, Low)**: on the A15 (right-to-left layout) Android mirrors the `Tilt` and `Vibration Sensitivity Threshold` sliders, so the most sensitive end is on the left, and the label showed only a percentage (`10%` was the least sensitive). **Fix**: `tiltLimitLabel` and `vibrationLimitLabel` (`core-shared/MotionSentinel.kt`) format the limit from the same `tiltThresholdForSensitivity` / `vibrationThresholdForSensitivity` the Sensor applies; `SensitivitySlider` (`core-ui/AlertSettingsComponents.kt`) shows `<label>: alert above 15°` / `0.13 g` and names both ends `Less sensitive` / `More sensitive` in a Row under the track, which follows the layout direction like the Slider, so the names stay at the right ends on a right-to-left phone. **Test**: `MotionSentinelTest.theSlidersShowTheLimitItself` (both ends and the middle of each slider); chapter 170.
 - **Verification (Nov9.8)**: all unit tests, `assembleDebug` and `assembleRelease` with `--warning-mode all` pass (only the known ISSUE-NOV8.13-O57 deprecations). On the A15: chapter 170.1 passed (labels as above; `Less sensitive` right, `More sensitive` left; a tap at the left end gave `5°` and `REV_Motion: Tilt limit 5 deg`; set back to `15°`, logged `Tilt limit 15 deg`). Chapter 168.1 passed (`MapJitterAuditTest` OK; the Monitor still shows `V -> TRK:T`; no rows of the test ID). `ProductionReadinessAuditTest` OK (3); release builds cold-started with zero Davey events over 500 ms and zero StackLog leaks in both apps; debug builds restored. Chapter 169.1 not run: nobody was there to call the A15. New gap ISSUE-NOV9.8-O70.
@@ -251,6 +255,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov9.3-MonitorStart: [SOT Count: 977 (Rules: 477), Open: H:1, M:2, L:12, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 318), QA: 99]**
 - **Nov9.2-Vibration: [SOT Count: 976 (Rules: 476), Open: H:1, M:3, L:11, Ideas: H:0, M:0, L:20, Testing: PASSED (Sub-items: 315), QA: 98]**
 - **Nov9.1-MicOnStartup: [SOT Count: 975 (Rules: 475), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:20, Testing: PASSED (Sub-items: 311), QA: 97]**
 - **Nov9.0-LiftTilt: [SOT Count: 974 (Rules: 474), Open: H:1, M:3, L:10, Ideas: H:0, M:0, L:19, Testing: PASSED (Sub-items: 307), QA: 96]**
