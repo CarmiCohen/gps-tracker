@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov10.3)
+# SOT Master Requirements & Hardening Status (Nov10.4)
 
-## 🏗️ Architectural Master Rules (486 Rules)
+## 🏗️ Architectural Master Rules (487 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -76,6 +76,7 @@
 *   **1.410 A Silent Notification Is The Phone's Own Vibration**: when the user has granted Notification access, the Sensor MUST treat a posted notification that would vibrate as the phone's own vibration for a few seconds, without reading its content; without the grant it MUST behave as before, and Phone Setup MUST offer the grant as optional (ISSUE-NOV9.4-O65).
 *   **1.411 An Empty Room Raises No Noise Alarm**: the noise alarm MUST stay silent in an empty, quiet room and MAY fire on a person's sound such as a cough; the jump stays 30 dB over the background (ISSUE-NOV9.4-O69).
 *   **1.412 The Release Install Names Its Failure**: `TESTS/install_release.ps1` MUST report a failed signing or install with the tool's own message (for example `INSTALL_FAILED_VERSION_DOWNGRADE`), never a bare `RemoteException` (ISSUE-NOV9.8-O70).
+*   **1.413 The Build Mutates No Resolved Configuration**: a build under `--warning-mode all` MUST print no "Mutating the dependencies of configuration" deprecation; the Android Gradle Plugin stays at 8.5.2 or later, since 8.2.2's classpath alignment caused it (ISSUE-NOV8.13-O57).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

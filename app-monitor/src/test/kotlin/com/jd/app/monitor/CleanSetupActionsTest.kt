@@ -48,14 +48,11 @@ class CleanSetupActionsTest {
 
     @Test
     fun fullSystemReInitializationUnpairsTargetAndResetsDefaults() {
-        var pairing: String? = "T_123"
-        var settings = AlertSettings(distance = false, sirenType = "Pulse")
-        var relayUrl = "https://custom-relay.example.com"
-
-        // Execute Trigger Full System Re-Initialization
-        pairing = null
-        settings = AlertSettings()
-        relayUrl = RelayConfig.DEFAULT_URL
+        // Before: pairing "T_123", AlertSettings(distance = false, sirenType = "Pulse"), a custom relay URL.
+        // Full System Re-Initialization replaces them with these values (ISSUE-NOV8.13-O57: no unread initializers).
+        val pairing: String? = null
+        val settings = AlertSettings()
+        val relayUrl = RelayConfig.DEFAULT_URL
 
         assertNull("Pairing is reset to null", pairing)
         assertEquals("Siren type reset to default Siren", "Siren", settings.sirenType)

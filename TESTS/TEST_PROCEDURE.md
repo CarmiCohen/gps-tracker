@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov10.3 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov10.4 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -849,8 +849,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: A** - `ReleaseAuditBuildTest.installScriptReportsTheRealFailureReason` passed; 174.1 passed on the PC in Nov10.3 (ISSUE-NOV9.8-O70, SOT 1.412)
 *   **174.1 Failure Reason:** After `assembleRelease`, run `powershell -File TESTS/install_release.ps1 -Serial NOSUCHDEVICE -Apps sensor`. Verify it prints `RELEASE sensor FAILED adb.exe: device 'NOSUCHDEVICE' not found` (not `RemoteException`) and exits 1. No phone is touched.
 
+## Chapter 175 - The Build Mutates No Resolved Configuration (Nov10.4)
+**Status: A** - 175.1 passed on the PC in Nov10.4: no "Mutating" line with AGP 8.5.2 (ISSUE-NOV8.13-O57, SOT 1.413)
+*   **175.1 No Mutating Warning:** Run `powershell -File TESTS/run_tests.ps1 test assembleDebug assembleRelease` and search `build/run_tests.log` for `Mutating the dependencies of configuration`. Verify there is none; the only expected deprecation is `Configuration.fileCollection(Spec)` from kapt (ISSUE-NOV10.4-O72).
+
 ---
-**Active Testing Chapters: 163 of 174**
+**Active Testing Chapters: 164 of 175**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
