@@ -99,6 +99,17 @@ class MotionSentinelTest {
         assertTrue("${phone.alerts}", phone.alerts.isEmpty())
     }
 
+    /** ISSUE-NOV9.4-O67: the sliders show the limit itself, so the label must match what the Sensor applies. */
+    @Test
+    fun theSlidersShowTheLimitItself() {
+        assertEquals("15°", tiltLimitLabel(0.5f))
+        assertEquals("5°", tiltLimitLabel(1.0f))
+        assertEquals("23°", tiltLimitLabel(0.1f))
+        assertEquals("0.13 g", vibrationLimitLabel(0.5f))
+        assertEquals("0.10 g", vibrationLimitLabel(1.0f))
+        assertEquals("0.82 g", vibrationLimitLabel(0.1f))
+    }
+
     @Test
     fun theSliderSetsTheTiltAngle() {
         assertEquals(15.0, tiltThresholdForSensitivity(0.5f), 1e-6)

@@ -301,5 +301,12 @@ const val DEFAULT_TILT_SENSITIVITY = 0.5f
 /** The `Tilt Sensitivity Threshold` slider (0.1 to 1.0) as an angle: 0.5 gives the old spec's 15°, 1.0 gives 5°. */
 fun tiltThresholdForSensitivity(sensitivity: Float): Double = 25.0 - 20.0 * sensitivity.coerceIn(0.1f, 1.0f)
 
+/** The tilt slider's limit as the user sees it, for example `15°` (ISSUE-NOV9.4-O67: the limit itself, not a percentage). */
+fun tiltLimitLabel(sensitivity: Float): String = "${kotlin.math.round(tiltThresholdForSensitivity(sensitivity)).toInt()}°"
+
+/** The vibration slider's limit as the user sees it, for example `0.13 g` (ISSUE-NOV9.4-O67). */
+fun vibrationLimitLabel(sensitivity: Float): String =
+    "%.2f g".format(java.util.Locale.US, vibrationThresholdForSensitivity(sensitivity) / STANDARD_GRAVITY)
+
 /** The standard-atmosphere altitude of [hPa], as `SensorManager.getAltitude` computes it; only differences are used. */
 fun pressureAltitudeMeters(hPa: Double): Double = 44_330.0 * (1.0 - (hPa / 1013.25).pow(1.0 / 5.255))

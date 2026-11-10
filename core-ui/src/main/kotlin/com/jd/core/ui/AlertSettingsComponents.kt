@@ -12,6 +12,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.tiltLimitLabel
+import com.jd.core.shared.vibrationLimitLabel
 
 /**
  * Revived Alarming & Alert Setup Overlays (R747 Locality Authority & R872 Stealth)
@@ -187,6 +189,7 @@ fun AlertManagementOverlay(
                 SensitivitySlider(
                     label = "Vibration Sensitivity Threshold",
                     value = draftAlertSettings.vibrationSensitivity,
+                    limitLabel = ::vibrationLimitLabel,
                     onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(vibrationSensitivity = it)) }
                 )
             } else if (draftAlertSettings.tamperAlert) {
@@ -204,6 +207,7 @@ fun AlertManagementOverlay(
                 SensitivitySlider(
                     label = "Tilt Sensitivity Threshold",
                     value = draftAlertSettings.tiltSensitivity,
+                    limitLabel = ::tiltLimitLabel,
                     onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(tiltSensitivity = it)) }
                 )
             } else if (draftAlertSettings.tiltAlert) {
@@ -375,14 +379,19 @@ fun AlarmToggle(
     }
 }
 
+/**
+ * Shows the limit the Sensor applies, not a percentage, and names both ends (ISSUE-NOV9.4-O67). The end labels sit in
+ * a Row, which follows the layout direction like the Slider, so on a right-to-left phone they mirror together with it.
+ */
 @Composable
 fun SensitivitySlider(
     label: String,
     value: Float,
+    limitLabel: (Float) -> String,
     onValueChange: (Float) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 8.dp)) {
-        Text(text = "$label: ${(value * 100).toInt()}%", color = Slate500, fontSize = 11.sp)
+        Text(text = "$label: alert above ${limitLabel(value)}", color = Slate500, fontSize = 11.sp)
         Slider(
             value = value,
             onValueChange = onValueChange,
@@ -390,5 +399,15 @@ fun SensitivitySlider(
             modifier = Modifier.fillMaxWidth(),
             colors = SliderDefaults.colors(thumbColor = ViewerCyan, activeTrackColor = ViewerCyan)
         )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(SENSITIVITY_LESS_END, color = Slate500, fontSize = 10.sp)
+            Text(SENSITIVITY_MORE_END, color = Slate500, fontSize = 10.sp)
+        }
     }
 }
+
+/** The start of a sensitivity slider (left, or right on a right-to-left phone): the highest limit. */
+const val SENSITIVITY_LESS_END = "Less sensitive"
+
+/** The end of a sensitivity slider: the lowest limit. */
+const val SENSITIVITY_MORE_END = "More sensitive"
