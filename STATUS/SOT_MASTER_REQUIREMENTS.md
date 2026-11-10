@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov10.0)
+# SOT Master Requirements & Hardening Status (Nov10.1)
 
-## 🏗️ Architectural Master Rules (483 Rules)
+## 🏗️ Architectural Master Rules (484 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.334 preserved)
@@ -73,6 +73,7 @@
 *   **1.407 The Sensor Phone's Own Sound Is No Noise Alarm**: While `OwnVibrationWatch` reports the Sensor phone's own ringing, notification, or alarm, `AcousticMonitor` MUST raise no noise alert, as `MotionSentinel` raises no vibration alert (ISSUE-NOV9.4-O66).
 *   **1.408 Sensitivity Sliders Show The Limit Itself**: A sensitivity slider MUST show the limit the Sensor applies (degrees, g), computed by the same function, and name its less and more sensitive ends so they stay correct in a right-to-left layout (ISSUE-NOV9.4-O67).
 *   **1.409 A Slider Drag Saves Once**: A sensitivity slider MUST save its value, and so move the Sensor's limit, once when the finger lifts, not at every step of the drag (ISSUE-NOV9.4-O68).
+*   **1.410 A Silent Notification Is The Phone's Own Vibration**: when the user has granted Notification access, the Sensor MUST treat a posted notification that would vibrate as the phone's own vibration for a few seconds, without reading its content; without the grant it MUST behave as before, and Phone Setup MUST offer the grant as optional (ISSUE-NOV9.4-O65).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

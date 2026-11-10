@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov10.0 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov10.1 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -836,8 +836,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: L** - 171.1 passed on the A15 in Nov10.0 (ISSUE-NOV9.4-O68, SOT 1.409)
 *   **171.1 One Log Line Per Drag:** On the Sensor's `ALERTS SETUP`, clear logcat and drag the tilt slider across most of its track. Verify the label follows the finger and exactly one `REV_Motion: Tilt limit` line appears, after the finger lifts, with the angle the label shows. Set it back to `15°`.
 
+## Chapter 172 - A Silent Notification Is The Phone's Own Vibration (Nov10.1)
+**Status: L** - 172.1 passed on the A15 in Nov10.1, window 2.2 s instead of 3 s (ISSUE-NOV10.1-O71); 172.2 not run (ISSUE-NOV9.4-O65, SOT 1.410)
+*   **172.1 Granted:** Grant access (`adb shell cmd notification allow_listener com.jd.app.sensor/com.jd.app.sensor.SilentNotificationListener`), start the Sensor service, and verify `REV_Motion: Notification access granted`. Post `adb shell cmd notification post -S bigtext o65test "test"` and verify `Phone ringing or notifying` then, about 3 s later, `Phone quiet`. Swipe the notification away.
+*   **172.2 Not granted:** Revoke with `disallow_listener`, restart the service, and verify `Notification access not granted`; Phone Setup section 9 opens Android's Notification access page.
+
 ---
-**Active Testing Chapters: 160 of 171**
+**Active Testing Chapters: 161 of 172**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

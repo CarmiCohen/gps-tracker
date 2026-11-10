@@ -122,7 +122,8 @@ fun PhoneSetupOverlay(
     onTestAlarm: () -> Unit,
     onRefreshPermissions: () -> Unit,
     onOpenMap: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onOpenNotificationListenerSettings: (() -> Unit)? = null
 ) {
     val manufacturer = remember { Build.MANUFACTURER.uppercase() }
     val model = remember { Build.MODEL.uppercase() }
@@ -220,6 +221,17 @@ fun PhoneSetupOverlay(
                     buttonText = "Authorize Full-Screen Intent",
                     onClick = onOpenFullScreenIntentSettings,
                     icon = Icons.Default.Lock
+                )
+            }
+
+            if (onOpenNotificationListenerSettings != null) {
+                Spacer(Modifier.height(12.dp))
+                SetupGuideSection(
+                    title = "9. Notification Access (optional)",
+                    description = "Lets the Sensor tell a silent notification's vibration from a knock at the highest sensitivity settings. Only the fact that a notification vibrates is used; its content is not read.",
+                    buttonText = "Grant Notification Access",
+                    onClick = onOpenNotificationListenerSettings,
+                    icon = Icons.Default.Notifications
                 )
             }
 

@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov10.0)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov10.1)
 
 *Working file: open work only. Resolved issues are described once, in `STATUS/RESOLUTION_ARCHIVE.md`. The text this file held up to Nov8.14 (done Work Queue rows, Resolved Gaps Nov4.32 to Nov8.14, resolved gap texts) is in tag Nov8.14: `git show Nov8.14:DOCS/issues.md`. Older dashboard rows are in the Dashboard History at the end of the archive (Documentation Rule D2).*
 
-## 🎯 Next Resumption Focus: Work Queue after Nov10.0, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov10.1, solved one by one in the order below
 
 ### Work Queue
 Take one item at a time, and display it before fixing it (Rule 1). Row numbers are kept from earlier versions.
 
-**Next item: the user runs the Nov10.0 Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). Chapter 169.1 (a call to the A15) is still open and needs a person. Then item 57, ISSUE-NOV9.4-O69 (needs a person at the A15; otherwise item 60). Nov10.0 was closed with minimal tests (user instruction), so the next version's step 1 runs the full unit tests, builds, and device audit. ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
+**Next item: the user runs the Nov10.1 Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). Chapter 169.1 (a call to the A15) is still open and needs a person. Then item 57, ISSUE-NOV9.4-O69 (needs a person at the A15); otherwise item 61, ISSUE-NOV9.8-O70. ISSUE-NOV6.0-O26 (item 18) stays blocked on a device below API 35.**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -17,8 +17,8 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 | 48 | ISSUE-NOV8.14-O58 | The SOT shows rules 1.1 to 1.334 only as the placeholder `... (Rules 1.1 to 1.334 preserved)` | Trace the rules in git history and restore them, or record where they live |
 | 53 | ISSUE-NOV9.1-O61 | Raising `targetSdk` to 35 would stop the Sensor from starting at boot (`dataSync` is forbidden from `BOOT_COMPLETED`) | Change the boot start types before any `targetSdk` raise |
 | 57 | ISSUE-NOV9.4-O69 | In a quiet room the noise alarm fired every one to two minutes | A person at the A15 noting what each alert was; then decide on the 30 dB jump |
-| 60 | ISSUE-NOV9.4-O65 | A notification that only vibrates, without sound, is not seen by `OwnVibrationWatch` | Decide: accept (most phones notify with sound), or a notification listener (special access) |
 | 61 | ISSUE-NOV9.8-O70 | `install_release.ps1` reports a failed install as `RemoteException` instead of adb's message | Capture adb's output so the real reason (for example a version downgrade) is shown |
+| 62 | ISSUE-NOV10.1-O71 | A silent notification's ignore window lasted 2.2 s on the A15, not the coded 3 s | Find why `Phone quiet` comes early (shell notification with sound? handler timing?) |
 
 ---
 
@@ -46,7 +46,7 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 - **ISSUE-NOV9.1-O61 (Low) - The boot start depends on `targetSdk` 34**: since Nov9.1 a Sensor refused location and the microphone at boot keeps running with the `dataSync` and `remoteMessaging` types. Android 15 forbids starting a `dataSync` foreground service from `BOOT_COMPLETED` for apps targeting API 35+, so raising `targetSdk` would make the last fallback fail and the Sensor would again not run after a reboot. Before any raise, drop `dataSync` from the boot start (keep `remoteMessaging`, or `location` with "Allow all the time") and repeat chapter 163.3.
 - **ISSUE-NOV9.4-O69 (Low) - Frequent noise alarms in a quiet room**: between 18:08 and 19:17 on 2026-11-09 the A15 raised a noise alert every one to two minutes (−42 to −25 dBFS over −74 to −65 dBFS) while a person was testing next to it; what made each sound was not noted. If speech or ordinary room sounds reach the 30 dB jump, the alarm is too sensitive for daily use. Needs a person to note the causes over a quiet quarter of an hour.
 - **ISSUE-NOV9.8-O70 (Low) - `install_release.ps1` hides the install error**: when `adb install` fails, PowerShell wraps its stderr lines as `RemoteException` records, and the script prints only the last one, so Nov9.8 saw `RELEASE sensor FAILED System.Management.Automation.RemoteException`; the real reason was `INSTALL_FAILED_VERSION_DOWNGRADE` (release APKs built before the version bump). Converting the output to strings (`| ForEach-Object { "$_" }`) would show it.
-- **ISSUE-NOV9.4-O65 (Low) - A vibrate-only notification can still count as a knock**: `OwnVibrationWatch` sees the phone's own ringing from the audio mode and from playing ringtones, notifications, and alarms; a notification that vibrates without sound changes neither. At the 0.13 g default the motor (0.11 g on the A15) stays under the limit, so this matters only at the highest settings. A notification listener would see them, but needs the user to grant special access.
+- **ISSUE-NOV10.1-O71 (Low) - The silent notification window ends after 2.2 s, not 3 s**: on 2026-11-10 at 09:45 on the A15, with notification access granted, a notification posted by `adb shell cmd notification post` gave `Phone ringing or notifying` at 38.665 and `Phone quiet` at 40.865, while `OwnVibrationWatch.NOTIFICATION_VIBRATION_MS` is 3 s. Cause not investigated; one guess is that the shell notification's sound started the ignore through the playback check first. Pending for future investigation (user decision).
 - **ISSUE-NOV8.14-O58 (Low) - SOT rules 1.1 to 1.334 are a placeholder**: the SOT lists them only as `... (Rules 1.1 to 1.334 preserved)`, which predates the Nov7 series and has not been traced (split from ISSUE-NOV8.5-O47).
 
 ### 3. Operational Notes
@@ -87,9 +87,9 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 
 ## 📊 Hardening Progress Dashboard
 *The newest rows only (at most 6); older rows are in the Dashboard History of `STATUS/RESOLUTION_ARCHIVE.md`. From Nov8.100-Documentation, Open and Ideas are counted from the lists in this file; earlier figures used a count that cannot be traced.*
+- **Nov10.1: [SOT Count: 984 (Rules: 484), Open: H:0, M:2, L:11, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 328), QA: 106]**
 - **Nov10.0: [SOT Count: 983 (Rules: 483), Open: H:0, M:2, L:11, Ideas: H:0, M:0, L:22, Testing: PARTIAL (Sub-items: 326), QA: 105]**
 - **Nov9.8: [SOT Count: 982 (Rules: 482), Open: H:0, M:2, L:12, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 325), QA: 104]**
 - **Nov9.7: [SOT Count: 981 (Rules: 481), Open: H:0, M:2, L:12, Ideas: H:0, M:0, L:22, Testing: NOT RUN (Sub-items: 324), QA: 103]**
 - **Nov9.6: [SOT Count: 980 (Rules: 480), Open: H:0, M:2, L:13, Ideas: H:0, M:0, L:22, Testing: NOT RUN (Sub-items: 323), QA: 102]**
 - **Nov9.5-DefaultId: [SOT Count: 979 (Rules: 479), Open: H:0, M:2, L:14, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 322), QA: 101]**
-- **Nov9.4-OwnVibration: [SOT Count: 978 (Rules: 478), Open: H:0, M:2, L:16, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 321), QA: 100]**

@@ -174,7 +174,10 @@ class AdminActivity : ComponentActivity() {
                                     onTestAlarm = { },
                                     onRefreshPermissions = { },
                                     onOpenMap = { },
-                                    onClose = { showPhoneSetupOverlay = false }
+                                    onClose = { showPhoneSetupOverlay = false },
+                                    onOpenNotificationListenerSettings = {
+                                        startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                    }
                                 )
                             } else if (showCleanSetupOverlay) {
                                 com.jd.core.ui.CleanSetupOverlay(

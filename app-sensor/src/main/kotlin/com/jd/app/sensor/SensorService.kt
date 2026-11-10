@@ -410,6 +410,11 @@ class SensorService : Service(), SensorEventListener {
             acousticMonitor.isOwnSoundActive = isOwn
             SystemLogger.i("Motion", if (isOwn) "Phone ringing or notifying: vibration and noise ignored" else "Phone quiet: vibration and noise detected again")
         }.also { it.start(serviceScope, handler) }
+        SystemLogger.i(
+            "Motion",
+            if (SilentNotificationListener.isGranted(this)) "Notification access granted: silent notifications are the phone's own vibration"
+            else "Notification access not granted: a silent notification's vibration can count as a knock at the highest settings"
+        )
         serviceStatus.setMotion(MotionState(isRunning = accel != null, hasBarometer = hasBarometer))
         SystemLogger.i(
             "Motion",
