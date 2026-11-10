@@ -143,7 +143,7 @@ fun PhoneSetupOverlay(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text("Phone Setup & Capabilities", color = BrandGold, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     Text("Detected Device: $manufacturer $model", color = Slate500, fontSize = 10.sp)
                 }
@@ -290,6 +290,16 @@ fun PhoneSetupOverlay(
                     Spacer(Modifier.width(8.dp))
                     Text("Test Remote Alarm Overlay", fontSize = 13.sp)
                 }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onClose,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
+                Spacer(Modifier.width(8.dp))
+                Text("Close", color = Color.White, fontSize = 13.sp)
             }
 
             Spacer(Modifier.height(48.dp))

@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -66,6 +67,9 @@ class AdminActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             RevolutionTheme {
+                // Back never closes the Sensor: screens deeper in register their own handlers (composed later,
+                // so they win); at the top level the app only goes to the background.
+                BackHandler { moveTaskToBack(true) }
                 val trackerId by identityManager.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
                 val relayUrl by viewModel.relayUrl.collectAsStateWithLifecycle()
                 val hudState by viewModel.hudState.collectAsStateWithLifecycle()
@@ -130,6 +134,7 @@ class AdminActivity : ComponentActivity() {
                                 }
                             }
                             if (showAlertsOverlay) {
+                                BackHandler { showAlertsOverlay = false }
                                 com.jd.core.ui.AlertManagementOverlay(
                                     isTracker = true,
                                     draftAlertSettings = alertSettings,
@@ -137,6 +142,7 @@ class AdminActivity : ComponentActivity() {
                                     onClose = { showAlertsOverlay = false }
                                 )
                             } else if (showSoundOverlay) {
+                                BackHandler { showSoundOverlay = false }
                                 com.jd.core.ui.AlarmSoundOverlay(
                                     isTracker = true,
                                     draftAlertSettings = alertSettings,
@@ -149,6 +155,7 @@ class AdminActivity : ComponentActivity() {
                                     onClose = { showSoundOverlay = false }
                                 )
                             } else if (showPhoneSetupOverlay) {
+                                BackHandler { showPhoneSetupOverlay = false }
                                 com.jd.core.ui.PhoneSetupOverlay(
                                     isTracker = true,
                                     homePointsCount = 0,
@@ -180,6 +187,7 @@ class AdminActivity : ComponentActivity() {
                                     }
                                 )
                             } else if (showCleanSetupOverlay) {
+                                BackHandler { showCleanSetupOverlay = false }
                                 com.jd.core.ui.CleanSetupOverlay(
                                     isTracker = true,
                                     onClearHomePoints = { },
@@ -188,6 +196,7 @@ class AdminActivity : ComponentActivity() {
                                     onClose = { showCleanSetupOverlay = false }
                                 )
                             } else if (showSettings) {
+                                BackHandler { showSettings = false }
                                 SettingsOverlay(
                                     currentRelayUrl = relayUrl,
                                     onOpenAlertsSetup = { showAlertsOverlay = true },
@@ -550,6 +559,7 @@ fun SensorAdminConsole(
     }
 
     if (showToolsOverlay) {
+        BackHandler { showToolsOverlay = false }
         com.jd.core.ui.ToolsOverlay(
             onTriggerBurst = { SystemLogger.i("TOOLS", "Triggered high-frequency IMU/GNSS burst (100Hz).") },
             onPruneDatabase = { SystemLogger.i("TOOLS", "Executed manual database pruning.") },
@@ -617,16 +627,11 @@ fun SensorAdminConsole(
         HudStatusBar(hudState = hudState)
         
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "SENSOR ADMIN",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                IconButton(onClick = onSettingsClick) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.Gray)
-                }
-            }
+            Text(
+                text = "SENSOR ADMIN",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
 
             Text(text = "ID: ${trackerId.take(12)}...", fontSize = 12.sp, color = Color.Gray)
             Text(text = "Relay URL: $relayUrl", fontSize = 12.sp, color = Color.Gray)

@@ -861,8 +861,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: A** - `TrackingDocumentIntegrityTest.sotRulesFormAnUnbrokenRunFromTheFirstRuleOfThisRepository` passed with rules 1.318, 1.333, 1.336 and 1.339 marked retired (SIMP-NOV10.5-S1, SOT 1.415)
 *   **177.1 Retired In Place:** Run `:core-shared:test`. Verify that a retired rule keeps its `*   **1.x` line, with a `*(Retired <Version>, <ID>: <reason>)*` note after its title, so the run from 1.304 stays unbroken.
 
+## Chapter 178 - Back Climbs, Never Closes (Nov10.8)
+**Status: A / D** - `SetupNavigationTest` 3/3 on the A15 in Nov10.8; 178.3 passed on the A15 (Sensor: Phone Setup to Settings to Admin to background, service kept; Monitor: map Back and Sound Back) (ISSUE-NOV10.8-O77, ISSUE-NOV10.8-O78, SOT 1.417)
+*   **178.1 Back From Phone Setup:** Run `:app-monitor:connectedDebugAndroidTest` with `SetupNavigationTest` (it uninstalls the Monitor afterwards; restore as in the Operational Notes). Verify Back from Phone Setup shows the map and the activity is not finishing.
+*   **178.2 Close Is Reachable:** Same test: the header `Close` X is displayed and closes Phone Setup; the bottom `Close` button closes it too.
+*   **178.3 Top Level And Sensor (device):** On the A15, Back on the Monitor map leaves the Monitor task and process alive (`dumpsys activity activities`). In the Sensor, open Settings, then Phone Setup: Back returns to Settings, Back again to Sensor Admin, Back again sends the Sensor to the background with its service running.
+
 ---
-**Active Testing Chapters: 166 of 177**
+**Active Testing Chapters: 167 of 178**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

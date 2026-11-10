@@ -3,6 +3,7 @@ package com.jd.app.monitor
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -71,6 +72,9 @@ class MonitorActivity : ComponentActivity() {
 
         setContent {
             RevolutionTheme {
+                // Back never closes the Monitor: screens deeper in register their own handlers (composed later,
+                // so they win); at the top level the app only goes to the background.
+                BackHandler { moveTaskToBack(true) }
                 LaunchedEffect(Unit) {
                     identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_MONITOR)
                 }
@@ -349,6 +353,7 @@ fun MonitorScreen(
     }
 
     if (showAlertsOverlay) {
+        BackHandler { showAlertsOverlay = false }
         com.jd.core.ui.AlertManagementOverlay(
             isTracker = false,
             draftAlertSettings = alertSettings,
@@ -359,6 +364,7 @@ fun MonitorScreen(
     }
 
     if (showSoundOverlay) {
+        BackHandler { showSoundOverlay = false }
         com.jd.core.ui.AlarmSoundOverlay(
             isTracker = false,
             draftAlertSettings = alertSettings,
@@ -374,6 +380,7 @@ fun MonitorScreen(
     }
 
     if (showPhoneSetupOverlay) {
+        BackHandler { showPhoneSetupOverlay = false }
         com.jd.core.ui.PhoneSetupOverlay(
             isTracker = false,
             homePointsCount = geofence.points.size,
@@ -418,6 +425,7 @@ fun MonitorScreen(
     }
 
     if (showCleanSetupOverlay) {
+        BackHandler { showCleanSetupOverlay = false }
         com.jd.core.ui.CleanSetupOverlay(
             isTracker = false,
             onClearHomePoints = onClearHomePoints,
@@ -429,6 +437,7 @@ fun MonitorScreen(
     }
 
     if (showToolsOverlay) {
+        BackHandler { showToolsOverlay = false }
         com.jd.core.ui.ToolsOverlay(
             onTriggerBurst = { },
             onPruneDatabase = { },
@@ -625,6 +634,7 @@ fun MonitorScreen(
             }
 
             if (isEditingHome) {
+                BackHandler { isEditingHome = false }
                 HomePointEditor(
                     geofence = geofence,
                     onSetRadius = onSetGeofenceRadius,
