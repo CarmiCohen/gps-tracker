@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov10.5-Documentation - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov10.6-Documentation - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -857,8 +857,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: A** - `TrackingDocumentIntegrityTest.sotRulesFormAnUnbrokenRunFromTheFirstRuleOfThisRepository` passed in Nov10.5-Documentation (ISSUE-NOV8.14-O58, SOT 1.414)
 *   **176.1 Unbroken Rule Run:** Run `:core-shared:test`. Verify that the SOT's `1.x` rules run from 1.304 to the newest in ascending order with none missing or repeated, and that no `preserved)` placeholder stands for rules. Against the Nov10.4 SOT (rules 1.341 to 1.413 only) it fails.
 
+## Chapter 177 - Retired SOT Rules Keep Their Numbers (Nov10.6-Documentation)
+**Status: A** - `TrackingDocumentIntegrityTest.sotRulesFormAnUnbrokenRunFromTheFirstRuleOfThisRepository` passed with rules 1.318, 1.333, 1.336 and 1.339 marked retired (SIMP-NOV10.5-S1, SOT 1.415)
+*   **177.1 Retired In Place:** Run `:core-shared:test`. Verify that a retired rule keeps its `*   **1.x` line, with a `*(Retired <Version>, <ID>: <reason>)*` note after its title, so the run from 1.304 stays unbroken.
+
 ---
-**Active Testing Chapters: 165 of 176**
+**Active Testing Chapters: 166 of 177**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
