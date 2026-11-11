@@ -64,6 +64,7 @@ class SocketioSignalingClient @Inject constructor(
     override val geofenceFlow: SharedFlow<GeofenceConfig> = _geofenceFlow.asSharedFlow()
 
     private var bytesSent: Long = 0
+    private val arrivalLag = ArrivalLagMeter() // Used only on the socket's event thread (ISSUE-NOV10.7-O73).
     private var currentDeviceId: String? = null
     private var currentUrl: String? = null
 
@@ -123,11 +124,13 @@ class SocketioSignalingClient @Inject constructor(
                     when (data) {
                         is JSONObject -> {
                             val update = parseLocationUpdate(data)
+                            measureArrival(update)
                             _telemetryFlow.tryEmit(update)
                         }
                         is JSONArray -> {
                             for (i in 0 until data.length()) {
                                 val update = parseLocationUpdate(data.getJSONObject(i))
+                                measureArrival(update)
                                 _telemetryFlow.tryEmit(update)
                             }
                         }
@@ -184,6 +187,11 @@ class SocketioSignalingClient @Inject constructor(
 
             connect()
         }
+    }
+
+    private fun measureArrival(update: LocationUpdate) {
+        arrivalLag.record(update.status, update.sequenceId, update.timestamp, System.currentTimeMillis())
+            ?.let { SystemLogger.i("Signaling", it) }
     }
 
     private suspend fun flushQueue() {

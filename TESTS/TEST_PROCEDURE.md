@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov10.6-Documentation - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov11.0 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -867,8 +867,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **178.2 Close Is Reachable:** Same test: the header `Close` X is displayed and closes Phone Setup; the bottom `Close` button closes it too.
 *   **178.3 Top Level And Sensor (device):** On the A15, Back on the Monitor map leaves the Monitor task and process alive (`dumpsys activity activities`). In the Sensor, open Settings, then Phone Setup: Back returns to Settings, Back again to Sensor Admin, Back again sends the Sensor to the background with its service running.
 
+## Chapter 179 - Each Viewer Measures Its Own Lag (Nov11.0)
+**Status: A / D** - `ArrivalLagMeterTest` 3/3; 179.2 run in Nov11.0: A15 Monitor alerts 0.27 to 0.33 s, S21FE Monitor in the background up to 3.4 s (ISSUE-NOV10.7-O73, SOT 1.418)
+*   **179.1 Lag Lines (unit):** `:core-network:testDebugUnitTest --tests "*ArrivalLagMeterTest"`: an alert row is reported at once with its lag; ordinary `VALID` and `NO_FIX` rows give one summary per window (rows, mean, max) and the next window starts empty; alert rows stay out of the summary.
+*   **179.2 Two Viewers (device):** With the Sensor running and two Monitors paired, read `adb logcat -d -s REV_Signaling:*` on each and compare the same alert `seq`: each Monitor open on screen should report it within about 1 s; record the background and screen-off figures of any second phone.
+
 ---
-**Active Testing Chapters: 167 of 178**
+**Active Testing Chapters: 168 of 179**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
