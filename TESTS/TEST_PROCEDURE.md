@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov11.0 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov11.1-push - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -872,8 +872,16 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **179.1 Lag Lines (unit):** `:core-network:testDebugUnitTest --tests "*ArrivalLagMeterTest"`: an alert row is reported at once with its lag; ordinary `VALID` and `NO_FIX` rows give one summary per window (rows, mean, max) and the next window starts empty; alert rows stay out of the summary.
 *   **179.2 Two Viewers (device):** With the Sensor running and two Monitors paired, read `adb logcat -d -s REV_Signaling:*` on each and compare the same alert `seq`: each Monitor open on screen should report it within about 1 s; record the background and screen-off figures of any second phone.
 
+## Chapter 180 - Alarms Also By Push (Nov11.1-push)
+**Status: A / D** - `PushSignalingTest` 6/6, `PushedRowsTest` 5/5, `PushedAlarmTest` 4/4, relay `npm test` 9/9; 180.4 run in Nov11.1-push on the A15: push 469 to 1213 ms, relay about 300 ms, one raise per alarm; 180.5 and the S21FE not run (ISSUE-NOV10.8-O86, ISSUE-NOV11.0-O87, SOT 1.419)
+*   **180.1 Wire And Token (unit):** `:core-network:testDebugUnitTest --tests "*PushSignalingTest"`: only a critical row carries `crit`; the push token follows every join, is sent at once when registered while connected, and is taken back only by leaving on purpose; a pushed row's text reads back as the sent row and unreadable text is rejected.
+*   **180.2 Waiting Rows And One Raise (unit):** `:app-monitor:testDebugUnitTest --tests "*Push*"`: a pushed row waits for the alarm engine, a row that waited over 30 s is dropped, only the paired tracker's rows are taken; a pushed alarm row raises its alarm, and the late relay rows (older, the same, newer) do not raise an acknowledged alarm again.
+*   **180.3 Relay (node):** `npm test` in `relay-server`: tokens per room, `crit` rows pushed, backfill replies only to the asking Monitor.
+*   **180.4 Push Arrives (device):** The relay's page must say `push: on`. With the Monitor in the background make a noise at the Sensor; `adb logcat -d -s REV_Push:* REV_Signaling:* REV_Alarm:*` must show the same `seq` once by push (no `normal priority` note) and once by relay, and one `Pending alarms` line.
+*   **180.5 Second Phone And Dead Session (device, S):** Repeat 180.4 with a second Monitor in the background or with its screen off and compare the push lag with the relay lag (ISSUE-NOV10.7-O73); if the session can be held dead without a force-stop, the push must start it and raise the alarm.
+
 ---
-**Active Testing Chapters: 168 of 179**
+**Active Testing Chapters: 169 of 180**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1042518889709",
+    "project_id": "jd-tracker-cc2611",
+    "storage_bucket": "jd-tracker-cc2611.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1042518889709:android:1cdc518c76800f5b5968e4",
+        "android_client_info": {
+          "package_name": "com.jd.app.monitor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC4YSoeNajzdL05vLMM47I06gI9pkAbOxA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

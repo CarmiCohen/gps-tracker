@@ -53,6 +53,7 @@ class SignalingClientTest {
             override suspend fun sendBackfillResponse(response: com.jd.core.shared.BackfillResponse) = true
             override val geofenceFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.GeofenceConfig>()
             override suspend fun sendGeofence(targetId: String, config: com.jd.core.shared.GeofenceConfig) = true
+            override fun registerPushToken(token: String) = Unit
         }
 
         assertFalse("Should start disconnected", mockClient.isConnected.first())

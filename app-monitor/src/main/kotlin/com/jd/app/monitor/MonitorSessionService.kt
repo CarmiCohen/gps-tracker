@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.google.firebase.messaging.FirebaseMessaging
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.ForensicIdentity
@@ -64,7 +65,12 @@ class MonitorSessionService : Service() {
             val targetId = identityManager.targetId.first() ?: return@launch
             identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_MONITOR) // ISSUE-NOV8.101-O59
             val selfId = identityManager.selfId.first()
-            
+
+            // The relay also pushes the tracker's alarm rows to this phone (ISSUE-NOV10.8-O86).
+            FirebaseMessaging.getInstance().token
+                .addOnSuccessListener { signalingClient.registerPushToken(it) }
+                .addOnFailureListener { SystemLogger.w("MonitorService", "No push token, so alarms arrive by the relay connection only: ${it.message}") }
+
             // The tracker enforces the user's geofence; the Monitor only delivers it (ISSUE-NOV8.13-O51).
             launch {
                 geofenceDeliveries(dataStore.geofence, signalingClient.viewerStatusFlow).collect { config ->

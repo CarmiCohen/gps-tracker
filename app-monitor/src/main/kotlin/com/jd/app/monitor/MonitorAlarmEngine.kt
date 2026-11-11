@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -39,6 +40,9 @@ import kotlin.time.Duration.Companion.seconds
  * Raises the Monitor alarms while a tracker is paired: it keeps the [AlarmBook], sounds the siren while any alarm
  * is unacknowledged, and shows the full-screen alarm notification. Started by [MonitorSessionService], so alarms
  * work with the screen off or the app in the background.
+ *
+ * It reads the tracker's rows from the relay connection and, for alarm rows, from [PushedRows] as well
+ * (ISSUE-NOV10.8-O86). The same row may come by both; the second copy changes nothing, see [newerReading].
  */
 @Singleton
 class MonitorAlarmEngine @Inject constructor(
@@ -46,7 +50,8 @@ class MonitorAlarmEngine @Inject constructor(
     private val signalingClient: SignalingClient,
     private val identityManager: ForensicIdentityManager,
     private val dataStore: MonitorDataStore,
-    private val siren: SirenPlayer
+    private val siren: SirenPlayer,
+    private val pushedRows: PushedRows
 ) {
     private val _alarms = MutableStateFlow(AlarmBook())
     val alarms: StateFlow<AlarmBook> = _alarms.asStateFlow()
@@ -101,7 +106,7 @@ class MonitorAlarmEngine @Inject constructor(
 
             alarmBooks(
                 target = identityManager.targetId,
-                telemetry = signalingClient.telemetryFlow,
+                telemetry = merge(signalingClient.telemetryFlow, pushedRows.fresh(System::currentTimeMillis)),
                 violations = signalingClient.violationFlow,
                 settings = dataStore.alertSettings,
                 ticks = secondTicks(),

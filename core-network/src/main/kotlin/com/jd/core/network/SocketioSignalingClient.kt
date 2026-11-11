@@ -67,6 +67,7 @@ class SocketioSignalingClient @Inject constructor(
     private val arrivalLag = ArrivalLagMeter() // Used only on the socket's event thread (ISSUE-NOV10.7-O73).
     private var currentDeviceId: String? = null
     private var currentUrl: String? = null
+    @Volatile private var pushToken: String? = null // Monitor only; kept across reconnections (ISSUE-NOV10.8-O86).
 
     // Batching logic (ISSUE-REVOL33.0-F1)
     private val pendingBatch = mutableListOf<LocationUpdate>()
@@ -99,7 +100,8 @@ class SocketioSignalingClient @Inject constructor(
                     put("secret", secret)
                     put("lastSeq", lastSequenceId)
                 })
-                
+                pushToken?.let { emit("push_token", pushTokenPayload(it)) } // After join: the relay files it under the joined room.
+
                 clientScope.launch {
                     flushQueue()
                 }
@@ -123,13 +125,13 @@ class SocketioSignalingClient @Inject constructor(
                 try {
                     when (data) {
                         is JSONObject -> {
-                            val update = parseLocationUpdate(data)
+                            val update = LocationRowWire.decode(data)
                             measureArrival(update)
                             _telemetryFlow.tryEmit(update)
                         }
                         is JSONArray -> {
                             for (i in 0 until data.length()) {
-                                val update = parseLocationUpdate(data.getJSONObject(i))
+                                val update = LocationRowWire.decode(data.getJSONObject(i))
                                 measureArrival(update)
                                 _telemetryFlow.tryEmit(update)
                             }
@@ -166,7 +168,7 @@ class SocketioSignalingClient @Inject constructor(
                     val updatesArr = data.getJSONArray("updates")
                     val updates = mutableListOf<LocationUpdate>()
                     for (i in 0 until updatesArr.length()) {
-                        updates.add(parseLocationUpdate(updatesArr.getJSONObject(i)))
+                        updates.add(LocationRowWire.decode(updatesArr.getJSONObject(i)))
                     }
                     val response = BackfillResponse(
                         requestId = data.getString("reqId"),
@@ -248,26 +250,16 @@ class SocketioSignalingClient @Inject constructor(
         }
     }
 
-    private fun parseLocationUpdate(data: JSONObject): LocationUpdate {
-        return LocationUpdate(
-            deviceId = data.optString("id", ""),
-            lat = data.optDouble("lat"),
-            lng = data.optDouble("lng"),
-            timestamp = data.optLong("ts"),
-            sequenceId = data.optLong("seq"),
-            status = data.optString("status", "VALID"),
-            accuracy = data.optDouble("acc", 0.0).toFloat(),
-            speed = data.optDouble("spd", 0.0).toFloat(),
-            batteryLevel = data.optInt("batt", 0),
-            isCharging = data.optBoolean("chg", false),
-            tempCelsius = data.optDouble("temp", 0.0).toFloat(),
-            isNoiseDetectionOff = data.optBoolean("noiseOff", false) // Absent from Sensors before Nov9.1: no warning.
-        ).apply {
-            sensorSnapshot.vibration = data.optDouble("vib", 0.0).toFloat()
-        }
+    override fun registerPushToken(token: String) {
+        pushToken = token
+        if (_isConnected.value) socket?.emit("push_token", pushTokenPayload(token))
     }
 
+    private fun pushTokenPayload(token: String) = JSONObject().put("token", token)
+
     override fun disconnect() {
+        // Leaving on purpose ends the pushes to this phone; a lost connection keeps them (ISSUE-NOV10.8-O86).
+        pushToken?.let { if (_isConnected.value) socket?.emit("push_token_remove", pushTokenPayload(it)) }
         socket?.disconnect()
         socket = null
         _isConnected.value = false
@@ -326,6 +318,7 @@ class SocketioSignalingClient @Inject constructor(
                 put("chg", update.isCharging)
                 put("temp", update.tempCelsius)
                 put("noiseOff", update.isNoiseDetectionOff) // Live rows only; the buffer does not keep it, so backfill omits it.
+                if (update.isCritical) put("crit", true) // Tells the relay to push this row to the Monitors as well (ISSUE-NOV10.8-O86).
             })
         }
 
@@ -409,6 +402,36 @@ class SocketioSignalingClient @Inject constructor(
          * silently when a flow buffer is full (ISSUE-NOV6.3-O32).
          */
         const val BURST_CAPACITY = 5000
+    }
+}
+
+/** The wire form of a telemetry row as the receiver reads it, from the relay socket or from an alarm push (ISSUE-NOV10.8-O86). */
+object LocationRowWire {
+
+    fun decode(data: JSONObject): LocationUpdate {
+        return LocationUpdate(
+            deviceId = data.optString("id", ""),
+            lat = data.optDouble("lat"),
+            lng = data.optDouble("lng"),
+            timestamp = data.optLong("ts"),
+            sequenceId = data.optLong("seq"),
+            status = data.optString("status", "VALID"),
+            accuracy = data.optDouble("acc", 0.0).toFloat(),
+            speed = data.optDouble("spd", 0.0).toFloat(),
+            batteryLevel = data.optInt("batt", 0),
+            isCharging = data.optBoolean("chg", false),
+            tempCelsius = data.optDouble("temp", 0.0).toFloat(),
+            isNoiseDetectionOff = data.optBoolean("noiseOff", false) // Absent from Sensors before Nov9.1: no warning.
+        ).apply {
+            sensorSnapshot.vibration = data.optDouble("vib", 0.0).toFloat()
+        }
+    }
+
+    /** Reads a row that the relay pushed as JSON text; null when the text is not a JSON object. */
+    fun decodeText(text: String): LocationUpdate? = try {
+        decode(JSONObject(text))
+    } catch (e: org.json.JSONException) {
+        null
     }
 }
 

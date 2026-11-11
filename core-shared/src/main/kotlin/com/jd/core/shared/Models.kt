@@ -32,7 +32,10 @@ data class LocationUpdate(
     var status: String = "VALID", // What the reading means (VALID, NO_FIX, JUMP, ...); delivery never depends on it
     /** The Sensor's noise detection is off: no microphone after a restart, denied, silenced, or failed (ISSUE-NOV8.103-O60). */
     var isNoiseDetectionOff: Boolean = false,
-    /** Sent at once, never dropped or deduplicated while queued (SIMP-NOV7.19-S1). Local to the sender, not on the wire. */
+    /**
+     * Sent at once, never dropped or deduplicated while queued (SIMP-NOV7.19-S1). On the wire it is `crit`, which
+     * tells the relay to push the row to the Monitors as well (ISSUE-NOV10.8-O86); the receiver does not read it back.
+     */
     var isCritical: Boolean = false,
     var sensorSnapshot: SensorSnapshot = SensorSnapshot()
 ) {

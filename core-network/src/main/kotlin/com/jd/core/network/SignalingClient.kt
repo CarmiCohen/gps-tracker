@@ -76,4 +76,10 @@ interface SignalingClient {
      * Returns false when not connected; the caller sends again once the tracker is reachable.
      */
     suspend fun sendGeofence(targetId: String, config: GeofenceConfig): Boolean
+
+    /**
+     * Monitor: gives the relay this phone's push [token], now and after every reconnection, so the paired tracker's
+     * alarm rows also arrive as high-priority pushes (ISSUE-NOV10.8-O86). [disconnect] takes the token back.
+     */
+    fun registerPushToken(token: String)
 }

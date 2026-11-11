@@ -4,6 +4,7 @@
     id("kotlin-kapt")
     id("kotlinx-serialization")
     id("dagger.hilt.android.plugin")
+    id("com.google.gms.google-services") // Reads google-services.json for the alarm pushes (ISSUE-NOV10.8-O86).
 }
 
 android {
