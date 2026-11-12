@@ -2,6 +2,7 @@ package com.jd.app.sensor
 
 import android.content.Context
 import android.os.Build
+import androidx.datastore.core.DataMigration
 import androidx.datastore.preferences.core.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -23,13 +24,13 @@ class SensorDataStore(context: Context) {
     } else context
 
     private val dataStore = PreferenceDataStoreFactory.create(
+        migrations = listOf(RemoveSirenTypeMigration),
         produceFile = { File(protectedContext.noBackupFilesDir, "sensor_settings.preferences_pb") }
     )
 
     private val simHashKey = stringPreferencesKey("sim_iccid_hash")
     private val relayUrlKey = stringPreferencesKey("relay_url")
     private val alertSettingsKey = stringPreferencesKey("alert_settings_json")
-    private val sirenTypeKey = stringPreferencesKey("siren_type")
     private val geofenceKey = stringPreferencesKey("geofence_json")
 
     val relayUrl: Flow<String?> = dataStore.data.map { it[relayUrlKey] }
@@ -41,10 +42,6 @@ class SensorDataStore(context: Context) {
         } else {
             AlertSettings()
         }
-    }
-
-    val sirenType: Flow<String> = dataStore.data.map { prefs ->
-        prefs[sirenTypeKey] ?: "Siren"
     }
 
     /** The geofence last received from the Monitor, kept across restarts so it is enforced offline (ISSUE-NOV8.13-O51). */
@@ -78,11 +75,18 @@ class SensorDataStore(context: Context) {
             prefs[alertSettingsKey] = Json.encodeToString(settings)
         }
     }
+}
 
-    suspend fun saveSirenType(type: String) {
-        dataStore.edit { prefs ->
-            prefs[sirenTypeKey] = type
-        }
-    }
+/** The siren type key written by the Sensor's former siren page; the Sensor makes no sound (ISSUE-NOV10.8-O82). */
+internal val LEGACY_SIREN_TYPE_KEY = stringPreferencesKey("siren_type")
+
+/** Removes [LEGACY_SIREN_TYPE_KEY] from an installed Sensor's settings once, on the first read (ISSUE-NOV10.8-O82). */
+internal object RemoveSirenTypeMigration : DataMigration<Preferences> {
+    override suspend fun shouldMigrate(currentData: Preferences): Boolean = LEGACY_SIREN_TYPE_KEY in currentData
+
+    override suspend fun migrate(currentData: Preferences): Preferences =
+        currentData.toMutablePreferences().apply { remove(LEGACY_SIREN_TYPE_KEY) }.toPreferences()
+
+    override suspend fun cleanUp() = Unit
 }
 

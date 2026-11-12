@@ -98,12 +98,10 @@ class AdminActivity : ComponentActivity() {
                     var isLocked by rememberSaveable { mutableStateOf(true) }
                     var showSettings by rememberSaveable { mutableStateOf(false) }
                     var showAlertsOverlay by rememberSaveable { mutableStateOf(false) }
-                    var showSoundOverlay by rememberSaveable { mutableStateOf(false) }
                     var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
                     var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
 
                     val alertSettings by viewModel.alertSettings.collectAsStateWithLifecycle()
-                    val sirenType by viewModel.sirenType.collectAsStateWithLifecycle()
 
                     if (isLocked) {
                         Box(
@@ -140,19 +138,6 @@ class AdminActivity : ComponentActivity() {
                                     draftAlertSettings = alertSettings,
                                     onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
                                     onClose = { showAlertsOverlay = false }
-                                )
-                            } else if (showSoundOverlay) {
-                                BackHandler { showSoundOverlay = false }
-                                com.jd.core.ui.AlarmSoundOverlay(
-                                    isTracker = true,
-                                    draftAlertSettings = alertSettings,
-                                    selectedSirenType = sirenType,
-                                    isSirenPlaying = false,
-                                    onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
-                                    onUpdateSirenType = { viewModel.updateSirenType(it) },
-                                    onUpdateAlarmVolume = { viewModel.updateAlarmVolume(it) },
-                                    onTestSiren = { },
-                                    onClose = { showSoundOverlay = false }
                                 )
                             } else if (showPhoneSetupOverlay) {
                                 BackHandler { showPhoneSetupOverlay = false }
@@ -191,7 +176,6 @@ class AdminActivity : ComponentActivity() {
                                 SettingsOverlay(
                                     currentRelayUrl = relayUrl,
                                     onOpenAlertsSetup = { showAlertsOverlay = true },
-                                    onOpenSoundSetup = { showSoundOverlay = true },
                                     onOpenPhoneSetup = { showPhoneSetupOverlay = true },
                                     onOpenCleanSetup = { showCleanSetupOverlay = true },
                                     onClose = { showSettings = false },
@@ -352,7 +336,6 @@ fun PermissionGuard(content: @Composable () -> Unit) {
 fun SettingsOverlay(
     currentRelayUrl: String,
     onOpenAlertsSetup: () -> Unit,
-    onOpenSoundSetup: () -> Unit,
     onOpenPhoneSetup: () -> Unit,
     onOpenCleanSetup: () -> Unit,
     onClose: () -> Unit,
@@ -378,24 +361,14 @@ fun SettingsOverlay(
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text("Alarming & Audio Setup", style = MaterialTheme.typography.titleMedium)
+        // The Sensor makes no sound, so it has no siren page (ISSUE-NOV10.8-O82).
+        Text("Alarming Setup", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Button(
+            onClick = onOpenAlertsSetup,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Button(
-                onClick = onOpenAlertsSetup,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("ALERTS SETUP")
-            }
-            Button(
-                onClick = onOpenSoundSetup,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("SIREN SETUP")
-            }
+            Text("ALERTS SETUP")
         }
 
         Spacer(modifier = Modifier.height(16.dp))

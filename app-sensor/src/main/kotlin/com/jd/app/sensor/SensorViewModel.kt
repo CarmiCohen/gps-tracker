@@ -74,25 +74,9 @@ class SensorViewModel @Inject constructor(
     val alertSettings: StateFlow<AlertSettings> = sensorDataStore.alertSettings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AlertSettings())
 
-    val sirenType: StateFlow<String> = sensorDataStore.sirenType
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Siren")
-
     fun updateAlertSettings(settings: AlertSettings) {
         viewModelScope.launch {
             sensorDataStore.saveAlertSettings(settings)
-        }
-    }
-
-    fun updateSirenType(type: String) {
-        viewModelScope.launch {
-            sensorDataStore.saveSirenType(type)
-        }
-    }
-
-    fun updateAlarmVolume(volume: Float) {
-        viewModelScope.launch {
-            val current = alertSettings.value
-            sensorDataStore.saveAlertSettings(current.copy(alarmVolume = volume, useCustomVolume = true))
         }
     }
 
@@ -113,7 +97,6 @@ class SensorViewModel @Inject constructor(
     fun triggerFullSystemReinitialization() {
         viewModelScope.launch {
             sensorDataStore.saveAlertSettings(AlertSettings())
-            sensorDataStore.saveSirenType("Siren")
             sensorDataStore.saveRelayUrl(RelayConfig.DEFAULT_URL)
             serviceStatus.resetUptime()
         }

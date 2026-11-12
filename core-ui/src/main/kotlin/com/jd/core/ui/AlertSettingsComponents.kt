@@ -233,7 +233,6 @@ fun AlertManagementOverlay(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlarmSoundOverlay(
-    isTracker: Boolean,
     draftAlertSettings: AlertSettings,
     selectedSirenType: String,
     isSirenPlaying: Boolean,
@@ -274,15 +273,11 @@ fun AlarmSoundOverlay(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("Test Audio Output", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                if (isTracker) {
-                    Text("Disabled (Stealth Tracker)", color = Slate500, fontSize = 13.sp)
-                } else {
-                    Button(
-                        onClick = onTestSiren,
-                        colors = ButtonDefaults.buttonColors(containerColor = if (isSirenPlaying) StatusRed else StatusGreen)
-                    ) {
-                        Text(if (isSirenPlaying) "STOP SIREN TEST" else "TEST SIREN AUDIO")
-                    }
+                Button(
+                    onClick = onTestSiren,
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isSirenPlaying) StatusRed else StatusGreen)
+                ) {
+                    Text(if (isSirenPlaying) "STOP SIREN TEST" else "TEST SIREN AUDIO")
                 }
             }
 

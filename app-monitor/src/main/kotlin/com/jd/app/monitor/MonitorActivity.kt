@@ -367,7 +367,6 @@ fun MonitorScreen(
     if (showSoundOverlay) {
         BackHandler { showSoundOverlay = false }
         com.jd.core.ui.AlarmSoundOverlay(
-            isTracker = false,
             draftAlertSettings = alertSettings,
             selectedSirenType = sirenType,
             isSirenPlaying = isSirenPlaying,

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov12.3 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov12.4 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -898,8 +898,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **183.2 Setup Pages (instrumented):** Monitor `Setup`, `PHONE`: no `Authorize Exact Alarms`, `Refresh Status` or `Diagnostics`; `Open Map` closes the page and shows the home point editor (`DONE`).
 *   **183.3 Live (device):** on the A15 the Monitor bar holds Setup, Settings, Map, Info and X; X goes to the launcher, the Monitor stays paired and its session runs. The Sensor bar holds Setup, Settings, Info and X; X sends it to the background and the Sensor service keeps running.
 
+## Chapter 184 - The Sensor Has No Siren Page (Nov12.4)
+**Status: A** - `SirenTypeRemovalTest` 2/2; 184.2 not yet looked at on the A15 (ISSUE-NOV10.8-O82, SOT 1.423)
+*   **184.1 Stored Siren Type Removed (unit):** `SirenTypeRemovalTest`: `RemoveSirenTypeMigration` removes a stored `siren_type` and keeps the other settings; settings without it are not migrated.
+*   **184.2 Settings Page (device):** the Sensor's Settings shows `Alarming Setup` with only `ALERTS SETUP`; no `SIREN SETUP` button exists. The Monitor's `SIREN & AUDIO SETUP` keeps its `TEST SIREN AUDIO` button.
+
 ---
-**Active Testing Chapters: 172 of 183**
+**Active Testing Chapters: 173 of 184**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
