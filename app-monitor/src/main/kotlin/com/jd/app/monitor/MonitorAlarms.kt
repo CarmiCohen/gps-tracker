@@ -1,5 +1,6 @@
 package com.jd.app.monitor
 
+import com.jd.core.network.SensorSilence
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.LocationUpdate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -110,6 +111,7 @@ fun newerReading(current: TrackerReading?, incoming: TrackerReading): TrackerRea
  * [hasRelayConnected] tells whether the relay has been connected since [watchingSinceMs]; until then a relay that is
  * not connected counts as lost only after [RELAY_FIRST_CONNECT_GRACE_MS].
  * [noGpsSignalSinceMs] is when the tracker started to report no position, or null while it reports one.
+ * [isReportedSilent] is true while the relay's notice that the tracker went silent holds (ISSUE-NOV10.8-O86).
  */
 fun alarmConditions(
     reading: TrackerReading?,
@@ -121,9 +123,12 @@ fun alarmConditions(
     isLocalInternet: Boolean = true,
     hasViolation: Boolean = false,
     violationType: String? = null,
-    noGpsSignalSinceMs: Long? = null
+    noGpsSignalSinceMs: Long? = null,
+    isReportedSilent: Boolean = false
 ): Set<AlarmType> = buildSet {
-    if (nowMs - (reading?.receivedAtMs ?: watchingSinceMs) >= TRACKER_PRESENT_MS) add(AlarmType.TRACKER_OFFLINE)
+    if (isReportedSilent || nowMs - (reading?.receivedAtMs ?: watchingSinceMs) >= TRACKER_PRESENT_MS) {
+        add(AlarmType.TRACKER_OFFLINE)
+    }
     if (!isRelayConnected && (hasRelayConnected || nowMs - watchingSinceMs >= RELAY_FIRST_CONNECT_GRACE_MS)) {
         add(AlarmType.RELAY_DISCONNECTED)
     }
@@ -204,6 +209,10 @@ fun secondTicks(): Flow<Unit> = flow {
  * The alarm book of the paired tracker, re-evaluated at [clock] time on every reading, settings change, and tick.
  * A new pairing starts an empty book, and nothing is evaluated before the saved settings are known, so a
  * switched-off alarm cannot sound at start. Each [acknowledgements] event acknowledges the book as it stands.
+ *
+ * Each of [silences], the relay's notice that the tracker went silent, holds the tracker offline until a row newer
+ * than the notice's last row arrives, on the tracker's clock (ISSUE-NOV10.8-O86). So the relay's replay of that last
+ * row on joining does not end it, and a notice about rows this Monitor has already outrun is ignored.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 fun alarmBooks(
@@ -215,6 +224,7 @@ fun alarmBooks(
     acknowledgements: Flow<Unit>,
     isRelayConnected: Flow<Boolean> = flowOf(true),
     isLocalInternet: Flow<Boolean> = flowOf(true),
+    silences: Flow<SensorSilence> = flowOf(),
     clock: () -> Long
 ): Flow<AlarmBook> = target.flatMapLatest { trackerId ->
     if (trackerId == null) return@flatMapLatest flowOf(AlarmBook())
@@ -222,6 +232,7 @@ fun alarmBooks(
     merge(
         telemetry.filter { it.deviceId == trackerId }.map { BookEvent.Reading(it.toTrackerReading(clock())) },
         violations.filter { it.location.deviceId == trackerId || it.location.deviceId.isEmpty() }.map { BookEvent.Violation(it) },
+        silences.filter { it.trackerId == trackerId }.map { BookEvent.Silence(it) },
         settings.map { BookEvent.Settings(it) },
         ticks.map { BookEvent.Tick },
         acknowledgements.map { BookEvent.Acknowledge },
@@ -235,10 +246,16 @@ fun alarmBooks(
                     reading = reading,
                     hasViolation = false,
                     violationType = null,
-                    noGpsSignalSinceMs = if (reading.hasGpsSignal()) null else state.noGpsSignalSinceMs ?: reading.receivedAtMs
+                    noGpsSignalSinceMs = if (reading.hasGpsSignal()) null else state.noGpsSignalSinceMs ?: reading.receivedAtMs,
+                    silentAfterSensorMs = state.silentAfterSensorMs?.takeIf { reading.sensorTimeMs <= it }
                 )
             }
             is BookEvent.Violation -> state.copy(hasViolation = true, violationType = event.violation.type)
+            is BookEvent.Silence -> {
+                val lastHeardMs = event.silence.lastSensorTimeMs
+                if (state.reading != null && state.reading.sensorTimeMs > lastHeardMs) state
+                else state.copy(silentAfterSensorMs = lastHeardMs)
+            }
             is BookEvent.Settings -> state.copy(settings = event.settings)
             BookEvent.Tick -> state
             BookEvent.Acknowledge -> state.copy(book = state.book.acknowledge(), hasViolation = false, violationType = null)
@@ -262,7 +279,8 @@ fun alarmBooks(
                     isLocalInternet = next.isLocalInternet,
                     hasViolation = next.hasViolation,
                     violationType = next.violationType,
-                    noGpsSignalSinceMs = next.noGpsSignalSinceMs
+                    noGpsSignalSinceMs = next.noGpsSignalSinceMs,
+                    isReportedSilent = next.silentAfterSensorMs != null
                 ),
                 alertSettings,
                 nowMs
@@ -280,12 +298,15 @@ private data class WatchState(
     val isLocalInternet: Boolean = true,
     val hasViolation: Boolean = false,
     val violationType: String? = null,
-    val noGpsSignalSinceMs: Long? = null
+    val noGpsSignalSinceMs: Long? = null,
+    /** While the relay's silence notice holds: the tracker time of the last row it had; a newer row ends it. */
+    val silentAfterSensorMs: Long? = null
 )
 
 private sealed interface BookEvent {
     data class Reading(val reading: TrackerReading) : BookEvent
     data class Violation(val violation: com.jd.core.shared.ViolationEvent) : BookEvent
+    data class Silence(val silence: SensorSilence) : BookEvent
     data class Settings(val settings: AlertSettings) : BookEvent
     data object Tick : BookEvent
     data object Acknowledge : BookEvent

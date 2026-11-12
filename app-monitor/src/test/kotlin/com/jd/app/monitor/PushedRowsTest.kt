@@ -1,5 +1,6 @@
 package com.jd.app.monitor
 
+import com.jd.core.network.SensorSilence
 import com.jd.core.shared.ACOUSTIC_ALERT_STATUS
 import com.jd.core.shared.LocationUpdate
 import kotlinx.coroutines.flow.first
@@ -15,7 +16,7 @@ import org.junit.Test
 
 /**
  * Chapter 180 (ISSUE-NOV10.8-O86): alarm rows that arrive by push wait for the alarm engine, but not for long, and
- * only the paired tracker's rows are taken.
+ * only the paired tracker's rows are taken. Chapter 181: the relay's silence notices follow the same rules.
  */
 class PushedRowsTest {
 
@@ -64,6 +65,35 @@ class PushedRowsTest {
         val taken = withTimeout(5.seconds) { rows.fresh { 1_000L }.take(16).toList() }
 
         assertEquals((5L..20L).toList(), taken.map { it.sequenceId })
+    }
+
+    private fun silence(lastSequence: Long, tracker: String = "T") = SensorSilence(tracker, 5_000L, lastSequence, 35_400L)
+
+    @Test
+    fun `a silence notice waits for the engine, but not too long, and only the paired tracker's is taken`() = runBlocking {
+        val rows = PushedRows()
+        val engineStartsAt = 1_000L + PUSHED_ROW_FRESH_MS + 1
+
+        assertFalse("Another tracker's notice", rows.offerSilence(silence(1, tracker = "X"), "T", engineStartsAt))
+        assertFalse("An unpaired Monitor must stay asleep", rows.offerSilence(silence(2), null, engineStartsAt))
+        assertTrue(rows.offerSilence(silence(3), "T", receivedAtMs = 1_000L))
+        assertTrue(rows.offerSilence(silence(4), "T", receivedAtMs = engineStartsAt))
+
+        val taken = withTimeout(5.seconds) { rows.freshSilences { engineStartsAt }.first() }
+
+        assertEquals("The stale notice must not be raised late", 4L, taken.lastSequenceId)
+    }
+
+    @Test
+    fun `the silence notice line tells how long and the last row`() {
+        assertEquals(
+            "Relay notice by push: tracker 'T' sent nothing for 35 s (last row seq 9)",
+            silenceArrivalLine(silence(9), isHighPriority = true)
+        )
+        assertEquals(
+            "Relay notice by push: tracker 'T' sent nothing for 35 s (last row seq 9) (delivered at normal priority)",
+            silenceArrivalLine(silence(9), isHighPriority = false)
+        )
     }
 
     @Test

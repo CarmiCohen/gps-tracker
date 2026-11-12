@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov11.1-push - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov11.2-relay - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -880,8 +880,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **180.4 Push Arrives (device):** The relay's page must say `push: on`. With the Monitor in the background make a noise at the Sensor; `adb logcat -d -s REV_Push:* REV_Signaling:* REV_Alarm:*` must show the same `seq` once by push (no `normal priority` note) and once by relay, and one `Pending alarms` line.
 *   **180.5 Second Phone And Dead Session (device, S):** Repeat 180.4 with a second Monitor in the background or with its screen off and compare the push lag with the relay lag (ISSUE-NOV10.7-O73); if the session can be held dead without a force-stop, the push must start it and raise the alarm.
 
+## Chapter 181 - The Relay Reports A Silent Sensor (Nov11.2-relay)
+**Status: A / D** - relay `npm test` 15/15, `SensorSilenceWireTest` 2/2, `PushedRowsTest` 7/7, `PushedAlarmTest` 7/7; 181.3 run in Nov11.2-relay on the A15: notice 36.5 s after the cut, one raise (the Monitor's own count was 1.2 s earlier); 181.4 not run (ISSUE-NOV10.8-O86, SOT 1.420)
+*   **181.1 Relay Silence Watch (node):** `npm test` in `relay-server`: a Sensor is reported once when its last row is 35 s old, every row restarts the limit, a Sensor never heard is not watched, the next row ends the silence and the next silence is reported again, the report names the newest row even when an older queued row came later, and each Sensor is watched by itself; end to end (`SENSOR_SILENT_MS` 300 ms) the real relay logs one `[SILENT] ... sent nothing` line per silence and `is back` after the next row.
+*   **181.2 Notice To Alarm (unit):** `:core-network:testDebugUnitTest --tests "*SensorSilenceWire*"` and `:app-monitor:testDebugUnitTest --tests "*Push*"`: the notice reads back as the relay writes it and anything else is rejected; it waits for the alarm engine under the 30 s rule and only the paired tracker's is taken; it raises `TRACKER_OFFLINE` at once, holds through the relay's replay of the last row, ends with a newer row, and a notice about rows the Monitor has outrun raises nothing.
+*   **181.3 Silence Pushed (device):** The relay's page must say `push: on`; open the Monitor once (a relay restart forgets tokens), then send it to the background. Cut the Sensor's network (Operational Notes, not a force-stop) and after 40 s `adb logcat -d -v time | Select-String 'REV_Push|REV_Alarm'` must show `Relay notice by push: tracker 'T' sent nothing for 35 s` and exactly one `Pending alarms` line adding `TRACKER_OFFLINE`. Restore the network; the rows must flow again.
+*   **181.4 Push Alone (device, S):** With the Monitor on a second phone whose connection is delayed or whose session is not running (ISSUE-NOV10.7-O73), repeat 181.3: the alarm must come with the push, before the Monitor's own count.
+
 ---
-**Active Testing Chapters: 169 of 180**
+**Active Testing Chapters: 170 of 181**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

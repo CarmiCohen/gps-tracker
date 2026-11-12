@@ -43,6 +43,7 @@ import kotlin.time.Duration.Companion.seconds
  *
  * It reads the tracker's rows from the relay connection and, for alarm rows, from [PushedRows] as well
  * (ISSUE-NOV10.8-O86). The same row may come by both; the second copy changes nothing, see [newerReading].
+ * The relay's pushed notice that the tracker went silent raises the same tracker-offline alarm as its own count.
  */
 @Singleton
 class MonitorAlarmEngine @Inject constructor(
@@ -108,6 +109,7 @@ class MonitorAlarmEngine @Inject constructor(
                 target = identityManager.targetId,
                 telemetry = merge(signalingClient.telemetryFlow, pushedRows.fresh(System::currentTimeMillis)),
                 violations = signalingClient.violationFlow,
+                silences = pushedRows.freshSilences(System::currentTimeMillis),
                 settings = dataStore.alertSettings,
                 ticks = secondTicks(),
                 acknowledgements = acknowledgements,
