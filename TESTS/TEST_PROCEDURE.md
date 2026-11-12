@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov12.1 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov12.2 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -873,7 +873,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **179.2 Two Viewers (device):** With the Sensor running and two Monitors paired, read `adb logcat -d -s REV_Signaling:*` on each and compare the same alert `seq`: each Monitor open on screen should report it within about 1 s; record the background and screen-off figures of any second phone.
 
 ## Chapter 180 - Alarms Also By Push (Nov11.1-push)
-**Status: A / D** - `PushSignalingTest` 6/6, `PushedRowsTest` 5/5, `PushedAlarmTest` 4/4, relay `npm test` 9/9; 180.4 run in Nov11.1-push on the A15: push 469 to 1213 ms, relay about 300 ms, one raise per alarm; 180.5 partly run in Nov12.0-push on the S21FE: screen on, a noise row by push 120 ms after the relay; the screen-off noise lag is not measured yet (ISSUE-NOV10.8-O86, ISSUE-NOV11.0-O87, SOT 1.419)
+**Status: A / D** - `PushSignalingTest` 6/6, `PushedRowsTest` 5/5, `PushedAlarmTest` 4/4, relay `npm test` 9/9; 180.4 run in Nov11.1-push on the A15: push 469 to 1213 ms, relay about 300 ms, one raise per alarm; 180.5 partly run in Nov12.0-push on the S21FE: screen on, a noise row by push 120 ms after the relay; Nov12.2: screen off 3 min, a noise row reached the S21FE by relay as fast as the A15 (about 0.3 s) and by push 131 ms later, the session stayed alive (O73 closed); a push starting a dead session is not run (no dead session without a force-stop) (ISSUE-NOV10.8-O86, ISSUE-NOV11.0-O87, ISSUE-NOV10.7-O73, SOT 1.419)
 *   **180.1 Wire And Token (unit):** `:core-network:testDebugUnitTest --tests "*PushSignalingTest"`: only a critical row carries `crit`; the push token follows every join, is sent at once when registered while connected, and is taken back only by leaving on purpose; a pushed row's text reads back as the sent row and unreadable text is rejected.
 *   **180.2 Waiting Rows And One Raise (unit):** `:app-monitor:testDebugUnitTest --tests "*Push*"`: a pushed row waits for the alarm engine, a row that waited over 30 s is dropped, only the paired tracker's rows are taken; a pushed alarm row raises its alarm, and the late relay rows (older, the same, newer) do not raise an acknowledged alarm again.
 *   **180.3 Relay (node):** `npm test` in `relay-server`: tokens per room, `crit` rows pushed, backfill replies only to the asking Monitor.

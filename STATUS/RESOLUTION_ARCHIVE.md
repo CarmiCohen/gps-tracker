@@ -2,6 +2,10 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov12.2)
+- **The Second Viewer Hears Alarms On Time (ISSUE-NOV10.7-O73, Medium, closed)**: chapter 180.5 run on the S21FE (Android 16, One UI 8) with the Nov12.1 debug Monitor, paired to `T`, Global Mute off (alarm volume at its minimum, 1), sent to the background with the screen off at 09:14:02 (screen woken only at 09:18:03 by an incoming call). The session stayed alive the whole time: the 10 s `Arrival lag` lines read 98 rows, mean 92 to 120 ms, max about 400 ms, with no bursts. Noise `seq 1241793` (A15 Sensor `Acoustic alert` at 09:17:26.189): A15 Monitor relay +301 ms, push +483 ms; S21FE relay row at -128 ms on its clock (about 430 ms clock offset, so about as fast as the A15) and its push 131 ms after its own relay row. An earlier noise (`seq 1239880`, 09:14:08) raised the siren on the S21FE (auto-stopped after 30 s), confirming the mute was off; the 09:17 noise was not raised again because that alarm was still unacknowledged (one raise per alarm, correct). The Nov10.7 and Nov11.0 lags of 3 to 18 s were not reproduced; with the push of ISSUE-NOV10.8-O86 as a second road, O73 is closed. Not shown: a push starting a dead session (no way to hold the session dead without a force-stop; stays with O86). The S21FE was restored: Global Mute on (checked), unpaired, release Monitor Nov12.1 (rebuilt: the APK on disk was versionCode 91, older than the installed debug build).
+- **Verification (Nov12.2)**: documentation only (D5): `:core-shared:test`; no builds besides the S21FE release Monitor, no device audit. Index row Nov12.1 filled (2d81d68).
+
 ## ✅ Resolved Issues (Nov12.1)
 - **The Relay's Dependencies Pinned (ISSUE-NOV11.2-O89, Low)**: `relay-server` had no lockfile and Render builds with `yarn install`, so each deploy took the newest versions in range (in Nov11.2-relay this forced Node 24). The PC moved from Node 22.19 to Node 24.22.1 (user decision; winget's `OpenJS.NodeJS.LTS` is now Node 26, so `--version 24.22.1` is needed, installed by the user in an admin PowerShell). The git-ignored `package-lock.json` and `node_modules` were deleted and `yarn.lock` generated with Yarn 1.22.22 through corepack (`corepack yarn@1.22.22 install`, no global Yarn): `firebase-admin` 13.10.0, `@firebase/database-compat` 2.1.8, `socket.io` 4.8.4; `--frozen-lockfile` changed nothing. Relay commit `c9dd901` (`gps-survival-relay`), pushed; Render's build command stays `yarn install` and is not redeployed yet (the user's Manual Deploy). Relay code unchanged (v6.046). Chapter 182, SOT 1.421.
 - **Verification (Nov12.1)**: relay `npm test` 15/15 on Node 24.22.1; documentation only for this repo (D5): `:core-shared:test`; no builds or device audit. Index row Nov12.0-push filled (edda875).
@@ -315,6 +319,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov10.9-moreIdeas: [SOT Count: 991 (Rules: 491), Open: H:0, M:7, L:14, Ideas: H:0, M:0, L:23, Testing: PASSED (Sub-items: 336), QA: 113]**
 - **Nov10.8: [SOT Count: 991 (Rules: 491), Open: H:0, M:3, L:11, Ideas: H:0, M:0, L:23, Testing: PASSED (Sub-items: 336), QA: 113]**
 - **Nov10.7: [SOT Count: 990 (Rules: 490), Open: H:0, M:3, L:10, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 333), QA: 112]**
 - **Nov10.6-Documentation: [SOT Count: 989 (Rules: 489), Open: H:0, M:2, L:8, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 333), QA: 111]**
