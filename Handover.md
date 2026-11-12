@@ -1,37 +1,42 @@
 ```
 git add .
-git commit -m "Nov12.5 - THE SENSOR'S OWN PHONE SETUP (ISSUE-NOV10.8-O81)
+git commit -m "Nov12.6 - TWO-PHONE TEST SESSION, DOCS ONLY (ISSUE-NOV12.6-O92, O93, O94, O95)
 
-- O81 closed: Sensor-only Phone Setup, 8 maker/Android-specific items with live status.
-- O81: console's 3 grant buttons -> one PHONE SETUP: N MISSING line; REQUEST_IGNORE_BATTERY_OPTIMIZATIONS added (battery dialog was dead).
-- New Low gap O91 (English text mirrored on an RTL phone). Chapter 184.2 checked on the A15.
-- Index row Nov12.4 filled (40c0278).
-- TESTS: run_tests 552 passed; A15 audit 3/3; release audit clean; chapter 185.
-- VERSION: Nov12.5, versionCode 97."
-git tag Nov12.5
+- Nov12.5 deployed on the A15 and the S21FE, monitored, all tests without a person run; no repairs.
+- O92 (Medium): an update or am instrument leaves SensorService stopped until the System Idle tap.
+- O93 (Medium): the Monitor's instrumented tests unpair the real Monitor (both phones).
+- O94 (Low): run_tests.ps1 undercounts when Android test tasks are up to date.
+- O95 (Low): BackfillGapRecoveryTest fresh-pairing test flaky on the S21FE.
+- Index row Nov12.5 filled (8293c85).
+- TESTS: unit 632 passed; instrumented A15 53+42, S21FE 52/53 (O95); release audits clean.
+- VERSION: Nov12.6, versionCode 98."
+git tag Nov12.6
 git push origin main --tags
 ```
 
-# Project Handover - Version Nov12.5 (The Sensor's Own Phone Setup)
+# Project Handover - Version Nov12.6 (Two-Phone Test Session)
 
 ## ▶️ Resumption State (Read First)
-- **Git**: run the block above as one commit, then the tag; next session, replace `pending` in the top row of `STATUS/BASELINE/INDEX.md` with `git rev-parse --short=7 Nov12.5^{commit}`.
-- **Relay**: separate repo `relay-server` (`gps-survival-relay`), v6.046 with `yarn.lock` (commit `c9dd901`); live on Render with `push: on`, not redeployed since Nov11.2-relay; Render deploys only by the user's Manual Deploy.
+- **Git**: run the block above as one commit, then the tag; next session, replace `pending` in the top row of `STATUS/BASELINE/INDEX.md` with `git rev-parse --short=7 Nov12.6^{commit}`.
+- **Docs-only version**: no app code changed; the phones run Nov12.5 builds (versionCode 97), which is correct.
+- **Relay**: separate repo `relay-server` (`gps-survival-relay`), v6.046 with `yarn.lock` (commit `c9dd901`); live on Render with `push: on`; Render deploys only by the user's Manual Deploy.
 - **PC**: Node 24.22.1; Yarn only through `corepack yarn@1.22.22`.
-- **User decisions**: Claude pushes the relay repo; ask before each use of the S21FE and restore it after; when the effort level should change, stop and ask; `//` means "continue". 2026-11-12: the Sensor has no Map button; its red X only goes to the background; the Sensor's Phone Setup item list (O81, archive).
-- **Phones**: A15 (`R58X40GV2AR`): Nov12.5 debug builds, Sensor `T` service running and now battery-exempt (Phone Setup item 5), 'Pause app activity if unused' still on (item 6), Monitor `V` paired to `T`, airplane mode off. S21FE (`R5CRC14PG4F`): the user's state, release Monitor Nov12.1, unpaired, Global Mute on.
+- **User decisions**: Claude pushes the relay repo; ask before each use of the S21FE and restore it after (2026-11-12: allowed for this session); when the effort level should change, stop and ask; `//` means "continue".
+- **Phones**: A15 (`R58X40GV2AR`): Nov12.5 debug Sensor `T` (service running) and Monitor `V` paired to `T`, airplane mode off. S21FE (`R5CRC14PG4F`): release Monitor Nov12.5, paired `V` to `T` (it was already paired when connected), Global Mute on. Test packages removed from both.
 - **Build**: AGP 8.5.2, Gradle 8.12, Kotlin 1.9.24; only deprecation left: kapt `fileCollection(Spec)` (O72).
-- **Test tips**: `DOCS/issues.md` Operational Notes (`connectedDebugAndroidTest` uninstalls the app: prefer `am instrument`; restore steps there); `TESTS/TEST_GUIDELINES.md` section 4.
+- **Test tips**: `DOCS/issues.md` Operational Notes; full unit count needs `run_tests.ps1 cleanTest cleanTestDebugUnitTest cleanTestReleaseUnitTest test` (O94); after `am instrument` re-pair the Monitor (O93) and tap the Sensor's `System Idle` (O92).
 
-## 🟢 Status: PASSED (Nov12.5)
-- ISSUE-NOV10.8-O81 closed: the Sensor has its own Phone Setup with live status; the console shows the missing count. Details: `STATUS/RESOLUTION_ARCHIVE.md`.
-- Found and fixed: the battery request dialog never opened (missing manifest permission).
-- Chapter 184.2 passed on the A15; chapter 182.2 still waits for the next Manual Deploy.
+## 🟢 Status: PASSED (Nov12.6)
+- No issue closed; new gaps O92, O93 (Medium), O94, O95 (Low). Details: `STATUS/RESOLUTION_ARCHIVE.md`.
+- Unit 632 passed; instrumented A15 Monitor 53/53, Sensor 42/42; S21FE Monitor 52/53 (O95 flaky, rerun 9/9).
+- Release cold-start audits clean on both phones; link mean lag about 0.35 s.
+- Not run: chapters needing a person; chapter 182.2 waits for the next Manual Deploy.
 
-**Audit line**: Nov12.5: [SOT Count: 998 (Rules: 498), Open: H:0, M:6, L:14, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 357), QA: 120]
+**Audit line**: Nov12.6: [SOT Count: 998 (Rules: 498), Open: H:0, M:8, L:16, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 357), QA: 120]
 
 ## 🎯 Next Resumption Focus
 1. Fill the `pending` index row with the tag's commit (`/effort low`).
-2. At the next Manual Deploy on Render: check chapter 182.2 (`/effort low`).
-3. O83: Sensor behaviour settings move to the Monitor by relay, Sensor reports its setup status (reuse `SensorSetupStatus`) (`/effort high`).
-4. Then O84 (three versions), O85, O80; O90 and O91 (RTL, ask the user) when convenient.
+2. O92: restart the Sensor after an app update (`/effort high`).
+3. O93: the Monitor's instrumented tests must not unpair the real Monitor (`/effort high`).
+4. At the next Manual Deploy on Render: check chapter 182.2 (`/effort low`).
+5. Then O83, O84 (three versions), O85, O80; O94, O95 when convenient.

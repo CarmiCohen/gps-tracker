@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov12.4)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov12.6)
 
 *Working file: open work only. Resolved issues are described once, in `STATUS/RESOLUTION_ARCHIVE.md`. The text this file held up to Nov8.14 (done Work Queue rows, Resolved Gaps Nov4.32 to Nov8.14, resolved gap texts) is in tag Nov8.14: `git show Nov8.14:DOCS/issues.md`. Older dashboard rows are in the Dashboard History at the end of the archive (Documentation Rule D2).*
 
-## 🎯 Next Resumption Focus: Work Queue after Nov12.5, solved one by one in the order below
+## 🎯 Next Resumption Focus: Work Queue after Nov12.6, solved one by one in the order below
 
 ### Work Queue
 Take one item at a time, and display it before fixing it (Rule 1). Row numbers are kept from earlier versions.
 
-**Next item: the user runs the Nov12.5 Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). At the next Manual Deploy, check chapter 182.2 (Render builds from the new `yarn.lock`). Then O83 (item 68; O81 done in Nov12.5, O82 in Nov12.4). Item 71 (ISSUE-NOV10.8-O86) continues in later versions: the O83 warnings by push (with O83), then a Monitor without a permanent connection (needs stored tokens and an always-awake relay, the Render payment decision, O9). The Medium gap O4 still has chapters for a person or a second phone. ISSUE-NOV10.4-O72 (the Kotlin upgrade) is the Low gap with real work. Items 53 (ISSUE-NOV9.1-O61) and 62 (ISSUE-NOV10.1-O71) are very low priority, user decisions 2026-11-10. ISSUE-NOV6.0-O26 (item 18) is very low priority too (user decision 2026-11-10) and stays blocked on a device below API 35. Nov10.9-moreIdeas logged user requests O80 to O86 (rows 65 to 71) and widened O76 with user decisions; suggested order: O83, O84 (three versions), O85, O80.**
+**Next item: the user runs the Nov12.6 Git block; the next session replaces `pending` in `STATUS/BASELINE/INDEX.md` with the tag's commit (`git rev-parse --short=7 <tag>^{commit}`, not HEAD). At the next Manual Deploy, check chapter 182.2 (Render builds from the new `yarn.lock`). Then O92 (item 72) and O93 (item 73), found in the Nov12.6 test session, then O83 (item 68; O81 done in Nov12.5, O82 in Nov12.4). Item 71 (ISSUE-NOV10.8-O86) continues in later versions: the O83 warnings by push (with O83), then a Monitor without a permanent connection (needs stored tokens and an always-awake relay, the Render payment decision, O9). The Medium gap O4 still has chapters for a person or a second phone. ISSUE-NOV10.4-O72 (the Kotlin upgrade) is the Low gap with real work. Items 53 (ISSUE-NOV9.1-O61) and 62 (ISSUE-NOV10.1-O71) are very low priority, user decisions 2026-11-10. ISSUE-NOV6.0-O26 (item 18) is very low priority too (user decision 2026-11-10) and stays blocked on a device below API 35. Nov10.9-moreIdeas logged user requests O80 to O86 (rows 65 to 71) and widened O76 with user decisions; suggested order: O83, O84 (three versions), O85, O80.**
 
 | # | Issue | Work | Needs |
 | :--- | :--- | :--- | :--- |
@@ -19,6 +19,8 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 | 69 | ISSUE-NOV10.8-O84 | Revive the menu's Events log, detailed Info and Graphs (sensors and connection) in both apps, with a selectable time period | Port from the archive (`LogComponents.kt` `LogOverlay`, Ribbons, GNSS detail); agree the graph list; split into versions |
 | 70 | ISSUE-NOV10.8-O85 | Removing a single home point is hard to find: add a point list with a delete button per point to the Monitor's `HomePointEditor`, and verify the existing marker-tap removal on the A15 | Test on the A15 |
 | 71 | ISSUE-NOV10.8-O86 | Alarm rows reach the Monitor also by push since Nov11.1-push, and the relay pushes a Sensor silence since Nov11.2-relay. Left: the O83 warnings by push, then a Monitor without a permanent connection | Design each; stored tokens and an always-awake relay (O9, Render payment decision) for the last |
+| 72 | ISSUE-NOV12.6-O92 | Restart `SensorService` after an app update (`MY_PACKAGE_REPLACED`) and after `am instrument` | Allowed foreground service types from that broadcast (like O61); test an update on the A15 |
+| 73 | ISSUE-NOV12.6-O93 | The Monitor's instrumented tests must not unpair the real Monitor (isolated store or restore), and the test process must end | Find the test that writes the pairing (probably `UnpairConfirmationTest`) |
 | 62 | ISSUE-NOV10.1-O71 | A silent notification's ignore window lasted 2.2 s on the A15, not the coded 3 s | Find why `Phone quiet` comes early (shell notification with sound? handler timing?) |
 
 ---
@@ -106,9 +108,9 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 
 ## 📊 Hardening Progress Dashboard
 *The newest rows only (at most 6); older rows are in the Dashboard History of `STATUS/RESOLUTION_ARCHIVE.md`. From Nov8.100-Documentation, Open and Ideas are counted from the lists in this file; earlier figures used a count that cannot be traced.*
+- **Nov12.6: [SOT Count: 998 (Rules: 498), Open: H:0, M:8, L:16, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 357), QA: 120]**
 - **Nov12.5: [SOT Count: 998 (Rules: 498), Open: H:0, M:6, L:14, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 357), QA: 120]**
 - **Nov12.4: [SOT Count: 997 (Rules: 497), Open: H:0, M:7, L:13, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 354), QA: 119]**
 - **Nov12.3: [SOT Count: 996 (Rules: 496), Open: H:0, M:7, L:14, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 352), QA: 118]**
 - **Nov12.2: [SOT Count: 995 (Rules: 495), Open: H:0, M:7, L:14, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 349), QA: 117]**
 - **Nov12.1: [SOT Count: 995 (Rules: 495), Open: H:0, M:8, L:14, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 349), QA: 117]**
-- **Nov12.0-push: [SOT Count: 994 (Rules: 494), Open: H:0, M:8, L:15, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 347), QA: 116]**
