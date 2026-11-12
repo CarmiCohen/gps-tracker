@@ -3,10 +3,8 @@ package com.jd.app.sensor
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -141,28 +139,10 @@ class AdminActivity : ComponentActivity() {
                                 )
                             } else if (showPhoneSetupOverlay) {
                                 BackHandler { showPhoneSetupOverlay = false }
-                                com.jd.core.ui.PhoneSetupOverlay(
-                                    onOpenAppInfo = { requestAppInfo() },
-                                    onOpenBatterySettings = { requestIgnoreBatteryOptimization() },
-                                    onOpenOverlayPermission = { requestOverlayPermission() },
-                                    onOpenDndSettings = {
-                                        val intent = android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
-                                        startActivity(intent)
-                                    },
-                                    onOpenFullScreenIntentSettings = {
-                                        val intent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                                            android.content.Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, android.net.Uri.parse("package:$packageName"))
-                                        } else {
-                                            android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                                data = android.net.Uri.parse("package:$packageName")
-                                            }
-                                        }
-                                        startActivity(intent)
-                                    },
-                                    onClose = { showPhoneSetupOverlay = false },
-                                    onOpenNotificationListenerSettings = {
-                                        startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                                    }
+                                // The Sensor's own page: only what the Sensor needs, with live status (ISSUE-NOV10.8-O81).
+                                SensorPhoneSetupOverlay(
+                                    isServiceRunning = isServiceRunning,
+                                    onClose = { showPhoneSetupOverlay = false }
                                 )
                             } else if (showCleanSetupOverlay) {
                                 BackHandler { showCleanSetupOverlay = false }
@@ -205,7 +185,7 @@ class AdminActivity : ComponentActivity() {
                                     logs = logs,
                                     onSettingsClick = { showSettings = true },
                                     onClose = { moveTaskToBack(true) },
-                                    onIgnoreBatteryOptimization = { requestIgnoreBatteryOptimization() }
+                                    onOpenPhoneSetup = { showPhoneSetupOverlay = true }
                                 )
                             }
                         }
@@ -215,26 +195,6 @@ class AdminActivity : ComponentActivity() {
         }
     }
 
-    private fun requestIgnoreBatteryOptimization() {
-        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-            data = Uri.parse("package:$packageName")
-        }
-        startActivity(intent)
-    }
-
-    private fun requestAppInfo() {
-        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.parse("package:$packageName")
-        }
-        startActivity(intent)
-    }
-
-    private fun requestOverlayPermission() {
-        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
-            data = Uri.parse("package:$packageName")
-        }
-        startActivity(intent)
-    }
 }
 
 /** Starts [SensorService], or sends a running one a new start command. */
@@ -501,27 +461,15 @@ fun SensorAdminConsole(
     logs: List<SystemLogger.LogEntry>, 
     onSettingsClick: () -> Unit,
     onClose: () -> Unit,
-    onIgnoreBatteryOptimization: () -> Unit
+    onOpenPhoneSetup: () -> Unit
 ) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
     var showSetupDialog by rememberSaveable { mutableStateOf(false) }
     var showStopConfirmDialog by rememberSaveable { mutableStateOf(false) }
-    val microphoneLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted && isServiceRunning) startSensorService(context) // The service takes the microphone on its next start command.
-    }
-    var isAllowedAllTheTime by remember { mutableStateOf(hasBackgroundLocation(context)) }
-    val backgroundLocationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        isAllowedAllTheTime = hasBackgroundLocation(context)
-    }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) { // The user may change it in the system settings.
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) isAllowedAllTheTime = hasBackgroundLocation(context)
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+    val setupStatus by rememberSensorSetupStatus() // Live: the user may change it in the system settings.
+    val isAllowedAllTheTime = setupStatus.backgroundLocation
+    val setupMissing = setupStatus.missingCount(remember { sensorSetupItems() })
 
     Column {
         // Menu Upper Line: Setup, Settings and Info; the red X sends the app to the background (ISSUE-NOV10.8-O76).
@@ -581,8 +529,15 @@ fun SensorAdminConsole(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(onClick = onIgnoreBatteryOptimization, modifier = Modifier.fillMaxWidth()) {
-                Text("WHITELIST BATTERY")
+            // One line for all grants; the Phone Setup page holds the buttons (ISSUE-NOV10.8-O81).
+            Button(
+                onClick = onOpenPhoneSetup,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (setupMissing == 0) Color(0xFF10B981) else Color(0xFFF59E0B)
+                )
+            ) {
+                Text(phoneSetupLineText(setupMissing))
             }
 
             Text(
@@ -590,24 +545,11 @@ fun SensorAdminConsole(
                 fontSize = 12.sp,
                 color = if (microphoneState == MicrophoneState.LISTENING) Color(0xFF10B981) else Color(0xFFF59E0B)
             )
-            if (microphoneState == MicrophoneState.NO_PERMISSION) {
-                Button(onClick = { microphoneLauncher.launch(OPTIONAL_MICROPHONE_PERMISSION) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("GRANT MICROPHONE")
-                }
-            }
             Text(
                 text = backgroundLocationStatusText(isAllowedAllTheTime),
                 fontSize = 12.sp,
                 color = if (isAllowedAllTheTime) Color(0xFF10B981) else Color(0xFFF59E0B)
             )
-            if (!isAllowedAllTheTime) {
-                Button(
-                    onClick = { backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("ALLOW LOCATION ALL THE TIME")
-                }
-            }
             Text(
                 text = motionStatusText(motionState),
                 fontSize = 12.sp,

@@ -16,7 +16,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Clean & Phone Setup Overlays for Sensor and Monitor applications.
+ * Clean Setup for both apps; Phone Setup for the Monitor only (the Sensor has its own page, `SensorPhoneSetup.kt`,
+ * ISSUE-NOV10.8-O81).
  */
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,8 +120,7 @@ fun PhoneSetupOverlay(
     // An item or button is shown only when its action is given, so no app shows a button that does nothing (ISSUE-NOV10.8-O76).
     homePointsCount: Int = 0,
     onOpenMap: (() -> Unit)? = null,
-    onTestAlarm: (() -> Unit)? = null,
-    onOpenNotificationListenerSettings: (() -> Unit)? = null
+    onTestAlarm: (() -> Unit)? = null
 ) {
     val manufacturer = remember { Build.MANUFACTURER.uppercase() }
     val model = remember { Build.MODEL.uppercase() }
@@ -209,17 +209,6 @@ fun PhoneSetupOverlay(
                     buttonText = "Authorize Full-Screen Intent",
                     onClick = onOpenFullScreenIntentSettings,
                     icon = Icons.Default.Lock
-                )
-            }
-
-            if (onOpenNotificationListenerSettings != null) {
-                Spacer(Modifier.height(12.dp))
-                SetupGuideSection(
-                    title = "$lastItemNumber. Notification Access (optional)",
-                    description = "Lets the Sensor tell a silent notification's vibration from a knock at the highest sensitivity settings. Only the fact that a notification vibrates is used; its content is not read.",
-                    buttonText = "Grant Notification Access",
-                    onClick = onOpenNotificationListenerSettings,
-                    icon = Icons.Default.Notifications
                 )
             }
 

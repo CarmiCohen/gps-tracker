@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov12.4 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov12.5 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -899,12 +899,18 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **183.3 Live (device):** on the A15 the Monitor bar holds Setup, Settings, Map, Info and X; X goes to the launcher, the Monitor stays paired and its session runs. The Sensor bar holds Setup, Settings, Info and X; X sends it to the background and the Sensor service keeps running.
 
 ## Chapter 184 - The Sensor Has No Siren Page (Nov12.4)
-**Status: A** - `SirenTypeRemovalTest` 2/2; 184.2 not yet looked at on the A15 (ISSUE-NOV10.8-O82, SOT 1.423)
+**Status: A / L** - `SirenTypeRemovalTest` 2/2; 184.2 verified on the A15 in Nov12.5 (ISSUE-NOV10.8-O82, SOT 1.423)
 *   **184.1 Stored Siren Type Removed (unit):** `SirenTypeRemovalTest`: `RemoveSirenTypeMigration` removes a stored `siren_type` and keeps the other settings; settings without it are not migrated.
 *   **184.2 Settings Page (device):** the Sensor's Settings shows `Alarming Setup` with only `ALERTS SETUP`; no `SIREN SETUP` button exists. The Monitor's `SIREN & AUDIO SETUP` keeps its `TEST SIREN AUDIO` button.
 
+## Chapter 185 - The Sensor's Own Phone Setup (Nov12.5)
+**Status: A / L** - `SensorPhoneSetupTest` 10/10; 185.2 and 185.3 verified on the A15 (ISSUE-NOV10.8-O81, SOT 1.424)
+*   **185.1 Item List (unit):** `SensorPhoneSetupTest`: Samsung on Android 14 shows the 8 items in order; other makers have no Samsung item; 'all the time' only from Android 10, the unused-app pause only from Android 11; no overlay, DND, full-screen or exact-alarm item exists; the Samsung list reads as unknown; the missing count skips optional, unreadable and hidden items; the console line text.
+*   **185.2 Live Status (device):** Sensor `Settings`, `PHONE SETUP` (or the console line): each item shows Done, Missing or Check yourself as the phone reports it (`dumpsys deviceidle whitelist`, `appops get com.jd.app.sensor AUTO_REVOKE_PERMISSIONS_IF_UNUSED`); a button shows only for a missing or unreadable item; after `Allow Unrestricted` and the system dialog, item 5 turns Done without reopening the page.
+*   **185.3 Buttons and Console (device):** `Open Samsung Battery` opens Device Care's Battery page; the console's `PHONE SETUP: N MISSING` counts the missing items and opens the page.
+
 ---
-**Active Testing Chapters: 173 of 184**
+**Active Testing Chapters: 174 of 185**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
