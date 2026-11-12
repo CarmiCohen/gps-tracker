@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov12.0-push - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov12.1 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -887,8 +887,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **181.3 Silence Pushed (device):** The relay's page must say `push: on`; open the Monitor once (a relay restart forgets tokens), then send it to the background. Cut the Sensor's network (Operational Notes, not a force-stop) and after 40 s `adb logcat -d -v time | Select-String 'REV_Push|REV_Alarm'` must show `Relay notice by push: tracker 'T' sent nothing for 35 s` and exactly one `Pending alarms` line adding `TRACKER_OFFLINE`. Restore the network; the rows must flow again.
 *   **181.4 Push Alone (device, S):** With the Monitor on a second phone whose connection is delayed or whose session is not running (ISSUE-NOV10.7-O73), repeat 181.3: the alarm must come with the push, before the Monitor's own count.
 
+## Chapter 182 - The Relay's Dependencies Pinned (Nov12.1)
+**Status: A** - `--frozen-lockfile` up to date, relay `npm test` 15/15 on Node 24.22.1 (ISSUE-NOV11.2-O89, SOT 1.421)
+*   **182.1 Lockfile Holds (node):** in `relay-server`, `node --version` must be the `package.json` engines major (24); `corepack yarn@1.22.22 install --frozen-lockfile` must end `Already up-to-date` (no `yarn.lock` change in `git status`), then `npm test` must pass.
+*   **182.2 Render Build (deploy):** after a Manual Deploy, Render's build log must show `yarn install` using the lockfile with no `No lockfile found`, and the relay's page must say `push: on`.
+
 ---
-**Active Testing Chapters: 170 of 181**
+**Active Testing Chapters: 171 of 182**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
