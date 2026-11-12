@@ -22,11 +22,11 @@ import androidx.compose.ui.unit.sp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CleanSetupOverlay(
-    isTracker: Boolean,
-    onClearHomePoints: () -> Unit,
     onResetStats: () -> Unit,
     onFullInit: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    /** Null where there are no home points to clear (the Sensor), so the button is not shown (ISSUE-NOV10.8-O76). */
+    onClearHomePoints: (() -> Unit)? = null
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -58,7 +58,7 @@ fun CleanSetupOverlay(
             SetupGroupHeader("SYSTEM MAINTENANCE ACTIONS", Rose500)
             Spacer(Modifier.height(12.dp))
 
-            if (!isTracker) {
+            if (onClearHomePoints != null) {
                 Button(
                     onClick = {
                         onClearHomePoints()
@@ -110,23 +110,22 @@ fun CleanSetupOverlay(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhoneSetupOverlay(
-    isTracker: Boolean,
-    homePointsCount: Int,
     onOpenAppInfo: () -> Unit,
     onOpenBatterySettings: () -> Unit,
     onOpenOverlayPermission: () -> Unit,
-    onOpenExactAlarmPermission: () -> Unit,
     onOpenDndSettings: () -> Unit,
     onOpenFullScreenIntentSettings: () -> Unit,
-    onOpenDiagnostics: () -> Unit,
-    onTestAlarm: () -> Unit,
-    onRefreshPermissions: () -> Unit,
-    onOpenMap: () -> Unit,
     onClose: () -> Unit,
+    // An item or button is shown only when its action is given, so no app shows a button that does nothing (ISSUE-NOV10.8-O76).
+    homePointsCount: Int = 0,
+    onOpenMap: (() -> Unit)? = null,
+    onTestAlarm: (() -> Unit)? = null,
     onOpenNotificationListenerSettings: (() -> Unit)? = null
 ) {
     val manufacturer = remember { Build.MANUFACTURER.uppercase() }
     val model = remember { Build.MODEL.uppercase() }
+    val hasFullScreenItem = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+    val lastItemNumber = if (hasFullScreenItem) 7 else 6
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -184,19 +183,8 @@ fun PhoneSetupOverlay(
 
             Spacer(Modifier.height(12.dp))
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                SetupGuideSection(
-                    title = "4. Exact Alarms Permission",
-                    description = "Required to schedule precise safety pulse and watchdog timers without jitter.",
-                    buttonText = "Authorize Exact Alarms",
-                    onClick = onOpenExactAlarmPermission,
-                    icon = Icons.Default.CheckCircle
-                )
-                Spacer(Modifier.height(12.dp))
-            }
-
             SetupGuideSection(
-                title = "5. Notification Alerts",
+                title = "4. Notification Alerts",
                 description = "Required to show persistent foreground service status and critical alert notifications.",
                 buttonText = "Open App Info",
                 onClick = onOpenAppInfo,
@@ -206,17 +194,17 @@ fun PhoneSetupOverlay(
             Spacer(Modifier.height(12.dp))
 
             SetupGuideSection(
-                title = "6. Do Not Disturb (DND) Bypass",
+                title = "5. Do Not Disturb (DND) Bypass",
                 description = "Required so critical alarms can bypass Do Not Disturb mode and sound sirens when emergencies occur.",
                 buttonText = "Grant DND Access",
                 onClick = onOpenDndSettings,
                 icon = Icons.Default.Star
             )
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            if (hasFullScreenItem) {
                 Spacer(Modifier.height(12.dp))
                 SetupGuideSection(
-                    title = "7. Full-Screen Intent Permission",
+                    title = "6. Full-Screen Intent Permission",
                     description = "Required to automatically display emergency alarm overlays over locked screens.",
                     buttonText = "Authorize Full-Screen Intent",
                     onClick = onOpenFullScreenIntentSettings,
@@ -227,7 +215,7 @@ fun PhoneSetupOverlay(
             if (onOpenNotificationListenerSettings != null) {
                 Spacer(Modifier.height(12.dp))
                 SetupGuideSection(
-                    title = "9. Notification Access (optional)",
+                    title = "$lastItemNumber. Notification Access (optional)",
                     description = "Lets the Sensor tell a silent notification's vibration from a knock at the highest sensitivity settings. Only the fact that a notification vibrates is used; its content is not read.",
                     buttonText = "Grant Notification Access",
                     onClick = onOpenNotificationListenerSettings,
@@ -235,10 +223,10 @@ fun PhoneSetupOverlay(
                 )
             }
 
-            if (!isTracker) {
+            if (onOpenMap != null) {
                 Spacer(Modifier.height(12.dp))
                 SetupGuideSection(
-                    title = "8. Home Points & Geofence Definition",
+                    title = "$lastItemNumber. Home Points & Geofence Definition",
                     description = "Define secure zones on the map. Current defined home points: $homePointsCount",
                     buttonText = "Open Map",
                     onClick = {
@@ -251,36 +239,7 @@ fun PhoneSetupOverlay(
 
             Spacer(Modifier.height(24.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onRefreshPermissions,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Refresh Status", fontSize = 12.sp)
-                }
-
-                Button(
-                    onClick = {
-                        onClose()
-                        onOpenDiagnostics()
-                    },
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Slate500)
-                ) {
-                    Icon(Icons.Default.Settings, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Diagnostics", fontSize = 12.sp)
-                }
-            }
-
-            if (!isTracker) {
-                Spacer(Modifier.height(12.dp))
+            if (onTestAlarm != null) {
                 Button(
                     onClick = onTestAlarm,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),

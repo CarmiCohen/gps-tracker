@@ -14,7 +14,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Verifies Chapter 127: no control on the real Monitor screen unpairs without confirmation (ISSUE-NOV5.2-O15). */
+/**
+ * Verifies Chapter 127: no control on the real Monitor screen unpairs without confirmation (ISSUE-NOV5.2-O15),
+ * and chapter 183: the red X closes the screen and never unpairs; the Tools, Events and Graphs buttons are gone (ISSUE-NOV10.8-O76).
+ */
 @RunWith(AndroidJUnit4::class)
 class UnpairConfirmationTest {
 
@@ -23,6 +26,7 @@ class UnpairConfirmationTest {
 
     private var resetCount = 0
     private var fullInitCount = 0
+    private var closeCount = 0
     private val maintenanceCalls = mutableListOf<String>()
 
     private fun showMonitorScreen() {
@@ -48,7 +52,8 @@ class UnpairConfirmationTest {
                     onUpdateRelayUrl = {},
                     onClearHomePoints = { maintenanceCalls += "clear" },
                     onResetStats = { maintenanceCalls += "stats" },
-                    onFullInit = { fullInitCount++ }
+                    onFullInit = { fullInitCount++ },
+                    onClose = { closeCount++ }
                 )
             }
         }
@@ -74,10 +79,36 @@ class UnpairConfirmationTest {
     }
 
     @Test
-    fun disconnectAsksBeforeUnpairing() {
+    fun redXClosesTheScreenWithoutUnpairing() {
         showMonitorScreen()
-        composeRule.onNodeWithContentDescription("Disconnect").performClick()
-        assertConfirmationShownWithoutUnpairing()
+        composeRule.onNodeWithContentDescription("Close").performClick()
+
+        assertEquals(1, closeCount)
+        composeRule.onNodeWithText("Unpair from tracker T?").assertDoesNotExist()
+        assertEquals(0, resetCount)
+    }
+
+    @Test
+    fun deadMenuButtonsAreGone() {
+        showMonitorScreen()
+        listOf("Tools", "Events", "Graphs", "Disconnect").forEach {
+            composeRule.onNodeWithContentDescription(it).assertDoesNotExist()
+        }
+    }
+
+    /** Phone Setup's Home Points item opens the map's home point editor (ISSUE-NOV10.8-O76). */
+    @Test
+    fun phoneSetupOpenMapStartsHomePointEditing() {
+        showMonitorScreen()
+        composeRule.onNodeWithContentDescription("Setup").performClick()
+        composeRule.onNodeWithText("PHONE").performClick()
+        listOf("Authorize Exact Alarms", "Refresh Status", "Diagnostics").forEach {
+            composeRule.onNodeWithText(it).assertDoesNotExist()
+        }
+        composeRule.onNodeWithText("Open Map").performScrollTo().performClick()
+
+        composeRule.onNodeWithText("Phone Setup & Capabilities").assertDoesNotExist()
+        composeRule.onNodeWithText("DONE").assertExists()
     }
 
     /** Full re-initialization unpairs and deletes the trail (ISSUE-NOV7.1-O35), so it asks first (ISSUE-NOV8.2-O46). */
@@ -123,7 +154,7 @@ class UnpairConfirmationTest {
     @Test
     fun confirmUnpairsOnce() {
         showMonitorScreen()
-        composeRule.onNodeWithContentDescription("Disconnect").performClick()
+        composeRule.onNodeWithContentDescription("Settings / Re-pair").performClick()
         composeRule.onNodeWithText("Unpair").performClick()
 
         composeRule.onNodeWithText("Unpair from tracker T?").assertDoesNotExist()

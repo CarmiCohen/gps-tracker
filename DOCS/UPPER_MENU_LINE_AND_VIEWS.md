@@ -1,14 +1,11 @@
-# Upper Menu Line & Quick Navigation Views Specification (vNov4.34)
+# Upper Menu Line & Quick Navigation Views Specification (vNov12.3)
 
-This document specifies the upper menu line (top control bar) across the Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications, detailing the expanded quick-action navigation buttons.
+This document specifies the upper menu line (top control bar) across the Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications. Since Nov12.3 every button does what it says (ISSUE-NOV10.8-O76, SOT 1.422).
 
 ## 1. Upper Menu Line Layout & Quick Navigation Icons
-The upper menu line is pinned to the very top of both Sensor and Monitor consoles, providing instant one-tap access to primary operational modes and diagnostics:
-- **Setup (`Build` - Cyan)**: Opens the device Setup & Info dialog (`showSetupDialog`), displaying device IDs, relay URL, and version details.
-- **Settings (`Settings` - White)**: Opens configuration overlays for custom device IDs, relay URL configuration, and maintenance options.
-- **Tools (`Refresh` - Gold)**: Opens `ToolsOverlay` for high-frequency telemetry burst simulation, database pruning, test violation triggering, and watchdog resetting.
-- **Map (`Place` - Green)**: Triggers map view centering, GPS fix verification, and auto-centering tracking mode.
-- **Events (`Menu` - Red)**: Accesses recent system event logs, violation markers, and audit history.
-- **Graphs (`Star` - Purple)**: Accesses telemetry analytics, IMU charts, and status metric visualizations.
-- **Info (`Info` - Blue)**: Opens the system information and device capabilities guide (`PhoneSetupOverlay`).
-- **Close / Disconnect (`Close` - Rose)**: Exits active session or locks the console.
+- **Setup (`Build` - Cyan)**: Opens the Setup & Info dialog (`showSetupDialog`), displaying device IDs, relay URL, version and status lines.
+- **Settings (`Settings` - White)**: Sensor: opens the Settings screen (IDs, relay URL, Alerts, Siren, Phone and Clean setup). Monitor (`Settings / Re-pair`): asks to unpair, with a confirmation; it is the only control that unpairs.
+- **Map (`Place` - Green, Monitor only)**: returns the map to automatic centering. The Sensor has no map (user decision 2026-11-12).
+- **Info (`Info` - Blue)**: opens the Setup & Info dialog; the detailed Info returns with ISSUE-NOV10.8-O84.
+- **Close (`Close` - Rose)**: sends the app to the background, as Back; services keep running and nothing is unpaired.
+- **Events and Graphs**: hidden until ISSUE-NOV10.8-O84 revives them. The Tools overlay was removed in Nov12.3 (see `TOOLS_MENU_AND_DIAGNOSTICS.md`).

@@ -1,13 +1,3 @@
-# System Tools & Diagnostics Menu (vNov4.32)
+# System Tools & Diagnostics Menu (removed in Nov12.3)
 
-This document describes the System Tools & Diagnostics menu integration in the GPS Tracker & Sentinel system.
-
-## 1. Menu Integration (`ToolsOverlay`)
-The **Tools** option is placed directly under the top menu bar alongside the Setup (`Build`) and Settings (`Settings`) gear icons in both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications.
-
-## 2. Available System Tools & Actions
-When tapping the Tools option, the `ToolsOverlay` panel opens with the following advanced hardware and telemetry control actions:
-1. **Trigger High-Frequency Burst (100Hz)**: Forces 100Hz IMU and GNSS sensor sampling to evaluate low-spec device resilience and buffer alignment.
-2. **Prune Database & Reclaim Cache**: Executes maintenance database pruning to optimize local storage and remove expired log rows.
-3. **Trigger Test Alarm / Violation**: Simulates test violation events (such as geofence breach or tamper detection) for alarm authority testing.
-4. **Reset Service Watchdog**: Forces watchdog re-alignment and pulse heartbeat synchronization.
+The Tools option and its `ToolsOverlay` (Nov4.32: 100 Hz burst, database pruning, test violation, watchdog reset) were removed from both apps in Nov12.3: every action was empty or only wrote a log line (ISSUE-NOV10.8-O76, user decision 2026-11-10; SOT 1.343 retired by 1.422). The last version with the overlay is tag Nov12.2 (`core-ui/src/main/kotlin/com/jd/core/ui/ToolsOverlay.kt`). Diagnostics views (event log, detailed Info, graphs) return with ISSUE-NOV10.8-O84.

@@ -157,12 +157,9 @@ class AdminActivity : ComponentActivity() {
                             } else if (showPhoneSetupOverlay) {
                                 BackHandler { showPhoneSetupOverlay = false }
                                 com.jd.core.ui.PhoneSetupOverlay(
-                                    isTracker = true,
-                                    homePointsCount = 0,
                                     onOpenAppInfo = { requestAppInfo() },
                                     onOpenBatterySettings = { requestIgnoreBatteryOptimization() },
                                     onOpenOverlayPermission = { requestOverlayPermission() },
-                                    onOpenExactAlarmPermission = { },
                                     onOpenDndSettings = {
                                         val intent = android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
                                         startActivity(intent)
@@ -177,10 +174,6 @@ class AdminActivity : ComponentActivity() {
                                         }
                                         startActivity(intent)
                                     },
-                                    onOpenDiagnostics = { },
-                                    onTestAlarm = { },
-                                    onRefreshPermissions = { },
-                                    onOpenMap = { },
                                     onClose = { showPhoneSetupOverlay = false },
                                     onOpenNotificationListenerSettings = {
                                         startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
@@ -189,8 +182,6 @@ class AdminActivity : ComponentActivity() {
                             } else if (showCleanSetupOverlay) {
                                 BackHandler { showCleanSetupOverlay = false }
                                 com.jd.core.ui.CleanSetupOverlay(
-                                    isTracker = true,
-                                    onClearHomePoints = { },
                                     onResetStats = { viewModel.resetOperationalStatistics() },
                                     onFullInit = { viewModel.triggerFullSystemReinitialization() },
                                     onClose = { showCleanSetupOverlay = false }
@@ -229,6 +220,7 @@ class AdminActivity : ComponentActivity() {
                                     relayUrl = relayUrl,
                                     logs = logs,
                                     onSettingsClick = { showSettings = true },
+                                    onClose = { moveTaskToBack(true) },
                                     onIgnoreBatteryOptimization = { requestIgnoreBatteryOptimization() }
                                 )
                             }
@@ -535,12 +527,12 @@ fun SensorAdminConsole(
     relayUrl: String,
     logs: List<SystemLogger.LogEntry>, 
     onSettingsClick: () -> Unit,
+    onClose: () -> Unit,
     onIgnoreBatteryOptimization: () -> Unit
 ) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
     var showSetupDialog by rememberSaveable { mutableStateOf(false) }
-    var showToolsOverlay by rememberSaveable { mutableStateOf(false) }
     var showStopConfirmDialog by rememberSaveable { mutableStateOf(false) }
     val microphoneLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && isServiceRunning) startSensorService(context) // The service takes the microphone on its next start command.
@@ -558,20 +550,9 @@ fun SensorAdminConsole(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    if (showToolsOverlay) {
-        BackHandler { showToolsOverlay = false }
-        com.jd.core.ui.ToolsOverlay(
-            onTriggerBurst = { SystemLogger.i("TOOLS", "Triggered high-frequency IMU/GNSS burst (100Hz).") },
-            onPruneDatabase = { SystemLogger.i("TOOLS", "Executed manual database pruning.") },
-            onTriggerTestAlarm = { SystemLogger.i("TOOLS", "Simulated test violation event.") },
-            onResetWatchdog = { SystemLogger.i("TOOLS", "Reset service watchdog timer.") },
-            onClose = { showToolsOverlay = false }
-        )
-        return
-    }
-
     Column {
-        // Menu Upper Line (Top Menu Bar with Setup, Settings, Tools, and Info)
+        // Menu Upper Line: Setup, Settings and Info; the red X sends the app to the background (ISSUE-NOV10.8-O76).
+        // Events and Graphs return with ISSUE-NOV10.8-O84; the Sensor has no map (user decision, 2026-11-12).
         Surface(
             color = Color.Black.copy(alpha = 0.85f),
             contentColor = Color.White
@@ -594,18 +575,6 @@ fun SensorAdminConsole(
                     IconButton(onClick = onSettingsClick, modifier = Modifier.size(28.dp)) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(15.dp))
                     }
-                    IconButton(onClick = { showToolsOverlay = true }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Tools", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
-                    }
-                    IconButton(onClick = { SystemLogger.i("UI", "Map view requested from upper menu.") }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Place, contentDescription = "Map", tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
-                    }
-                    IconButton(onClick = { SystemLogger.i("UI", "Events log requested from upper menu.") }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Menu, contentDescription = "Events", tint = Color(0xFFF43F5E), modifier = Modifier.size(15.dp))
-                    }
-                    IconButton(onClick = { SystemLogger.i("UI", "Graphs analytics requested from upper menu.") }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Star, contentDescription = "Graphs", tint = Color(0xFF8B5CF6), modifier = Modifier.size(15.dp))
-                    }
                     IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(28.dp)) {
                         Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
                     }
@@ -618,7 +587,7 @@ fun SensorAdminConsole(
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
-                IconButton(onClick = onSettingsClick, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFF43F5E), modifier = Modifier.size(18.dp))
                 }
             }

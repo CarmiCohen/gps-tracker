@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov12.2 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov12.3 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -458,7 +458,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **110.3 Background Transition Hardening Window:** Verify that `DeviceHardeningStrategy` detects app background transitions and applies the 60-second background escalation window to eliminate jitter spikes on staggered tier devices.
 
 ## Chapter 111 - System Tools & Diagnostics Menu Audit (Nov4.32)
-**Status: D** - Screens open, but most actions are empty
+**Status: D** - The Tools overlay had only empty actions and was removed in Nov12.3; its absence is checked by chapter 183 (ISSUE-NOV10.8-O76)
 *   **111.1 Tools Option Under Top Menu Bar:** Verify that a dedicated **Tools** option (refresh/tools icon button) is positioned directly under the top menu bar alongside the Setup (`Build`) and Settings (`Settings`) gear icons in both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications.
 *   **111.2 System Tools & Diagnostics Overlay:** Verify that tapping the Tools option opens `ToolsOverlay` with quick action buttons:
     - **Trigger High-Frequency Burst (100Hz)**
@@ -474,12 +474,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **112.3 Sound & Alert Setup Integration:** Verify full integration and accessibility of `AlarmSoundOverlay` and `AlertManagementOverlay` from configuration menus in both Sensor and Monitor applications.
 
 ## Chapter 113 - Upper Menu Line Expansion Audit (Nov4.34)
-**Status: L / D** - All buttons visible; Events and Graphs do nothing
+**Status: L / D** - Since Nov12.3 the bars hold Setup, Settings, Map (Monitor only) and Info; Tools removed, Events and Graphs hidden until ISSUE-NOV10.8-O84 (chapter 183)
 *   **113.1 Expanded Quick Navigation Icons:** Verify that the upper menu line across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications includes direct one-tap navigation buttons for Setup (`Build`), Settings (`Settings`), Tools (`Refresh`), Map (`Place`), Events (`Menu`), Graphs (`Star`), and Info (`Info`).
 *   **113.2 Action Dispatch:** Verify that tapping each upper menu action correctly dispatches the intended navigation event, opens the corresponding overlay/dialog, or logs telemetry feedback.
 
 ## Chapter 114 - Monitor Hardware Deployment, UI Single-Line Fitting & HUD Telemetry Formatting Audit (Nov4.35)
-**Status: L / D** - All buttons visible; Events and Graphs do nothing
+**Status: L / A** - Since Nov12.3 the Monitor bar's Setup, Settings / Re-pair, Map, Info and Close fit at 320 dp (`HudLayoutAuditTest`); Tools, Events and Graphs are gone (chapter 183)
 *   **114.1 Hardware Deployment & Live Telemetry Monitoring:** Verify deployment of `:app-monitor` to target hardware (Samsung S21FE / connected device R58X40GV2AR) and verify live logcat monitoring and telemetry status handling.
 *   **114.2 Upper Menu Header Single-Line Fitting:** Verify that the upper menu header bar (`Surface` / `Row`) across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications fits title text (`MONITOR: ...` / `SENSOR: ...`) and all 7 action buttons (Setup, Settings, Tools, Map, Events, Graphs, Info) and Disconnect button without text wrapping or layout distortion.
 *   **114.3 HUD Telemetry Formatting & Text Ellipsization:** Verify that `HudStatusBar` row 2 metadata formatting correctly preserves telemetry status text (`B:100%|T:30°C|A:...|AGE:0s`) without truncating the age parameter, and applies single-line ellipsization (`TextOverflow.Ellipsis`) to device identity strings.
@@ -892,8 +892,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **182.1 Lockfile Holds (node):** in `relay-server`, `node --version` must be the `package.json` engines major (24); `corepack yarn@1.22.22 install --frozen-lockfile` must end `Already up-to-date` (no `yarn.lock` change in `git status`), then `npm test` must pass.
 *   **182.2 Render Build (deploy):** after a Manual Deploy, Render's build log must show `yarn install` using the lockfile with no `No lockfile found`, and the relay's page must say `push: on`.
 
+## Chapter 183 - No Button That Does Nothing (Nov12.3)
+**Status: A / L** - `UnpairConfirmationTest` 8/8 and `HudLayoutAuditTest` 4/4 by `am instrument` on the A15 (airplane mode, ISSUE-NOV12.3-O90); 183.3 verified on the A15 (ISSUE-NOV10.8-O76, SOT 1.422)
+*   **183.1 Menu Bars (instrumented):** `UnpairConfirmationTest` and `HudLayoutAuditTest`: the Monitor bar shows Setup, Settings / Re-pair, Map, Info and Close within 320 dp, and no Tools, Events, Graphs or Disconnect; the red X calls close once and never shows the unpair dialog; the gear still asks before unpairing.
+*   **183.2 Setup Pages (instrumented):** Monitor `Setup`, `PHONE`: no `Authorize Exact Alarms`, `Refresh Status` or `Diagnostics`; `Open Map` closes the page and shows the home point editor (`DONE`).
+*   **183.3 Live (device):** on the A15 the Monitor bar holds Setup, Settings, Map, Info and X; X goes to the launcher, the Monitor stays paired and its session runs. The Sensor bar holds Setup, Settings, Info and X; X sends it to the background and the Sensor service keeps running.
+
 ---
-**Active Testing Chapters: 171 of 182**
+**Active Testing Chapters: 172 of 183**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

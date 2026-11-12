@@ -160,7 +160,8 @@ class MonitorActivity : ComponentActivity() {
                         onFullInit = {
                             viewModel.triggerFullSystemReinitialization()
                             context.stopService(Intent(context, MonitorSessionService::class.java))
-                        }
+                        },
+                        onClose = { moveTaskToBack(true) }
                     )
                 }
             }
@@ -285,7 +286,8 @@ fun MonitorScreen(
     onRemoveHomePoint: (index: Int) -> Unit = {},
     onSetGeofenceRadius: (meters: Double) -> Unit = {},
     onResetStats: () -> Unit = {},
-    onFullInit: () -> Unit = {}
+    onFullInit: () -> Unit = {},
+    onClose: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
@@ -294,7 +296,6 @@ fun MonitorScreen(
     var showSoundOverlay by rememberSaveable { mutableStateOf(false) }
     var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
     var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
-    var showToolsOverlay by rememberSaveable { mutableStateOf(false) }
     var isEditingRelayUrl by rememberSaveable { mutableStateOf(false) }
     var relayUrlInput by rememberSaveable(relayUrl) { mutableStateOf(relayUrl) }
     var followMode by rememberSaveable { mutableStateOf(MapFollowMode.AUTO) }
@@ -382,7 +383,6 @@ fun MonitorScreen(
     if (showPhoneSetupOverlay) {
         BackHandler { showPhoneSetupOverlay = false }
         com.jd.core.ui.PhoneSetupOverlay(
-            isTracker = false,
             homePointsCount = geofence.points.size,
             onOpenAppInfo = {
                 val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -400,7 +400,6 @@ fun MonitorScreen(
                 }
                 context.startActivity(intent)
             },
-            onOpenExactAlarmPermission = { },
             onOpenDndSettings = {
                 val intent = android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
                 context.startActivity(intent)
@@ -415,10 +414,8 @@ fun MonitorScreen(
                 }
                 context.startActivity(intent)
             },
-            onOpenDiagnostics = { showToolsOverlay = true },
             onTestAlarm = onTestSiren,
-            onRefreshPermissions = { },
-            onOpenMap = { showPhoneSetupOverlay = false },
+            onOpenMap = { isEditingHome = true },
             onClose = { showPhoneSetupOverlay = false }
         )
         return
@@ -427,23 +424,10 @@ fun MonitorScreen(
     if (showCleanSetupOverlay) {
         BackHandler { showCleanSetupOverlay = false }
         com.jd.core.ui.CleanSetupOverlay(
-            isTracker = false,
             onClearHomePoints = onClearHomePoints,
             onResetStats = onResetStats,
             onFullInit = { pendingUnpair = UnpairAction.FULL_REINITIALIZATION },
             onClose = { showCleanSetupOverlay = false }
-        )
-        return
-    }
-
-    if (showToolsOverlay) {
-        BackHandler { showToolsOverlay = false }
-        com.jd.core.ui.ToolsOverlay(
-            onTriggerBurst = { },
-            onPruneDatabase = { },
-            onTriggerTestAlarm = { },
-            onResetWatchdog = { },
-            onClose = { showToolsOverlay = false }
         )
         return
     }
@@ -565,8 +549,8 @@ fun MonitorScreen(
                     trackerId = trackerId,
                     onSetup = { showSetupDialog = true },
                     onUnpair = requestUnpair,
-                    onTools = { showToolsOverlay = true },
-                    onMap = { followMode = MapFollowMode.AUTO }
+                    onMap = { followMode = MapFollowMode.AUTO },
+                    onClose = onClose
                 )
                 // Line 1: Local Device Status
                 HudStatusBar(hudState = localHudState, compact = true)
@@ -754,9 +738,11 @@ fun MonitorMenuBar(
     trackerId: String,
     onSetup: () -> Unit,
     onUnpair: () -> Unit,
-    onTools: () -> Unit,
-    onMap: () -> Unit
+    onMap: () -> Unit,
+    onClose: () -> Unit
 ) {
+    // Events and Graphs return with ISSUE-NOV10.8-O84; unpairing is only behind the gear, the red X
+    // sends the app to the background (ISSUE-NOV10.8-O76).
     Surface(
         color = Color.Black.copy(alpha = 0.85f),
         contentColor = Color.White
@@ -777,17 +763,8 @@ fun MonitorMenuBar(
                 IconButton(onClick = onUnpair, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Settings, contentDescription = "Settings / Re-pair", tint = Color.White, modifier = Modifier.size(15.dp))
                 }
-                IconButton(onClick = onTools, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Tools", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
-                }
                 IconButton(onClick = onMap, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Place, contentDescription = "Map", tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
-                }
-                IconButton(onClick = { }, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Menu, contentDescription = "Events", tint = Color(0xFFF43F5E), modifier = Modifier.size(15.dp))
-                }
-                IconButton(onClick = { }, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Star, contentDescription = "Graphs", tint = Color(0xFF8B5CF6), modifier = Modifier.size(15.dp))
                 }
                 IconButton(onClick = onSetup, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
@@ -802,8 +779,8 @@ fun MonitorMenuBar(
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onUnpair, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Disconnect", tint = Color(0xFFF43F5E), modifier = Modifier.size(18.dp))
+            IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFF43F5E), modifier = Modifier.size(18.dp))
             }
         }
     }

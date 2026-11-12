@@ -72,7 +72,7 @@ class HudLayoutAuditTest {
             }
         }
 
-        listOf("Setup", "Settings / Re-pair", "Tools", "Map", "Events", "Graphs", "Info", "Disconnect").forEach {
+        listOf("Setup", "Settings / Re-pair", "Map", "Info", "Close").forEach {
             val bounds = composeRule.onNodeWithContentDescription(it).getUnclippedBoundsInRoot()
             assertTrue("$it must stay visible", bounds.right > bounds.left && bounds.right.value <= 320f)
         }
