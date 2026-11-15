@@ -8,6 +8,9 @@ import androidx.lifecycle.viewModelScope
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.EventEntry
+import com.jd.core.shared.EventLevel
+import com.jd.core.shared.EventLog
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
 import com.jd.core.shared.LocationUpdate
@@ -38,8 +41,14 @@ class MonitorViewModel @Inject constructor(
     private val dataStore: MonitorDataStore,
     private val locationSource: MonitorLocationSource,
     private val alarmEngine: MonitorAlarmEngine,
+    private val eventLog: EventLog,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
+
+    /** This phone's events and the paired Sensor's, oldest first (ISSUE-NOV10.8-O84). */
+    val events: StateFlow<List<EventEntry>> = eventLog.events
+
+    fun clearEvents() = eventLog.clear()
 
     /**
      * The stored pairing; null only until it has been read. The ViewModel outlives Activity recreation,
@@ -112,10 +121,12 @@ class MonitorViewModel @Inject constructor(
 
     fun addHomePoint(lat: Double, lng: Double) {
         viewModelScope.launch { dataStore.editGeofence { it.withPoint(HomePoint(lat, lng)) } }
+        eventLog.record(EventLevel.INFO, "Home point added")
     }
 
     fun removeHomePoint(index: Int) {
         viewModelScope.launch { dataStore.editGeofence { it.withoutPoint(index) } }
+        eventLog.record(EventLevel.INFO, "Home point ${index + 1} removed")
     }
 
     fun setGeofenceRadius(meters: Double) {
@@ -128,6 +139,7 @@ class MonitorViewModel @Inject constructor(
      */
     fun clearHomePoints() {
         viewModelScope.launch { dataStore.editGeofence { it.cleared() } }
+        eventLog.record(EventLevel.INFO, "All home points removed")
     }
 
     /** Resets operational statistics and clears stored trail history (ISSUE-NOV7.1-O35). */
@@ -137,6 +149,7 @@ class MonitorViewModel @Inject constructor(
             _latestTelemetry.value = null
             alarmEngine.acknowledge()
         }
+        eventLog.record(EventLevel.INFO, "Trail history cleared")
     }
 
     /** Triggers full system re-initialization: unpairs target, resets settings & URL to defaults, clears trail (ISSUE-NOV7.1-O35). */
@@ -151,6 +164,7 @@ class MonitorViewModel @Inject constructor(
             _latestTelemetry.value = null
             alarmEngine.acknowledge()
         }
+        eventLog.record(EventLevel.WARNING, "Full re-initialization: unpaired from ${pairing.value?.trackerId}, settings reset")
     }
 
 
@@ -289,9 +303,11 @@ class MonitorViewModel @Inject constructor(
         viewModelScope.launch {
             identityManager.setTargetId(id)
         }
+        eventLog.record(EventLevel.INFO, "Paired with tracker $id")
     }
 
     fun clearTargetId() {
+        eventLog.record(EventLevel.WARNING, "Unpaired from tracker ${pairing.value?.trackerId}")
         viewModelScope.launch {
             identityManager.clearTargetId()
         }

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov15.3 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov15.4 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -474,7 +474,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **112.3 Sound & Alert Setup Integration:** Verify full integration and accessibility of `AlarmSoundOverlay` and `AlertManagementOverlay` from configuration menus in both Sensor and Monitor applications.
 
 ## Chapter 113 - Upper Menu Line Expansion Audit (Nov4.34)
-**Status: L / D** - Since Nov12.3 the bars hold Setup, Settings, Map (Monitor only) and Info; Tools removed, Events and Graphs hidden until ISSUE-NOV10.8-O84 (chapter 183)
+**Status: L / D** - Since Nov12.3 the bars hold Setup, Settings, Map (Monitor only) and Info; Tools removed, Events and Graphs hidden until ISSUE-NOV10.8-O84 (chapter 183); Events back since Nov15.4 (chapter 190), Graphs still hidden
 *   **113.1 Expanded Quick Navigation Icons:** Verify that the upper menu line across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications includes direct one-tap navigation buttons for Setup (`Build`), Settings (`Settings`), Tools (`Refresh`), Map (`Place`), Events (`Menu`), Graphs (`Star`), and Info (`Info`).
 *   **113.2 Action Dispatch:** Verify that tapping each upper menu action correctly dispatches the intended navigation event, opens the corresponding overlay/dialog, or logs telemetry feedback.
 
@@ -934,8 +934,16 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **189.3 Monitor Warnings (unit):** `SensorSetupWarningsTest`: one line per missing item and fault, microphone ones dropped while noise detection is off; the warning line and the two Setup & Info lines (setup complete or to fix; detection settings applied, not applied yet, or newer from another Monitor).
 *   **189.4 Live (device):** with both apps paired, open the Monitor: `REV_SensorSetup: Report sent` and `REV_MonitorService: Sensor setup report from T`; `device_check.ps1 -App monitor -Command STATE` shows `sensorSetup=`. Run `adb shell "dumpsys deviceidle whitelist -com.jd.app.sensor"`: within 30 s the report lists `BATTERY_UNRESTRICTED` and the Monitor shows `SENSOR PHONE: N ITEMS NEED ATTENTION` (acknowledge any alarm screen with `KEYCODE_TAB`, `KEYCODE_ENTER`). Restore with `+com.jd.app.sensor`: the count drops again.
 
+## Chapter 190 - The Events Log (Nov15.4)
+**Status: A / L** - `EventLogTest` 11/11, `SensorEventsWireTest` 4/4, `SensorEventsTest` 4/4, `MonitorEventsTest` 3/3, `UnpairConfirmationTest.eventsButtonOpensTheEventsList` and `HudLayoutAuditTest` passed on the A15; 190.5 verified on the A15 (ISSUE-NOV10.8-O84 part 1, SOT 1.429)
+*   **190.1 Store (unit):** `EventLogTest`: an event survives a restart; the peer's events are merged once each, in time order; events older than 7 days are dropped, also from the file; a line cut short by a crash is skipped and the file repaired; at most 5,000 are kept, the newest; Clear deletes the list and the file; ids differ and name the phone; the list shows the chosen period newest first with DETAIL only on request; the Sensor sends its newest 50 without DETAIL; the export has one line per event; a link logs its changes only from its first connection on.
+*   **190.2 Wire (unit):** `SensorEventsWireTest`: the `sensor_events` message survives the round trip under the Sensor's own ID, is not read as another settings type (or the reverse), reads an unknown level as INFO, ignores a malformed payload, is sent only while connected, and reaches the Monitor's `sensorEventsFlow`.
+*   **190.3 What Is Recorded (unit):** `SensorEventsTest`: a phone setup change is recorded once, naming each problem, and a new detection revision alone records nothing; `MonitorEventsTest`: an alarm raised is recorded once, an ended condition and a new raise after acknowledgement are recorded, an acknowledgement names the alarms that waited.
+*   **190.4 Menu (instrumented):** `UnpairConfirmationTest.eventsButtonOpensTheEventsList`: the Monitor's Events button opens the list with its periods and Close returns; `HudLayoutAuditTest`: Events stays visible with long IDs. Run the Monitor in airplane mode (O90).
+*   **190.5 Live (device):** with both apps paired, open the Monitor's Events: the Sensor's events (`S`) appear once each beside the Monitor's (`M`), newest first, left to right also on a right-to-left phone; force-stop and reopen the Monitor: `REV_SensorEvents: N newest events sent` follows its connect within 1 s; Export opens the share sheet with a text file; Clear asks first. `adb shell run-as com.jd.app.monitor cat files/event_log.jsonl` shows one JSON line per event.
+
 ---
-**Active Testing Chapters: 178 of 189**
+**Active Testing Chapters: 179 of 190**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

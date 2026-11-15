@@ -2,6 +2,8 @@ package com.jd.core.network
 
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
+import com.jd.core.shared.EventEntry
+import com.jd.core.shared.SensorEventBatch
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.SensorBehaviour
@@ -103,6 +105,18 @@ interface SignalingClient {
      * not connected; the caller sends again once a Monitor is reachable.
      */
     suspend fun sendSensorSetup(report: SensorSetupReport): Boolean
+
+    /**
+     * Monitor: the Sensor's newest events, each time a Sensor sends them (ISSUE-NOV10.8-O84). They repeat events sent
+     * before, which the event log skips.
+     */
+    val sensorEventsFlow: Flow<SensorEventBatch>
+
+    /**
+     * Sensor: sends its newest [events] to the Monitors of its room (ISSUE-NOV10.8-O84). Returns false when not
+     * connected; the caller sends again once a Monitor is reachable.
+     */
+    suspend fun sendSensorEvents(events: List<EventEntry>): Boolean
 
     /**
      * Monitor: gives the relay this phone's push [token], now and after every reconnection, so the paired tracker's

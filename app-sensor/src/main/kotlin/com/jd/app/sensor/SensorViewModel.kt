@@ -8,6 +8,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
+import com.jd.core.shared.EventEntry
+import com.jd.core.shared.EventLog
 import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.atUiRate
@@ -28,10 +30,16 @@ class SensorViewModel @Inject constructor(
     private val sensorDataStore: SensorDataStore,
     private val fixStore: SensorFixStore,
     private val serviceStatus: SensorServiceStatus,
+    private val eventLog: EventLog,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val selfId = identityManager.selfId
+
+    /** This phone's events, oldest first (ISSUE-NOV10.8-O84). */
+    val events: StateFlow<List<EventEntry>> = eventLog.events
+
+    fun clearEvents() = eventLog.clear()
 
     /** Reported by [SensorService] itself; shown in the Setup dialog (ISSUE-NOV6.4-O34). */
     val isServiceRunning: StateFlow<Boolean> = serviceStatus.isRunning

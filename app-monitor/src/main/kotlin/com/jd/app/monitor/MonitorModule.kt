@@ -3,11 +3,14 @@ package com.jd.app.monitor
 import android.content.Context
 import androidx.room.Room
 import com.jd.core.network.SignalingClient
+import com.jd.core.shared.EventLog
+import com.jd.core.shared.EventSource
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.io.File
 import javax.inject.Singleton
 
 @Module
@@ -34,6 +37,12 @@ object MonitorModule {
     fun provideMonitorDataStore(@ApplicationContext context: Context): MonitorDataStore {
         return MonitorDataStore(context)
     }
+
+    /** The Monitor's events and the Sensor's events it received (ISSUE-NOV10.8-O84). */
+    @Provides
+    @Singleton
+    fun provideEventLog(@ApplicationContext context: Context): EventLog =
+        EventLog(File(context.filesDir, EventLog.FILE_NAME), EventSource.MONITOR)
 
     @Provides
     @Singleton

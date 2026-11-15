@@ -39,6 +39,7 @@ class SensorHudValuesTest {
     @Inject lateinit var sensorDataStore: SensorDataStore
     @Inject lateinit var fixStore: SensorFixStore
     @Inject lateinit var serviceStatus: SensorServiceStatus
+    @Inject lateinit var eventLog: com.jd.core.shared.EventLog
 
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
     private lateinit var viewModel: SensorViewModel
@@ -47,7 +48,7 @@ class SensorHudValuesTest {
     fun setup() {
         hiltRule.inject()
         fixStore.clear()
-        viewModel = SensorViewModel(identityManager, signalingClient, sensorDataStore, fixStore, serviceStatus, context)
+        viewModel = SensorViewModel(identityManager, signalingClient, sensorDataStore, fixStore, serviceStatus, eventLog, context)
     }
 
     @After

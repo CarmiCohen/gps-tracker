@@ -11,6 +11,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
+import com.jd.core.shared.EventLevel
+import com.jd.core.shared.EventLog
 import com.jd.core.shared.SystemLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -52,7 +54,8 @@ class MonitorAlarmEngine @Inject constructor(
     private val identityManager: ForensicIdentityManager,
     private val dataStore: MonitorDataStore,
     private val siren: SirenPlayer,
-    private val pushedRows: PushedRows
+    private val pushedRows: PushedRows,
+    private val eventLog: EventLog
 ) {
     private val _alarms = MutableStateFlow(AlarmBook())
     val alarms: StateFlow<AlarmBook> = _alarms.asStateFlow()
@@ -97,7 +100,7 @@ class MonitorAlarmEngine @Inject constructor(
                         sirenTimeoutJob = scope.launch {
                             delay(30.seconds)
                             sirenTimedOut.value = true
-                            SystemLogger.i("Alarm", "Siren auto-stopped after 30s timer (timer or acknowledge)")
+                            eventLog.record(EventLevel.DETAIL, "Siren stopped after 30 s")
                         }
                     } else {
                         sirenTimedOut.value = false
@@ -120,6 +123,7 @@ class MonitorAlarmEngine @Inject constructor(
                 if (book.pending.map { it.type } != _alarms.value.pending.map { it.type }) {
                     SystemLogger.w("Alarm", "Pending alarms: ${book.pending.joinToString { it.type.name }}")
                 }
+                alarmEvents(_alarms.value, book).forEach { eventLog.record(it.level, it.message) }
                 _alarms.value = book
                 showNotification(book)
             }.launchIn(this)
@@ -152,6 +156,7 @@ class MonitorAlarmEngine @Inject constructor(
     }
 
     fun acknowledge() {
+        acknowledgementEvent(_alarms.value)?.let { eventLog.record(it.level, it.message) }
         sirenTimeoutJob?.cancel()
         sirenTimedOut.value = false
         acknowledgements.tryEmit(Unit)

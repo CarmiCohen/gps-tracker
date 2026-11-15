@@ -2,6 +2,8 @@ package com.jd.core.network
 
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
+import com.jd.core.shared.EventEntry
+import com.jd.core.shared.SensorEventBatch
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
 import com.jd.core.shared.LocationUpdate
@@ -70,6 +72,9 @@ class SocketioSignalingClient @Inject constructor(
 
     private val _sensorSetupFlow = MutableStateFlow<SensorSetupReport?>(null)
     override val sensorSetupFlow: StateFlow<SensorSetupReport?> = _sensorSetupFlow.asStateFlow()
+
+    private val _sensorEventsFlow = MutableSharedFlow<SensorEventBatch>(extraBufferCapacity = 16)
+    override val sensorEventsFlow: SharedFlow<SensorEventBatch> = _sensorEventsFlow.asSharedFlow()
 
     private var bytesSent: Long = 0
     private val arrivalLag = ArrivalLagMeter() // Used only on the socket's event thread (ISSUE-NOV10.7-O73).
@@ -195,6 +200,7 @@ class SocketioSignalingClient @Inject constructor(
                 GeofenceWire.decode(data)?.let { _geofenceFlow.tryEmit(it) }
                 SensorBehaviourWire.decode(data)?.let { _sensorBehaviourFlow.tryEmit(it) }
                 SensorSetupWire.decode(data)?.let { _sensorSetupFlow.value = it }
+                SensorEventsWire.decode(data)?.let { _sensorEventsFlow.tryEmit(it) }
             }
 
             connect()
@@ -419,6 +425,15 @@ class SocketioSignalingClient @Inject constructor(
         val deviceId = currentDeviceId ?: return false
         if (!_isConnected.value) return false
         val payload = SensorSetupWire.encode(report.trackerId.ifEmpty { deviceId }, report)
+        socket?.emit("settings_update", payload)
+        bytesSent += payload.toString().length.toLong()
+        return true
+    }
+
+    override suspend fun sendSensorEvents(events: List<EventEntry>): Boolean {
+        val deviceId = currentDeviceId ?: return false
+        if (!_isConnected.value) return false
+        val payload = SensorEventsWire.encode(deviceId, events)
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true

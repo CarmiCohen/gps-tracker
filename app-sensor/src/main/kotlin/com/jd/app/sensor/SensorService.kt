@@ -39,7 +39,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 import kotlin.math.max
@@ -60,6 +62,7 @@ class SensorService : Service(), SensorEventListener {
     @Inject lateinit var sensorDataStore: SensorDataStore
     @Inject lateinit var fixStore: SensorFixStore
     @Inject lateinit var serviceStatus: SensorServiceStatus
+    @Inject lateinit var eventLog: EventLog
     private lateinit var forensicBuffer: ForensicBuffer
     private lateinit var sensorManager: SensorManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -147,7 +150,7 @@ class SensorService : Service(), SensorEventListener {
 
     private val thermalListener = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         PowerManager.OnThermalStatusChangedListener { status ->
-            SystemLogger.w("SensorService", "Thermal Status Changed: $status")
+            eventLog.record(EventLevel.DETAIL, "Thermal status changed: $status")
             refreshSamplingRate()
         }
     } else null
@@ -190,11 +193,13 @@ class SensorService : Service(), SensorEventListener {
         setupGeofenceListener()
         setupSensorBehaviourListener()
         setupSetupReporting()
+        setupEventReporting()
         registerSensors()
         startLocationUpdates()
         connectSignaling()
         
         isInitialized = true
+        eventLog.record(EventLevel.INFO, "Sensor service started (version ${getAppVersionName(this)})")
         val startMs = try { android.os.SystemClock.elapsedRealtime() } catch (_: Throwable) { System.currentTimeMillis() }
         serviceStatus.markRunning(startMs)
     }
@@ -254,6 +259,7 @@ class SensorService : Service(), SensorEventListener {
             .onEach { config ->
                 val stored = sensorDataStore.saveGeofence(config)
                 SystemLogger.i("Geofence", "Received ${config.points.size} home points, radius ${config.radiusMeters} m, rev ${config.revision} (stored: $stored)")
+                if (stored) eventLog.record(EventLevel.INFO, "Home points received: ${config.points.size}, radius ${config.radiusMeters.toInt()} m")
             }
             .launchIn(serviceScope)
         sensorDataStore.geofence
@@ -307,7 +313,7 @@ class SensorService : Service(), SensorEventListener {
     private fun applyForegroundStart(start: ForegroundStart) {
         // Requested again once location is regained, so the updates resume at once.
         if (start.hasLocation && serviceStatus.refusedAccess.value.location) startLocationUpdates()
-        if (!start.hasLocation) SystemLogger.w("SensorService", "Started in the background without location: tracking resumes after a notification tap or opening the Sensor app")
+        if (!start.hasLocation) eventLog.record(EventLevel.WARNING, "Started in the background without location: tracking resumes after a notification tap or opening the Sensor app")
         hasForegroundStart = true
         isLocationRefused = !start.hasLocation
         hasMicrophoneType = start.hasMicrophone
@@ -401,6 +407,9 @@ class SensorService : Service(), SensorEventListener {
                 // A revision not stored comes from a Monitor that came online and sent what it holds: it gets the setup
                 // report, also when another Monitor was already there. A stored one changes the report, which sends it.
                 if (!stored) setupReport.value?.let { sendSetupReport(it) }
+                // Every Monitor sends its settings when it comes online; one that joins while another Monitor keeps the
+                // room's online status unchanged would otherwise not get the events (ISSUE-NOV10.8-O84).
+                sendEvents(eventLog.events.value.newestForPeer())
             }
             .launchIn(serviceScope)
         sensorDataStore.sensorBehaviour
@@ -410,7 +419,7 @@ class SensorService : Service(), SensorEventListener {
                 motionSentinel.tiltThresholdDegrees = tiltThresholdForSensitivity(behaviour.tiltSensitivity)
                 motionSentinel.vibrationThreshold = vibrationThresholdForSensitivity(behaviour.vibrationSensitivity)
                 acousticMonitor.jumpDb = noiseJumpForSensitivity(behaviour.noiseSensitivity)
-                SystemLogger.i("SensorBehaviour", "Applied rev ${behaviour.revision}: ${sensorBehaviourLines(behaviour).joinToString("; ")}")
+                eventLog.record(EventLevel.INFO, "Detection settings applied (rev ${behaviour.revision}): ${sensorBehaviourLines(behaviour).joinToString("; ")}")
                 if (behaviour.noiseAlert != previous.noiseAlert) withContext(Dispatchers.Main) { applyAccess() }
             }
             .launchIn(serviceScope)
@@ -439,7 +448,34 @@ class SensorService : Service(), SensorEventListener {
         peerDeliveries(setupReport.filterNotNull(), signalingClient.viewerStatusFlow)
             .onEach(::sendSetupReport)
             .launchIn(serviceScope)
+        var previousReport: SensorSetupReport? = null
+        setupReport.filterNotNull()
+            .onEach { report ->
+                setupChangeEvent(previousReport, report)?.let(::record)
+                previousReport = report
+            }
+            .launchIn(serviceScope)
     }
+
+    /**
+     * Records the links to the relay and to the Monitors, and sends the newest events to the Monitors each time one comes
+     * online and at each new event while one is (ISSUE-NOV10.8-O84).
+     */
+    private fun setupEventReporting() {
+        signalingClient.isConnected.linkChanges().onEach { record(relayLinkEvent(it)) }.launchIn(serviceScope)
+        signalingClient.viewerStatusFlow.linkChanges().onEach { record(monitorLinkEvent(it)) }.launchIn(serviceScope)
+        peerDeliveries(eventLog.events.map { it.newestForPeer() }.filter { it.isNotEmpty() }, signalingClient.viewerStatusFlow)
+            .onEach(::sendEvents)
+            .launchIn(serviceScope)
+    }
+
+    private suspend fun sendEvents(events: List<EventEntry>) {
+        if (events.isEmpty()) return
+        val sent = signalingClient.sendSensorEvents(events)
+        SystemLogger.i("SensorEvents", "${events.size} newest events sent: $sent")
+    }
+
+    private fun record(event: LoggedEvent) = eventLog.record(event.level, event.message)
 
     private suspend fun sendSetupReport(report: SensorSetupReport) {
         val sent = signalingClient.sendSensorSetup(report)
@@ -519,12 +555,12 @@ class SensorService : Service(), SensorEventListener {
                 if (motionSentinel.isArmed != publishedMotionArmed) {
                     publishedMotionArmed = motionSentinel.isArmed
                     publishMotion()
-                    SystemLogger.i("Motion", if (motionSentinel.isArmed) "Tilt and lift armed" else "Tilt and lift waiting for the phone to rest")
+                    eventLog.record(EventLevel.DETAIL, if (motionSentinel.isArmed) "Tilt and lift armed" else "Tilt and lift waiting for the phone to rest")
                 }
                 if (motionSentinel.isVibrationArmed != publishedVibrationArmed) {
                     publishedVibrationArmed = motionSentinel.isVibrationArmed
                     publishMotion()
-                    SystemLogger.i("Motion", if (motionSentinel.isVibrationArmed) "Vibration armed" else "Vibration waiting for the phone to rest")
+                    eventLog.record(EventLevel.DETAIL, if (motionSentinel.isVibrationArmed) "Vibration armed" else "Vibration waiting for the phone to rest")
                 }
             }
             Sensor.TYPE_GRAVITY -> {
@@ -585,9 +621,9 @@ class SensorService : Service(), SensorEventListener {
                 if ((currentFix == null) != isReportingNoFix) {
                     isReportingNoFix = currentFix == null
                     if (isReportingNoFix) {
-                        SystemLogger.w("SensorService", "No current GPS fix (none, or older than ${FIX_STALE_AFTER_MS}ms): reporting $NO_FIX_STATUS")
+                        eventLog.record(EventLevel.WARNING, "No current GPS fix (none, or older than ${FIX_STALE_AFTER_MS / 1000} s)")
                     } else {
-                        SystemLogger.i("SensorService", "GPS fix current again")
+                        eventLog.record(EventLevel.INFO, "GPS fix current again")
                     }
                 }
                 // Only the tick that carries a new fix is checked; repeated ticks of the same fix stay VALID.
@@ -646,7 +682,7 @@ class SensorService : Service(), SensorEventListener {
     private fun reportViolation(update: LocationUpdate, status: String, logLine: String) {
         update.status = status
         update.isCritical = true
-        SystemLogger.w("SensorService", logLine)
+        eventLog.record(EventLevel.ALARM, logLine)
         // Built before launching: the pooled update is zeroed on release, before the launched send runs.
         val violation = ViolationEvent(type = status, location = update.snapshot(), nonce = java.util.UUID.randomUUID().toString())
         serviceScope.launch { signalingClient.sendViolation(violation) }
@@ -666,7 +702,7 @@ class SensorService : Service(), SensorEventListener {
             val threshold = max(currentIntervalMs * 3, 10000L) 
             
             if (elapsedMs > threshold) {
-                SystemLogger.e("Watchdog", "Sensing loop stall detected! (Elapsed: ${elapsedMs}ms, Threshold: ${threshold}ms). Restarting...")
+                eventLog.record(EventLevel.WARNING, "Sensing loop stalled for ${elapsedMs / 1000} s: restarted")
                 startSensingLoop()
             }
         }
@@ -754,7 +790,8 @@ class SensorService : Service(), SensorEventListener {
     }
 
     override fun onDestroy() {
-        SystemLogger.i("SensorService", "onDestroy called. Cleaning up...")
+        if (isInitialized) eventLog.record(EventLevel.WARNING, "Sensor service stopped")
+        else SystemLogger.i("SensorService", "onDestroy before initialization")
         acousticMonitor.stop()
         getSystemService(NotificationManager::class.java).cancel(RESTART_NOTIFICATION_ID)
         serviceScope.cancel()

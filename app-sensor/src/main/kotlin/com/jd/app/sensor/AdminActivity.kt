@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -105,6 +106,7 @@ class AdminActivity : ComponentActivity() {
                     var showAlertsOverlay by rememberSaveable { mutableStateOf(false) }
                     var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
                     var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
+                    var showEventsOverlay by rememberSaveable { mutableStateOf(false) }
 
                     val sensorBehaviour by viewModel.sensorBehaviour.collectAsStateWithLifecycle()
 
@@ -137,7 +139,16 @@ class AdminActivity : ComponentActivity() {
                                     startSensorService(context)
                                 }
                             }
-                            if (showAlertsOverlay) {
+                            if (showEventsOverlay) {
+                                BackHandler { showEventsOverlay = false }
+                                val events by viewModel.events.collectAsStateWithLifecycle()
+                                com.jd.core.ui.EventLogOverlay(
+                                    events = events,
+                                    showSource = false,
+                                    onClear = viewModel::clearEvents,
+                                    onClose = { showEventsOverlay = false }
+                                )
+                            } else if (showAlertsOverlay) {
                                 BackHandler { showAlertsOverlay = false }
                                 // Read-only: the Monitor sets the detection settings (ISSUE-NOV10.8-O83).
                                 SensorBehaviourOverlay(
@@ -191,6 +202,7 @@ class AdminActivity : ComponentActivity() {
                                     relayUrl = relayUrl,
                                     logs = logs,
                                     onSettingsClick = { showSettings = true },
+                                    onEventsClick = { showEventsOverlay = true },
                                     onClose = { moveTaskToBack(true) },
                                     onOpenPhoneSetup = { showPhoneSetupOverlay = true }
                                 )
@@ -474,6 +486,7 @@ fun SensorAdminConsole(
     relayUrl: String,
     logs: List<SystemLogger.LogEntry>, 
     onSettingsClick: () -> Unit,
+    onEventsClick: () -> Unit,
     onClose: () -> Unit,
     onOpenPhoneSetup: () -> Unit
 ) {
@@ -487,7 +500,7 @@ fun SensorAdminConsole(
 
     Column {
         // Menu Upper Line: Setup, Settings and Info; the red X sends the app to the background (ISSUE-NOV10.8-O76).
-        // Events and Graphs return with ISSUE-NOV10.8-O84; the Sensor has no map (user decision, 2026-11-12).
+        // Events since ISSUE-NOV10.8-O84 Nov15.4; Graphs follow with O84. The Sensor has no map (user decision, 2026-11-12).
         Surface(
             color = Color.Black.copy(alpha = 0.85f),
             contentColor = Color.White
@@ -509,6 +522,9 @@ fun SensorAdminConsole(
                     }
                     IconButton(onClick = onSettingsClick, modifier = Modifier.size(28.dp)) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(15.dp))
+                    }
+                    IconButton(onClick = onEventsClick, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
                     }
                     IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(28.dp)) {
                         Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))

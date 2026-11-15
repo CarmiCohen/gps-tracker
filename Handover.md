@@ -1,37 +1,38 @@
 ```
 git add .
-git commit -m "Nov15.3 - THE MONITOR WARNS ABOUT THE SENSOR PHONE (ISSUE-NOV10.8-O83 part 2, O97)
+git commit -m "Nov15.4 - THE EVENTS LOG RETURNS (ISSUE-NOV10.8-O84 part 1)
 
-- O83 part 2: the Sensor sends a sensor_setup settings message (missing Phone Setup items, service faults, applied detection rev) on Monitor connect and on change (setup re-read every 30 s); relay unchanged. O83 closed.
-- Monitor: amber 'SENSOR PHONE: N ITEMS NEED ATTENTION' line with a details list; Setup & Info shows setup and detection-settings status (O97 item 3).
-- trackerDeliveries moved to core-network peerDeliveries (GeofenceSync.kt deleted). New idea SIMP-NOV15.3-S1. Index row Nov15.2 filled (d43bf6b).
-- TESTS: unit 701; A15 live report 0.25-0.33 s, battery exemption off/on seen on the Monitor; instrumented Sensor 43/43, Monitor 54/54; ProductionReadinessAuditTest 3/3; release audits clean; stress 4 rotation clean.
-- VERSION: Nov15.3, versionCode 102."
-git tag Nov15.3
+- O84 part 1: both apps keep their events 7 days in a file (core-shared EventLog); menu Events button opens the list (1 h/6 h/24 h/7 d, Details, Export by share sheet, Clear with confirmation).
+- The Sensor sends its newest 50 events as a sensor_events settings message (relay unchanged); the Monitor lists them marked S, once each.
+- Instrumented tests use their own event files. New gap O98. Index row Nov15.3 filled (a55ad8f).
+- TESTS: unit 734; instrumented Sensor 43/43, Monitor 55/55; ProductionReadinessAuditTest 3/3; release audits clean; A15 live check.
+- VERSION: Nov15.4, versionCode 103."
+git tag Nov15.4
 git push origin main --tags
 ```
 
-# Project Handover - Version Nov15.3 (The Monitor Warns About The Sensor Phone)
+# Project Handover - Version Nov15.4 (The Events Log Returns)
 
 ## ▶️ Resumption State (Read First)
-- **Git**: run the block above as one commit, then the tag; next session, replace `pending` in the top row of `STATUS/BASELINE/INDEX.md` with `git rev-parse --short=7 Nov15.3^{commit}`. `GeofenceSync.kt` is already staged as deleted (`git rm`).
-- **Relay**: separate repo `relay-server` (`gps-survival-relay`), v6.046 with `yarn.lock` (commit `c9dd901`); live on Render with `push: on`; Render deploys only by the user's Manual Deploy. Nov15.3 needed no relay change.
-- **PC**: Node 24.22.1; Yarn only through `corepack yarn@1.22.22`. If Kotlin compiles fail with `Daemon compilation failed: null` or a Hilt `Could not get element`, run `gradlew --stop` and build with `-Pkotlin.compiler.execution.strategy=in-process`; check no other session builds the project at the same time (seen in Nov15.3).
+- **Git**: run the block above as one commit, then the tag; next session, replace `pending` in the top row of `STATUS/BASELINE/INDEX.md` with `git rev-parse --short=7 Nov15.4^{commit}`.
+- **Relay**: separate repo `relay-server` (`gps-survival-relay`), v6.046 with `yarn.lock` (commit `c9dd901`); live on Render with `push: on`; Render deploys only by the user's Manual Deploy. Nov15.4 needed no relay change.
+- **PC**: Node 24.22.1; Yarn only through `corepack yarn@1.22.22`. If Kotlin compiles fail with `Daemon compilation failed: null`, run `gradlew --stop` and build with `-Pkotlin.compiler.execution.strategy=in-process`.
 - **User decisions**: Claude pushes the relay repo; ask before each use of the S21FE and restore it after; when the effort level should change, stop and ask; `//` means "continue".
-- **Phones**: A15 (`R58X40GV2AR`): Nov15.3 debug Sensor `T` and Monitor `V` paired; all four sensor switches on, sliders 0.5; battery exemption kept; Sensor and Monitor test APKs installed; airplane mode off. The A15 reports `KEEP_WHEN_UNUSED` missing (real). S21FE (`R5CRC14PG4F`): not used; release Monitor Nov12.5, Global Mute on.
+- **Phones**: A15 (`R58X40GV2AR`): Nov15.4 debug Sensor `T` and Monitor `V` paired again after the Gradle instrumented runs uninstalled both (permissions re-granted, battery exemption restored for both, detection settings at defaults rev 0, home points empty, earlier events lost); Sensor test APK installed; airplane mode off; `KEEP_WHEN_UNUSED` missing (real). S21FE (`R5CRC14PG4F`): not used; release Monitor Nov12.5, Global Mute on.
 - **Build**: AGP 8.5.2, Gradle 8.12, Kotlin 1.9.24; only deprecation left: kapt `fileCollection(Spec)` (O72).
-- **Test tips**: `DOCS/issues.md` Operational Notes; chapter 189.4 for the live warning check; on a one-phone test, acknowledge alarm screens with `KEYCODE_TAB` + `KEYCODE_ENTER` (a tap can raise a lift alarm).
+- **Test tips**: `DOCS/issues.md` Operational Notes (prefer `am instrument` with installed test APKs: it keeps the apps' data); chapter 190.5 for the live Events check; Monitor instrumented runs in airplane mode (O90).
 
-## 🟢 Status: PASSED (Nov15.3)
-- ISSUE-NOV10.8-O83 closed (part 2) and ISSUE-NOV15.2-O97 item 3 done; details: `STATUS/RESOLUTION_ARCHIVE.md`.
-- Unit 701 passed; `assembleDebug` and `assembleRelease` built, no new warning.
-- A15: chapter 189.4 live; instrumented Sensor 43/43, Monitor 54/54 (pairing kept); `ProductionReadinessAuditTest` 3/3; release cold-start audits clean; stress section 4 rotation clean.
-- Not run: stress sections 1 to 3 (no controls, D) and 5 (shielding, H); chapters marked H or S in `TEST_PROCEDURE.md`; chapter 182.2 waits for the next Manual Deploy.
+## 🟢 Status: PASSED (Nov15.4)
+- ISSUE-NOV10.8-O84 part 1 (Events) done; parts 2 (detailed Info) and 3 (Graphs) open; new Low gap ISSUE-NOV15.4-O98; details: `STATUS/RESOLUTION_ARCHIVE.md`.
+- Unit 734 passed; `assembleDebug` and `assembleRelease` built, no new warning.
+- A15: chapter 190.5 live (two fixes found there: events re-sent on a Monitor's settings message, Events screen left to right); instrumented Sensor 43/43, Monitor 55/55; `ProductionReadinessAuditTest` 3/3; release cold-start audits clean.
+- Not run: Clear on the phone (kept the log; unit-tested); stress protocol (no change in that area); chapters marked H or S; chapter 182.2 waits for the next Manual Deploy.
 
-**Audit line**: Nov15.3: [SOT Count: 1002 (Rules: 502), Open: H:0, M:5, L:18, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 370), QA: 124]
+**Audit line**: Nov15.4: [SOT Count: 1003 (Rules: 503), Open: H:0, M:5, L:19, Ideas: H:0, M:0, L:22, Testing: PASSED (Sub-items: 375), QA: 125]
 
 ## 🎯 Next Resumption Focus
 1. Fill the `pending` index row with the tag's commit (`/effort low`).
 2. At the next Manual Deploy on Render: check chapter 182.2 (`/effort low`).
-3. O84: Events log, detailed Info and Graphs, likely three versions (`/effort high`).
-4. Then O85, O80; O86 (O83 warnings by push), O94 to O97 when convenient.
+3. O84 part 2: the detailed Info; agree its contents first (`/effort high`).
+4. O84 part 3: the Graphs, with a 7-day sample store (`/effort high`).
+5. Then O85, O80; O98, O86, O94 to O97 when convenient.

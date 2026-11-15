@@ -8,11 +8,14 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
 import com.jd.core.network.peerDeliveries
+import com.jd.core.shared.EventLog
 import com.jd.core.shared.ForensicIdentity
+import com.jd.core.shared.linkChanges
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.SystemLogger
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -31,6 +34,7 @@ class MonitorSessionService : Service() {
     @Inject lateinit var trailDao: TrailDao
     @Inject lateinit var dataStore: MonitorDataStore
     @Inject lateinit var alarmEngine: MonitorAlarmEngine
+    @Inject lateinit var eventLog: EventLog
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var signalingJob: Job? = null
@@ -93,6 +97,14 @@ class MonitorSessionService : Service() {
                 signalingClient.sensorSetupFlow.filterNotNull().collect { report ->
                     SystemLogger.i("MonitorService", "Sensor setup report from ${report.trackerId}: missing ${report.missing}, faults ${report.faults}, behaviour rev ${report.behaviourRevision}")
                 }
+            }
+
+            // The Monitor's events list also holds the paired Sensor's events (ISSUE-NOV10.8-O84).
+            launch {
+                signalingClient.sensorEventsFlow.filter { it.trackerId == targetId }.collect { eventLog.merge(it.events) }
+            }
+            launch {
+                signalingClient.isConnected.linkChanges().collect { relayLinkEvent(it).let { event -> eventLog.record(event.level, event.message) } }
             }
 
             // Get last sequence ID for initial backfill handshake (R-ID 768)

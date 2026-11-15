@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,6 +36,7 @@ import com.jd.core.ui.RevolutionTheme
 import com.jd.core.ui.getAppVersionName
 import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.EventEntry
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.SensorSetupReport
@@ -106,6 +108,7 @@ class MonitorActivity : ComponentActivity() {
                 val alarmBook by viewModel.alarms.collectAsStateWithLifecycle()
                 val geofence by viewModel.geofence.collectAsStateWithLifecycle()
                 val sensorSetup by viewModel.sensorSetup.collectAsStateWithLifecycle()
+                val events by viewModel.events.collectAsStateWithLifecycle()
 
                 LaunchedEffect(pairing) {
                     val serviceIntent = Intent(context, MonitorSessionService::class.java)
@@ -145,6 +148,8 @@ class MonitorActivity : ComponentActivity() {
                         sirenType = sirenType,
                         isSirenPlaying = isSirenPlaying,
                         sensorSetup = sensorSetup,
+                        events = events,
+                        onClearEvents = viewModel::clearEvents,
                         onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
                         onUpdateSirenType = { viewModel.updateSirenType(it) },
                         onUpdateAlarmVolume = { viewModel.updateAlarmVolume(it) },
@@ -291,7 +296,9 @@ fun MonitorScreen(
     onResetStats: () -> Unit = {},
     onFullInit: () -> Unit = {},
     onClose: () -> Unit = {},
-    sensorSetup: SensorSetupReport? = null
+    sensorSetup: SensorSetupReport? = null,
+    events: List<EventEntry> = emptyList(),
+    onClearEvents: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
@@ -300,6 +307,7 @@ fun MonitorScreen(
     val setupWarnings = remember(sensorSetup, alertSettings.acousticAlert) { sensorSetupWarnings(sensorSetup, alertSettings) }
     var showSetupWarnings by rememberSaveable { mutableStateOf(false) }
     var showAlertsOverlay by rememberSaveable { mutableStateOf(false) }
+    var showEventsOverlay by rememberSaveable { mutableStateOf(false) }
     var showSoundOverlay by rememberSaveable { mutableStateOf(false) }
     var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
     var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
@@ -364,6 +372,17 @@ fun MonitorScreen(
                 }
             }
         )
+    }
+
+    if (showEventsOverlay) {
+        BackHandler { showEventsOverlay = false }
+        com.jd.core.ui.EventLogOverlay(
+            events = events,
+            showSource = true,
+            onClear = onClearEvents,
+            onClose = { showEventsOverlay = false }
+        )
+        return
     }
 
     if (showAlertsOverlay) {
@@ -561,6 +580,7 @@ fun MonitorScreen(
                     onSetup = { showSetupDialog = true },
                     onUnpair = requestUnpair,
                     onMap = { followMode = MapFollowMode.AUTO },
+                    onEvents = { showEventsOverlay = true },
                     onClose = onClose
                 )
                 // Line 1: Local Device Status
@@ -755,9 +775,10 @@ fun MonitorMenuBar(
     onSetup: () -> Unit,
     onUnpair: () -> Unit,
     onMap: () -> Unit,
+    onEvents: () -> Unit,
     onClose: () -> Unit
 ) {
-    // Events and Graphs return with ISSUE-NOV10.8-O84; unpairing is only behind the gear, the red X
+    // Events since ISSUE-NOV10.8-O84 Nov15.4; Graphs follow with O84. Unpairing is only behind the gear, the red X
     // sends the app to the background (ISSUE-NOV10.8-O76).
     Surface(
         color = Color.Black.copy(alpha = 0.85f),
@@ -781,6 +802,9 @@ fun MonitorMenuBar(
                 }
                 IconButton(onClick = onMap, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Place, contentDescription = "Map", tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
+                }
+                IconButton(onClick = onEvents, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
                 }
                 IconButton(onClick = onSetup, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))

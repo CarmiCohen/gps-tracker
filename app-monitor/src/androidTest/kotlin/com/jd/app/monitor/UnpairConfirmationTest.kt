@@ -91,9 +91,20 @@ class UnpairConfirmationTest {
     @Test
     fun deadMenuButtonsAreGone() {
         showMonitorScreen()
-        listOf("Tools", "Events", "Graphs", "Disconnect").forEach {
+        listOf("Tools", "Graphs", "Disconnect").forEach {
             composeRule.onNodeWithContentDescription(it).assertDoesNotExist()
         }
+    }
+
+    /** The menu's Events button opens the Events list, and its Close button returns to the map (ISSUE-NOV10.8-O84). */
+    @Test
+    fun eventsButtonOpensTheEventsList() {
+        showMonitorScreen()
+        composeRule.onNodeWithContentDescription("Events").performClick()
+        composeRule.onNodeWithText("EVENTS").assertExists()
+        composeRule.onNodeWithText("24 h").assertExists()
+        composeRule.onNodeWithContentDescription("Close").performClick()
+        composeRule.onNodeWithText("EVENTS").assertDoesNotExist()
     }
 
     /** Phone Setup's Home Points item opens the map's home point editor (ISSUE-NOV10.8-O76). */

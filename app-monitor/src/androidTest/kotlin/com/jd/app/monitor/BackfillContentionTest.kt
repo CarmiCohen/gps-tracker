@@ -181,6 +181,14 @@ object TestMonitorModule {
         return MonitorDataStore(context)
     }
 
+    /** The tests' own event file, so a run never writes into the installed Monitor's Events list (ISSUE-NOV10.8-O84). */
+    @Provides
+    @Singleton
+    fun provideEventLog(): com.jd.core.shared.EventLog {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        return com.jd.core.shared.EventLog(java.io.File(context.cacheDir, "event_log_test.jsonl"), com.jd.core.shared.EventSource.MONITOR)
+    }
+
     @Provides
     @Singleton
     fun provideMonitorRepository(
@@ -229,6 +237,8 @@ class FakeSignalingClient : SignalingClient {
     override suspend fun sendSensorBehaviour(targetId: String, behaviour: com.jd.core.shared.SensorBehaviour): Boolean = true
     override val sensorSetupFlow: StateFlow<com.jd.core.shared.SensorSetupReport?> = MutableStateFlow(null)
     override suspend fun sendSensorSetup(report: com.jd.core.shared.SensorSetupReport): Boolean = true
+    override val sensorEventsFlow: Flow<com.jd.core.shared.SensorEventBatch> = MutableSharedFlow()
+    override suspend fun sendSensorEvents(events: List<com.jd.core.shared.EventEntry>): Boolean = true
     override fun registerPushToken(token: String) = Unit
 
     fun emitTelemetry(update: LocationUpdate) {
