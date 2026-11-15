@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.noiseLimitLabel
 import com.jd.core.shared.tiltLimitLabel
 import com.jd.core.shared.vibrationLimitLabel
 
@@ -19,16 +20,13 @@ import com.jd.core.shared.vibrationLimitLabel
  * Revived Alarming & Alert Setup Overlays (R747 Locality Authority & R872 Stealth)
  */
 
-/** Shown on the Monitor instead of the tilt slider: the Sensor detects tilt with its own (ISSUE-NOV5.2-O11 Group 5). */
-const val TILT_SENSITIVITY_ON_SENSOR_NOTE = "The tilt angle is set on the Sensor (Tilt Sensitivity Threshold)"
+/** Under the Sensor's switches on the Monitor: they and the sliders are sent to the Sensor (ISSUE-NOV10.8-O83). */
+const val SENSOR_SETTINGS_SENT_NOTE = "Sent to the Sensor: a switched-off sensor is not used there, and the sliders set its limits."
 
-/** Shown on the Monitor instead of the vibration slider: the Sensor detects vibration with its own (ISSUE-NOV5.2-O11 Group 7). */
-const val VIBRATION_SENSITIVITY_ON_SENSOR_NOTE = "The vibration limit is set on the Sensor (Vibration Sensitivity Threshold)"
-
+/** The Monitor's Alerts & Sensors page; the Sensor shows its part read-only (ISSUE-NOV10.8-O83). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlertManagementOverlay(
-    isTracker: Boolean,
     draftAlertSettings: AlertSettings,
     onUpdateAlertSettings: (AlertSettings) -> Unit,
     onClose: () -> Unit
@@ -181,44 +179,44 @@ fun AlertManagementOverlay(
 
             // Section 5: Sentinel Hardware Sensors
             Text("SENTINEL HARDWARE MOTION SENSORS", color = StatusGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(
+                SENSOR_SETTINGS_SENT_NOTE,
+                color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
+            )
             AlarmToggle("Tamper / Vibration Sensor", draftAlertSettings.tamperAlert) {
                 onUpdateAlertSettings(draftAlertSettings.copy(tamperAlert = it))
             }
-            // Like tilt, the Sensor detects vibration with its own slider; the Monitor's switch only gates the alarm.
-            if (isTracker) {
+            if (draftAlertSettings.tamperAlert) {
                 SensitivitySlider(
                     label = "Vibration Sensitivity Threshold",
                     value = draftAlertSettings.vibrationSensitivity,
                     limitLabel = ::vibrationLimitLabel,
                     onValueCommitted = { onUpdateAlertSettings(draftAlertSettings.copy(vibrationSensitivity = it)) }
                 )
-            } else if (draftAlertSettings.tamperAlert) {
-                Text(
-                    VIBRATION_SENSITIVITY_ON_SENSOR_NOTE,
-                    color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
-                )
             }
 
             AlarmToggle("Tilt Angle Detection Sensor", draftAlertSettings.tiltAlert) {
                 onUpdateAlertSettings(draftAlertSettings.copy(tiltAlert = it))
             }
-            // The Sensor detects tilt with its own slider (user decision, 2026-11-09); the Monitor's switch only gates the alarm.
-            if (isTracker) {
+            if (draftAlertSettings.tiltAlert) {
                 SensitivitySlider(
                     label = "Tilt Sensitivity Threshold",
                     value = draftAlertSettings.tiltSensitivity,
                     limitLabel = ::tiltLimitLabel,
                     onValueCommitted = { onUpdateAlertSettings(draftAlertSettings.copy(tiltSensitivity = it)) }
                 )
-            } else if (draftAlertSettings.tiltAlert) {
-                Text(
-                    TILT_SENSITIVITY_ON_SENSOR_NOTE,
-                    color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
-                )
             }
 
             AlarmToggle("Acoustic / Microphone Noise Sensor", draftAlertSettings.acousticAlert) {
                 onUpdateAlertSettings(draftAlertSettings.copy(acousticAlert = it))
+            }
+            if (draftAlertSettings.acousticAlert) {
+                SensitivitySlider(
+                    label = "Noise Sensitivity Threshold",
+                    value = draftAlertSettings.noiseSensitivity,
+                    limitLabel = ::noiseLimitLabel,
+                    onValueCommitted = { onUpdateAlertSettings(draftAlertSettings.copy(noiseSensitivity = it)) }
+                )
             }
 
             AlarmToggle("Lift / Height Change Sensor", draftAlertSettings.liftAlert) {

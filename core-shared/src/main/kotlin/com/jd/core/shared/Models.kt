@@ -197,8 +197,55 @@ data class AlertSettings(
     val tamperAlert: Boolean = true,
     val globalMute: Boolean = false,
     val systemStorageLow: Boolean = true,
-    val vibrationSensitivity: Float = 0.5f,
-    val tiltSensitivity: Float = 0.5f,
+    val vibrationSensitivity: Float = DEFAULT_VIBRATION_SENSITIVITY,
+    val tiltSensitivity: Float = DEFAULT_TILT_SENSITIVITY,
+    val noiseSensitivity: Float = DEFAULT_NOISE_SENSITIVITY,
+    /** The revision of the Sensor's part ([sensorBehaviour]), stamped by the Monitor's store on each change (ISSUE-NOV10.8-O83). */
+    val sensorRevision: Long = 0L,
     val sirenType: String = "Siren"
-)
+) {
+    /** What the Sensor must do, from the Monitor's switches and sliders (ISSUE-NOV10.8-O83). */
+    fun sensorBehaviour(): SensorBehaviour = SensorBehaviour(
+        tiltAlert = tiltAlert,
+        vibrationAlert = tamperAlert,
+        noiseAlert = acousticAlert,
+        liftAlert = liftAlert,
+        tiltSensitivity = tiltSensitivity,
+        vibrationSensitivity = vibrationSensitivity,
+        noiseSensitivity = noiseSensitivity,
+        revision = sensorRevision
+    )
+
+    /** These settings with a new [sensorRevision] when their Sensor part differs from [previous]'s, else with [previous]'s. */
+    fun revisedAfter(previous: AlertSettings, nowMs: Long): AlertSettings {
+        val changed = sensorBehaviour().copy(revision = 0L) != previous.sensorBehaviour().copy(revision = 0L)
+        return copy(sensorRevision = if (changed) maxOf(nowMs, previous.sensorRevision + 1) else previous.sensorRevision)
+    }
+}
+
+/**
+ * The Sensor's detection settings, set on the Monitor and sent by relay like the geofence (ISSUE-NOV10.8-O83, user
+ * decisions 2026-11-15): a switched-off kind is not detected at all (noise off closes the microphone), and the three
+ * sliders set the limits. [revision] is the Monitor's edit time: the Sensor keeps only the newest.
+ */
+@Serializable
+data class SensorBehaviour(
+    val tiltAlert: Boolean = true,
+    val vibrationAlert: Boolean = true,
+    val noiseAlert: Boolean = true,
+    val liftAlert: Boolean = true,
+    val tiltSensitivity: Float = DEFAULT_TILT_SENSITIVITY,
+    val vibrationSensitivity: Float = DEFAULT_VIBRATION_SENSITIVITY,
+    val noiseSensitivity: Float = DEFAULT_NOISE_SENSITIVITY,
+    val revision: Long = 0L
+) {
+    /** False for an alert [status] whose kind is switched off. */
+    fun allows(status: String): Boolean = when (status) {
+        TILT_ALERT_STATUS -> tiltAlert
+        VIBRATION_ALERT_STATUS -> vibrationAlert
+        ACOUSTIC_ALERT_STATUS -> noiseAlert
+        LIFT_ALERT_STATUS -> liftAlert
+        else -> true
+    }
+}
 

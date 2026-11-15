@@ -8,7 +8,8 @@ import kotlin.math.sqrt
  * Detects a sudden loud noise in the Sensor's microphone levels (ISSUE-NOV5.2-O11 Group 4).
  *
  * A phone microphone measures relative to full scale (dBFS), not true sound pressure, so the trigger is a jump of
- * [jumpDb] above the learned background level ([floorDbfs]), not an absolute loudness (user decision, 2026-11-08: 30 dB).
+ * [jumpDb] above the learned background level ([floorDbfs]), not an absolute loudness (user decision, 2026-11-08: 30 dB;
+ * since ISSUE-NOV10.8-O83 set by the Monitor's `Noise Sensitivity Threshold` slider, [noiseJumpForSensitivity]).
  * The background follows quiet frames within about a second and loud frames only over about ten seconds, so a
  * noise that goes on (a TV, rain) becomes background instead of raising alerts again and again.
  *
@@ -16,7 +17,7 @@ import kotlin.math.sqrt
  * audio thread owns it.
  */
 class AcousticDetector(
-    private val jumpDb: Double = ACOUSTIC_JUMP_DB,
+    @Volatile var jumpDb: Double = ACOUSTIC_JUMP_DB,
     private val minAlertDbfs: Double = ACOUSTIC_MIN_ALERT_DBFS,
     private val warmUpMs: Long = ACOUSTIC_WARM_UP_MS,
     private val lockoutMs: Long = ACOUSTIC_LOCKOUT_MS
@@ -58,8 +59,22 @@ class AcousticDetector(
     }
 }
 
-/** The jump above the background that counts as an alert (user decision, 2026-11-08). */
+/** The jump above the background that counts as an alert (user decision, 2026-11-08); the slider's middle. */
 const val ACOUSTIC_JUMP_DB = 30.0
+
+const val DEFAULT_NOISE_SENSITIVITY = 0.5f
+
+/**
+ * The `Noise Sensitivity Threshold` slider (0.1 to 1.0) as the jump above the background in dB, linear between three
+ * points: 0.1 gives 45 dB, 0.5 the 30 dB of [ACOUSTIC_JUMP_DB], 1.0 gives 15 dB (ISSUE-NOV10.8-O83).
+ */
+fun noiseJumpForSensitivity(sensitivity: Float): Double {
+    val s = sensitivity.coerceIn(0.1f, 1.0f).toDouble()
+    return if (s <= 0.5) 45.0 + (ACOUSTIC_JUMP_DB - 45.0) * (s - 0.1) / 0.4 else ACOUSTIC_JUMP_DB + (15.0 - ACOUSTIC_JUMP_DB) * (s - 0.5) / 0.5
+}
+
+/** The noise slider's limit as the user sees it, for example `30 dB` (the limit itself, like ISSUE-NOV9.4-O67). */
+fun noiseLimitLabel(sensitivity: Float): String = "${kotlin.math.round(noiseJumpForSensitivity(sensitivity)).toInt()} dB"
 
 /** A jump that stays quieter than this is ignored, so a microphone near digital silence cannot alert on a whisper. */
 const val ACOUSTIC_MIN_ALERT_DBFS = -50.0

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov15.0 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov15.2 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -920,8 +920,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **187.1 Isolation (instrumented):** `IdentityIsolationTest` (Monitor and Sensor): writes and a reset through the injected `ForensicIdentityManager` change only the test file `forensic_identity_test.preferences_pb`; the installed app's store, read only, keeps its pairing and self ID.
 *   **187.2 Full Run Keeps The Pairing (device):** record `device_check.ps1 -App monitor -Command STATE` and `-App sensor -Command STATE`, run both test APKs with `am instrument` (airplane mode, phone unlocked), and verify the same `self` and `target` afterwards.
 
+## Chapter 188 - The Monitor Sets The Sensor's Detection (Nov15.2)
+**Status: A / L** - `SensorBehaviourTest` 5/5, `SensorBehaviourWireTest` 3/3, `SensorBehaviourStoreTest` 5/5; 188.4 verified on the A15 (sent, stored, applied in 0.3 s; microphone closed and reopened) (ISSUE-NOV10.8-O83, SOT 1.427)
+*   **188.1 Settings And Revision (unit):** `SensorBehaviourTest`: the Monitor's `AlertSettings` give the Sensor's switches and limits; only a change to them gets a new revision (at least previous+1, from the stored copy); a switched-off kind drops its alert status; the noise slider maps 0.1/0.5/1.0 to 45/30/15 dB and a listening detector takes a new limit at once.
+*   **188.2 Wire (unit):** `SensorBehaviourWireTest`: the `sensor_behaviour` message survives the round trip, is not read as a geofence (or the reverse), and a malformed one is ignored.
+*   **188.3 Sensor Store (unit):** `SensorBehaviourStoreTest`: an installed Sensor's old tilt and vibration limits become revision 0 and the old settings are removed; a received setting is kept; the read-only page text; `TURNED_OFF` is not reported as noise detection off.
+*   **188.4 Live (device):** with both apps paired, switch `Acoustic / Microphone Noise Sensor` off on the Monitor: `REV_MonitorService: Sensor behaviour rev ... sent`, `REV_SensorBehaviour: Received ... (stored: true)` and `Applied ... Noise: Off`; `dumpsys audio` shows no live `VOICE_RECOGNITION` session of `com.jd.app.sensor`. Switch it on: `REV_Acoustic: Listening` again. The Sensor's Settings shows `DETECTION SETTINGS`, read-only.
+
 ---
-**Active Testing Chapters: 176 of 187**
+**Active Testing Chapters: 177 of 188**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

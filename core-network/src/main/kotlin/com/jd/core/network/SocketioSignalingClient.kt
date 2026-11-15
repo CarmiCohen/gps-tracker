@@ -5,6 +5,7 @@ import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
 import com.jd.core.shared.LocationUpdate
+import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.ViolationEvent
 import com.jd.core.shared.SystemLogger
 import io.socket.client.IO
@@ -62,6 +63,9 @@ class SocketioSignalingClient @Inject constructor(
 
     private val _geofenceFlow = MutableSharedFlow<GeofenceConfig>(extraBufferCapacity = 16)
     override val geofenceFlow: SharedFlow<GeofenceConfig> = _geofenceFlow.asSharedFlow()
+
+    private val _sensorBehaviourFlow = MutableSharedFlow<SensorBehaviour>(extraBufferCapacity = 16)
+    override val sensorBehaviourFlow: SharedFlow<SensorBehaviour> = _sensorBehaviourFlow.asSharedFlow()
 
     private var bytesSent: Long = 0
     private val arrivalLag = ArrivalLagMeter() // Used only on the socket's event thread (ISSUE-NOV10.7-O73).
@@ -185,6 +189,7 @@ class SocketioSignalingClient @Inject constructor(
             on("settings_relay") { args ->
                 val data = args.getOrNull(0) as? JSONObject ?: return@on
                 GeofenceWire.decode(data)?.let { _geofenceFlow.tryEmit(it) }
+                SensorBehaviourWire.decode(data)?.let { _sensorBehaviourFlow.tryEmit(it) }
             }
 
             connect()
@@ -396,6 +401,14 @@ class SocketioSignalingClient @Inject constructor(
         return true
     }
 
+    override suspend fun sendSensorBehaviour(targetId: String, behaviour: SensorBehaviour): Boolean {
+        if (!_isConnected.value) return false
+        val payload = SensorBehaviourWire.encode(targetId, behaviour)
+        socket?.emit("settings_update", payload)
+        bytesSent += payload.toString().length.toLong()
+        return true
+    }
+
     private companion object {
         /**
          * The most a peer can flush at once. Socket callbacks use tryEmit, which drops
@@ -467,6 +480,44 @@ internal object GeofenceWire {
             )
         } catch (e: Exception) {
             Timber.e(e, "Failed to parse geofence settings_relay")
+            null
+        }
+    }
+}
+
+/** Wire form of [SensorBehaviour] inside the relay's generic settings_update / settings_relay event (ISSUE-NOV10.8-O83). */
+internal object SensorBehaviourWire {
+    const val TYPE = "sensor_behaviour"
+
+    fun encode(targetId: String, behaviour: SensorBehaviour): JSONObject = JSONObject().apply {
+        put("id", targetId)
+        put("type", TYPE)
+        put("rev", behaviour.revision)
+        put("tilt", behaviour.tiltAlert)
+        put("vib", behaviour.vibrationAlert)
+        put("noise", behaviour.noiseAlert)
+        put("lift", behaviour.liftAlert)
+        put("tiltSens", behaviour.tiltSensitivity.toDouble())
+        put("vibSens", behaviour.vibrationSensitivity.toDouble())
+        put("noiseSens", behaviour.noiseSensitivity.toDouble())
+    }
+
+    /** Returns null for another settings type or a malformed payload. */
+    fun decode(data: JSONObject): SensorBehaviour? {
+        if (data.optString("type") != TYPE) return null
+        return try {
+            SensorBehaviour(
+                tiltAlert = data.getBoolean("tilt"),
+                vibrationAlert = data.getBoolean("vib"),
+                noiseAlert = data.getBoolean("noise"),
+                liftAlert = data.getBoolean("lift"),
+                tiltSensitivity = data.getDouble("tiltSens").toFloat(),
+                vibrationSensitivity = data.getDouble("vibSens").toFloat(),
+                noiseSensitivity = data.getDouble("noiseSens").toFloat(),
+                revision = data.getLong("rev")
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to parse sensor_behaviour settings_relay")
             null
         }
     }

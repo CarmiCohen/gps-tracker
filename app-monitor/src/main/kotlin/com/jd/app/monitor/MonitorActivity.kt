@@ -356,7 +356,6 @@ fun MonitorScreen(
     if (showAlertsOverlay) {
         BackHandler { showAlertsOverlay = false }
         com.jd.core.ui.AlertManagementOverlay(
-            isTracker = false,
             draftAlertSettings = alertSettings,
             onUpdateAlertSettings = onUpdateAlertSettings,
             onClose = { showAlertsOverlay = false }

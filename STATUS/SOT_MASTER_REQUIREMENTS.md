@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov15.0)
+# SOT Master Requirements & Hardening Status (Nov15.2)
 
-## 🏗️ Architectural Master Rules (500 Rules)
+## 🏗️ Architectural Master Rules (501 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -127,6 +127,7 @@
 *   **1.424 The Sensor's Own Phone Setup**: the Sensor's Phone Setup MUST list only what the Sensor needs, for its maker and Android version, each item with its live status re-read on resume, and a button only while an item is missing or unreadable; the console shows the number of missing items. Monitor items (overlay, DND, full-screen intents) MUST NOT appear on the Sensor (ISSUE-NOV10.8-O81).
 *   **1.425 An Update Does Not Stop The Sensor**: the Sensor MUST start its service by itself after a reboot and after an app update (`MY_PACKAGE_REPLACED`), and when its app is opened, before any unlock tap, all behind one permission check shared by the app, the receiver and the service (ISSUE-NOV12.6-O92).
 *   **1.426 Tests Use Their Own Identity Store**: the instrumented tests of both apps MUST get `ForensicIdentityManager` on a test file through a `@TestInstallIn` replacement of `IdentityModule`, never on the installed app's `forensic_identity.preferences_pb`, so an `am instrument` run never changes the real pairing or identity (ISSUE-NOV12.6-O93; refines 1.406).
+*   **1.427 The Monitor Sets The Sensor's Detection**: the four sensor switches and the tilt, vibration and noise limits MUST be edited on the Monitor only and sent to the Sensor as a revisioned `sensor_behaviour` settings message, like the geofence; the Sensor MUST keep only the newest revision, show it read-only, send no alert of a switched-off kind and keep the microphone closed while noise is off (ISSUE-NOV10.8-O83).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

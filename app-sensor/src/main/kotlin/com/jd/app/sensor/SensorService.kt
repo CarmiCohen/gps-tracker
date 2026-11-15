@@ -95,6 +95,12 @@ class SensorService : Service(), SensorEventListener {
     @Volatile private var geofenceChanged = false
     // Noise, tilt, and lift found on their own threads, each sent by a following sensing tick with the current position.
     private val pendingAlerts = java.util.concurrent.ConcurrentLinkedQueue<PendingAlert>()
+    // The Monitor's switches and limits (ISSUE-NOV10.8-O83): written by the behaviour collector, read on the sensor threads.
+    @Volatile private var sensorBehaviour = SensorBehaviour()
+    // Main thread only: what the last start command obtained; the noise switch can change after it.
+    private var hasForegroundStart = false
+    private var isLocationRefused = false
+    private var hasMicrophoneType = false
     private val acousticMonitor = AcousticMonitor(
         onAlert = { level, floor -> onAcousticAlert(level, floor) },
         onState = { serviceStatus.setMicrophone(it) }
@@ -174,7 +180,7 @@ class SensorService : Service(), SensorEventListener {
         acquireWakeLock()
         setupBackfillListener()
         setupGeofenceListener()
-        watchMotionSensitivity()
+        setupSensorBehaviourListener()
         registerSensors()
         startLocationUpdates()
         connectSignaling()
@@ -290,18 +296,35 @@ class SensorService : Service(), SensorEventListener {
      * notification again, so a tap that did not help leaves it in place (ISSUE-NOV8.103-O60).
      */
     private fun applyForegroundStart(start: ForegroundStart) {
-        val refused = RefusedAccess(location = !start.hasLocation, microphone = !start.hasMicrophone && hasMicrophonePermission())
         // Requested again once location is regained, so the updates resume at once.
         if (start.hasLocation && serviceStatus.refusedAccess.value.location) startLocationUpdates()
+        if (!start.hasLocation) SystemLogger.w("SensorService", "Started in the background without location: tracking resumes after a notification tap or opening the Sensor app")
+        hasForegroundStart = true
+        isLocationRefused = !start.hasLocation
+        hasMicrophoneType = start.hasMicrophone
+        applyAccess()
+    }
+
+    /**
+     * Main thread, after each start command and each change of the Monitor's noise switch (ISSUE-NOV10.8-O83): the
+     * microphone is refused only while noise detection is on, so a switched-off microphone posts no tap-to-enable notification.
+     */
+    private fun applyAccess() {
+        if (!hasForegroundStart) return
+        val isNoiseOn = sensorBehaviour.noiseAlert
+        val refused = RefusedAccess(location = isLocationRefused, microphone = isNoiseOn && !hasMicrophoneType && hasMicrophonePermission())
         serviceStatus.setRefusedAccess(refused)
-        if (refused.location) SystemLogger.w("SensorService", "Started in the background without location: tracking resumes after a notification tap or opening the Sensor app")
-        updateMicrophone(start.hasMicrophone)
+        updateMicrophone(isNoiseOn, hasMicrophoneType)
         updateRestartNotification(refused)
     }
 
-    /** Listens while the foreground service holds the microphone type. */
-    private fun updateMicrophone(canUseMicrophone: Boolean) {
+    /** Listens while noise detection is on and the foreground service holds the microphone type. */
+    private fun updateMicrophone(isNoiseOn: Boolean, canUseMicrophone: Boolean) {
         when {
+            !isNoiseOn -> {
+                acousticMonitor.stop()
+                serviceStatus.setMicrophone(MicrophoneState.TURNED_OFF)
+            }
             canUseMicrophone -> acousticMonitor.start(this)
             !hasMicrophonePermission() -> {
                 acousticMonitor.stop()
@@ -351,25 +374,32 @@ class SensorService : Service(), SensorEventListener {
     }
 
     private fun queueAlert(status: String, logLine: String) {
+        if (!sensorBehaviour.allows(status)) return // Switched off on the Monitor (ISSUE-NOV10.8-O83).
         pendingAlerts.add(PendingAlert(status, logLine))
         orchestrator.preemptLoop("sensing_loop") // Sent now, not after up to 10 s of a slow sampling interval.
     }
 
     /**
-     * The Sensor's own `Tilt Sensitivity Threshold` and `Vibration Sensitivity Threshold` sliders set the tilt angle and
-     * the vibration limit (user decision for tilt, 2026-11-09; vibration follows it, ISSUE-NOV5.2-O11 Group 7).
+     * Stores each detection setting the Monitor sends, and applies the stored one, also after a restart while offline
+     * (ISSUE-NOV10.8-O83): the Monitor's sliders set the tilt angle, the vibration limit and the noise jump, and its
+     * switches stop the detection of a kind (user decisions 2026-11-15).
      */
-    private fun watchMotionSensitivity() {
-        sensorDataStore.alertSettings
-            .onEach { settings ->
-                val degrees = tiltThresholdForSensitivity(settings.tiltSensitivity)
-                if (degrees != motionSentinel.tiltThresholdDegrees) SystemLogger.i("Motion", "Tilt limit ${kotlin.math.round(degrees).toInt()} deg") // Rounded like the slider label.
-                motionSentinel.tiltThresholdDegrees = degrees
-                val vibration = vibrationThresholdForSensitivity(settings.vibrationSensitivity)
-                if (vibration != motionSentinel.vibrationThreshold) {
-                    SystemLogger.i("Motion", "Vibration limit ${"%.2f".format(java.util.Locale.US, vibration / STANDARD_GRAVITY)} g")
-                }
-                motionSentinel.vibrationThreshold = vibration
+    private fun setupSensorBehaviourListener() {
+        signalingClient.sensorBehaviourFlow
+            .onEach { behaviour ->
+                val stored = sensorDataStore.saveSensorBehaviour(behaviour)
+                SystemLogger.i("SensorBehaviour", "Received rev ${behaviour.revision} (stored: $stored)")
+            }
+            .launchIn(serviceScope)
+        sensorDataStore.sensorBehaviour
+            .onEach { behaviour ->
+                val previous = sensorBehaviour
+                sensorBehaviour = behaviour
+                motionSentinel.tiltThresholdDegrees = tiltThresholdForSensitivity(behaviour.tiltSensitivity)
+                motionSentinel.vibrationThreshold = vibrationThresholdForSensitivity(behaviour.vibrationSensitivity)
+                acousticMonitor.jumpDb = noiseJumpForSensitivity(behaviour.noiseSensitivity)
+                SystemLogger.i("SensorBehaviour", "Applied rev ${behaviour.revision}: ${sensorBehaviourLines(behaviour).joinToString("; ")}")
+                if (behaviour.noiseAlert != previous.noiseAlert) withContext(Dispatchers.Main) { applyAccess() }
             }
             .launchIn(serviceScope)
     }

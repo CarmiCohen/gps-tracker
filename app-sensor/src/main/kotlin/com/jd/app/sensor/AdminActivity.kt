@@ -106,7 +106,7 @@ class AdminActivity : ComponentActivity() {
                     var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
                     var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
 
-                    val alertSettings by viewModel.alertSettings.collectAsStateWithLifecycle()
+                    val sensorBehaviour by viewModel.sensorBehaviour.collectAsStateWithLifecycle()
 
                     if (isLocked) {
                         Box(
@@ -139,10 +139,9 @@ class AdminActivity : ComponentActivity() {
                             }
                             if (showAlertsOverlay) {
                                 BackHandler { showAlertsOverlay = false }
-                                com.jd.core.ui.AlertManagementOverlay(
-                                    isTracker = true,
-                                    draftAlertSettings = alertSettings,
-                                    onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
+                                // Read-only: the Monitor sets the detection settings (ISSUE-NOV10.8-O83).
+                                SensorBehaviourOverlay(
+                                    behaviour = sensorBehaviour,
                                     onClose = { showAlertsOverlay = false }
                                 )
                             } else if (showPhoneSetupOverlay) {
@@ -343,7 +342,7 @@ fun SettingsOverlay(
             onClick = onOpenAlertsSetup,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("ALERTS SETUP")
+            Text("DETECTION SETTINGS")
         }
 
         Spacer(modifier = Modifier.height(16.dp))

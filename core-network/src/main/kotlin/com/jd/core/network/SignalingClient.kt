@@ -4,6 +4,7 @@ import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.LocationUpdate
+import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.ViolationEvent
 import kotlinx.coroutines.flow.Flow
 
@@ -76,6 +77,17 @@ interface SignalingClient {
      * Returns false when not connected; the caller sends again once the tracker is reachable.
      */
     suspend fun sendGeofence(targetId: String, config: GeofenceConfig): Boolean
+
+    /**
+     * Sensor: the detection settings sent by the paired Monitor (ISSUE-NOV10.8-O83).
+     */
+    val sensorBehaviourFlow: Flow<SensorBehaviour>
+
+    /**
+     * Monitor: sends the Sensor's detection settings to the tracker [targetId] (ISSUE-NOV10.8-O83). Returns false when
+     * not connected; the caller sends again once the tracker is reachable.
+     */
+    suspend fun sendSensorBehaviour(targetId: String, behaviour: SensorBehaviour): Boolean
 
     /**
      * Monitor: gives the relay this phone's push [token], now and after every reconnection, so the paired tracker's

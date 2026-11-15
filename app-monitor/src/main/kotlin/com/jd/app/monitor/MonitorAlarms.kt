@@ -63,10 +63,12 @@ fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) 
     AlarmType.GPS_SIGNAL_LOSS -> signalLoss
     AlarmType.GPS_JUMP -> jammerDetection
     AlarmType.GEOFENCE_BREACH -> distance
-    AlarmType.ACOUSTIC_ALERT -> acousticAlert // "Acoustic / Microphone Noise Sensor"; the Sensor listens either way.
-    AlarmType.TILT_ALERT -> tiltAlert // "Tilt Angle Detection Sensor"; the angle is set on the Sensor.
+    // The four Sensor switches also stop the Sensor's detection once it has them (ISSUE-NOV10.8-O83); the alarm stays
+    // gated here for rows sent before the Sensor received the change.
+    AlarmType.ACOUSTIC_ALERT -> acousticAlert // "Acoustic / Microphone Noise Sensor"
+    AlarmType.TILT_ALERT -> tiltAlert // "Tilt Angle Detection Sensor"
     AlarmType.LIFT_ALERT -> liftAlert // "Lift / Height Change Sensor"
-    AlarmType.VIBRATION_ALERT -> tamperAlert // "Tamper / Vibration Sensor"; the limit is set on the Sensor.
+    AlarmType.VIBRATION_ALERT -> tamperAlert // "Tamper / Vibration Sensor"
     AlarmType.NOISE_DETECTION_OFF -> acousticAlert // A noise alarm the Sensor cannot raise (ISSUE-NOV8.103-O60).
 }
 

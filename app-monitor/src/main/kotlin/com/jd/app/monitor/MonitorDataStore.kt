@@ -28,14 +28,7 @@ class MonitorDataStore(private val context: Context) {
     val relayUrl: Flow<String?> = context.monitorDataStore.data.map { it[relayUrlKey] }
     val isDndBypassEnabled: Flow<Boolean> = context.monitorDataStore.data.map { it[isDndBypassEnabledKey] ?: false }
 
-    val alertSettings: Flow<AlertSettings> = context.monitorDataStore.data.map { prefs ->
-        val jsonStr = prefs[alertSettingsKey]
-        if (!jsonStr.isNullOrBlank()) {
-            runCatching { Json.decodeFromString<AlertSettings>(jsonStr) }.getOrDefault(AlertSettings())
-        } else {
-            AlertSettings()
-        }
-    }
+    val alertSettings: Flow<AlertSettings> = context.monitorDataStore.data.map { prefs -> decodeAlertSettings(prefs[alertSettingsKey]) }
 
     val sirenType: Flow<String> = context.monitorDataStore.data.map { prefs ->
         prefs[sirenTypeKey] ?: "Siren"
@@ -63,11 +56,18 @@ class MonitorDataStore(private val context: Context) {
         context.monitorDataStore.edit { it[isDndBypassEnabledKey] = enabled }
     }
 
-    suspend fun saveAlertSettings(settings: AlertSettings) {
+    /**
+     * Stores [settings]; a change to the Sensor's part gets a new revision, so the Sensor takes it over any older copy
+     * (ISSUE-NOV10.8-O83). The revision is taken from the stored settings, not from [settings], which may be stale.
+     */
+    suspend fun saveAlertSettings(settings: AlertSettings, nowMs: Long = System.currentTimeMillis()) {
         context.monitorDataStore.edit { prefs ->
-            prefs[alertSettingsKey] = Json.encodeToString(settings)
+            prefs[alertSettingsKey] = Json.encodeToString(settings.revisedAfter(decodeAlertSettings(prefs[alertSettingsKey]), nowMs))
         }
     }
+
+    private fun decodeAlertSettings(json: String?): AlertSettings =
+        json?.takeIf { it.isNotBlank() }?.let { runCatching { Json.decodeFromString<AlertSettings>(it) }.getOrNull() } ?: AlertSettings()
 
     suspend fun saveSirenType(type: String) {
         context.monitorDataStore.edit { prefs ->

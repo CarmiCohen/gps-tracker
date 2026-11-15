@@ -10,6 +10,7 @@ import android.media.MediaRecorder
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.jd.core.shared.ACOUSTIC_FRAME_MS
+import com.jd.core.shared.ACOUSTIC_JUMP_DB
 import com.jd.core.shared.AcousticDetector
 import com.jd.core.shared.SystemLogger
 import com.jd.core.shared.acousticLevelDbfs
@@ -33,6 +34,9 @@ class AcousticMonitor(
      * intruder, so no alert is raised (ISSUE-NOV9.4-O66). The detector still sees the levels.
      */
     @Volatile var isOwnSoundActive = false
+
+    /** The jump above the background that alerts, from the Monitor's `Noise Sensitivity Threshold` slider (ISSUE-NOV10.8-O83). */
+    @Volatile var jumpDb: Double = ACOUSTIC_JUMP_DB
 
     /** Starts listening; does nothing while already listening. */
     fun start(context: Context) {
@@ -82,8 +86,8 @@ class AcousticMonitor(
                 return
             }
             record.startRecording()
-            SystemLogger.i("Acoustic", "Listening (jump ${com.jd.core.shared.ACOUSTIC_JUMP_DB.toInt()} dB above background)")
-            val detector = AcousticDetector()
+            SystemLogger.i("Acoustic", "Listening (jump ${jumpDb.toInt()} dB above background)")
+            val detector = AcousticDetector(jumpDb = jumpDb)
             val buffer = ShortArray(frameSamples)
             var silentSinceMs: Long? = null
             var state: MicrophoneState? = null
@@ -112,6 +116,7 @@ class AcousticMonitor(
                 silentSinceMs = null
                 report(MicrophoneState.LISTENING)
                 val floor = detector.floorDbfs
+                detector.jumpDb = jumpDb // A slider change applies at once, without relearning the background.
                 if (detector.onLevel(level, nowMs) && floor != null && !isOwnSoundActive) onAlert(level, floor)
             }
         } catch (e: Exception) {

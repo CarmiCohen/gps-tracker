@@ -8,7 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
-import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.atUiRate
 import com.jd.core.ui.HudState
@@ -71,15 +71,9 @@ class SensorViewModel @Inject constructor(
         .map { RelayConfig.resolve(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RelayConfig.DEFAULT_URL)
 
-    val alertSettings: StateFlow<AlertSettings> = sensorDataStore.alertSettings
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AlertSettings())
-
-    fun updateAlertSettings(settings: AlertSettings) {
-        viewModelScope.launch {
-            sensorDataStore.saveAlertSettings(settings)
-        }
-    }
-
+    /** Set on the Monitor and shown here read-only (ISSUE-NOV10.8-O83). */
+    val sensorBehaviour: StateFlow<SensorBehaviour> = sensorDataStore.sensorBehaviour
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SensorBehaviour())
 
     fun updateRelayUrl(url: String) {
         viewModelScope.launch {
@@ -93,10 +87,12 @@ class SensorViewModel @Inject constructor(
         serviceStatus.resetUptime()
     }
 
-    /** Triggers full system re-initialization: resets settings & relay URL to defaults, resets uptime timer (ISSUE-NOV7.1-O35). */
+    /**
+     * Triggers full system re-initialization: resets the relay URL to its default and the uptime timer (ISSUE-NOV7.1-O35).
+     * The detection settings and the geofence belong to the Monitor and are kept (ISSUE-NOV10.8-O83).
+     */
     fun triggerFullSystemReinitialization() {
         viewModelScope.launch {
-            sensorDataStore.saveAlertSettings(AlertSettings())
             sensorDataStore.saveRelayUrl(RelayConfig.DEFAULT_URL)
             serviceStatus.resetUptime()
         }

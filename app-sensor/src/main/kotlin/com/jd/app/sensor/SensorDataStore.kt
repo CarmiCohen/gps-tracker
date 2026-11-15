@@ -10,6 +10,7 @@ import java.io.File
 
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.GeofenceConfig
+import com.jd.core.shared.SensorBehaviour
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -24,24 +25,29 @@ class SensorDataStore(context: Context) {
     } else context
 
     private val dataStore = PreferenceDataStoreFactory.create(
-        migrations = listOf(RemoveSirenTypeMigration),
+        migrations = listOf(RemoveSirenTypeMigration, LegacyAlertSettingsMigration),
         produceFile = { File(protectedContext.noBackupFilesDir, "sensor_settings.preferences_pb") }
     )
 
     private val simHashKey = stringPreferencesKey("sim_iccid_hash")
     private val relayUrlKey = stringPreferencesKey("relay_url")
-    private val alertSettingsKey = stringPreferencesKey("alert_settings_json")
     private val geofenceKey = stringPreferencesKey("geofence_json")
 
     val relayUrl: Flow<String?> = dataStore.data.map { it[relayUrlKey] }
 
-    val alertSettings: Flow<AlertSettings> = dataStore.data.map { prefs ->
-        val jsonStr = prefs[alertSettingsKey]
-        if (!jsonStr.isNullOrBlank()) {
-            runCatching { Json.decodeFromString<AlertSettings>(jsonStr) }.getOrDefault(AlertSettings())
-        } else {
-            AlertSettings()
+    /** The detection settings last received from the Monitor, kept across restarts (ISSUE-NOV10.8-O83). */
+    val sensorBehaviour: Flow<SensorBehaviour> = dataStore.data.map { prefs -> decodeSensorBehaviour(prefs[SENSOR_BEHAVIOUR_KEY]) }
+
+    /** Stores [behaviour] unless the stored one is as new or newer; returns true when stored. */
+    suspend fun saveSensorBehaviour(behaviour: SensorBehaviour): Boolean {
+        var stored = false
+        dataStore.edit { prefs ->
+            if (behaviour.revision > decodeSensorBehaviour(prefs[SENSOR_BEHAVIOUR_KEY]).revision) {
+                prefs[SENSOR_BEHAVIOUR_KEY] = Json.encodeToString(behaviour)
+                stored = true
+            }
         }
+        return stored
     }
 
     /** The geofence last received from the Monitor, kept across restarts so it is enforced offline (ISSUE-NOV8.13-O51). */
@@ -70,11 +76,36 @@ class SensorDataStore(context: Context) {
         dataStore.edit { it[relayUrlKey] = url }
     }
 
-    suspend fun saveAlertSettings(settings: AlertSettings) {
-        dataStore.edit { prefs ->
-            prefs[alertSettingsKey] = Json.encodeToString(settings)
+}
+
+/** Where [SensorDataStore.sensorBehaviour] is stored. */
+internal val SENSOR_BEHAVIOUR_KEY = stringPreferencesKey("sensor_behaviour_json")
+
+internal fun decodeSensorBehaviour(json: String?): SensorBehaviour =
+    json?.let { runCatching { Json.decodeFromString<SensorBehaviour>(it) }.getOrNull() } ?: SensorBehaviour()
+
+/** The Alert Settings the Sensor kept before its sliders moved to the Monitor (ISSUE-NOV10.8-O83). */
+internal val LEGACY_ALERT_SETTINGS_KEY = stringPreferencesKey("alert_settings_json")
+
+/**
+ * Once, on the first read: the tilt and vibration limits set on an installed Sensor become its starting
+ * [SensorBehaviour] at revision 0, so it keeps detecting as tuned until the Monitor's first message replaces them (user
+ * decision 2026-11-15: the Monitor's values win); then the old settings are removed (ISSUE-NOV10.8-O83).
+ */
+internal object LegacyAlertSettingsMigration : DataMigration<Preferences> {
+    override suspend fun shouldMigrate(currentData: Preferences): Boolean = LEGACY_ALERT_SETTINGS_KEY in currentData
+
+    override suspend fun migrate(currentData: Preferences): Preferences = currentData.toMutablePreferences().apply {
+        val legacy = runCatching { Json.decodeFromString<AlertSettings>(currentData[LEGACY_ALERT_SETTINGS_KEY].orEmpty()) }.getOrNull()
+        if (legacy != null && SENSOR_BEHAVIOUR_KEY !in currentData) {
+            this[SENSOR_BEHAVIOUR_KEY] = Json.encodeToString(
+                SensorBehaviour(tiltSensitivity = legacy.tiltSensitivity, vibrationSensitivity = legacy.vibrationSensitivity)
+            )
         }
-    }
+        remove(LEGACY_ALERT_SETTINGS_KEY)
+    }.toPreferences()
+
+    override suspend fun cleanUp() = Unit
 }
 
 /** The siren type key written by the Sensor's former siren page; the Sensor makes no sound (ISSUE-NOV10.8-O82). */

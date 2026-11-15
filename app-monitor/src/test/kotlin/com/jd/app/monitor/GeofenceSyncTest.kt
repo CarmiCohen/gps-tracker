@@ -28,7 +28,7 @@ class GeofenceSyncTest {
         val geofence = MutableStateFlow(first)
         val online = MutableStateFlow(false)
         val sent = mutableListOf<GeofenceConfig>()
-        val job = launch { geofenceDeliveries(geofence, online).toList(sent) }
+        val job = launch { trackerDeliveries(geofence, online).toList(sent) }
         settle()
         assertEquals("Nothing is sent while the tracker is offline", emptyList<GeofenceConfig>(), sent)
 
@@ -49,7 +49,7 @@ class GeofenceSyncTest {
         val geofence = MutableStateFlow(first)
         val online = MutableStateFlow(false)
         val sent = mutableListOf<GeofenceConfig>()
-        val job = launch { geofenceDeliveries(geofence, online).toList(sent) }
+        val job = launch { trackerDeliveries(geofence, online).toList(sent) }
         settle()
         geofence.value = second; settle()
         assertEquals(emptyList<GeofenceConfig>(), sent)

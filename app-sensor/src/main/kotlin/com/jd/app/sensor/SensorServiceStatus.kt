@@ -106,13 +106,16 @@ enum class MicrophoneState {
     /** The microphone delivers only zeros: Android or another app has silenced it. */
     SILENCED,
     /** The phone has no usable microphone, or it failed. */
-    UNAVAILABLE;
+    UNAVAILABLE,
+    /** Noise detection is switched off on the Monitor, so the microphone stays closed (ISSUE-NOV10.8-O83). */
+    TURNED_OFF;
 
     /**
      * The running service cannot detect noise, which every telemetry row tells the Monitor (ISSUE-NOV8.103-O60).
-     * [OFF] is not reported: the service is stopped, or is starting and has not opened the microphone yet.
+     * [OFF] is not reported: the service is stopped, or is starting and has not opened the microphone yet. [TURNED_OFF]
+     * is the Monitor user's own choice, not a fault to warn about (ISSUE-NOV10.8-O83).
      */
-    val isNoiseDetectionOff: Boolean get() = this != OFF && this != LISTENING
+    val isNoiseDetectionOff: Boolean get() = this != OFF && this != LISTENING && this != TURNED_OFF
 }
 
 /**
@@ -167,5 +170,6 @@ fun microphoneStatusText(state: MicrophoneState): String = "Microphone: " + when
     MicrophoneState.LISTENING -> "Listening"
     MicrophoneState.SILENCED -> "Silenced by the system"
     MicrophoneState.UNAVAILABLE -> "Not available"
+    MicrophoneState.TURNED_OFF -> "Off (noise detection switched off on the Monitor)"
 }
 

@@ -225,6 +225,8 @@ class FakeSignalingClient : SignalingClient {
 
     override val geofenceFlow: Flow<com.jd.core.shared.GeofenceConfig> = MutableSharedFlow()
     override suspend fun sendGeofence(targetId: String, config: com.jd.core.shared.GeofenceConfig): Boolean = true
+    override val sensorBehaviourFlow: Flow<com.jd.core.shared.SensorBehaviour> = MutableSharedFlow()
+    override suspend fun sendSensorBehaviour(targetId: String, behaviour: com.jd.core.shared.SensorBehaviour): Boolean = true
     override fun registerPushToken(token: String) = Unit
 
     fun emitTelemetry(update: LocationUpdate) {

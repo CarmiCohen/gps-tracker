@@ -38,10 +38,10 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
 
     data class Alert(val kind: Kind, val detail: String)
 
-    /** The tilt that alerts, from the Sensor's own `Tilt Sensitivity Threshold` slider. */
+    /** The tilt that alerts, from the Monitor's `Tilt Sensitivity Threshold` slider (ISSUE-NOV10.8-O83). */
     @Volatile var tiltThresholdDegrees: Double = tiltThresholdForSensitivity(DEFAULT_TILT_SENSITIVITY)
 
-    /** The deviation from gravity in m/s² that alerts, from the Sensor's own `Vibration Sensitivity Threshold` slider. */
+    /** The deviation from gravity in m/s² that alerts, from the Monitor's `Vibration Sensitivity Threshold` slider (ISSUE-NOV10.8-O83). */
     @Volatile var vibrationThreshold: Double = vibrationThresholdForSensitivity(DEFAULT_VIBRATION_SENSITIVITY)
 
     /** True while the phone itself rings, plays a notification, or is in a call: its own motor shakes it (ISSUE-NOV9.2-O62). */
