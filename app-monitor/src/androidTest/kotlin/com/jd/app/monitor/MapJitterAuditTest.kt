@@ -3,15 +3,10 @@ package com.jd.app.monitor
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jd.core.network.ForensicIdentityManager
-import com.jd.core.shared.ForensicIdentity
-import com.jd.core.shared.LocationUpdate
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -38,31 +33,15 @@ class MapJitterAuditTest {
     @Inject
     lateinit var identityManager: ForensicIdentityManager
 
-    @Inject
-    lateinit var trailDao: TrailDao
-
     private val testTrackerId = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
-    /** The installed Monitor's pairing, restored after the test (ISSUE-NOV9.3-O64). */
-    private var savedTargetId: String? = null
-
+    /**
+     * The pairing and the rows written here live in the test module's own identity file and in-memory
+     * database, so the installed Monitor is never touched (ISSUE-NOV12.6-O93, replaces the restore of ISSUE-NOV9.3-O64).
+     */
     @Before
     fun init() {
         hiltRule.inject()
-        savedTargetId = runBlocking { identityManager.targetId.first() }
-    }
-
-    /**
-     * Puts back the real pairing and removes the test rows, so a run with
-     * `am instrument` (which keeps app data) leaves the Monitor as it was (ISSUE-NOV9.3-O64).
-     */
-    @After
-    fun restore() = runBlocking {
-        val saved = savedTargetId
-        if (saved == null) identityManager.clearTargetId() else identityManager.setTargetId(saved)
-        // keep = 0 deletes every row of the test tracker.
-        trailDao.pruneOldestRows(testTrackerId, 0)
-        Unit
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

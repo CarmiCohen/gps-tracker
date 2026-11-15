@@ -136,10 +136,17 @@ class BackfillContentionTest {
     components = [SingletonComponent::class],
     replaces = [
         com.jd.app.monitor.MonitorModule::class,
-        com.jd.core.network.NetworkModule::class
+        com.jd.core.network.NetworkModule::class,
+        com.jd.core.network.IdentityModule::class
     ]
 )
 object TestMonitorModule {
+    /**
+     * The tests' own identity file: `am instrument` keeps app data, so the tests must never write the
+     * installed Monitor's pairing in [ForensicIdentityManager.FILE_NAME] (ISSUE-NOV12.6-O93).
+     */
+    const val TEST_IDENTITY_FILE = "forensic_identity_test.preferences_pb"
+
     @Provides
     @Singleton
     fun provideSignalingClient(): SignalingClient = FakeSignalingClient()
@@ -147,7 +154,7 @@ object TestMonitorModule {
     @Provides
     @Singleton
     fun provideForensicIdentityManager(): ForensicIdentityManager {
-        return ForensicIdentityManager(ApplicationProvider.getApplicationContext())
+        return ForensicIdentityManager(ApplicationProvider.getApplicationContext(), TEST_IDENTITY_FILE)
     }
 
     @Provides

@@ -54,7 +54,7 @@ class IdentityPersistenceTest {
         identityManager.setSelfId("custom_persistent_id")
         
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
-        val reopenedManager = ForensicIdentityManager(context)
+        val reopenedManager = ForensicIdentityManager(context, TestMonitorModule.TEST_IDENTITY_FILE)
         
         val reloadedId = reopenedManager.selfId.first()
         assertEquals("Identity must persist across manager re-instantiation (app restart)", "custom_persistent_id", reloadedId)

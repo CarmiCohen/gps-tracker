@@ -20,15 +20,20 @@ import javax.inject.Singleton
  * Centralizes hardware-bound hashed ID generation and target tracking (Revol30.1).
  * Hardened for Direct Boot (Point 77): Uses Device Protected Storage.
  * Updated Nov2.21: Enforced DataStore singleton pattern to prevent multi-instance exceptions in tests (ISSUE-REVOL38.1-F2).
+ * Updated Nov15.0: the store file is a parameter, so instrumented tests use their own file and never
+ * touch the installed app's pairing (ISSUE-NOV12.6-O93).
  */
 @Singleton
-class ForensicIdentityManager @Inject constructor(private val context: Context) {
-    
+class ForensicIdentityManager(context: Context, fileName: String) {
+
+    /** The app's own identity store. */
+    @Inject constructor(context: Context) : this(context, FILE_NAME)
+
     private val protectedContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
         context.createDeviceProtectedStorageContext()
     } else context
 
-    private val dataStore: DataStore<Preferences> = DataStoreSingleton.getInstance(protectedContext)
+    private val dataStore: DataStore<Preferences> = DataStoreSingleton.getInstance(protectedContext, fileName)
     
     private val selfIdKey = stringPreferencesKey("forensic_id")
     private val saltKey = stringPreferencesKey("identity_salt")
@@ -95,18 +100,22 @@ class ForensicIdentityManager @Inject constructor(private val context: Context) 
         dataStore.edit { it.remove(targetIdKey) }
     }
 
+    companion object {
+        /** The file of the app's own identity store. */
+        const val FILE_NAME = "forensic_identity.preferences_pb"
+    }
+
     /**
-     * Internal singleton to ensure only one DataStore instance exists per process for the identity file.
+     * Internal singleton to ensure only one DataStore instance exists per process for each identity file.
      */
     private object DataStoreSingleton {
-        @Volatile
-        private var INSTANCE: DataStore<Preferences>? = null
+        private val instances = HashMap<String, DataStore<Preferences>>()
 
-        fun getInstance(context: Context): DataStore<Preferences> {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: PreferenceDataStoreFactory.create(
-                    produceFile = { File(context.noBackupFilesDir, "forensic_identity.preferences_pb") }
-                ).also { INSTANCE = it }
+        fun getInstance(context: Context, fileName: String): DataStore<Preferences> = synchronized(this) {
+            instances.getOrPut(fileName) {
+                PreferenceDataStoreFactory.create(
+                    produceFile = { File(context.noBackupFilesDir, fileName) }
+                )
             }
         }
     }

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov12.7 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov15.0 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -915,8 +915,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **186.2 Update Over A Running Sensor (device):** with the Sensor running and the Monitor paired, run `:app-sensor:installDebug` and do not touch the Sensor. Verify in logcat `BootReceiver: App update detected` and the service running again within seconds (`dumpsys activity services com.jd.app.sensor`), with types `0x201` when location is not allowed all the time (the notification `Tracking off - tap to enable`, chapter 163.3) or `0x209` when it is; the Monitor raises no `TRACKER_OFFLINE`, or clears it at once.
 *   **186.3 Opening The App After A Force-Stop (device):** `adb shell am force-stop com.jd.app.sensor`, then open the Sensor app and leave it on `System Idle`: verify `AdminActivity: App opened: starting SensorService` and the service running with types `0x289`, without the unlock tap.
 
+## Chapter 187 - Tests Use Their Own Identity Store (Nov15.0)
+**Status: A / L** - `IdentityIsolationTest` passed in Monitor 54/54 and Sensor 43/43 on the A15; pairing `V` to `T` and Sensor `T` kept after both runs (ISSUE-NOV12.6-O93, SOT 1.426)
+*   **187.1 Isolation (instrumented):** `IdentityIsolationTest` (Monitor and Sensor): writes and a reset through the injected `ForensicIdentityManager` change only the test file `forensic_identity_test.preferences_pb`; the installed app's store, read only, keeps its pairing and self ID.
+*   **187.2 Full Run Keeps The Pairing (device):** record `device_check.ps1 -App monitor -Command STATE` and `-App sensor -Command STATE`, run both test APKs with `am instrument` (airplane mode, phone unlocked), and verify the same `self` and `target` afterwards.
+
 ---
-**Active Testing Chapters: 175 of 186**
+**Active Testing Chapters: 176 of 187**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
