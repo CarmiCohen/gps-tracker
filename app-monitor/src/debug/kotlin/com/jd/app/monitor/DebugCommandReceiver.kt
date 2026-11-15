@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.jd.core.network.ForensicIdentityManager
+import com.jd.core.network.SignalingClient
 import com.jd.core.shared.DebugCommand
 import com.jd.core.shared.SystemLogger
 import dagger.hilt.EntryPoint
@@ -27,6 +28,7 @@ class DebugCommandReceiver : BroadcastReceiver() {
     interface Deps {
         fun identityManager(): ForensicIdentityManager
         fun dataStore(): MonitorDataStore
+        fun signalingClient(): SignalingClient
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -56,8 +58,12 @@ class DebugCommandReceiver : BroadcastReceiver() {
             DebugCommand.State, is DebugCommand.SetSensorId -> Unit
         }
         val fence = store.geofence.first()
+        // The Sensor's setup report as received, so a remote check needs no screenshot (ISSUE-NOV10.8-O83 part 2).
+        val setup = deps.signalingClient().sensorSetupFlow.value
+            ?.let { "from=${it.trackerId},missing=${it.missing},faults=${it.faults},behaviourRev=${it.behaviourRevision}" } ?: "none"
         return "OK $command self=${identity.selfId.first()} target=${identity.targetId.first()} " +
             "homePoints=${fence.points.size} radius=${fence.radiusMeters} revision=${fence.revision} " +
-            "points=${fence.points.joinToString(";") { "${it.lat},${it.lng}" }}"
+            "points=${fence.points.joinToString(";") { "${it.lat},${it.lng}" }} " +
+            "sensorRevision=${store.alertSettings.first().sensorRevision} sensorSetup=$setup"
     }
 }

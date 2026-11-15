@@ -1,6 +1,7 @@
 package com.jd.app.sensor
 
 import android.os.Build
+import com.jd.core.shared.SensorSetupItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

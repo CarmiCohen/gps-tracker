@@ -1,5 +1,6 @@
 package com.jd.app.monitor
 
+import com.jd.core.network.peerDeliveries
 import com.jd.core.shared.GEOFENCE_BREACH_STATUS
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
@@ -28,7 +29,7 @@ class GeofenceSyncTest {
         val geofence = MutableStateFlow(first)
         val online = MutableStateFlow(false)
         val sent = mutableListOf<GeofenceConfig>()
-        val job = launch { trackerDeliveries(geofence, online).toList(sent) }
+        val job = launch { peerDeliveries(geofence, online).toList(sent) }
         settle()
         assertEquals("Nothing is sent while the tracker is offline", emptyList<GeofenceConfig>(), sent)
 
@@ -49,7 +50,7 @@ class GeofenceSyncTest {
         val geofence = MutableStateFlow(first)
         val online = MutableStateFlow(false)
         val sent = mutableListOf<GeofenceConfig>()
-        val job = launch { trackerDeliveries(geofence, online).toList(sent) }
+        val job = launch { peerDeliveries(geofence, online).toList(sent) }
         settle()
         geofence.value = second; settle()
         assertEquals(emptyList<GeofenceConfig>(), sent)

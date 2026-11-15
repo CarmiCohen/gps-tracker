@@ -12,6 +12,7 @@ import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.RelayConfig
+import com.jd.core.shared.SensorSetupReport
 import com.jd.core.shared.atUiRate
 import com.jd.core.ui.HudState
 import com.jd.core.ui.metersPerSecondToKmh
@@ -63,6 +64,14 @@ class MonitorViewModel @Inject constructor(
     val isSirenPlaying: StateFlow<Boolean> = alarmEngine.isSirenOn
 
     val alarms: StateFlow<AlarmBook> = alarmEngine.alarms
+
+    /**
+     * The paired Sensor's newest setup report, or null while none has arrived; a report of another tracker is never
+     * shown (ISSUE-NOV10.8-O83 part 2).
+     */
+    val sensorSetup: StateFlow<SensorSetupReport?> = combine(signalingClient.sensorSetupFlow, identityManager.targetId) { report, target ->
+        report?.takeIf { it.trackerId == target }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun acknowledgeAlarms() {
         alarmEngine.acknowledge()

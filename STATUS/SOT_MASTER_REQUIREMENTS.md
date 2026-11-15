@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov15.2)
+# SOT Master Requirements & Hardening Status (Nov15.3)
 
-## 🏗️ Architectural Master Rules (501 Rules)
+## 🏗️ Architectural Master Rules (502 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -128,6 +128,7 @@
 *   **1.425 An Update Does Not Stop The Sensor**: the Sensor MUST start its service by itself after a reboot and after an app update (`MY_PACKAGE_REPLACED`), and when its app is opened, before any unlock tap, all behind one permission check shared by the app, the receiver and the service (ISSUE-NOV12.6-O92).
 *   **1.426 Tests Use Their Own Identity Store**: the instrumented tests of both apps MUST get `ForensicIdentityManager` on a test file through a `@TestInstallIn` replacement of `IdentityModule`, never on the installed app's `forensic_identity.preferences_pb`, so an `am instrument` run never changes the real pairing or identity (ISSUE-NOV12.6-O93; refines 1.406).
 *   **1.427 The Monitor Sets The Sensor's Detection**: the four sensor switches and the tilt, vibration and noise limits MUST be edited on the Monitor only and sent to the Sensor as a revisioned `sensor_behaviour` settings message, like the geofence; the Sensor MUST keep only the newest revision, show it read-only, send no alert of a switched-off kind and keep the microphone closed while noise is off (ISSUE-NOV10.8-O83).
+*   **1.428 The Monitor Warns About The Sensor Phone**: the Sensor MUST report to its Monitors, as a `sensor_setup` settings message, its missing required Phone Setup items, what the running service lacks although the setup allows it, and the detection revision it applies, each time a Monitor comes online and on each change (the setup re-read at least every 30 s); the Monitor MUST show the paired tracker's warnings on its main screen with the list, never as an alarm, leave out microphone warnings while noise detection is off, and show whether its detection revision is applied (ISSUE-NOV10.8-O83 part 2, ISSUE-NOV15.2-O97).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

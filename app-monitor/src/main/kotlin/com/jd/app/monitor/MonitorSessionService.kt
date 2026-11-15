@@ -7,11 +7,13 @@ import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessaging
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
+import com.jd.core.network.peerDeliveries
 import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.SystemLogger
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -74,16 +76,22 @@ class MonitorSessionService : Service() {
 
             // The tracker enforces the user's geofence; the Monitor only delivers it (ISSUE-NOV8.13-O51).
             launch {
-                trackerDeliveries(dataStore.geofence, signalingClient.viewerStatusFlow).collect { config ->
+                peerDeliveries(dataStore.geofence, signalingClient.viewerStatusFlow).collect { config ->
                     val sent = signalingClient.sendGeofence(targetId, config)
                     SystemLogger.i("MonitorService", "Geofence rev ${config.revision} (${config.points.size} points, ${config.radiusMeters.toInt()} m) sent to $targetId: $sent")
                 }
             }
             // The Sensor's detection switches and limits are set here and sent the same way (ISSUE-NOV10.8-O83).
             launch {
-                trackerDeliveries(dataStore.alertSettings.map { it.sensorBehaviour() }, signalingClient.viewerStatusFlow).collect { behaviour ->
+                peerDeliveries(dataStore.alertSettings.map { it.sensorBehaviour() }, signalingClient.viewerStatusFlow).collect { behaviour ->
                     val sent = signalingClient.sendSensorBehaviour(targetId, behaviour)
                     SystemLogger.i("MonitorService", "Sensor behaviour rev ${behaviour.revision} sent to $targetId: $sent ($behaviour)")
+                }
+            }
+            // The Sensor answers with what its phone setup lacks; the screen warns from the client's copy (ISSUE-NOV10.8-O83 part 2).
+            launch {
+                signalingClient.sensorSetupFlow.filterNotNull().collect { report ->
+                    SystemLogger.i("MonitorService", "Sensor setup report from ${report.trackerId}: missing ${report.missing}, faults ${report.faults}, behaviour rev ${report.behaviourRevision}")
                 }
             }
 

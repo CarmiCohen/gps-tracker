@@ -29,28 +29,22 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.jd.core.shared.SensorFault
+import com.jd.core.shared.SensorSetupItem
+import com.jd.core.shared.SensorSetupReport
 import com.jd.core.ui.BrandGold
 import com.jd.core.ui.Slate500
 import com.jd.core.ui.Slate900
 import com.jd.core.ui.StatusGreen
 
 /**
- * The Sensor's one-time Phone Setup (ISSUE-NOV10.8-O81, user decision 2026-11-12): only what the Sensor needs, for this
- * phone maker and Android version, each item with its live status. The Monitor keeps its own page
- * (`core-ui` `PhoneSetupOverlay`): overlay, DND and full-screen intents are Monitor needs, the Sensor makes no sound.
+ * The Sensor's one-time Phone Setup (ISSUE-NOV10.8-O81, user decision 2026-11-12): only what the Sensor needs
+ * ([SensorSetupItem]), for this phone maker and Android version, each item with its live status. The Monitor keeps its
+ * own page (`core-ui` `PhoneSetupOverlay`): overlay, DND and full-screen intents are Monitor needs, the Sensor makes no
+ * sound. What is missing here is also reported to the Monitor ([sensorSetupReport], ISSUE-NOV10.8-O83 part 2).
+ *
+ * This class: what this phone grants the Sensor now.
  */
-internal enum class SensorSetupItem(val optional: Boolean = false) {
-    PRECISE_LOCATION,
-    BACKGROUND_LOCATION,
-    MICROPHONE,
-    NOTIFICATIONS,
-    BATTERY_UNRESTRICTED,
-    KEEP_WHEN_UNUSED,
-    SAMSUNG_NEVER_SLEEPING,
-    NOTIFICATION_ACCESS(optional = true)
-}
-
-/** What this phone grants the Sensor now. */
 internal data class SensorSetupStatus(
     val preciseLocation: Boolean,
     val backgroundLocation: Boolean,
@@ -72,10 +66,37 @@ internal data class SensorSetupStatus(
         SensorSetupItem.NOTIFICATION_ACCESS -> notificationAccess
     }
 
-    /** Items known to be missing, optional ones not counted: the number on the console's Phone Setup line. */
-    fun missingCount(items: List<SensorSetupItem>): Int =
-        items.count { !it.optional && isGranted(it) == false }
+    /** The items of [items] known to be missing, optional ones not counted: what the Monitor is told. */
+    fun missingItems(items: List<SensorSetupItem>): List<SensorSetupItem> =
+        items.filter { !it.optional && isGranted(it) == false }
+
+    /** The number on the console's Phone Setup line. */
+    fun missingCount(items: List<SensorSetupItem>): Int = missingItems(items).size
 }
+
+/**
+ * What the Sensor tells the Monitor about its phone (ISSUE-NOV10.8-O83 part 2): the [missing] setup items, and what
+ * the running service lacks although the setup allows it. A microphone without permission is the missing Microphone
+ * item, and one switched off on the Monitor is the Monitor user's own choice: neither is a fault here.
+ */
+internal fun sensorSetupReport(
+    missing: List<SensorSetupItem>,
+    microphone: MicrophoneState,
+    refused: RefusedAccess,
+    behaviourRevision: Long
+): SensorSetupReport = SensorSetupReport(
+    missing = missing,
+    faults = listOfNotNull(
+        SensorFault.LOCATION_NEEDS_TAP.takeIf { refused.location },
+        when (microphone) {
+            MicrophoneState.NEEDS_APP_OPEN -> SensorFault.MICROPHONE_NEEDS_TAP
+            MicrophoneState.SILENCED -> SensorFault.MICROPHONE_SILENCED
+            MicrophoneState.UNAVAILABLE -> SensorFault.MICROPHONE_UNAVAILABLE
+            MicrophoneState.OFF, MicrophoneState.NO_PERMISSION, MicrophoneState.LISTENING, MicrophoneState.TURNED_OFF -> null
+        }
+    ),
+    behaviourRevision = behaviourRevision
+)
 
 /** The items this phone shows: "all the time" exists from Android 10, the unused-app pause from Android 11. */
 internal fun sensorSetupItems(sdkInt: Int = Build.VERSION.SDK_INT, manufacturer: String = Build.MANUFACTURER): List<SensorSetupItem> =
@@ -163,27 +184,27 @@ internal fun SensorPhoneSetupOverlay(
                 val granted = status.isGranted(item)
                 when (item) {
                     SensorSetupItem.PRECISE_LOCATION -> SetupStatusItem(
-                        "$number. Precise Location", granted,
+                        "$number. ${item.label}", granted,
                         "Tracking needs precise location. In App info > Permissions > Location, turn on 'Use precise location'.",
                         "Open App Info"
                     ) { open(appInfo()) }
                     SensorSetupItem.BACKGROUND_LOCATION -> SetupStatusItem(
-                        "$number. Location 'Allow all the time'", granted,
+                        "$number. ${item.label}", granted,
                         "Lets a Sensor restarted after a reboot track at once, without a tap on its notification.",
                         "Allow All the Time"
                     ) { backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION) }
                     SensorSetupItem.MICROPHONE -> SetupStatusItem(
-                        "$number. Microphone", granted,
+                        "$number. ${item.label}", granted,
                         "Used to detect noise. Without it the Sensor runs without noise detection.",
                         "Grant Microphone"
                     ) { microphoneLauncher.launch(OPTIONAL_MICROPHONE_PERMISSION) }
                     SensorSetupItem.NOTIFICATIONS -> SetupStatusItem(
-                        "$number. Notifications", granted,
+                        "$number. ${item.label}", granted,
                         "Android shows the running Sensor as a notification; after a reboot, a tap on it lets the Sensor take location and the microphone.",
                         "Open Notification Settings"
                     ) { open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)) }
                     SensorSetupItem.BATTERY_UNRESTRICTED -> SetupStatusItem(
-                        "$number. Battery 'Unrestricted'", granted,
+                        "$number. ${item.label}", granted,
                         "Keeps Android from putting the Sensor to sleep in the background.",
                         "Allow Unrestricted"
                     ) {
@@ -192,12 +213,12 @@ internal fun SensorPhoneSetupOverlay(
                         open(intent)
                     }
                     SensorSetupItem.KEEP_WHEN_UNUSED -> SetupStatusItem(
-                        "$number. Keep the Sensor When Unused", granted,
+                        "$number. ${item.label}", granted,
                         "The Sensor is rarely opened. In App info, turn off 'Pause app activity if unused' (on some phones 'Remove permissions if app is unused'), or Android stops it after a few months.",
                         "Open App Info"
                     ) { open(appInfo()) }
                     SensorSetupItem.SAMSUNG_NEVER_SLEEPING -> SetupStatusItem(
-                        "$number. Samsung 'Never sleeping apps'", granted,
+                        "$number. ${item.label}", granted,
                         "Samsung puts apps to sleep on its own. In Battery > Background usage limits, add GPS Sensor to 'Never sleeping apps' and keep it out of 'Sleeping apps' and 'Deep sleeping apps'. Android does not let the app read this list: check it yourself.",
                         "Open Samsung Battery"
                     ) {
@@ -208,7 +229,7 @@ internal fun SensorPhoneSetupOverlay(
                         }
                     }
                     SensorSetupItem.NOTIFICATION_ACCESS -> SetupStatusItem(
-                        "$number. Notification Access (optional)", granted,
+                        "$number. ${item.label}", granted,
                         "Lets the Sensor tell a silent notification's vibration from a knock at the highest sensitivity settings. Only the fact that a notification vibrates is used; its content is not read.",
                         "Grant Notification Access"
                     ) { open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov15.2 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov15.3 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -927,8 +927,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **188.3 Sensor Store (unit):** `SensorBehaviourStoreTest`: an installed Sensor's old tilt and vibration limits become revision 0 and the old settings are removed; a received setting is kept; the read-only page text; `TURNED_OFF` is not reported as noise detection off.
 *   **188.4 Live (device):** with both apps paired, switch `Acoustic / Microphone Noise Sensor` off on the Monitor: `REV_MonitorService: Sensor behaviour rev ... sent`, `REV_SensorBehaviour: Received ... (stored: true)` and `Applied ... Noise: Off`; `dumpsys audio` shows no live `VOICE_RECOGNITION` session of `com.jd.app.sensor`. Switch it on: `REV_Acoustic: Listening` again. The Sensor's Settings shows `DETECTION SETTINGS`, read-only.
 
+## Chapter 189 - The Monitor Warns About The Sensor Phone (Nov15.3)
+**Status: A / L** - `SensorSetupWireTest` 6/6, `SensorSetupReportTest` 8/8, `SensorSetupWarningsTest` 6/6; 189.4 verified on the A15 (report in 0.25 to 0.33 s, warning line 2 then 1 item) (ISSUE-NOV10.8-O83 part 2, ISSUE-NOV15.2-O97, SOT 1.428)
+*   **189.1 Wire (unit):** `SensorSetupWireTest`: the `sensor_setup` message survives the round trip under the Sensor's own ID, is not read as a geofence or detection setting (or the reverse), skips names from a newer Sensor, is sent only while connected, and the Monitor's client keeps the newest report until it leaves on purpose.
+*   **189.2 Sensor Report (unit):** `SensorSetupReportTest`: the missing items are those the console counts (no optional or unreadable item); a microphone needing a tap, silenced or unavailable and a location refused after a restart are faults; no permission, `TURNED_OFF`, `OFF` and `LISTENING` are not; every noise-detection-off state reaches the Monitor; a new detection revision is a new report.
+*   **189.3 Monitor Warnings (unit):** `SensorSetupWarningsTest`: one line per missing item and fault, microphone ones dropped while noise detection is off; the warning line and the two Setup & Info lines (setup complete or to fix; detection settings applied, not applied yet, or newer from another Monitor).
+*   **189.4 Live (device):** with both apps paired, open the Monitor: `REV_SensorSetup: Report sent` and `REV_MonitorService: Sensor setup report from T`; `device_check.ps1 -App monitor -Command STATE` shows `sensorSetup=`. Run `adb shell "dumpsys deviceidle whitelist -com.jd.app.sensor"`: within 30 s the report lists `BATTERY_UNRESTRICTED` and the Monitor shows `SENSOR PHONE: N ITEMS NEED ATTENTION` (acknowledge any alarm screen with `KEYCODE_TAB`, `KEYCODE_ENTER`). Restore with `+com.jd.app.sensor`: the count drops again.
+
 ---
-**Active Testing Chapters: 177 of 188**
+**Active Testing Chapters: 178 of 189**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

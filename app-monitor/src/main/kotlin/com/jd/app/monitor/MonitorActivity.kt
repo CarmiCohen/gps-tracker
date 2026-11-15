@@ -37,6 +37,7 @@ import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.RelayConfig
+import com.jd.core.shared.SensorSetupReport
 import com.jd.core.network.ForensicIdentityManager
 import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
@@ -104,6 +105,7 @@ class MonitorActivity : ComponentActivity() {
                 val isSirenPlaying by viewModel.isSirenPlaying.collectAsStateWithLifecycle()
                 val alarmBook by viewModel.alarms.collectAsStateWithLifecycle()
                 val geofence by viewModel.geofence.collectAsStateWithLifecycle()
+                val sensorSetup by viewModel.sensorSetup.collectAsStateWithLifecycle()
 
                 LaunchedEffect(pairing) {
                     val serviceIntent = Intent(context, MonitorSessionService::class.java)
@@ -142,6 +144,7 @@ class MonitorActivity : ComponentActivity() {
                         alertSettings = alertSettings,
                         sirenType = sirenType,
                         isSirenPlaying = isSirenPlaying,
+                        sensorSetup = sensorSetup,
                         onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
                         onUpdateSirenType = { viewModel.updateSirenType(it) },
                         onUpdateAlarmVolume = { viewModel.updateAlarmVolume(it) },
@@ -287,11 +290,15 @@ fun MonitorScreen(
     onSetGeofenceRadius: (meters: Double) -> Unit = {},
     onResetStats: () -> Unit = {},
     onFullInit: () -> Unit = {},
-    onClose: () -> Unit = {}
+    onClose: () -> Unit = {},
+    sensorSetup: SensorSetupReport? = null
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
     var showSetupDialog by rememberSaveable { mutableStateOf(false) }
+    // What the Sensor phone lacks, as the Sensor reports it (ISSUE-NOV10.8-O83 part 2).
+    val setupWarnings = remember(sensorSetup, alertSettings.acousticAlert) { sensorSetupWarnings(sensorSetup, alertSettings) }
+    var showSetupWarnings by rememberSaveable { mutableStateOf(false) }
     var showAlertsOverlay by rememberSaveable { mutableStateOf(false) }
     var showSoundOverlay by rememberSaveable { mutableStateOf(false) }
     var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
@@ -324,6 +331,12 @@ fun MonitorScreen(
             },
             dismissButton = { TextButton(onClick = { pendingHomeRemoval = null }) { Text("Cancel") } }
         )
+    }
+
+    if (showSetupWarnings) {
+        // A list that became empty closes itself, and does not reopen with the next warning.
+        if (setupWarnings.isEmpty()) SideEffect { showSetupWarnings = false }
+        else SensorSetupWarningDialog(setupWarnings, onClose = { showSetupWarnings = false })
     }
 
     pendingUnpair?.let { action ->
@@ -554,6 +567,9 @@ fun MonitorScreen(
                 HudStatusBar(hudState = localHudState, compact = true)
                 // Line 2: Sensor / Tracker Status
                 HudStatusBar(hudState = remoteHudState, compact = true)
+                if (setupWarnings.isNotEmpty()) {
+                    SensorSetupWarningLine(setupWarnings.size, onClick = { showSetupWarnings = true })
+                }
             }
         }
     ) { padding ->
@@ -642,6 +658,8 @@ fun MonitorScreen(
                     Text("Relay URL: $relayUrl")
                     Text("App Version: ${getAppVersionName(LocalContext.current)}")
                     Text(localHudState.relayStatusText)
+                    Text(sensorSetupStatusText(sensorSetup, setupWarnings.size))
+                    Text(sensorBehaviourStatusText(sensorSetup, alertSettings.sensorRevision))
 
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(

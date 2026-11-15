@@ -5,8 +5,10 @@ import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.SensorBehaviour
+import com.jd.core.shared.SensorSetupReport
 import com.jd.core.shared.ViolationEvent
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * SignalingClient: Unified communication interface.
@@ -88,6 +90,19 @@ interface SignalingClient {
      * not connected; the caller sends again once the tracker is reachable.
      */
     suspend fun sendSensorBehaviour(targetId: String, behaviour: SensorBehaviour): Boolean
+
+    /**
+     * Monitor: the newest setup report received from a Sensor, or null when none arrived since [connect]
+     * (ISSUE-NOV10.8-O83 part 2). It is kept here, not in a screen, so a report that arrives while the Monitor's screen
+     * is closed is shown when it opens. [disconnect] forgets it.
+     */
+    val sensorSetupFlow: StateFlow<SensorSetupReport?>
+
+    /**
+     * Sensor: tells the Monitors of its room what its phone setup lacks (ISSUE-NOV10.8-O83 part 2). Returns false when
+     * not connected; the caller sends again once a Monitor is reachable.
+     */
+    suspend fun sendSensorSetup(report: SensorSetupReport): Boolean
 
     /**
      * Monitor: gives the relay this phone's push [token], now and after every reconnection, so the paired tracker's

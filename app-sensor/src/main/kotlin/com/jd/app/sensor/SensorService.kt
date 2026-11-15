@@ -27,12 +27,18 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
 import com.jd.core.network.SignalingClient
+import com.jd.core.network.peerDeliveries
 import com.jd.core.shared.*
 import com.jd.core.ui.getAppVersionName
 import com.jd.core.ui.toFixReading
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
@@ -97,6 +103,8 @@ class SensorService : Service(), SensorEventListener {
     private val pendingAlerts = java.util.concurrent.ConcurrentLinkedQueue<PendingAlert>()
     // The Monitor's switches and limits (ISSUE-NOV10.8-O83): written by the behaviour collector, read on the sensor threads.
     @Volatile private var sensorBehaviour = SensorBehaviour()
+    // What the Monitor is told about this phone's setup (ISSUE-NOV10.8-O83 part 2); null until first read.
+    private val setupReport = MutableStateFlow<SensorSetupReport?>(null)
     // Main thread only: what the last start command obtained; the noise switch can change after it.
     private var hasForegroundStart = false
     private var isLocationRefused = false
@@ -181,6 +189,7 @@ class SensorService : Service(), SensorEventListener {
         setupBackfillListener()
         setupGeofenceListener()
         setupSensorBehaviourListener()
+        setupSetupReporting()
         registerSensors()
         startLocationUpdates()
         connectSignaling()
@@ -194,7 +203,7 @@ class SensorService : Service(), SensorEventListener {
         serviceScope.launch {
             // A Sensor started at boot, before its first screen, still connects as `T` (ISSUE-NOV8.101-O59).
             identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_SENSOR)
-            kotlinx.coroutines.flow.combine(identityManager.selfId, sensorDataStore.relayUrl) { selfId, rawUrl ->
+            combine(identityManager.selfId, sensorDataStore.relayUrl) { selfId, rawUrl ->
                 val url = RelayConfig.resolve(rawUrl)
                 selfId to url
             }.collect { (selfId, url) ->
@@ -389,6 +398,9 @@ class SensorService : Service(), SensorEventListener {
             .onEach { behaviour ->
                 val stored = sensorDataStore.saveSensorBehaviour(behaviour)
                 SystemLogger.i("SensorBehaviour", "Received rev ${behaviour.revision} (stored: $stored)")
+                // A revision not stored comes from a Monitor that came online and sent what it holds: it gets the setup
+                // report, also when another Monitor was already there. A stored one changes the report, which sends it.
+                if (!stored) setupReport.value?.let { sendSetupReport(it) }
             }
             .launchIn(serviceScope)
         sensorDataStore.sensorBehaviour
@@ -402,6 +414,36 @@ class SensorService : Service(), SensorEventListener {
                 if (behaviour.noiseAlert != previous.noiseAlert) withContext(Dispatchers.Main) { applyAccess() }
             }
             .launchIn(serviceScope)
+    }
+
+    /**
+     * Tells the Monitor what this phone's setup lacks and which detection settings are applied (ISSUE-NOV10.8-O83
+     * part 2, ISSUE-NOV15.2-O97): the report is sent each time a Monitor comes online, and each time it changes while one
+     * is online. Android announces no change of a permission or an exemption, so the setup is read again every
+     * [SETUP_STATUS_CHECK_MS].
+     */
+    private fun setupSetupReporting() {
+        val items = sensorSetupItems()
+        val missingItems = flow {
+            while (true) {
+                emit(readSensorSetupStatus(this@SensorService).missingItems(items))
+                delay(SETUP_STATUS_CHECK_MS)
+            }
+        }
+        combine(missingItems, serviceStatus.microphone, serviceStatus.refusedAccess, sensorDataStore.sensorBehaviour) { missing, microphone, refused, behaviour ->
+            sensorSetupReport(missing, microphone, refused, behaviour.revision)
+        }
+            .distinctUntilChanged()
+            .onEach { setupReport.value = it }
+            .launchIn(serviceScope)
+        peerDeliveries(setupReport.filterNotNull(), signalingClient.viewerStatusFlow)
+            .onEach(::sendSetupReport)
+            .launchIn(serviceScope)
+    }
+
+    private suspend fun sendSetupReport(report: SensorSetupReport) {
+        val sent = signalingClient.sendSensorSetup(report)
+        SystemLogger.i("SensorSetup", "Report sent: $sent (missing ${report.missing}, faults ${report.faults}, behaviour rev ${report.behaviourRevision})")
     }
 
     /**
@@ -708,6 +750,7 @@ class SensorService : Service(), SensorEventListener {
         const val ACTION_RESTORE_ACCESS = "com.jd.app.sensor.ACTION_RESTORE_ACCESS"
         private const val RESTART_NOTIFICATION_ID = 2 // The foreground service notification is 1.
         private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L
+        private const val SETUP_STATUS_CHECK_MS = 30_000L
     }
 
     override fun onDestroy() {

@@ -6,6 +6,7 @@ import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.SensorBehaviour
+import com.jd.core.shared.SensorSetupReport
 import com.jd.core.shared.ViolationEvent
 import com.jd.core.shared.SystemLogger
 import io.socket.client.IO
@@ -66,6 +67,9 @@ class SocketioSignalingClient @Inject constructor(
 
     private val _sensorBehaviourFlow = MutableSharedFlow<SensorBehaviour>(extraBufferCapacity = 16)
     override val sensorBehaviourFlow: SharedFlow<SensorBehaviour> = _sensorBehaviourFlow.asSharedFlow()
+
+    private val _sensorSetupFlow = MutableStateFlow<SensorSetupReport?>(null)
+    override val sensorSetupFlow: StateFlow<SensorSetupReport?> = _sensorSetupFlow.asStateFlow()
 
     private var bytesSent: Long = 0
     private val arrivalLag = ArrivalLagMeter() // Used only on the socket's event thread (ISSUE-NOV10.7-O73).
@@ -190,6 +194,7 @@ class SocketioSignalingClient @Inject constructor(
                 val data = args.getOrNull(0) as? JSONObject ?: return@on
                 GeofenceWire.decode(data)?.let { _geofenceFlow.tryEmit(it) }
                 SensorBehaviourWire.decode(data)?.let { _sensorBehaviourFlow.tryEmit(it) }
+                SensorSetupWire.decode(data)?.let { _sensorSetupFlow.value = it }
             }
 
             connect()
@@ -269,6 +274,7 @@ class SocketioSignalingClient @Inject constructor(
         socket = null
         _isConnected.value = false
         _viewerStatusFlow.value = false
+        _sensorSetupFlow.value = null // The next session may watch another Sensor.
         currentDeviceId = null
         stopBatchTimer()
     }
@@ -404,6 +410,15 @@ class SocketioSignalingClient @Inject constructor(
     override suspend fun sendSensorBehaviour(targetId: String, behaviour: SensorBehaviour): Boolean {
         if (!_isConnected.value) return false
         val payload = SensorBehaviourWire.encode(targetId, behaviour)
+        socket?.emit("settings_update", payload)
+        bytesSent += payload.toString().length.toLong()
+        return true
+    }
+
+    override suspend fun sendSensorSetup(report: SensorSetupReport): Boolean {
+        val deviceId = currentDeviceId ?: return false
+        if (!_isConnected.value) return false
+        val payload = SensorSetupWire.encode(report.trackerId.ifEmpty { deviceId }, report)
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true
