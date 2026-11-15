@@ -1,45 +1,33 @@
 package com.jd.app.sensor
 
-import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.core.content.ContextCompat
 import com.jd.core.shared.SystemLogger
 
 /**
- * BootReceiver: Ensures the SensorService starts automatically after device reboot.
+ * BootReceiver: starts [SensorService] after a reboot and after an app update, both of which leave it stopped.
  * Updated Nov1.0: Added permission guard to prevent SecurityException on API 34+ (R-ID 10).
+ * Updated Nov12.7: also on `MY_PACKAGE_REPLACED` (ISSUE-NOV12.6-O92), with the same permission list as the app and
+ * the service. Both broadcasts are exempt from Android 12's background start restriction; location and the microphone
+ * may still be refused from the background, which the service handles with its restart notification (ISSUE-NOV8.103-O60).
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            SystemLogger.i("BootReceiver", "System reboot detected. Checking permissions...")
-            
-            if (hasRequiredPermissions(context)) {
-                SystemLogger.i("BootReceiver", "Permissions verified. Starting SensorService...")
-                val serviceIntent = Intent(context, SensorService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
-            } else {
-                SystemLogger.w("BootReceiver", "Critical permissions missing after boot. Service start aborted.")
-            }
+        if (!startsSensorOn(intent.action)) return
+        val reason = if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) "App update" else "System reboot"
+        if (hasRequiredSensorPermissions(context)) {
+            SystemLogger.i("BootReceiver", "$reason detected. Permissions verified. Starting SensorService...")
+            startSensorService(context)
+        } else {
+            SystemLogger.w("BootReceiver", "$reason detected. Critical permissions missing. Service start aborted.")
         }
     }
 
-    private fun hasRequiredPermissions(context: Context): Boolean {
-        val locationGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        
-        val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        } else true
+    companion object {
+        /** The broadcasts after which the Sensor starts itself (ISSUE-NOV12.6-O92); the manifest declares the same. */
+        val START_ACTIONS = setOf(Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED)
 
-        return locationGranted && notificationGranted
+        fun startsSensorOn(action: String?): Boolean = action in START_ACTIONS
     }
 }

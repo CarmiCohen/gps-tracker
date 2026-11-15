@@ -24,4 +24,4 @@ The Sensor is a high-precision, background-persistent engine and acts as the aut
 ## 5. Persistence & Direct Boot
 - **Direct Boot Aware**: Service starts and identifies itself before first user unlock.
 - **Config Mirroring**: Maintains a secondary "Last Known Good" config file to survive DataStore corruption.
-- **Sticky Foreground Service**: `SensorService` operates as `START_STICKY` with `BootReceiver` support for automatic restart on LMK or system boot.
+- **Sticky Foreground Service**: `SensorService` operates as `START_STICKY` with `BootReceiver` support for automatic restart on LMK, system boot or an app update (ISSUE-NOV12.6-O92).

@@ -262,7 +262,7 @@ class SensorService : Service(), SensorEventListener {
             SystemLogger.i("SensorService", "Restart notification tapped: taking location and microphone")
         }
         
-        if (hasRequiredPermissions()) {
+        if (hasRequiredSensorPermissions(this)) {
             val start = startForegroundServiceInternal()
             if (start == null) {
                 SystemLogger.e("SensorService", "No foreground service type allowed. Self-stopping.")
@@ -282,22 +282,6 @@ class SensorService : Service(), SensorEventListener {
         }
         
         return START_STICKY
-    }
-
-    private fun hasRequiredPermissions(): Boolean {
-        val locationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        
-        val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        } else true
-
-        val networkStateGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_NETWORK_STATE) == PackageManager.PERMISSION_GRANTED
-
-        val fgsLocationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        } else true
-
-        return locationGranted && notificationGranted && networkStateGranted && fgsLocationGranted
     }
 
     /**

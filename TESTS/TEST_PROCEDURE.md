@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov12.6 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov12.7 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -909,8 +909,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **185.2 Live Status (device):** Sensor `Settings`, `PHONE SETUP` (or the console line): each item shows Done, Missing or Check yourself as the phone reports it (`dumpsys deviceidle whitelist`, `appops get com.jd.app.sensor AUTO_REVOKE_PERMISSIONS_IF_UNUSED`); a button shows only for a missing or unreadable item; after `Allow Unrestricted` and the system dialog, item 5 turns Done without reopening the page.
 *   **185.3 Buttons and Console (device):** `Open Samsung Battery` opens Device Care's Battery page; the console's `PHONE SETUP: N MISSING` counts the missing items and opens the page.
 
+## Chapter 186 - An Update Does Not Stop The Sensor (Nov12.7)
+**Status: A / L** - `BootReceiverTest` 4/4; 186.2 (`0x209`) and 186.3 (`0x289`, no tap) verified on the A15 (ISSUE-NOV12.6-O92, SOT 1.425)
+*   **186.1 Start Broadcasts (unit):** `BootReceiverTest`: the receiver starts the Sensor on `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED` only (not on another app's `PACKAGE_REPLACED`); the manifest declares exactly those two actions on the unexported `BootReceiver`.
+*   **186.2 Update Over A Running Sensor (device):** with the Sensor running and the Monitor paired, run `:app-sensor:installDebug` and do not touch the Sensor. Verify in logcat `BootReceiver: App update detected` and the service running again within seconds (`dumpsys activity services com.jd.app.sensor`), with types `0x201` when location is not allowed all the time (the notification `Tracking off - tap to enable`, chapter 163.3) or `0x209` when it is; the Monitor raises no `TRACKER_OFFLINE`, or clears it at once.
+*   **186.3 Opening The App After A Force-Stop (device):** `adb shell am force-stop com.jd.app.sensor`, then open the Sensor app and leave it on `System Idle`: verify `AdminActivity: App opened: starting SensorService` and the service running with types `0x289`, without the unlock tap.
+
 ---
-**Active Testing Chapters: 174 of 185**
+**Active Testing Chapters: 175 of 186**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
