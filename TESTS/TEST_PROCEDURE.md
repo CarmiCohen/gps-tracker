@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov16.5 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov16.6 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -566,7 +566,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **125.3 Failed And Unanswered Requests:** Verify that a request that could not be sent is made again by a later scan, and that an unanswered request is released after 30 seconds without a chunk and asked again. Automated by `aFailedRequestIsNotForgotten`, `BackfillLedgerTest.anUnansweredRequestIsReleasedAndAskedAgain`, and `eachChunkRestartsTheTimeout`.
 *   **125.4 Unfillable Holes:** Verify that a hole the Sensor answers without rows is not requested again in the same process, while a new hole still is. Automated by `aHoleTheSensorCannotFillIsAskedOnce` and `BackfillLedgerTest.anAnsweredHoleIsNotAskedForever`.
 *   **125.5 Reconnect Burst:** Verify that a flushed queue and a full backfill reach a busy collector with nothing dropped. Automated by `SignalingBatchTest.testReconnectBurstReachesABusyCollector` and `testBackfillBurstReachesABusyCollector`.
-*   **125.6 Missing Start:** Verify that a fresh pairing requests the rows before its first update, and that a table pruned to its cap does not request its deleted rows. Automated by `aMissingStartIsRequestedOnAFreshPairing` and `aPrunedStartIsNotRequested`.
+*   **125.6 Missing Start:** Verify that a fresh pairing requests the rows before its first update, and that a table pruned to its cap does not request its deleted rows, nor a hole that ends at its oldest row by time (after a Sensor counter reset, Nov16.6, ISSUE-NOV15.6-O100 part 6). Automated by `aMissingStartIsRequestedOnAFreshPairing`, `aPrunedStartIsNotRequested`, and `aHoleWidenedByPruningAfterACounterResetIsNotRequested`.
 *   **125.7 Outage On Hardware:** Through a private relay, never the production relay, cut only the Sensor for 60 seconds at the 10Hz charging rate. Pull the Monitor database after recovery and verify that no hole remains. Repeat with the Monitor on a second phone through the production relay when one is available.
 
 ## Chapter 126 - Real Version Strings (Nov7.0)

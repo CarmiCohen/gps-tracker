@@ -150,13 +150,20 @@ class MonitorRepository @Inject constructor(
         isLocalUser = false
     )
 
+    /**
+     * The holes worth requesting. A table at the cap has been pruned by time, so neither its missing start nor a
+     * hole ending at its oldest row by time is a gap: after a Sensor counter reset the run above the low rows is the
+     * oldest, and each prune widens that hole past the range already answered (ISSUE-NOV15.6-O100 part 6).
+     */
     private suspend fun findGaps(deviceId: String): List<SequenceGap> {
         val gaps = trailDao.getSequenceGaps(deviceId)
         val first = trailDao.getFirstSequenceId(deviceId) ?: return gaps
 
-        // A table at the cap has been pruned, so its missing start is not a gap.
-        val hasMissingStart = first > 1 && trailDao.countRows(deviceId) < MAX_STORED_TRAIL_POINTS
-        return if (hasMissingStart) gaps + SequenceGap(1, first - 1) else gaps
+        if (trailDao.countRows(deviceId) >= MAX_STORED_TRAIL_POINTS) {
+            val oldest = trailDao.getOldestSequenceId(deviceId)
+            return gaps.filterNot { it.lastMissing + 1 == oldest }
+        }
+        return if (first > 1) gaps + SequenceGap(1, first - 1) else gaps
     }
 
     private suspend fun requestMissingRanges(deviceId: String) {

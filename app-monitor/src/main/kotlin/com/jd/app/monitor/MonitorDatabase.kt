@@ -54,6 +54,10 @@ interface TrailDao {
     @Query("SELECT COUNT(*) FROM trails WHERE trackerId = :id AND isLocalUser = 0")
     suspend fun countRows(id: String): Int
 
+    /** The sequence of the oldest row by time: the next row [pruneOldestRows] deletes (ISSUE-NOV15.6-O100 part 6). */
+    @Query("SELECT sequenceId FROM trails WHERE trackerId = :id AND isLocalUser = 0 ORDER BY timestamp ASC LIMIT 1")
+    suspend fun getOldestSequenceId(id: String): Long?
+
     /**
      * Returns every hole between stored rows, newest first. The table is the only record of
      * what is missing, so a hole stays findable until it is filled (ISSUE-NOV6.3-O32).

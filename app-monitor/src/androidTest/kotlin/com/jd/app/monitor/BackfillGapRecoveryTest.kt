@@ -187,4 +187,28 @@ class BackfillGapRecoveryTest {
             requests.map { it.startSequenceId to it.endSequenceId }
         )
     }
+
+    /**
+     * ISSUE-NOV15.6-O100 part 6: after a Sensor counter reset, rows 1 to 787 are newer than the run above them, so
+     * pruning by time eats that run from below and widens the hole. At the cap that hole is pruned, not missing.
+     */
+    @Test
+    fun aHoleWidenedByPruningAfterACounterResetIsNotRequested() = runBlocking {
+        val lowRun = 1L..787L
+        val first = 700_000L
+        val last = first + MAX_STORED_TRAIL_POINTS - lowRun.count() - 1
+        trailDao.insertAll(rows(first..last))
+        trailDao.insertAll(lowRun.map { TrailEntity("T", 10_000_000L + it, it, 32.0, 35.0, 5f, "VALID") })
+        assertEquals(MAX_STORED_TRAIL_POINTS.toLong(), trailDao.countRows("T").toLong())
+
+        client.emitTelemetry(update(last + 2))
+        awaitRequests(1)
+        delay(500)
+
+        assertEquals(
+            "Only the real hole, not the pruned rows above the low run",
+            listOf((last + 1) to (last + 1)),
+            requests.map { it.startSequenceId to it.endSequenceId }
+        )
+    }
 }
