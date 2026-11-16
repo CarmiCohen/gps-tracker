@@ -958,8 +958,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **192.4 Menu (instrumented):** `UnpairConfirmationTest.graphsButtonOpensTheGraphs`: the Monitor's Graphs button opens the Graphs with their periods and Close returns; `HudLayoutAuditTest`: Graphs stays visible with long IDs. Run the Monitor in airplane mode (O90).
 *   **192.5 Live (device):** install both debug apps over their data and wait 3 minutes; `adb shell run-as com.jd.app.sensor cat /data/user_de/0/com.jd.app.sensor/files/graph_history_sensor.jsonl` shows one array a minute; open the Sensor's Graphs: the four sections with points for the last minutes; open the Monitor's Graphs: `REV_SensorGraphs: Graph request after ...: N samples sent` in the Sensor's log and the `SENSOR - ` graphs filled within a minute, then `THIS MONITOR - CONNECTION`. Read the screens with `uiautomator dump`.
 
+## Chapter 193 - The Home Point List (Nov16.0)
+**Status: A / L** - `HomePointListTest` 3/3 passed on the A15; 193.2 verified on the A15 (ISSUE-NOV10.8-O85, SOT 1.432)
+*   **193.1 List (instrumented):** `HomePointListTest`: the Monitor's `HOME` editor lists each point as `N.  lat, lng` (five decimals) with a `Remove Home Point N` button; the button opens `Remove Home Point N?`, `Cancel` keeps the point, `Remove` removes only that point. Run the Monitor in airplane mode (O90).
+*   **193.2 Live (device):** with both apps paired, add two points (`device_check.ps1 -App monitor -Command ADD_HOME -Lat .. -Lng ..`, or a map tap in the editor); open `HOME`: two rows, read left to right also in Hebrew; tap a row's X (find it by `content-desc` in a `uiautomator dump`) and `Remove`: the list shows one point and the Sensor logs `REV_Geofence: Received 1 home points`. Tapping a point's marker still asks and removes it the same way. Clear the test points with `CLEAR_HOME` afterwards.
+
 ---
-**Active Testing Chapters: 181 of 192**
+**Active Testing Chapters: 182 of 193**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

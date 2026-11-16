@@ -11,6 +11,8 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -326,7 +328,8 @@ fun MonitorScreen(
     // (Chapter 127; full re-initialization also unpairs, ISSUE-NOV8.2-O46).
     var pendingUnpair by rememberSaveable { mutableStateOf<UnpairAction?>(null) }
     val requestUnpair = { pendingUnpair = UnpairAction.UNPAIR }
-    // Home Point editing (ISSUE-NOV8.13-O51): a map tap adds a point, a tapped point asks before it is removed.
+    // Home Point editing (ISSUE-NOV8.13-O51): a map tap adds a point; a tapped point or its list row (ISSUE-NOV10.8-O85)
+    // asks before it is removed.
     var isEditingHome by rememberSaveable { mutableStateOf(false) }
     var pendingHomeRemoval by rememberSaveable { mutableStateOf<Int?>(null) }
     val currentOnAddHomePoint by rememberUpdatedState(onAddHomePoint)
@@ -678,6 +681,7 @@ fun MonitorScreen(
                 HomePointEditor(
                     geofence = geofence,
                     onSetRadius = onSetGeofenceRadius,
+                    onRemovePoint = { pendingHomeRemoval = it },
                     onDone = { isEditingHome = false },
                     // Clear of the map control column, which sits at the start edge.
                     modifier = Modifier.align(Alignment.BottomCenter).padding(start = 72.dp, end = 8.dp, bottom = 8.dp)
@@ -897,11 +901,15 @@ fun MapToolButton(icon: ImageVector? = null, symbol: String? = null, label: Stri
     }
 }
 
-/** Home Point editing panel: how to edit, the point count, and the geofence radius (ISSUE-NOV8.13-O51). */
+/**
+ * Home Point editing panel: how to edit, the point count, the geofence radius (ISSUE-NOV8.13-O51), and a list of the
+ * points with a remove button each (ISSUE-NOV10.8-O85). [onRemovePoint] only asks; the caller's dialog confirms.
+ */
 @Composable
 fun HomePointEditor(
     geofence: GeofenceConfig,
     onSetRadius: (Double) -> Unit,
+    onRemovePoint: (Int) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -925,7 +933,33 @@ fun HomePointEditor(
                 )
                 TextButton(onClick = onDone) { Text("DONE") }
             }
-            Text("Tap the map to add, tap a home to remove", fontSize = 11.sp, color = Color.LightGray)
+            Text("Tap the map to add; tap a home or its X to remove", fontSize = 11.sp, color = Color.LightGray)
+            // At most about three rows high, scrolling beyond, so the map above stays free for tapping.
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 96.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                geofence.points.forEachIndexed { index, point ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(32.dp)) {
+                        // Left to right always: in a right-to-left locale the bidi algorithm reorders the number
+                        // and the coordinates (seen on the A15).
+                        Text(
+                            homePointLabel(index, point),
+                            fontSize = 12.sp,
+                            style = LocalTextStyle.current.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Ltr),
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { onRemovePoint(index) }, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Remove Home Point ${index + 1}",
+                                tint = com.jd.core.ui.StatusRed
+                            )
+                        }
+                    }
+                }
+            }
             Slider(
                 value = radius,
                 onValueChange = { radius = (it / RADIUS_STEP_METERS).toInt() * RADIUS_STEP_METERS },
@@ -938,6 +972,10 @@ fun HomePointEditor(
 }
 
 private const val RADIUS_STEP_METERS = 10f
+
+/** A Home Point's list row text: its number, as on the map marker, and its coordinates to five decimals (about 1 m). */
+internal fun homePointLabel(index: Int, point: com.jd.core.shared.HomePoint): String =
+    String.format(java.util.Locale.US, "%d.  %.5f, %.5f", index + 1, point.lat, point.lng)
 
 /** A red dot, so an OUT marker cannot be mistaken for the tracker or a Home Point marker. */
 private fun breachMarkerIcon(context: android.content.Context): android.graphics.drawable.Drawable =
