@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.datastore.core.DataMigration
 import androidx.datastore.preferences.core.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.File
 
@@ -76,7 +77,39 @@ class SensorDataStore(context: Context) {
         dataStore.edit { it[relayUrlKey] = url }
     }
 
+    /**
+     * The lowest sequence number the service may give a row, set by an imported settings file: a reinstalled Sensor then
+     * continues above the numbers the Monitor already holds instead of restarting at 0 (ISSUE-NOV10.8-O80, ISSUE-NOV5.2-O16).
+     */
+    val sequenceFloor: Flow<Long> = dataStore.data.map { it[SEQUENCE_FLOOR_KEY] ?: 0L }
+
+    /** [file] with the stored settings filled in (ISSUE-NOV10.8-O80). */
+    suspend fun exportInto(file: SensorSettingsFile): SensorSettingsFile {
+        val prefs = dataStore.data.first()
+        return file.copy(
+            relayUrl = prefs[relayUrlKey],
+            behaviour = decodeSensorBehaviour(prefs[SENSOR_BEHAVIOUR_KEY]),
+            geofence = decodeGeofence(prefs[geofenceKey])
+        )
+    }
+
+    /**
+     * Stores [file]'s settings. The detection settings and the geofence are the Monitor's: each is kept only while no
+     * newer one is stored, so the Monitor's next message still replaces them. The floor only ever rises.
+     */
+    suspend fun importFrom(file: SensorSettingsFile, nowMs: Long = System.currentTimeMillis()) {
+        dataStore.edit { prefs ->
+            val relayUrl = file.relayUrl
+            if (relayUrl == null) prefs.remove(relayUrlKey) else prefs[relayUrlKey] = relayUrl
+            file.sequenceFloor(nowMs)?.let { floor -> prefs[SEQUENCE_FLOOR_KEY] = maxOf(floor, prefs[SEQUENCE_FLOOR_KEY] ?: 0L) }
+        }
+        saveSensorBehaviour(file.behaviour)
+        saveGeofence(file.geofence)
+    }
 }
+
+/** Where [SensorDataStore.sequenceFloor] is stored. */
+internal val SEQUENCE_FLOOR_KEY = longPreferencesKey("sequence_floor")
 
 /** Where [SensorDataStore.sensorBehaviour] is stored. */
 internal val SENSOR_BEHAVIOUR_KEY = stringPreferencesKey("sensor_behaviour_json")

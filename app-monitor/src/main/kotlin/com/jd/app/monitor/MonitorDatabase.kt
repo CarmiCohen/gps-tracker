@@ -2,6 +2,7 @@ package com.jd.app.monitor
 
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.Serializable
 
 /**
  * MonitorDatabase: Stores telemetry for both the local user and the remote tracker.
@@ -12,6 +13,8 @@ const val MAX_TRAIL_POINTS = 1000
 /** Rows stored per tracker. About 1.4 hours at the 10Hz charging rate, or 5.8 days at the 10s rate. */
 const val MAX_STORED_TRAIL_POINTS = 50_000
 
+/** Also a row of the settings file (ISSUE-NOV10.8-O80). */
+@Serializable
 @Entity(
     tableName = "trails",
     primaryKeys = ["trackerId", "timestamp", "sequenceId"],
@@ -86,6 +89,10 @@ interface TrailDao {
      */
     @Query("DELETE FROM trails")
     suspend fun deleteAll()
+
+    /** Every stored row, for the settings file (ISSUE-NOV10.8-O80). */
+    @Query("SELECT * FROM trails")
+    suspend fun getAll(): List<TrailEntity>
 
     @Query("SELECT DISTINCT trackerId FROM trails")
     suspend fun getTrackerIds(): List<String>

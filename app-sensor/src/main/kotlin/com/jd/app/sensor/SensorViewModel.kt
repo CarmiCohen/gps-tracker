@@ -2,6 +2,7 @@ package com.jd.app.sensor
 
 import android.content.Context
 import android.location.LocationManager
+import android.net.Uri
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import androidx.lifecycle.ViewModel
@@ -9,6 +10,9 @@ import androidx.lifecycle.viewModelScope
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.EventEntry
+import com.jd.core.shared.EventLevel
+import com.jd.core.shared.SettingsFileException
+import com.jd.core.shared.settingsFileName
 import com.jd.core.shared.EventLog
 import com.jd.core.shared.EventPeriod
 import com.jd.core.shared.GraphHistory
@@ -40,10 +44,48 @@ class SensorViewModel @Inject constructor(
     private val eventLog: EventLog,
     private val infoSource: SensorInfoSource,
     private val graphHistory: GraphHistory,
+    private val settingsTransfer: SensorSettingsTransfer,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val selfId = identityManager.selfId
+
+    private val _transferMessages = MutableSharedFlow<String>(extraBufferCapacity = 1)
+
+    /** The outcome of each settings file export or import, shown once (ISSUE-NOV10.8-O80). */
+    val transferMessages: SharedFlow<String> = _transferMessages.asSharedFlow()
+
+    /** The name the file picker suggests for an export. */
+    fun exportFileName(): String = settingsFileName("Sensor", System.currentTimeMillis())
+
+    fun exportSettings(uri: Uri) {
+        viewModelScope.launch {
+            val message = try {
+                val file = settingsTransfer.export(uri)
+                "Settings exported: ID ${file.sensorId}, next sequence ${file.nextSequenceId ?: "unknown"}"
+                    .also { eventLog.record(EventLevel.INFO, it) }
+            } catch (e: Exception) {
+                "Export failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
+            }
+            _transferMessages.emit(message)
+        }
+    }
+
+    fun importSettings(uri: Uri) {
+        viewModelScope.launch {
+            val message = try {
+                val file = settingsTransfer.import(uri)
+                "Settings imported: ID ${file.sensorId}, ${file.geofence.points.size} home points"
+                    .also { eventLog.record(EventLevel.INFO, it) }
+            } catch (e: Exception) {
+                "Import failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
+            }
+            _transferMessages.emit(message)
+        }
+    }
+
+    private fun Exception.userMessage(): String =
+        if (this is SettingsFileException) message.orEmpty() else (message ?: javaClass.simpleName)
 
     /** This phone's events, oldest first (ISSUE-NOV10.8-O84). */
     val events: StateFlow<List<EventEntry>> = eventLog.events

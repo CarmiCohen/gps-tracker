@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov15.6 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov16.1 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -963,8 +963,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **193.1 List (instrumented):** `HomePointListTest`: the Monitor's `HOME` editor lists each point as `N.  lat, lng` (five decimals) with a `Remove Home Point N` button; the button opens `Remove Home Point N?`, `Cancel` keeps the point, `Remove` removes only that point. Run the Monitor in airplane mode (O90).
 *   **193.2 Live (device):** with both apps paired, add two points (`device_check.ps1 -App monitor -Command ADD_HOME -Lat .. -Lng ..`, or a map tap in the editor); open `HOME`: two rows, read left to right also in Hebrew; tap a row's X (find it by `content-desc` in a `uiautomator dump`) and `Remove`: the list shows one point and the Sensor logs `REV_Geofence: Received 1 home points`. Tapping a point's marker still asks and removes it the same way. Clear the test points with `CLEAR_HOME` afterwards.
 
+## Chapter 194 - The Settings File (Nov16.1)
+**Status: A / L** - `MonitorSettingsFileTest` 7/7, `SensorSettingsFileTest` 6/6; 194.3 verified on the A15 (ISSUE-NOV10.8-O80 part 1, SOT 1.433)
+*   **194.1 Monitor file (unit):** `MonitorSettingsFileTest`: every field (pairing, relay, DND bypass, alert settings, siren, geofence, local and Sensor trail rows) survives the file; an unpaired Monitor with the default relay too; the file names its format and version; a later version that only adds fields is read; a Sensor file, non-JSON, a file without `format` and a later version are refused with their messages; imported alert settings and geofence get a revision newer than the stored and the file's; the suggested name `GPS-Monitor-settings-yyyyMMdd-HHmm.json`.
+*   **194.2 Sensor file (unit):** `SensorSettingsFileTest`: every field survives the file; the sequence floor is the exported number plus 1000 at once, plus one per 100 ms since the export, and nothing more for a clock behind the export; no floor without a number; a Monitor file or one without `format` is refused.
+*   **194.3 Live (device):** both apps paired; Maintenance (Monitor: Setup, `CLEAN`; Sensor: Settings, `CLEAN SETUP`) > `Export Settings to File` > Save in Downloads; note the Monitor's trail rows and the Sensor's next sequence (`REV_SensorService: Telemetry sent. Seq:`). Uninstall and reinstall both apps, grant the permissions again (`pm grant`, `dumpsys deviceidle whitelist +`, `cmd notification allow_dnd`). Sensor: `Import Settings from File` > `Choose File` > its file: Events show `Sequence numbering continues at N` above the exported number and the telemetry continues there. Monitor pairing screen: `Import Settings from File` with the Sensor's file shows `Import failed: Not a GPS Monitor settings file`; with its own file the map opens paired, Events show `Settings imported: tracker T, ... trail rows`, and the Sensor logs the imported detection settings at a new revision.
+
 ---
-**Active Testing Chapters: 182 of 193**
+**Active Testing Chapters: 183 of 194**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

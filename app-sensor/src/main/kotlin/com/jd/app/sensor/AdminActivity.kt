@@ -88,6 +88,17 @@ class AdminActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 val context = LocalContext.current
                 var initialAutoStartTriggered by rememberSaveable { mutableStateOf(false) }
+
+                // The settings file (ISSUE-NOV10.8-O80): the system picker needs no storage permission.
+                val exportLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument(SETTINGS_FILE_MIME_TYPE)
+                ) { uri -> uri?.let(viewModel::exportSettings) }
+                val importLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument()
+                ) { uri -> uri?.let(viewModel::importSettings) }
+                LaunchedEffect(Unit) {
+                    viewModel.transferMessages.collect { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
+                }
                 
                 LaunchedEffect(Unit) {
                     identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_SENSOR)
@@ -188,6 +199,8 @@ class AdminActivity : ComponentActivity() {
                                 com.jd.core.ui.CleanSetupOverlay(
                                     onResetStats = { viewModel.resetOperationalStatistics() },
                                     onFullInit = { viewModel.triggerFullSystemReinitialization() },
+                                    onExportSettings = { exportLauncher.launch(viewModel.exportFileName()) },
+                                    onImportSettings = { importLauncher.launch(arrayOf("*/*")) }, // The content is checked on reading.
                                     onClose = { showCleanSetupOverlay = false }
                                 )
                             } else if (showSettings) {
@@ -238,6 +251,9 @@ class AdminActivity : ComponentActivity() {
     }
 
 }
+
+/** The type the file picker gives the exported settings file. */
+const val SETTINGS_FILE_MIME_TYPE = "application/json"
 
 /** Starts [SensorService], or sends a running one a new start command. */
 fun startSensorService(context: android.content.Context) {

@@ -27,8 +27,22 @@ fun CleanSetupOverlay(
     onFullInit: () -> Unit,
     onClose: () -> Unit,
     /** Null where there are no home points to clear (the Sensor), so the button is not shown (ISSUE-NOV10.8-O76). */
-    onClearHomePoints: (() -> Unit)? = null
+    onClearHomePoints: (() -> Unit)? = null,
+    /** Opens the file picker to save the settings file (ISSUE-NOV10.8-O80); null hides the Settings File group. */
+    onExportSettings: (() -> Unit)? = null,
+    /** Opens the file picker to read a settings file, after the user confirms (ISSUE-NOV10.8-O80). */
+    onImportSettings: (() -> Unit)? = null
 ) {
+    var confirmImport by remember { mutableStateOf(false) }
+    if (confirmImport && onImportSettings != null) {
+        ImportSettingsDialog(
+            onConfirm = {
+                confirmImport = false
+                onImportSettings()
+            },
+            onDismiss = { confirmImport = false }
+        )
+    }
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Slate900
@@ -52,6 +66,29 @@ fun CleanSetupOverlay(
                 )
                 IconButton(onClick = onClose) {
                     Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                }
+            }
+
+            if (onExportSettings != null && onImportSettings != null) {
+                Spacer(Modifier.height(16.dp))
+                SetupGroupHeader("SETTINGS FILE (KEEPS THE SETUP ACROSS A REINSTALL)", BrandGold)
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = onExportSettings,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Export Settings to File", fontSize = 13.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = { confirmImport = true },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Import Settings from File", color = Color.White, fontSize = 13.sp)
                 }
             }
 
@@ -253,6 +290,26 @@ fun PhoneSetupOverlay(
             Spacer(Modifier.height(48.dp))
         }
     }
+}
+
+/**
+ * Asks before an import replaces this phone's settings and pairing (ISSUE-NOV10.8-O80). The pairing is restored too, so
+ * a file imported on another phone makes it a copy of the exported one (accepted by the user, 2026-11-10).
+ */
+@Composable
+fun ImportSettingsDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Import Settings?") },
+        text = {
+            Text(
+                "The file's settings and pairing replace this phone's. Import only a file exported from this app; " +
+                    "imported on another phone, it makes that phone a copy of this one."
+            )
+        },
+        confirmButton = { Button(onClick = onConfirm) { Text("Choose File") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable

@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.GeofenceConfig
+import com.jd.core.shared.importedOver
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -72,6 +74,33 @@ class MonitorDataStore(private val context: Context) {
     suspend fun saveSirenType(type: String) {
         context.monitorDataStore.edit { prefs ->
             prefs[sirenTypeKey] = type
+        }
+    }
+
+    /** [file] with the stored settings filled in (ISSUE-NOV10.8-O80). */
+    suspend fun exportInto(file: MonitorSettingsFile): MonitorSettingsFile {
+        val prefs = context.monitorDataStore.data.first()
+        return file.copy(
+            relayUrl = prefs[relayUrlKey],
+            dndBypass = prefs[isDndBypassEnabledKey] ?: false,
+            alertSettings = decodeAlertSettings(prefs[alertSettingsKey]),
+            sirenType = prefs[sirenTypeKey] ?: "Siren",
+            geofence = decodeGeofence(prefs[geofenceKey])
+        )
+    }
+
+    /**
+     * Replaces the stored settings with [file]'s in one edit. The alert settings and the geofence get new revisions, so
+     * the Sensor takes them over the copies it holds (ISSUE-NOV10.8-O80).
+     */
+    suspend fun importFrom(file: MonitorSettingsFile, nowMs: Long = System.currentTimeMillis()) {
+        context.monitorDataStore.edit { prefs ->
+            val relayUrl = file.relayUrl
+            if (relayUrl == null) prefs.remove(relayUrlKey) else prefs[relayUrlKey] = relayUrl
+            prefs[isDndBypassEnabledKey] = file.dndBypass
+            prefs[alertSettingsKey] = Json.encodeToString(file.alertSettings.importedOver(decodeAlertSettings(prefs[alertSettingsKey]), nowMs))
+            prefs[sirenTypeKey] = file.sirenType
+            prefs[geofenceKey] = Json.encodeToString(file.geofence.importedOver(decodeGeofence(prefs[geofenceKey]), nowMs))
         }
     }
 }

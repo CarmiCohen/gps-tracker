@@ -104,6 +104,19 @@ class MonitorActivity : ComponentActivity() {
                 }
                 val context = LocalContext.current
 
+                // The settings file (ISSUE-NOV10.8-O80): the system picker needs no storage permission.
+                val exportLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument(SETTINGS_FILE_MIME_TYPE)
+                ) { uri -> uri?.let(viewModel::exportSettings) }
+                val importLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument()
+                ) { uri -> uri?.let(viewModel::importSettings) }
+                val exportSettings = { exportLauncher.launch(viewModel.exportFileName()) }
+                val importSettings = { importLauncher.launch(arrayOf("*/*")) } // The content is checked on reading.
+                LaunchedEffect(Unit) {
+                    viewModel.transferMessages.collect { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
+                }
+
                 val alertSettings by viewModel.alertSettings.collectAsStateWithLifecycle()
                 val sirenType by viewModel.sirenType.collectAsStateWithLifecycle()
                 val isSirenPlaying by viewModel.isSirenPlaying.collectAsStateWithLifecycle()
@@ -134,7 +147,8 @@ class MonitorActivity : ComponentActivity() {
                     PairingWizard(
                         relayUrl = relayUrl,
                         onPair = { id -> viewModel.setTargetId(id) },
-                        onUpdateRelayUrl = { url -> viewModel.updateRelayUrl(url) }
+                        onUpdateRelayUrl = { url -> viewModel.updateRelayUrl(url) },
+                        onImportSettings = importSettings
                     )
                 } else {
                     MonitorScreen(
@@ -173,6 +187,8 @@ class MonitorActivity : ComponentActivity() {
                             viewModel.triggerFullSystemReinitialization()
                             context.stopService(Intent(context, MonitorSessionService::class.java))
                         },
+                        onExportSettings = exportSettings,
+                        onImportSettings = importSettings,
                         onClose = { moveTaskToBack(true) }
                     )
                 }
@@ -181,6 +197,9 @@ class MonitorActivity : ComponentActivity() {
     }
 }
 
+/** The type the file picker gives the exported settings file. */
+const val SETTINGS_FILE_MIME_TYPE = "application/json"
+
 private const val WORLD_ZOOM = 3.0
 private const val DEVICE_ZOOM = 18.0
 
@@ -188,9 +207,21 @@ private const val DEVICE_ZOOM = 18.0
 fun PairingWizard(
     relayUrl: String,
     onPair: (String) -> Unit,
-    onUpdateRelayUrl: (String) -> Unit
+    onUpdateRelayUrl: (String) -> Unit,
+    /** A reinstalled Monitor opens here, so the settings file is imported from here too (ISSUE-NOV10.8-O80). */
+    onImportSettings: () -> Unit = {}
 ) {
     var text by rememberSaveable { mutableStateOf(ForensicIdentity.DEFAULT_TRACKER_ID) }
+    var confirmImport by rememberSaveable { mutableStateOf(false) }
+    if (confirmImport) {
+        com.jd.core.ui.ImportSettingsDialog(
+            onConfirm = {
+                confirmImport = false
+                onImportSettings()
+            },
+            onDismiss = { confirmImport = false }
+        )
+    }
     var isError by rememberSaveable { mutableStateOf(false) }
     var relayUrlInput by rememberSaveable(relayUrl) { mutableStateOf(relayUrl) }
     var showRelayConfig by rememberSaveable { mutableStateOf(false) }
@@ -268,6 +299,13 @@ fun PairingWizard(
             }
         }
 
+        OutlinedButton(
+            onClick = { confirmImport = true },
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+        ) {
+            Text("Import Settings from File")
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
         Text(text = "Version: ${getAppVersionName(LocalContext.current)}", fontSize = 12.sp, color = Color.Gray)
     }
@@ -299,6 +337,9 @@ fun MonitorScreen(
     onSetGeofenceRadius: (meters: Double) -> Unit = {},
     onResetStats: () -> Unit = {},
     onFullInit: () -> Unit = {},
+    /** The settings file's file pickers (ISSUE-NOV10.8-O80). */
+    onExportSettings: () -> Unit = {},
+    onImportSettings: () -> Unit = {},
     onClose: () -> Unit = {},
     sensorSetup: SensorSetupReport? = null,
     events: List<EventEntry> = emptyList(),
@@ -478,6 +519,8 @@ fun MonitorScreen(
         BackHandler { showCleanSetupOverlay = false }
         com.jd.core.ui.CleanSetupOverlay(
             onClearHomePoints = onClearHomePoints,
+            onExportSettings = onExportSettings,
+            onImportSettings = onImportSettings,
             onResetStats = onResetStats,
             onFullInit = { pendingUnpair = UnpairAction.FULL_REINITIALIZATION },
             onClose = { showCleanSetupOverlay = false }

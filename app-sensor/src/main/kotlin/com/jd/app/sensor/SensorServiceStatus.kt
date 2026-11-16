@@ -41,6 +41,18 @@ class SensorServiceStatus @Inject constructor() {
         refused.value = access
     }
 
+    private val nextSequenceValue = MutableStateFlow(0L)
+
+    /**
+     * The sequence number the service gives its next row; 0 until a service ran in this process. Kept after a stop, so a
+     * settings file exported then still continues the numbering (ISSUE-NOV10.8-O80, ISSUE-NOV5.2-O16).
+     */
+    val nextSequence: StateFlow<Long> = nextSequenceValue.asStateFlow()
+
+    fun setNextSequence(next: Long) {
+        nextSequenceValue.value = next
+    }
+
     fun markRunning(startTimeMs: Long = currentElapsedRealtime()) {
         startTime.value = startTimeMs
         running.value = true

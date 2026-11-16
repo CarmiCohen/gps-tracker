@@ -1,6 +1,7 @@
 package com.jd.app.monitor
 
 import android.content.Context
+import android.net.Uri
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import androidx.lifecycle.ViewModel
@@ -23,6 +24,8 @@ import com.jd.core.shared.SENSOR_INFO_REQUEST_INTERVAL_MS
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.SensorSetupReport
+import com.jd.core.shared.SettingsFileException
+import com.jd.core.shared.settingsFileName
 import com.jd.core.shared.atUiRate
 import com.jd.core.ui.HudState
 import com.jd.core.ui.getAppVersionName
@@ -53,8 +56,49 @@ class MonitorViewModel @Inject constructor(
     private val alarmEngine: MonitorAlarmEngine,
     private val eventLog: EventLog,
     private val graphs: MonitorGraphs,
+    private val settingsTransfer: MonitorSettingsTransfer,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
+
+    private val _transferMessages = MutableSharedFlow<String>(extraBufferCapacity = 1)
+
+    /** The outcome of each settings file export or import, shown once (ISSUE-NOV10.8-O80). */
+    val transferMessages: SharedFlow<String> = _transferMessages.asSharedFlow()
+
+    /** The name the file picker suggests for an export. */
+    fun exportFileName(): String = settingsFileName("Monitor", System.currentTimeMillis())
+
+    fun exportSettings(uri: Uri) {
+        viewModelScope.launch {
+            val message = try {
+                val file = settingsTransfer.export(uri)
+                "Settings exported: ${file.geofence.points.size} home points, ${file.trails.size} trail rows"
+                    .also { eventLog.record(EventLevel.INFO, it) }
+            } catch (e: Exception) {
+                "Export failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
+            }
+            _transferMessages.emit(message)
+        }
+    }
+
+    fun importSettings(uri: Uri) {
+        viewModelScope.launch {
+            val pairedBefore = pairing.value?.trackerId
+            val message = try {
+                val file = settingsTransfer.import(uri)
+                // Another Sensor's samples must not mix with the imported one's (ISSUE-NOV10.8-O84 part 3).
+                if (file.trackerId != pairedBefore) graphs.sensor.clear()
+                "Settings imported: tracker ${file.trackerId ?: "none"}, ${file.geofence.points.size} home points, ${file.trails.size} trail rows"
+                    .also { eventLog.record(EventLevel.INFO, it) }
+            } catch (e: Exception) {
+                "Import failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
+            }
+            _transferMessages.emit(message)
+        }
+    }
+
+    private fun Exception.userMessage(): String =
+        if (this is SettingsFileException) message.orEmpty() else (message ?: javaClass.simpleName)
 
     /** This phone's events and the paired Sensor's, oldest first (ISSUE-NOV10.8-O84). */
     val events: StateFlow<List<EventEntry>> = eventLog.events

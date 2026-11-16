@@ -199,7 +199,9 @@ class SensorService : Service(), SensorEventListener {
         initJob = serviceScope.launch(Dispatchers.IO) {
             try {
                 forensicBuffer.initialize()
-                sequenceIdCounter.set(forensicBuffer.nextSequenceId())
+                // An imported settings file sets a floor, so a reinstalled Sensor does not restart at 0 (ISSUE-NOV10.8-O80).
+                sequenceIdCounter.set(maxOf(forensicBuffer.nextSequenceId(), sensorDataStore.sequenceFloor.first()))
+                serviceStatus.setNextSequence(sequenceIdCounter.get())
                 SystemLogger.i("SensorService", "ForensicBuffer initialized asynchronously. Next seq: ${sequenceIdCounter.get()}")
             } catch (e: Exception) {
                 SystemLogger.e("SensorService", "Async ForensicBuffer initialization failed: ${e.message}")
@@ -222,6 +224,7 @@ class SensorService : Service(), SensorEventListener {
         setupBackfillListener()
         setupGeofenceListener()
         setupSensorBehaviourListener()
+        setupSequenceFloor()
         setupSetupReporting()
         setupEventReporting()
         setupInfoAnswering()
@@ -433,6 +436,24 @@ class SensorService : Service(), SensorEventListener {
      * (ISSUE-NOV10.8-O83): the Monitor's sliders set the tilt angle, the vibration limit and the noise jump, and its
      * switches stop the detection of a kind (user decisions 2026-11-15).
      */
+    /**
+     * A settings file imported while the service runs raises the sequence numbering at once (ISSUE-NOV10.8-O80,
+     * ISSUE-NOV5.2-O16). Before the buffer's first number is read the start-up sets the counter, also from the floor.
+     */
+    private fun setupSequenceFloor() {
+        sensorDataStore.sequenceFloor
+            .distinctUntilChanged()
+            .onEach { floor ->
+                initJob?.join()
+                if (floor > sequenceIdCounter.get()) {
+                    sequenceIdCounter.accumulateAndGet(floor, ::maxOf)
+                    serviceStatus.setNextSequence(sequenceIdCounter.get())
+                    eventLog.record(EventLevel.INFO, "Sequence numbering continues at $floor (imported settings)")
+                }
+            }
+            .launchIn(serviceScope)
+    }
+
     private fun setupSensorBehaviourListener() {
         signalingClient.sensorBehaviourFlow
             .onEach { behaviour ->
@@ -770,6 +791,7 @@ class SensorService : Service(), SensorEventListener {
                 update.timestamp = System.currentTimeMillis()
                 update.monotonicNanos = System.nanoTime()
                 update.sequenceId = sequenceIdCounter.getAndIncrement()
+                serviceStatus.setNextSequence(update.sequenceId + 1) // For the settings file (ISSUE-NOV10.8-O80).
                 update.status = "VALID"
                 update.batteryLevel = lastBatteryLevel
                 update.isCharging = lastIsCharging
