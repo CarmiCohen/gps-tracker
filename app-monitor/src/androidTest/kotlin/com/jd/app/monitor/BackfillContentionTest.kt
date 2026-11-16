@@ -240,6 +240,12 @@ class FakeSignalingClient : SignalingClient {
     override val sensorEventsFlow: Flow<com.jd.core.shared.SensorEventBatch> = MutableSharedFlow()
     override suspend fun sendSensorEvents(events: List<com.jd.core.shared.EventEntry>): Boolean = true
     override fun registerPushToken(token: String) = Unit
+    override val linkStats: StateFlow<com.jd.core.shared.LinkStats> = MutableStateFlow(com.jd.core.shared.LinkStats())
+    override fun queuedRowCount(): Int = 0
+    override val infoRequestFlow: Flow<Unit> = MutableSharedFlow()
+    override suspend fun requestSensorInfo(targetId: String): Boolean = true
+    override val sensorInfoFlow: StateFlow<com.jd.core.shared.ReceivedSensorInfo?> = MutableStateFlow(null)
+    override suspend fun sendSensorInfo(info: com.jd.core.shared.SensorInfo): Boolean = true
 
     fun emitTelemetry(update: LocationUpdate) {
         _telemetryFlow.tryEmit(update)

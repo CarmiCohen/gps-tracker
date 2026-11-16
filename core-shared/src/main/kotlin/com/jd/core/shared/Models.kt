@@ -37,6 +37,13 @@ data class LocationUpdate(
      * tells the relay to push the row to the Monitors as well (ISSUE-NOV10.8-O86); the receiver does not read it back.
      */
     var isCritical: Boolean = false,
+    /** Satellites used in the fix and in view, -1 when unknown (ISSUE-NOV10.8-O84 part 2). */
+    var satsUsed: Int = -1,
+    var satsInView: Int = -1,
+    /** Mean signal of the satellites used in the fix, null when none is (ISSUE-NOV10.8-O84 part 2). */
+    var meanCn0DbHz: Float? = null,
+    /** The microphone's newest sound level, null while it is not listening (ISSUE-NOV10.8-O84 part 2). */
+    var noiseDbfs: Float? = null,
     var sensorSnapshot: SensorSnapshot = SensorSnapshot()
 ) {
     /** Deep copy for holders that outlive a pooled instance, which is zeroed on release. */
@@ -48,6 +55,7 @@ data class LocationUpdate(
         isCharging = false; batteryLevel = -1; gsmSignalDbm = 0; networkType = "--"
         isBuffered = false; isHistoricalLkg = false; tempCelsius = -1f
         isThermalThrottled = false; cumulativeBytesSent = 0L; status = "VALID"; isNoiseDetectionOff = false; isCritical = false
+        satsUsed = -1; satsInView = -1; meanCn0DbHz = null; noiseDbfs = null
         sensorSnapshot.reset()
     }
 }

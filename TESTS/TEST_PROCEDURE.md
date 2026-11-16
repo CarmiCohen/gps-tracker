@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov15.4 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov15.5 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -942,8 +942,16 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **190.4 Menu (instrumented):** `UnpairConfirmationTest.eventsButtonOpensTheEventsList`: the Monitor's Events button opens the list with its periods and Close returns; `HudLayoutAuditTest`: Events stays visible with long IDs. Run the Monitor in airplane mode (O90).
 *   **190.5 Live (device):** with both apps paired, open the Monitor's Events: the Sensor's events (`S`) appear once each beside the Monitor's (`M`), newest first, left to right also on a right-to-left phone; force-stop and reopen the Monitor: `REV_SensorEvents: N newest events sent` follows its connect within 1 s; Export opens the share sheet with a text file; Clear asks first. `adb shell run-as com.jd.app.monitor cat files/event_log.jsonl` shows one JSON line per event.
 
+## Chapter 191 - The Detailed Info (Nov15.5)
+**Status: A / L** - `InfoSectionsTest` 9/9, `MotionSentinelTest.infoValuesFollowTheMotion`, `SensorInfoWireTest` 7/7, `SensorInfoScreenTest` 3/3, `MonitorInfoScreenTest` 3/3, `HudLayoutAuditTest` and `RotationStateRestorationTest` passed on the A15; 191.5 verified on the A15 (ISSUE-NOV10.8-O84 part 2, SOT 1.430)
+*   **191.1 Lines (unit):** `InfoSectionsTest`: a link drop counts at the disconnect and its length once back; the mean signal is over the satellites used; a healthy Sensor has five sections and no warning, with readable values; the Satellites line opens the list and warns below 4 used; each problem (stopped service, faulty microphone, no relay, rows held offline, no fix, low battery, heat, no network, power saving, rare bucket, optimization, low storage, outside home) is marked; the Monitor's copy is prefixed and grays when old; the Monitor's own section; the newest row stands in; durations, distances, buckets.
+*   **191.2 Motion values (unit):** `MotionSentinelTest.infoValuesFollowTheMotion`: no tilt before arming, the tilt from the resting position after, the 1-minute vibration peak holds and then falls back, the pressure follows the barometer.
+*   **191.3 Wire (unit):** `SensorInfoWireTest`: the `sensor_info` message survives the round trip and is not read as another settings type; a newer Sensor's field is skipped, a malformed one ignored; only the own `ping_relay` echo sets the latency, one ping at connect then every 30 s, none while disconnected; the Monitor's `info_request` reaches the Sensor's `infoRequestFlow` and the answer its `sensorInfoFlow`, forgotten on leaving; only rows held offline count; the four row fields cross the wire and a row without them means unknown.
+*   **191.4 Screens (unit and instrumented):** `SensorInfoScreenTest`: a stopped service shows a note, a running one its sections and satellites; `MonitorInfoScreenTest`: a fresh Info (ages by the Monitor's receive time) then this phone, an old one grayed with its age, the newest row while none came, only this phone without either. `HudLayoutAuditTest`: Info stays visible with long IDs; `RotationStateRestorationTest`: the `Monitor Setup` dialog survives rotation. Run the Monitor in airplane mode (O90).
+*   **191.5 Live (device):** with both apps paired, open the Sensor's Info (tap `System Idle`, then Info): five sections with live values, a latency in ms, the Satellites line opens the list (used first); open the Monitor's Info: within 10 s the `SENSOR - ` sections arrive with the Sensor's latency, and `THIS PHONE (MONITOR)` shows its own link, GPS and distance. Read the screens with `uiautomator dump`; acknowledge any alarm screen first.
+
 ---
-**Active Testing Chapters: 179 of 190**
+**Active Testing Chapters: 180 of 191**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

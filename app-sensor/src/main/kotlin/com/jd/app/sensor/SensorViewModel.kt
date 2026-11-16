@@ -10,6 +10,7 @@ import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLog
+import com.jd.core.shared.InfoScreenState
 import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.atUiRate
@@ -18,6 +19,7 @@ import com.jd.core.ui.readBattery
 import com.jd.core.ui.withLocalReadings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -31,6 +33,7 @@ class SensorViewModel @Inject constructor(
     private val fixStore: SensorFixStore,
     private val serviceStatus: SensorServiceStatus,
     private val eventLog: EventLog,
+    private val infoSource: SensorInfoSource,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -40,6 +43,18 @@ class SensorViewModel @Inject constructor(
     val events: StateFlow<List<EventEntry>> = eventLog.events
 
     fun clearEvents() = eventLog.clear()
+
+    /**
+     * The Info screen, built from the running service every second while the screen is open (ISSUE-NOV10.8-O84 part 2).
+     */
+    val infoScreen: StateFlow<InfoScreenState> = flow {
+        while (true) {
+            emit(sensorInfoScreen(infoSource.current()))
+            delay(INFO_REFRESH_MS)
+        }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), InfoScreenState())
 
     /** Reported by [SensorService] itself; shown in the Setup dialog (ISSUE-NOV6.4-O34). */
     val isServiceRunning: StateFlow<Boolean> = serviceStatus.isRunning

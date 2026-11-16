@@ -13,7 +13,7 @@ In the legacy monolithic app, the user had to select a role (Tracker vs. Viewer)
 ## 3. Configuration, Provisioning & UI Features
 - **First-Run Sync & Pairing**: Upon first launch of the Monitor, `PairingWizard` prompts for the Target Tracker ID (default `"T"`).
 - **Upper Menu Header**: Both applications feature a top menu header containing:
-  - **Setup Button (`Build`)**: Opens the Setup & Info dialog displaying Device IDs, Version, Service Status, and active Relay URL.
+  - **Setup Button (`Build`)**: Opens the Setup dialog displaying Device IDs, Version, Service Status, and active Relay URL; the Info button opens the detailed Info screen (Nov15.5, ISSUE-NOV10.8-O84 part 2).
   - **Settings Button (`Settings`)**: Opens configuration overlays for custom device IDs, Relay URL customization, and reset options.
   - **Disconnect / Close**: Quick action to stop services or re-pair devices.
 - **Relay URL Configuration**: Users can customize the Relay Server URL (or reset to default `https://gps-survival-relay.onrender.com`) in both Sensor and Monitor setup overlays, with automatic reactive signaling re-connection.

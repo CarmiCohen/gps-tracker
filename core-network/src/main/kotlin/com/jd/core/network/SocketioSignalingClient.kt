@@ -6,7 +6,11 @@ import com.jd.core.shared.EventEntry
 import com.jd.core.shared.SensorEventBatch
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
+import com.jd.core.shared.LATENCY_PING_INTERVAL_MS
+import com.jd.core.shared.LinkStats
 import com.jd.core.shared.LocationUpdate
+import com.jd.core.shared.ReceivedSensorInfo
+import com.jd.core.shared.SensorInfo
 import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.SensorSetupReport
 import com.jd.core.shared.ViolationEvent
@@ -20,6 +24,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -76,6 +81,18 @@ class SocketioSignalingClient @Inject constructor(
     private val _sensorEventsFlow = MutableSharedFlow<SensorEventBatch>(extraBufferCapacity = 16)
     override val sensorEventsFlow: SharedFlow<SensorEventBatch> = _sensorEventsFlow.asSharedFlow()
 
+    private val _linkStats = MutableStateFlow(LinkStats())
+    override val linkStats: StateFlow<LinkStats> = _linkStats.asStateFlow()
+
+    private val _infoRequestFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+    override val infoRequestFlow: SharedFlow<Unit> = _infoRequestFlow.asSharedFlow()
+
+    private val _sensorInfoFlow = MutableStateFlow<ReceivedSensorInfo?>(null)
+    override val sensorInfoFlow: StateFlow<ReceivedSensorInfo?> = _sensorInfoFlow.asStateFlow()
+
+    private var currentRoom: String? = null // The room joined as `secret`, where the latency pings go.
+    private var pingJob: Job? = null
+
     private var bytesSent: Long = 0
     private val arrivalLag = ArrivalLagMeter() // Used only on the socket's event thread (ISSUE-NOV10.7-O73).
     private var currentDeviceId: String? = null
@@ -96,6 +113,7 @@ class SocketioSignalingClient @Inject constructor(
         disconnect()
         currentDeviceId = deviceId
         currentUrl = url
+        currentRoom = secret
         val opts = IO.Options.builder()
             .setTransports(arrayOf("websocket"))
             .setReconnection(true)
@@ -114,18 +132,22 @@ class SocketioSignalingClient @Inject constructor(
                     put("lastSeq", lastSequenceId)
                 })
                 pushToken?.let { emit("push_token", pushTokenPayload(it)) } // After join: the relay files it under the joined room.
+                _linkStats.update { it.afterLink(true, System.currentTimeMillis()) }
 
                 clientScope.launch {
                     flushQueue()
                 }
                 startBatchTimer()
+                startPinging()
             }
 
             on(Socket.EVENT_DISCONNECT) {
                 _isConnected.value = false
                 _viewerStatusFlow.value = false
                 SystemLogger.w("Signaling", "Disconnected from relay")
+                _linkStats.update { it.afterLink(false, System.currentTimeMillis()) }
                 stopBatchTimer()
+                stopPinging()
                 clientScope.launch { movePendingToQueue() }
             }
 
@@ -201,6 +223,15 @@ class SocketioSignalingClient @Inject constructor(
                 SensorBehaviourWire.decode(data)?.let { _sensorBehaviourFlow.tryEmit(it) }
                 SensorSetupWire.decode(data)?.let { _sensorSetupFlow.value = it }
                 SensorEventsWire.decode(data)?.let { _sensorEventsFlow.tryEmit(it) }
+                SensorInfoWire.decode(data)?.let { _sensorInfoFlow.value = ReceivedSensorInfo(it, System.currentTimeMillis()) }
+                if (InfoRequestWire.isRequest(data)) _infoRequestFlow.tryEmit(Unit)
+            }
+
+            // Every ping of the room comes here; only this device's own echo is its latency (ISSUE-NOV10.8-O84 part 2).
+            on("ping_relay") { args ->
+                val data = args.getOrNull(0) as? JSONObject ?: return@on
+                val id = currentDeviceId ?: return@on
+                LatencyPingWire.roundTripMs(data, id, monotonicMs())?.let { rtt -> _linkStats.update { it.copy(latencyMs = rtt) } }
             }
 
             connect()
@@ -239,6 +270,30 @@ class SocketioSignalingClient @Inject constructor(
         batchFlushJob?.cancel()
         batchFlushJob = null
     }
+
+    /** Measures the latency to the relay at once and then every [LATENCY_PING_INTERVAL_MS] while connected. */
+    private fun startPinging() {
+        pingJob?.cancel()
+        pingJob = clientScope.launch {
+            while (isActive) {
+                val room = currentRoom
+                val id = currentDeviceId
+                if (room != null && id != null && _isConnected.value) {
+                    val payload = LatencyPingWire.encode(room, id, monotonicMs())
+                    socket?.emit("ping_cmd", payload)
+                    bytesSent += payload.toString().length.toLong()
+                }
+                delay(LATENCY_PING_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun stopPinging() {
+        pingJob?.cancel()
+        pingJob = null
+    }
+
+    private fun monotonicMs(): Long = System.nanoTime() / 1_000_000L
 
     private suspend fun flushPendingBatch() {
         val toSend = batchMutex.withLock {
@@ -280,10 +335,17 @@ class SocketioSignalingClient @Inject constructor(
         socket = null
         _isConnected.value = false
         _viewerStatusFlow.value = false
+        _linkStats.update { it.afterLink(false, System.currentTimeMillis()) }
         _sensorSetupFlow.value = null // The next session may watch another Sensor.
+        _sensorInfoFlow.value = null
         currentDeviceId = null
+        currentRoom = null
         stopBatchTimer()
+        stopPinging()
     }
+
+    /** The rows held while offline; the half-second batch in transit is no backlog (ISSUE-NOV10.8-O84 part 2). */
+    override fun queuedRowCount(): Int = queue.size()
 
     override fun getMonthlyDataUsageBytes(): Long = bytesSent
 
@@ -335,6 +397,11 @@ class SocketioSignalingClient @Inject constructor(
                 put("chg", update.isCharging)
                 put("temp", update.tempCelsius)
                 put("noiseOff", update.isNoiseDetectionOff) // Live rows only; the buffer does not keep it, so backfill omits it.
+                // Live rows only, like noiseOff (ISSUE-NOV10.8-O84 part 2); a value not known is left out.
+                if (update.satsUsed >= 0) put("sats", update.satsUsed)
+                if (update.satsInView >= 0) put("satsView", update.satsInView)
+                update.meanCn0DbHz?.let { put("snr", it.toDouble()) }
+                update.noiseDbfs?.let { put("noise", it.toDouble()) }
                 if (update.isCritical) put("crit", true) // Tells the relay to push this row to the Monitors as well (ISSUE-NOV10.8-O86).
             })
         }
@@ -439,6 +506,23 @@ class SocketioSignalingClient @Inject constructor(
         return true
     }
 
+    override suspend fun requestSensorInfo(targetId: String): Boolean {
+        if (!_isConnected.value) return false
+        val payload = InfoRequestWire.encode(targetId)
+        socket?.emit("settings_update", payload)
+        bytesSent += payload.toString().length.toLong()
+        return true
+    }
+
+    override suspend fun sendSensorInfo(info: SensorInfo): Boolean {
+        val deviceId = currentDeviceId ?: return false
+        if (!_isConnected.value) return false
+        val payload = SensorInfoWire.encode(info.sensorId.ifEmpty { deviceId }, info)
+        socket?.emit("settings_update", payload)
+        bytesSent += payload.toString().length.toLong()
+        return true
+    }
+
     private companion object {
         /**
          * The most a peer can flush at once. Socket callbacks use tryEmit, which drops
@@ -464,7 +548,12 @@ object LocationRowWire {
             batteryLevel = data.optInt("batt", 0),
             isCharging = data.optBoolean("chg", false),
             tempCelsius = data.optDouble("temp", 0.0).toFloat(),
-            isNoiseDetectionOff = data.optBoolean("noiseOff", false) // Absent from Sensors before Nov9.1: no warning.
+            isNoiseDetectionOff = data.optBoolean("noiseOff", false), // Absent from Sensors before Nov9.1: no warning.
+            // Absent from Sensors before Nov15.5, from backfilled rows, and while not known (ISSUE-NOV10.8-O84 part 2).
+            satsUsed = data.optInt("sats", -1),
+            satsInView = data.optInt("satsView", -1),
+            meanCn0DbHz = if (data.has("snr")) data.optDouble("snr").toFloat() else null,
+            noiseDbfs = if (data.has("noise")) data.optDouble("noise").toFloat() else null
         ).apply {
             sensorSnapshot.vibration = data.optDouble("vib", 0.0).toFloat()
         }

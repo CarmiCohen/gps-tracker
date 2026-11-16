@@ -43,7 +43,7 @@ fun sensorSetupWarnings(report: SensorSetupReport?, settings: AlertSettings): Li
 fun sensorSetupLineText(warningCount: Int): String =
     if (warningCount == 1) "SENSOR PHONE: 1 ITEM NEEDS ATTENTION" else "SENSOR PHONE: $warningCount ITEMS NEED ATTENTION"
 
-/** The Sensor phone line of the Monitor Setup & Info dialog. */
+/** The Sensor phone line of the Monitor Setup dialog. */
 fun sensorSetupStatusText(report: SensorSetupReport?, warningCount: Int): String = "Sensor phone setup: " + when {
     report == null -> "not reported yet"
     warningCount == 0 -> "complete"
@@ -51,7 +51,7 @@ fun sensorSetupStatusText(report: SensorSetupReport?, warningCount: Int): String
 }
 
 /**
- * The detection settings line of the Monitor Setup & Info dialog (ISSUE-NOV15.2-O97): whether the Sensor applies the
+ * The detection settings line of the Monitor Setup dialog (ISSUE-NOV15.2-O97): whether the Sensor applies the
  * revision this Monitor holds ([AlertSettings.sensorRevision]).
  */
 fun sensorBehaviourStatusText(report: SensorSetupReport?, sensorRevision: Long): String = "Sensor detection settings: " + when {

@@ -68,13 +68,13 @@ class PushSignalingTest {
 
             socket.simulateConnect()
             runCurrent()
-            assertEquals("The relay files the token under the joined room", listOf("join", "push_token"), socket.emittedEvents.map { it.first })
+            assertEquals("The relay files the token under the joined room", listOf("join", "push_token"), socket.emittedEvents.map { it.first }.filter { it != "ping_cmd" }) // The latency ping (ISSUE-NOV10.8-O84 part 2) is no data.
             assertEquals(listOf("token-1"), socket.tokens("push_token"))
 
             socket.disconnect() // The connection is lost; the relay restarts or forgets.
             socket.simulateConnect()
             runCurrent()
-            assertEquals(listOf("join", "push_token", "join", "push_token"), socket.emittedEvents.map { it.first })
+            assertEquals(listOf("join", "push_token", "join", "push_token"), socket.emittedEvents.map { it.first }.filter { it != "ping_cmd" }) // The latency ping (ISSUE-NOV10.8-O84 part 2) is no data.
             assertEquals(listOf("token-1", "token-1"), socket.tokens("push_token"))
         } finally {
             client.disconnect()

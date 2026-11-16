@@ -15,6 +15,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
+import android.location.LocationManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -25,15 +26,19 @@ import android.os.PowerManager
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.location.GnssStatusCompat
+import androidx.core.location.LocationManagerCompat
 import com.google.android.gms.location.*
 import com.jd.core.network.SignalingClient
 import com.jd.core.network.peerDeliveries
 import com.jd.core.shared.*
 import com.jd.core.ui.getAppVersionName
+import com.jd.core.ui.readPhoneState
 import com.jd.core.ui.toFixReading
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
@@ -63,6 +68,7 @@ class SensorService : Service(), SensorEventListener {
     @Inject lateinit var fixStore: SensorFixStore
     @Inject lateinit var serviceStatus: SensorServiceStatus
     @Inject lateinit var eventLog: EventLog
+    @Inject lateinit var infoSource: SensorInfoSource
     private lateinit var forensicBuffer: ForensicBuffer
     private lateinit var sensorManager: SensorManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -116,6 +122,25 @@ class SensorService : Service(), SensorEventListener {
         onAlert = { level, floor -> onAcousticAlert(level, floor) },
         onState = { serviceStatus.setMicrophone(it) }
     )
+
+    // For the Info screens and the rows (ISSUE-NOV10.8-O84 part 2); written on their own threads, read anywhere.
+    @Volatile private var satellites: List<SatelliteReading> = emptyList()
+    private var isGnssRegistered = false // Main thread only.
+    @Volatile private var lux: Float? = null
+    @Volatile private var selfId = ""
+    @Volatile private var isMonitorOnline = false
+
+    private val gnssCallback = object : GnssStatusCompat.Callback() {
+        override fun onSatelliteStatusChanged(status: GnssStatusCompat) {
+            satellites = (0 until status.satelliteCount).map { i ->
+                SatelliteReading(status.getSvid(i), status.getConstellationType(i), status.getCn0DbHz(i), status.usedInFix(i))
+            }
+        }
+
+        override fun onStopped() {
+            satellites = emptyList()
+        }
+    }
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -194,9 +219,11 @@ class SensorService : Service(), SensorEventListener {
         setupSensorBehaviourListener()
         setupSetupReporting()
         setupEventReporting()
+        setupInfoAnswering()
         registerSensors()
         startLocationUpdates()
         connectSignaling()
+        infoSource.register(::buildInfo)
         
         isInitialized = true
         eventLog.record(EventLevel.INFO, "Sensor service started (version ${getAppVersionName(this)})")
@@ -212,6 +239,7 @@ class SensorService : Service(), SensorEventListener {
                 val url = RelayConfig.resolve(rawUrl)
                 selfId to url
             }.collect { (selfId, url) ->
+                this@SensorService.selfId = selfId
                 SystemLogger.i("SensorService", "Connecting to relay $url as $selfId")
                 signalingClient.connect(
                     url = url,
@@ -464,6 +492,7 @@ class SensorService : Service(), SensorEventListener {
     private fun setupEventReporting() {
         signalingClient.isConnected.linkChanges().onEach { record(relayLinkEvent(it)) }.launchIn(serviceScope)
         signalingClient.viewerStatusFlow.linkChanges().onEach { record(monitorLinkEvent(it)) }.launchIn(serviceScope)
+        signalingClient.viewerStatusFlow.onEach { isMonitorOnline = it }.launchIn(serviceScope)
         peerDeliveries(eventLog.events.map { it.newestForPeer() }.filter { it.isNotEmpty() }, signalingClient.viewerStatusFlow)
             .onEach(::sendEvents)
             .launchIn(serviceScope)
@@ -476,6 +505,69 @@ class SensorService : Service(), SensorEventListener {
     }
 
     private fun record(event: LoggedEvent) = eventLog.record(event.level, event.message)
+
+    /**
+     * Sends this phone's Info to the Monitors every [SENSOR_INFO_SEND_INTERVAL_MS] for [SENSOR_INFO_ANSWER_WINDOW_MS] after
+     * each request; an open Monitor Info screen asks again before the window ends (ISSUE-NOV10.8-O84 part 2).
+     */
+    private fun setupInfoAnswering() {
+        serviceScope.launch {
+            signalingClient.infoRequestFlow.collectLatest {
+                val untilMs = SystemClock.elapsedRealtime() + SENSOR_INFO_ANSWER_WINDOW_MS
+                while (SystemClock.elapsedRealtime() < untilMs) {
+                    signalingClient.sendSensorInfo(buildInfo())
+                    delay(SENSOR_INFO_SEND_INTERVAL_MS)
+                }
+            }
+        }
+    }
+
+    /** This phone's Info now, for its own Info screen and the Monitors' (ISSUE-NOV10.8-O84 part 2). Any thread. */
+    private fun buildInfo(): SensorInfo {
+        val nowMs = System.currentTimeMillis()
+        val nowElapsedMs = SystemClock.elapsedRealtime()
+        val startedElapsedMs = serviceStatus.startTimeMillis.value
+        val motion = serviceStatus.motion.value
+        val microphone = serviceStatus.microphone.value
+        val fix = lastLocation
+        val home = geofence
+        val hasAccelerometer = motion.isRunning
+        return SensorInfo(
+            capturedAtMs = nowMs,
+            sensorId = selfId,
+            version = getAppVersionName(this),
+            serviceStartedAtMs = if (startedElapsedMs > 0L) nowMs - (nowElapsedMs - startedElapsedMs) else 0L,
+            motion = motionStatusText(motion).substringAfter(": "),
+            isMotionArmed = motion.isArmed && motion.isVibrationArmed,
+            microphone = microphoneStatusText(microphone).substringAfter(": "),
+            isMicrophoneFaulty = microphone.isNoiseDetectionOff,
+            behaviourRevision = sensorBehaviour.revision,
+            link = signalingClient.linkStats.value,
+            isMonitorOnline = isMonitorOnline,
+            queuedRows = signalingClient.queuedRowCount(),
+            // The fix's age from the monotonic clock, as the GPS time may differ from the phone's clock.
+            fixTimeMs = fix?.let { nowMs - (SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos) / 1_000_000L } ?: 0L,
+            lat = fix?.latitude ?: 0.0,
+            lng = fix?.longitude ?: 0.0,
+            accuracyM = fix?.accuracy ?: 0f,
+            speedMps = fix?.takeIf { it.hasSpeed() }?.speed,
+            homeDistanceM = fix?.takeIf { home.isActive }?.let { loc ->
+                home.points.minOf { SpatialMath.calculateDistance(loc.latitude, loc.longitude, it.lat, it.lng) }
+            },
+            homeRadiusM = home.takeIf { it.isActive }?.radiusMeters,
+            satellites = satellites,
+            vibrationG = if (hasAccelerometer) (motionSentinel.vibration / STANDARD_GRAVITY).toFloat() else null,
+            vibrationPeakG = if (hasAccelerometer) (motionSentinel.vibrationPeak / STANDARD_GRAVITY).toFloat() else null,
+            vibrationLimitG = (motionSentinel.vibrationThreshold / STANDARD_GRAVITY).toFloat(),
+            tiltDeg = motionSentinel.tiltDegrees?.toFloat(),
+            tiltLimitDeg = motionSentinel.tiltThresholdDegrees.toFloat(),
+            pressureHpa = motionSentinel.pressureHpa?.toFloat(),
+            noiseDbfs = acousticMonitor.levelDbfs?.toFloat(),
+            noiseFloorDbfs = acousticMonitor.floorDbfs?.toFloat(),
+            lux = lux,
+            phone = readPhoneState(this)
+        )
+    }
 
     private suspend fun sendSetupReport(report: SensorSetupReport) {
         val sent = signalingClient.sendSensorSetup(report)
@@ -490,6 +582,7 @@ class SensorService : Service(), SensorEventListener {
         val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         val gravity = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)
         val pressure = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
+        val light = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT) // Info only (ISSUE-NOV10.8-O84 part 2); reports on change.
         hasGravitySensor = gravity != null
         hasBarometer = pressure != null
         val handler = Handler(HandlerThread("MotionSensors").also { it.start(); motionThread = it }.looper)
@@ -497,6 +590,7 @@ class SensorService : Service(), SensorEventListener {
         accel?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME, handler) }
         gravity?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME, handler) }
         pressure?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler) }
+        light?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler) }
         ownVibrationWatch = OwnVibrationWatch(this) { isOwn ->
             motionSentinel.isOwnVibrationActive = isOwn
             acousticMonitor.isOwnSoundActive = isOwn
@@ -526,6 +620,20 @@ class SensorService : Service(), SensorEventListener {
         } catch (e: SecurityException) {
             SystemLogger.e("Location", "SecurityException during location updates: ${e.message}")
         }
+        registerGnssStatus()
+    }
+
+    /** The satellites for the Info screens and the rows (ISSUE-NOV10.8-O84 part 2); once per service. Main thread. */
+    private fun registerGnssStatus() {
+        if (isGnssRegistered) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        val locationManager = getSystemService(LocationManager::class.java) ?: return
+        try {
+            isGnssRegistered = LocationManagerCompat.registerGnssStatusCallback(locationManager, ContextCompat.getMainExecutor(this), gnssCallback)
+        } catch (e: SecurityException) {
+            SystemLogger.e("Location", "GNSS status refused: ${e.message}")
+        }
+        if (!isGnssRegistered) SystemLogger.w("Location", "No GNSS status: the Info shows no satellites")
     }
 
     private fun refreshSamplingRate() {
@@ -569,6 +677,7 @@ class SensorService : Service(), SensorEventListener {
                 lastGravity[2] = event.values[2].toDouble()
             }
             Sensor.TYPE_PRESSURE -> motionSentinel.onPressure(event.values[0].toDouble(), eventMs)?.let(::onMotionAlert)
+            Sensor.TYPE_LIGHT -> lux = event.values[0]
         }
     }
 
@@ -613,6 +722,14 @@ class SensorService : Service(), SensorEventListener {
                 update.isCharging = lastIsCharging
                 update.tempCelsius = lastTempCelsius
                 update.isNoiseDetectionOff = serviceStatus.microphone.value.isNoiseDetectionOff // ISSUE-NOV8.103-O60
+                // For the Monitor's Info now and the graphs later (ISSUE-NOV10.8-O84 part 2); unknown without GNSS status.
+                if (isGnssRegistered) {
+                    val gnss = gnssSummary(satellites)
+                    update.satsUsed = gnss.used
+                    update.satsInView = gnss.inView
+                    update.meanCn0DbHz = gnss.meanCn0DbHz
+                }
+                update.noiseDbfs = acousticMonitor.levelDbfs?.toFloat()
                 
                 val hasPhysicalMotion = update.sensorSnapshot.vibration > 0.12f
                 // A fix older than FIX_STALE_AFTER_MS is no longer the current position: send NO_FIX without one.
@@ -792,6 +909,7 @@ class SensorService : Service(), SensorEventListener {
     override fun onDestroy() {
         if (isInitialized) eventLog.record(EventLevel.WARNING, "Sensor service stopped")
         else SystemLogger.i("SensorService", "onDestroy before initialization")
+        infoSource.unregister()
         acousticMonitor.stop()
         getSystemService(NotificationManager::class.java).cancel(RESTART_NOTIFICATION_ID)
         serviceScope.cancel()
@@ -803,6 +921,7 @@ class SensorService : Service(), SensorEventListener {
             ownVibrationWatch?.stop()
             motionThread?.quitSafely()
             fusedLocationClient.removeLocationUpdates(locationCallback)
+            if (isGnssRegistered) getSystemService(LocationManager::class.java)?.let { LocationManagerCompat.unregisterGnssStatusCallback(it, gnssCallback) }
             try { unregisterReceiver(batteryReceiver) } catch (e: Exception) {}
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 thermalListener?.let { powerManager.removeThermalStatusListener(it) }

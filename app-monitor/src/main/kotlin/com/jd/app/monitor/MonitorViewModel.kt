@@ -13,17 +13,22 @@ import com.jd.core.shared.EventLevel
 import com.jd.core.shared.EventLog
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
+import com.jd.core.shared.InfoScreenState
+import com.jd.core.shared.SENSOR_INFO_REQUEST_INTERVAL_MS
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.SensorSetupReport
 import com.jd.core.shared.atUiRate
 import com.jd.core.ui.HudState
+import com.jd.core.ui.getAppVersionName
 import com.jd.core.ui.metersPerSecondToKmh
 import com.jd.core.ui.motionState
 import com.jd.core.ui.readBattery
+import com.jd.core.ui.readPhoneState
 import com.jd.core.ui.withLocalReadings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -298,6 +303,41 @@ class MonitorViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "sensor"))
 
     val hudState: StateFlow<HudState> = remoteHudState
+
+    /** The paired Sensor's newest Info; another tracker's is never shown (ISSUE-NOV10.8-O84 part 2). */
+    private val pairedSensorInfo = combine(signalingClient.sensorInfoFlow, identityManager.targetId) { received, target ->
+        received?.takeIf { it.info.sensorId == target }
+    }
+
+    /** Asks the paired Sensor for its Info every [SENSOR_INFO_REQUEST_INTERVAL_MS] while collected. Emits nothing. */
+    private val sensorInfoRequests = flow<InfoScreenState> {
+        while (true) {
+            identityManager.targetId.first()?.let { signalingClient.requestSensorInfo(it) }
+            delay(SENSOR_INFO_REQUEST_INTERVAL_MS)
+        }
+    }
+
+    /**
+     * The Info screen (ISSUE-NOV10.8-O84 part 2), rebuilt every second while it is open; only then is the Sensor asked
+     * for its Info, so a closed screen costs no data.
+     */
+    val infoScreen: StateFlow<InfoScreenState> = merge(
+        sensorInfoRequests,
+        combine(_ticker, pairedSensorInfo, pairedTelemetry, signalingClient.linkStats, localFix) { now, received, row, link, fix ->
+            monitorInfoScreen(
+                received = received,
+                newestRow = row,
+                link = link,
+                localFix = fix,
+                phone = readPhoneState(context),
+                monitorId = selfId.first(),
+                version = getAppVersionName(context),
+                nowMs = now
+            )
+        }
+    )
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), InfoScreenState())
 
     fun setTargetId(id: String) {
         viewModelScope.launch {

@@ -364,7 +364,7 @@ class SignalingBatchTest {
             runCurrent()
 
             // Filter for relevant signaling events (ignore "join")
-            val sigEvents = fakeSocket.emittedEvents.filter { it.first != "join" }
+            val sigEvents = fakeSocket.emittedEvents.filter { it.first != "join" && it.first != "ping_cmd" } // The latency ping is no data (ISSUE-NOV10.8-O84 part 2).
             assertEquals("Should have 2 signaling events: batch and then critical update", 2, sigEvents.size)
             assertEquals("location_batch", sigEvents[0].first)
             assertEquals("location_batch", sigEvents[1].first)
@@ -424,7 +424,7 @@ class SignalingBatchTest {
             client.sendViolation(ViolationEvent("SPEED", LocationUpdate(), "nonce"))
             runCurrent()
 
-            val sigEvents = fakeSocket.emittedEvents.filter { it.first != "join" }
+            val sigEvents = fakeSocket.emittedEvents.filter { it.first != "join" && it.first != "ping_cmd" } // The latency ping is no data (ISSUE-NOV10.8-O84 part 2).
             assertEquals(2, sigEvents.size)
             assertEquals("location_batch", sigEvents[0].first)
             assertEquals("violation_event", sigEvents[1].first)

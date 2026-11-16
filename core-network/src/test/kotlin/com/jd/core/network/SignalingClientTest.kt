@@ -60,6 +60,12 @@ class SignalingClientTest {
             override val sensorEventsFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.SensorEventBatch>()
             override suspend fun sendSensorEvents(events: List<com.jd.core.shared.EventEntry>) = true
             override fun registerPushToken(token: String) = Unit
+            override val linkStats = kotlinx.coroutines.flow.MutableStateFlow(com.jd.core.shared.LinkStats())
+            override fun queuedRowCount() = 0
+            override val infoRequestFlow = kotlinx.coroutines.flow.emptyFlow<Unit>()
+            override suspend fun requestSensorInfo(targetId: String) = true
+            override val sensorInfoFlow = kotlinx.coroutines.flow.MutableStateFlow<com.jd.core.shared.ReceivedSensorInfo?>(null)
+            override suspend fun sendSensorInfo(info: com.jd.core.shared.SensorInfo) = true
         }
 
         assertFalse("Should start disconnected", mockClient.isConnected.first())

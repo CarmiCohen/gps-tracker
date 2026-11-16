@@ -5,7 +5,10 @@ import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.SensorEventBatch
 import com.jd.core.shared.GeofenceConfig
+import com.jd.core.shared.LinkStats
 import com.jd.core.shared.LocationUpdate
+import com.jd.core.shared.ReceivedSensorInfo
+import com.jd.core.shared.SensorInfo
 import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.SensorSetupReport
 import com.jd.core.shared.ViolationEvent
@@ -123,4 +126,31 @@ interface SignalingClient {
      * alarm rows also arrive as high-priority pushes (ISSUE-NOV10.8-O86). [disconnect] takes the token back.
      */
     fun registerPushToken(token: String)
+
+    /**
+     * The relay link since the app started, with the latency to the relay, for the Info screens (ISSUE-NOV10.8-O84
+     * part 2).
+     */
+    val linkStats: StateFlow<LinkStats>
+
+    /** Sensor: the rows held while offline, waiting to be sent, for its Info (ISSUE-NOV10.8-O84 part 2). */
+    fun queuedRowCount(): Int
+
+    /** Sensor: each time a Monitor's Info screen asks for the Sensor's Info (ISSUE-NOV10.8-O84 part 2). */
+    val infoRequestFlow: Flow<Unit>
+
+    /**
+     * Monitor: asks the tracker [targetId] for its Info while the Info screen is open (ISSUE-NOV10.8-O84 part 2).
+     * Returns false when not connected.
+     */
+    suspend fun requestSensorInfo(targetId: String): Boolean
+
+    /**
+     * Monitor: the newest Info received from a Sensor, or null when none arrived since [connect] (ISSUE-NOV10.8-O84
+     * part 2). [disconnect] forgets it.
+     */
+    val sensorInfoFlow: StateFlow<ReceivedSensorInfo?>
+
+    /** Sensor: sends its [info] to the Monitors of its room (ISSUE-NOV10.8-O84 part 2). Returns false when not connected. */
+    suspend fun sendSensorInfo(info: SensorInfo): Boolean
 }

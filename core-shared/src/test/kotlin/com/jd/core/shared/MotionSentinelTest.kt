@@ -402,4 +402,30 @@ class MotionSentinelTest {
         assertEquals(0.0, pressureAltitudeMeters(1013.25), 1e-6)
         assertEquals(0.83, pressureAltitudeMeters(1013.15) - pressureAltitudeMeters(1013.25), 0.02)
     }
+
+    /** Chapter 191 (ISSUE-NOV10.8-O84 part 2): the values the Info screens show. */
+    @Test
+    fun infoValuesFollowTheMotion() {
+        val phone = Phone()
+        assertNull("No pressure without a barometer", phone.sentinel.pressureHpa)
+        phone.rest(5_000)
+        assertNull("No tilt before arming", phone.sentinel.tiltDegrees)
+        assertTrue("A resting phone barely vibrates", phone.sentinel.vibration < 0.1)
+
+        phone.rest(MOTION_ARM_AFTER_STILL_MS)
+        assertEquals("Armed: the tilt from the resting position", 0.0, phone.sentinel.tiltDegrees!!, 1.0)
+        phone.tiltSlowly(8.0) // Below the default 15 degrees limit.
+        assertEquals(8.0, phone.sentinel.tiltDegrees!!, 1.0)
+
+        phone.knock()
+        val peak = phone.sentinel.vibrationPeak
+        assertTrue("The knock is the peak: $peak", peak > 5.0)
+        phone.rest(VIBRATION_PEAK_WINDOW_MS / 2)
+        assertEquals("The peak stays within its window", peak, phone.sentinel.vibrationPeak, 1e-9)
+        phone.rest(VIBRATION_PEAK_WINDOW_MS)
+        assertTrue("Then it falls back to the resting level", phone.sentinel.vibrationPeak < 0.1)
+
+        phone.sentinel.onPressure(1013.0, phone.nowMs)
+        assertEquals(1013.0, phone.sentinel.pressureHpa!!, 1e-9)
+    }
 }

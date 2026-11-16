@@ -52,13 +52,13 @@ class RotationStateRestorationTest {
 
         // Open Setup dialog
         composeRule.onNodeWithContentDescription("Setup").performClick()
-        composeRule.onNodeWithText("Monitor Setup & Info").assertExists()
+        composeRule.onNodeWithText("Monitor Setup").assertExists()
 
         // Emulate configuration change / rotation save & restore state
         restorationTester.emulateSavedInstanceStateRestore()
 
         // Verify Setup dialog remains open after rotation
-        composeRule.onNodeWithText("Monitor Setup & Info").assertExists()
+        composeRule.onNodeWithText("Monitor Setup").assertExists()
     }
 
     @Test

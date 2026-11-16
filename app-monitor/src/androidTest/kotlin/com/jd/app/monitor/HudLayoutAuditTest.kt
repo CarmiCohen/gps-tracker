@@ -67,7 +67,7 @@ class HudLayoutAuditTest {
         composeRule.setContent {
             RevolutionTheme {
                 Box(Modifier.width(320.dp)) {
-                    MonitorMenuBar("MONITOR-LONG-ID", "TRACKER-LONG-ID", {}, {}, {}, {}, {})
+                    MonitorMenuBar("MONITOR-LONG-ID", "TRACKER-LONG-ID", {}, {}, {}, {}, {}, {})
                 }
             }
         }

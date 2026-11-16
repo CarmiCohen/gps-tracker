@@ -53,6 +53,22 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
     @Volatile var isVibrationArmed = false
         private set
 
+    /** The newest sample's distance from the estimated gravity in m/s², for the Info screens (ISSUE-NOV10.8-O84 part 2). */
+    @Volatile var vibration = 0.0
+        private set
+
+    /** The largest [vibration] of about the last [VIBRATION_PEAK_WINDOW_MS] (ISSUE-NOV10.8-O84 part 2). */
+    @Volatile var vibrationPeak = 0.0
+        private set
+    private var vibrationPeakMs = 0L
+
+    /** The tilt from the armed resting position in degrees, null while tilt is not armed (ISSUE-NOV10.8-O84 part 2). */
+    @Volatile var tiltDegrees: Double? = null
+        private set
+
+    /** The smoothed air pressure in hPa, null without a barometer (ISSUE-NOV10.8-O84 part 2). */
+    val pressureHpa: Double? get() = pressureSmoothed
+
     private var gx = 0.0
     private var gy = 0.0
     private var gz = 0.0
@@ -73,7 +89,7 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
     private var liftHeight = 0.0
     private var liftQuietSinceMs: Long? = null
 
-    private var pressureSmoothed: Double? = null
+    @Volatile private var pressureSmoothed: Double? = null
     private var pressureReference: Double? = null
     private var lastPressureMs = -1L
     private var baroSinceMs: Long? = null
@@ -107,6 +123,11 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
         val dt = gapMs / 1000.0
         // Measured against the gravity before this sample, so a single sharp knock counts at its full size.
         val vibration = norm(x - gx, y - gy, z - gz)
+        this.vibration = vibration
+        if (vibration >= vibrationPeak || nowMs - vibrationPeakMs > VIBRATION_PEAK_WINDOW_MS) {
+            vibrationPeak = vibration
+            vibrationPeakMs = nowMs
+        }
         val alpha = dt / (GRAVITY_TIME_CONSTANT_S + dt)
         gx += alpha * (x - gx)
         gy += alpha * (y - gy)
@@ -147,6 +168,7 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
         }
 
         val angle = angleDegrees(gx, gy, gz, refX, refY, refZ)
+        tiltDegrees = angle
         if (angle >= tiltThresholdDegrees) {
             val since = tiltSinceMs ?: nowMs.also { tiltSinceMs = it }
             if (nowMs - since >= TILT_CONFIRM_MS) {
@@ -221,6 +243,7 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
 
     private fun disarm(nowMs: Long, alert: Alert): Alert {
         isArmed = false
+        tiltDegrees = null
         lastMotionMs = nowMs
         tiltSinceMs = null
         liftStartMs = null
@@ -249,6 +272,9 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
         }
     }
 }
+
+/** The Info screens' vibration peak covers about this long (ISSUE-NOV10.8-O84 part 2). */
+const val VIBRATION_PEAK_WINDOW_MS = 60_000L
 
 /** Rest needed before tilt and lift are armed; a car waiting at a red light can arm too (see SOT 1.400). */
 const val MOTION_ARM_AFTER_STILL_MS = 30_000L

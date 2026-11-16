@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- The Info screens name the network (ISSUE-NOV10.8-O84 part 2, PhoneStateReader.kt); a normal permission. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application>
         <!-- The Events list's Export shares a file from the cache (ISSUE-NOV10.8-O84, EventLogOverlay.kt). -->
         <provider

@@ -38,6 +38,12 @@ class AcousticMonitor(
     /** The jump above the background that alerts, from the Monitor's `Noise Sensitivity Threshold` slider (ISSUE-NOV10.8-O83). */
     @Volatile var jumpDb: Double = ACOUSTIC_JUMP_DB
 
+    /** The newest frame's level and the learned background in dBFS, null while not listening (ISSUE-NOV10.8-O84 part 2). */
+    @Volatile var levelDbfs: Double? = null
+        private set
+    @Volatile var floorDbfs: Double? = null
+        private set
+
     /** Starts listening; does nothing while already listening. */
     fun start(context: Context) {
         synchronized(lock) {
@@ -56,6 +62,8 @@ class AcousticMonitor(
             isRunning = false
             thread?.join(STOP_WAIT_MS) // A read returns within one frame.
             thread = null
+            levelDbfs = null
+            floorDbfs = null
         }
     }
 
@@ -108,6 +116,7 @@ class AcousticMonitor(
                 }
                 val nowMs = SystemClock.elapsedRealtime()
                 val level = acousticLevelDbfs(buffer, read)
+                levelDbfs = level
                 if (level == null) {
                     val since = silentSinceMs ?: nowMs.also { silentSinceMs = it }
                     if (nowMs - since >= SILENCED_AFTER_MS) report(MicrophoneState.SILENCED)
@@ -116,6 +125,7 @@ class AcousticMonitor(
                 silentSinceMs = null
                 report(MicrophoneState.LISTENING)
                 val floor = detector.floorDbfs
+                floorDbfs = floor
                 detector.jumpDb = jumpDb // A slider change applies at once, without relearning the background.
                 if (detector.onLevel(level, nowMs) && floor != null && !isOwnSoundActive) onAlert(level, floor)
             }
@@ -123,6 +133,8 @@ class AcousticMonitor(
             SystemLogger.e("Acoustic", "Microphone error: ${e.message}")
             onState(MicrophoneState.UNAVAILABLE)
         } finally {
+            levelDbfs = null
+            floorDbfs = null
             try { record.stop() } catch (_: Exception) {}
             record.release()
         }

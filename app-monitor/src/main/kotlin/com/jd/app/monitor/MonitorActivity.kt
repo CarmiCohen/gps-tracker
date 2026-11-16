@@ -150,6 +150,7 @@ class MonitorActivity : ComponentActivity() {
                         sensorSetup = sensorSetup,
                         events = events,
                         onClearEvents = viewModel::clearEvents,
+                        infoOverlay = { onClose -> MonitorInfoScreen(viewModel, onClose) },
                         onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
                         onUpdateSirenType = { viewModel.updateSirenType(it) },
                         onUpdateAlarmVolume = { viewModel.updateAlarmVolume(it) },
@@ -298,7 +299,9 @@ fun MonitorScreen(
     onClose: () -> Unit = {},
     sensorSetup: SensorSetupReport? = null,
     events: List<EventEntry> = emptyList(),
-    onClearEvents: () -> Unit = {}
+    onClearEvents: () -> Unit = {},
+    /** The detailed Info screen (ISSUE-NOV10.8-O84 part 2), given its close action. */
+    infoOverlay: @Composable (onClose: () -> Unit) -> Unit = {}
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
@@ -308,6 +311,7 @@ fun MonitorScreen(
     var showSetupWarnings by rememberSaveable { mutableStateOf(false) }
     var showAlertsOverlay by rememberSaveable { mutableStateOf(false) }
     var showEventsOverlay by rememberSaveable { mutableStateOf(false) }
+    var showInfoOverlay by rememberSaveable { mutableStateOf(false) }
     var showSoundOverlay by rememberSaveable { mutableStateOf(false) }
     var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
     var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
@@ -372,6 +376,12 @@ fun MonitorScreen(
                 }
             }
         )
+    }
+
+    if (showInfoOverlay) {
+        BackHandler { showInfoOverlay = false }
+        infoOverlay { showInfoOverlay = false }
+        return
     }
 
     if (showEventsOverlay) {
@@ -581,6 +591,7 @@ fun MonitorScreen(
                     onUnpair = requestUnpair,
                     onMap = { followMode = MapFollowMode.AUTO },
                     onEvents = { showEventsOverlay = true },
+                    onInfo = { showInfoOverlay = true },
                     onClose = onClose
                 )
                 // Line 1: Local Device Status
@@ -670,7 +681,7 @@ fun MonitorScreen(
                 showSetupDialog = false 
                 isEditingRelayUrl = false
             },
-            title = { Text("Monitor Setup & Info") },
+            title = { Text("Monitor Setup") }, // The detailed Info has its own screen (ISSUE-NOV10.8-O84 part 2).
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Tracker ID: $trackerId")
@@ -776,9 +787,10 @@ fun MonitorMenuBar(
     onUnpair: () -> Unit,
     onMap: () -> Unit,
     onEvents: () -> Unit,
+    onInfo: () -> Unit,
     onClose: () -> Unit
 ) {
-    // Events since ISSUE-NOV10.8-O84 Nov15.4; Graphs follow with O84. Unpairing is only behind the gear, the red X
+    // Events since ISSUE-NOV10.8-O84 Nov15.4, the detailed Info since Nov15.5; Graphs follow with O84. Unpairing is only behind the gear, the red X
     // sends the app to the background (ISSUE-NOV10.8-O76).
     Surface(
         color = Color.Black.copy(alpha = 0.85f),
@@ -806,7 +818,7 @@ fun MonitorMenuBar(
                 IconButton(onClick = onEvents, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
                 }
-                IconButton(onClick = onSetup, modifier = Modifier.size(28.dp)) {
+                IconButton(onClick = onInfo, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
                 }
             }

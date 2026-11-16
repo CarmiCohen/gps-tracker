@@ -107,6 +107,7 @@ class AdminActivity : ComponentActivity() {
                     var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
                     var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
                     var showEventsOverlay by rememberSaveable { mutableStateOf(false) }
+                    var showInfoOverlay by rememberSaveable { mutableStateOf(false) }
 
                     val sensorBehaviour by viewModel.sensorBehaviour.collectAsStateWithLifecycle()
 
@@ -139,7 +140,15 @@ class AdminActivity : ComponentActivity() {
                                     startSensorService(context)
                                 }
                             }
-                            if (showEventsOverlay) {
+                            if (showInfoOverlay) {
+                                BackHandler { showInfoOverlay = false }
+                                val infoScreen by viewModel.infoScreen.collectAsStateWithLifecycle()
+                                com.jd.core.ui.DeviceInfoOverlay(
+                                    title = "SENSOR INFO",
+                                    state = infoScreen,
+                                    onClose = { showInfoOverlay = false }
+                                )
+                            } else if (showEventsOverlay) {
                                 BackHandler { showEventsOverlay = false }
                                 val events by viewModel.events.collectAsStateWithLifecycle()
                                 com.jd.core.ui.EventLogOverlay(
@@ -203,6 +212,7 @@ class AdminActivity : ComponentActivity() {
                                     logs = logs,
                                     onSettingsClick = { showSettings = true },
                                     onEventsClick = { showEventsOverlay = true },
+                                    onInfoClick = { showInfoOverlay = true },
                                     onClose = { moveTaskToBack(true) },
                                     onOpenPhoneSetup = { showPhoneSetupOverlay = true }
                                 )
@@ -487,6 +497,7 @@ fun SensorAdminConsole(
     logs: List<SystemLogger.LogEntry>, 
     onSettingsClick: () -> Unit,
     onEventsClick: () -> Unit,
+    onInfoClick: () -> Unit,
     onClose: () -> Unit,
     onOpenPhoneSetup: () -> Unit
 ) {
@@ -500,7 +511,8 @@ fun SensorAdminConsole(
 
     Column {
         // Menu Upper Line: Setup, Settings and Info; the red X sends the app to the background (ISSUE-NOV10.8-O76).
-        // Events since ISSUE-NOV10.8-O84 Nov15.4; Graphs follow with O84. The Sensor has no map (user decision, 2026-11-12).
+        // Events since ISSUE-NOV10.8-O84 Nov15.4, the detailed Info since Nov15.5; Graphs follow with O84. The Sensor has
+        // no map (user decision, 2026-11-12).
         Surface(
             color = Color.Black.copy(alpha = 0.85f),
             contentColor = Color.White
@@ -526,7 +538,7 @@ fun SensorAdminConsole(
                     IconButton(onClick = onEventsClick, modifier = Modifier.size(28.dp)) {
                         Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
                     }
-                    IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onInfoClick, modifier = Modifier.size(28.dp)) {
                         Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
                     }
                 }
@@ -683,7 +695,7 @@ fun SensorAdminConsole(
     if (showSetupDialog) {
         AlertDialog(
             onDismissRequest = { showSetupDialog = false },
-            title = { Text("Sensor Setup & Info") },
+            title = { Text("Sensor Setup") }, // The detailed Info has its own screen (ISSUE-NOV10.8-O84 part 2).
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Sensor Device ID: $trackerId")
