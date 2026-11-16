@@ -53,6 +53,34 @@ class EventLogTest {
     }
 
     @Test
+    fun `a past event is decided from the loaded log, before later records, at its own time`() = runTest {
+        log(EventSource.SENSOR).record(EventLevel.INFO, "Sensor service started")
+        runCurrent()
+
+        nowMs += 600_000
+        val restarted = log(EventSource.SENSOR)
+        var seen: List<String>? = null
+        restarted.recordFrom { events ->
+            seen = events.map { it.message }
+            PastEvent(EventLevel.WARNING, "Sensor service stopped: app crashed", nowMs - 300_000)
+        }
+        restarted.record(EventLevel.INFO, "Sensor service started")
+        runCurrent()
+        assertEquals("The decision saw the stored log, not the later record", listOf("Sensor service started"), seen)
+        assertEquals(
+            listOf("Sensor service started", "Sensor service stopped: app crashed", "Sensor service started"),
+            restarted.events.value.map { it.message }
+        )
+        assertEquals(nowMs - 300_000, restarted.events.value[1].timestampMs)
+        assertEquals(EventSource.SENSOR, restarted.events.value[1].source)
+
+        restarted.recordFrom { null }
+        restarted.recordFrom { error("broken") }
+        runCurrent()
+        assertEquals("No event, and a failing decision changes nothing", 3, restarted.events.value.size)
+    }
+
+    @Test
     fun `the peer's events are merged once, in time order`() = runTest {
         val log = log()
         log.record(EventLevel.INFO, "Relay connected")

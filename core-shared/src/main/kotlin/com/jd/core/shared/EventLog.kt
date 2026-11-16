@@ -38,6 +38,9 @@ data class EventEntry(
     val message: String
 )
 
+/** An event learned after the fact, at the time it happened (ISSUE-NOV15.4-O98). */
+data class PastEvent(val level: EventLevel, val message: String, val timestampMs: Long)
+
 /** The Sensor's newest events as the Monitor receives them (ISSUE-NOV10.8-O84). */
 data class SensorEventBatch(val trackerId: String, val events: List<EventEntry>)
 
@@ -105,6 +108,20 @@ class EventLog(
         SystemLogger.log(if (level == EventLevel.ALARM || level == EventLevel.WARNING) "W" else "I", "Event", message)
         val entry = EventEntry(newId(now), now, source, level, message)
         scope.launch { add(listOf(entry)) }
+    }
+
+    /**
+     * Adds the event [decide] finds from the kept events, if any (ISSUE-NOV15.4-O98). [decide] runs on the writer thread,
+     * after the file has loaded and every earlier change is in, so it sees what the log held when this was called.
+     */
+    fun recordFrom(decide: (List<EventEntry>) -> PastEvent?) {
+        scope.launch {
+            val event = runCatching { decide(_events.value) }
+                .onFailure { SystemLogger.w("Event", "Past event not decided: ${it.message}") }
+                .getOrNull() ?: return@launch
+            SystemLogger.log(if (event.level == EventLevel.ALARM || event.level == EventLevel.WARNING) "W" else "I", "Event", event.message)
+            add(listOf(EventEntry(newId(event.timestampMs), event.timestampMs, source, event.level, event.message)))
+        }
     }
 
     /** Adds the peer's events; an event already kept is skipped, so the peer may send the same ones again. */

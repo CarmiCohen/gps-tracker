@@ -1,6 +1,7 @@
 package com.jd.app.sensor
 
 import android.Manifest
+import android.app.ActivityManager
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -235,7 +236,9 @@ class SensorService : Service(), SensorEventListener {
         infoSource.register(::buildInfo)
         
         isInitialized = true
-        eventLog.record(EventLevel.INFO, "Sensor service started (version ${getAppVersionName(this)})")
+        val bootTimeMs = System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()
+        eventLog.recordFrom { events -> unrecordedStopEvent(events, bootTimeMs, ::processExits) }
+        eventLog.record(EventLevel.INFO, serviceStartedMessage(getAppVersionName(this)))
         val startMs = try { android.os.SystemClock.elapsedRealtime() } catch (_: Throwable) { System.currentTimeMillis() }
         serviceStatus.markRunning(startMs)
     }
@@ -981,8 +984,17 @@ class SensorService : Service(), SensorEventListener {
         private const val SETUP_STATUS_CHECK_MS = 30_000L
     }
 
+    /** The Sensor process's recent ends as Android recorded them (API 30+), for [unrecordedStopEvent] (ISSUE-NOV15.4-O98). */
+    private fun processExits(): List<ProcessExit> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return emptyList()
+        return getSystemService(ActivityManager::class.java)
+            ?.getHistoricalProcessExitReasons(packageName, 0, 16).orEmpty()
+            .filter { it.processName == packageName }
+            .map { ProcessExit(it.timestamp, it.reason) }
+    }
+
     override fun onDestroy() {
-        if (isInitialized) eventLog.record(EventLevel.WARNING, "Sensor service stopped")
+        if (isInitialized) eventLog.record(EventLevel.WARNING, SERVICE_STOPPED)
         else SystemLogger.i("SensorService", "onDestroy before initialization")
         infoSource.unregister()
         acousticMonitor.stop()

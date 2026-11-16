@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov16.2 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov16.3 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -975,8 +975,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **195.2 Move on update (device):** with Nov16.1 installed and paired, `run-as <package> ls /data/user_de/0/<package>/no_backup` lists the stores; install Nov16.2 over it and open both apps: `no_backup` is empty, `files/datastore` (device storage) holds `forensic_identity.preferences_pb` (and the Sensor's `sensor_settings.preferences_pb`) with the same IDs (`cat` shows `T`; `V` with target `T`).
 *   **195.3 Backup and restore (device):** `bmgr transport com.android.localtransport/.LocalTransport`, `bmgr backupnow com.jd.app.sensor com.jd.app.monitor` (both `Success`), `pm clear` both apps, `bmgr list sets` (token 1), `bmgr restore 1 <package>` for each: the Sensor's settings and identity, the Monitor's `monitor_settings`, identity and `monitor_db` are back, and after granting the permissions again (Operational Notes) both apps start paired. The event logs, graph history and forensic buffer are not restored. Switch the transport back to `com.google.android.gms/.backup.BackupTransportService`.
 
+## Chapter 196 - Unrecorded Sensor Stops (Nov16.3)
+**Status: A / L** - `SensorEventsTest` 8/8, `EventLogTest` 12/12, `MonitorEventsTest` 4/4; 196.3 verified on the A15 (ISSUE-NOV15.4-O98 parts 1 and 3, SOT 1.435)
+*   **196.1 Decision (unit):** `SensorEventsTest`: a log whose last start has a stop (also one recorded after the fact) or no start needs no event and asks Android nothing; otherwise the first Android exit record after that start gives the reason and time; without one the stop follows the last event, as `phone shut down or restarted` when that event came before boot, else `reason unknown`.
+*   **196.2 Past event (unit):** `EventLogTest`: `recordFrom` decides from the loaded log before any later record, adds the event at its own time in order, and a null or failing decision adds nothing. `MonitorEventsTest`: an acknowledged alarm whose condition then clears records `Ended` (part 1).
+*   **196.3 Live (device):** install the debug Sensor over the running one, then `am force-stop com.jd.app.sensor` and open the app; `run-as com.jd.app.sensor cat /data/user_de/0/com.jd.app.sensor/files/event_log.jsonl` shows `Sensor service stopped: app updated`, then `Sensor service stopped: force-stopped or app reinstalled`, each before the next `Sensor service started`.
+
 ---
-**Active Testing Chapters: 184 of 195**
+**Active Testing Chapters: 185 of 196**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

@@ -35,6 +35,13 @@ class MonitorEventsTest {
     }
 
     @Test
+    fun `an acknowledged alarm whose condition then clears records Ended`() {
+        val acknowledged = AlarmBook().update(setOf(AlarmType.TILT_ALERT), settings, nowMs = 1_000L).acknowledge()
+        val cleared = acknowledged.update(emptySet(), settings, nowMs = 2_000L)
+        assertEquals(listOf(LoggedEvent(EventLevel.INFO, "Ended: ${AlarmType.TILT_ALERT.title}")), alarmEvents(acknowledged, cleared))
+    }
+
+    @Test
     fun `an acknowledgement names the alarms that waited for it`() {
         val raised = AlarmBook().update(setOf(AlarmType.TILT_ALERT, AlarmType.LIFT_ALERT), settings, nowMs = 1_000L)
         assertEquals(
