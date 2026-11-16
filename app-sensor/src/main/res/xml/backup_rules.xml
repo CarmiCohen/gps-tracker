@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ISSUE-NOV10.8-O80 part 2: Auto Backup up to Android 11. Only the setup and the pairing; the
+     forensic buffer, event log and graph history stay on the phone. -->
+<full-backup-content>
+    <include domain="device_file" path="datastore/sensor_settings.preferences_pb" />
+    <include domain="device_file" path="datastore/forensic_identity.preferences_pb" />
+</full-backup-content>

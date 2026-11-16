@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov16.1 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov16.2 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -969,8 +969,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **194.2 Sensor file (unit):** `SensorSettingsFileTest`: every field survives the file; the sequence floor is the exported number plus 1000 at once, plus one per 100 ms since the export, and nothing more for a clock behind the export; no floor without a number; a Monitor file or one without `format` is refused.
 *   **194.3 Live (device):** both apps paired; Maintenance (Monitor: Setup, `CLEAN`; Sensor: Settings, `CLEAN SETUP`) > `Export Settings to File` > Save in Downloads; note the Monitor's trail rows and the Sensor's next sequence (`REV_SensorService: Telemetry sent. Seq:`). Uninstall and reinstall both apps, grant the permissions again (`pm grant`, `dumpsys deviceidle whitelist +`, `cmd notification allow_dnd`). Sensor: `Import Settings from File` > `Choose File` > its file: Events show `Sequence numbering continues at N` above the exported number and the telemetry continues there. Monitor pairing screen: `Import Settings from File` with the Sensor's file shows `Import failed: Not a GPS Monitor settings file`; with its own file the map opens paired, Events show `Settings imported: tracker T, ... trail rows`, and the Sensor logs the imported detection settings at a new revision.
 
+## Chapter 195 - Auto Backup (Nov16.2)
+**Status: A / L** - `BackupStoreFileTest` 5/5, `IdentityIsolationTest` both apps; 195.2 and 195.3 verified on the A15 (ISSUE-NOV10.8-O80 part 2, SOT 1.434)
+*   **195.1 Store move (unit):** `BackupStoreFileTest`: an old store in `no_backup` moves to `files/datastore`; when both exist the `files/datastore` copy (a restored backup) wins and the old one is deleted; nothing is created when neither exists; a second call changes nothing.
+*   **195.2 Move on update (device):** with Nov16.1 installed and paired, `run-as <package> ls /data/user_de/0/<package>/no_backup` lists the stores; install Nov16.2 over it and open both apps: `no_backup` is empty, `files/datastore` (device storage) holds `forensic_identity.preferences_pb` (and the Sensor's `sensor_settings.preferences_pb`) with the same IDs (`cat` shows `T`; `V` with target `T`).
+*   **195.3 Backup and restore (device):** `bmgr transport com.android.localtransport/.LocalTransport`, `bmgr backupnow com.jd.app.sensor com.jd.app.monitor` (both `Success`), `pm clear` both apps, `bmgr list sets` (token 1), `bmgr restore 1 <package>` for each: the Sensor's settings and identity, the Monitor's `monitor_settings`, identity and `monitor_db` are back, and after granting the permissions again (Operational Notes) both apps start paired. The event logs, graph history and forensic buffer are not restored. Switch the transport back to `com.google.android.gms/.backup.BackupTransportService`.
+
 ---
-**Active Testing Chapters: 183 of 194**
+**Active Testing Chapters: 184 of 195**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

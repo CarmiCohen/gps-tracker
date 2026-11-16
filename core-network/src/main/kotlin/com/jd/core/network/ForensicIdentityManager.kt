@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.jd.core.shared.BackupStoreFile
 import com.jd.core.shared.ForensicIdentity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -22,6 +23,8 @@ import javax.inject.Singleton
  * Updated Nov2.21: Enforced DataStore singleton pattern to prevent multi-instance exceptions in tests (ISSUE-REVOL38.1-F2).
  * Updated Nov15.0: the store file is a parameter, so instrumented tests use their own file and never
  * touch the installed app's pairing (ISSUE-NOV12.6-O93).
+ * Updated Nov16.2: the store is in files/datastore so Auto Backup copies the pairing; an older file is
+ * moved once from no_backup (ISSUE-NOV10.8-O80 part 2).
  */
 @Singleton
 class ForensicIdentityManager(context: Context, fileName: String) {
@@ -114,7 +117,12 @@ class ForensicIdentityManager(context: Context, fileName: String) {
         fun getInstance(context: Context, fileName: String): DataStore<Preferences> = synchronized(this) {
             instances.getOrPut(fileName) {
                 PreferenceDataStoreFactory.create(
-                    produceFile = { File(context.noBackupFilesDir, fileName) }
+                    produceFile = {
+                        BackupStoreFile.moveIfNeeded(
+                            legacy = File(context.noBackupFilesDir, fileName),
+                            target = BackupStoreFile.location(context.filesDir, fileName)
+                        )
+                    }
                 )
             }
         }

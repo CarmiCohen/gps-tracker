@@ -10,7 +10,8 @@ No copies are made any more. User decision, 2026-11-08 (option C).
 
 | Version | Commit | Notes |
 | :--- | :--- | :--- |
-| Nov16.1 | pending | |
+| Nov16.2 | pending | |
+| Nov16.1 | 66d7e41 | |
 | Nov16.0 | 7d677bf | |
 | Nov15.6 | 9f5b386 | |
 | Nov15.5 | ab41e44 | |

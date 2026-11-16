@@ -16,6 +16,9 @@
     <application
         android:name=".MonitorApp"
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        tools:targetApi="31"
         android:usesCleartextTraffic="true"
         android:icon="@android:drawable/ic_menu_compass"
         android:label="GPS Monitor"

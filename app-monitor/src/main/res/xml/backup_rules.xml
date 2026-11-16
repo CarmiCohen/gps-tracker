@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ISSUE-NOV10.8-O80 part 2: Auto Backup up to Android 11. The settings (with home points and
+     distance), the pairing and the trails database; the event log and graph history stay on the phone. -->
+<full-backup-content>
+    <include domain="file" path="datastore/monitor_settings.preferences_pb" />
+    <include domain="device_file" path="datastore/forensic_identity.preferences_pb" />
+    <include domain="database" path="monitor_db" />
+    <include domain="database" path="monitor_db-wal" />
+    <include domain="database" path="monitor_db-shm" />
+</full-backup-content>

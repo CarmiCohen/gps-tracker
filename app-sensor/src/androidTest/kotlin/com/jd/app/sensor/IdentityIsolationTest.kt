@@ -15,7 +15,6 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
 import javax.inject.Inject
 
 /**
@@ -49,7 +48,9 @@ class IdentityIsolationTest {
         identityManager.resetIdentity(ForensicIdentity.PREFIX_SENSOR)
 
         assertEquals("The installed identity must not change", selfBefore, installed.selfId.first())
-        val testFile = File(context.createDeviceProtectedStorageContext().noBackupFilesDir, TestIdentityModule.TEST_IDENTITY_FILE)
+        val testFile = com.jd.core.shared.BackupStoreFile.location(
+            context.createDeviceProtectedStorageContext().filesDir, TestIdentityModule.TEST_IDENTITY_FILE
+        )
         assertTrue("The tests must write their own identity file", testFile.exists())
     }
 }

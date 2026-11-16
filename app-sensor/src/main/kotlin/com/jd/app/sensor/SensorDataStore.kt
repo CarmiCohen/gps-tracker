@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.map
 import java.io.File
 
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.BackupStoreFile
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.SensorBehaviour
 import kotlinx.serialization.encodeToString
@@ -27,8 +28,19 @@ class SensorDataStore(context: Context) {
 
     private val dataStore = PreferenceDataStoreFactory.create(
         migrations = listOf(RemoveSirenTypeMigration, LegacyAlertSettingsMigration),
-        produceFile = { File(protectedContext.noBackupFilesDir, "sensor_settings.preferences_pb") }
+        // ISSUE-NOV10.8-O80 part 2: in files/datastore so Auto Backup copies it; moved once from no_backup.
+        produceFile = {
+            BackupStoreFile.moveIfNeeded(
+                legacy = File(protectedContext.noBackupFilesDir, FILE_NAME),
+                target = BackupStoreFile.location(protectedContext.filesDir, FILE_NAME)
+            )
+        }
     )
+
+    companion object {
+        /** The store's file; the backup rules in res/xml name it too. */
+        const val FILE_NAME = "sensor_settings.preferences_pb"
+    }
 
     private val simHashKey = stringPreferencesKey("sim_iccid_hash")
     private val relayUrlKey = stringPreferencesKey("relay_url")
