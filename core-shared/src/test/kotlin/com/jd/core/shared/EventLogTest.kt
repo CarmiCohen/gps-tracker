@@ -165,11 +165,11 @@ class EventLogTest {
             event("detail", ageMs = 60_000, level = EventLevel.DETAIL),
             event("now", ageMs = 1_000, level = EventLevel.ALARM)
         )
-        assertEquals(listOf("now"), events.shown(EventPeriod.HOUR, showDetails = false, nowMs = nowMs).map { it.id })
-        assertEquals(listOf("now", "detail"), events.shown(EventPeriod.HOUR, showDetails = true, nowMs = nowMs).map { it.id })
-        assertEquals(listOf("now", "hours"), events.shown(EventPeriod.SIX_HOURS, showDetails = false, nowMs = nowMs).map { it.id })
-        assertEquals(listOf("now", "hours", "week"), events.shown(EventPeriod.WEEK, showDetails = false, nowMs = nowMs).map { it.id })
-        assertEquals(EventLog.RETENTION_MS, EventPeriod.WEEK.durationMs)
+        assertEquals(listOf("now"), events.shown(ViewPeriod.HOUR, showDetails = false, nowMs = nowMs).map { it.id })
+        assertEquals(listOf("now", "detail"), events.shown(ViewPeriod.HOUR, showDetails = true, nowMs = nowMs).map { it.id })
+        assertEquals(listOf("now", "hours"), events.shown(ViewPeriod.SIX_HOURS, showDetails = false, nowMs = nowMs).map { it.id })
+        assertEquals(listOf("now", "hours", "week"), events.shown(ViewPeriod.WEEK, showDetails = false, nowMs = nowMs).map { it.id })
+        assertEquals(EventLog.RETENTION_MS, ViewPeriod.WEEK.durationMs)
     }
 
     @Test

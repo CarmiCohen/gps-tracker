@@ -44,16 +44,8 @@ data class PastEvent(val level: EventLevel, val message: String, val timestampMs
 /** The Sensor's newest events as the Monitor receives them (ISSUE-NOV10.8-O84). */
 data class SensorEventBatch(val trackerId: String, val events: List<EventEntry>)
 
-/** The periods the Events list can show (user decision 2026-11-15). */
-enum class EventPeriod(val label: String, val durationMs: Long) {
-    HOUR("1 h", 3_600_000L),
-    SIX_HOURS("6 h", 6 * 3_600_000L),
-    DAY("24 h", 24 * 3_600_000L),
-    WEEK("7 d", EventLog.RETENTION_MS)
-}
-
 /** The events of [period] before [nowMs], newest first; DETAIL events only when [showDetails]. */
-fun List<EventEntry>.shown(period: EventPeriod, showDetails: Boolean, nowMs: Long): List<EventEntry> =
+fun List<EventEntry>.shown(period: ViewPeriod, showDetails: Boolean, nowMs: Long): List<EventEntry> =
     filter { it.timestampMs >= nowMs - period.durationMs && (showDetails || it.level != EventLevel.DETAIL) }
         .sortedByDescending { it.timestampMs }
 

@@ -58,8 +58,8 @@ class UnpairConfirmationTest {
                     graphsOverlay = { onClose ->
                         com.jd.core.ui.GraphsOverlay(
                             title = "GRAPHS",
-                            state = com.jd.core.shared.monitorGraphScreen(emptyList(), emptyList(), com.jd.core.shared.EventPeriod.DAY, System.currentTimeMillis()),
-                            period = com.jd.core.shared.EventPeriod.DAY,
+                            state = com.jd.core.shared.monitorGraphScreen(emptyList(), emptyList(), com.jd.core.shared.ViewPeriod.DAY, System.currentTimeMillis()),
+                            period = com.jd.core.shared.ViewPeriod.DAY,
                             onPeriod = {},
                             onClose = onClose
                         )

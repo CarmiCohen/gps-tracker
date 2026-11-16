@@ -29,7 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.jd.core.shared.EventPeriod
+import com.jd.core.shared.ViewPeriod
 import com.jd.core.shared.GraphLine
 import com.jd.core.shared.GraphPanel
 import com.jd.core.shared.GraphScreenState
@@ -48,8 +48,8 @@ import java.util.Locale
 fun GraphsOverlay(
     title: String,
     state: GraphScreenState,
-    period: EventPeriod,
-    onPeriod: (EventPeriod) -> Unit,
+    period: ViewPeriod,
+    onPeriod: (ViewPeriod) -> Unit,
     onClose: () -> Unit
 ) {
     // English labels and a time axis running left to right, also on a right-to-left phone (as the Events list).
@@ -63,7 +63,7 @@ fun GraphsOverlay(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    EventPeriod.entries.forEach { option ->
+                    ViewPeriod.entries.forEach { option ->
                         EventChip(option.label, isOn = option == period, onClick = { onPeriod(option) })
                     }
                 }

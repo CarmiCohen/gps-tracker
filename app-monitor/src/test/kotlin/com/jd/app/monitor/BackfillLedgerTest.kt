@@ -108,6 +108,29 @@ class BackfillLedgerTest {
     }
 
     @Test
+    fun rowsTheSensorAnsweredItNoLongerHoldsAreNotOpen() { // ISSUE-NOV15.6-O100 part 2
+        val lost = SequenceGap(1, 100)
+        ledger.onRequestComplete(send(listOf(lost)).single().requestId)
+        val waiting = SequenceGap(200, 209)
+
+        val gaps = listOf(waiting, SequenceGap(1, 40))
+        ledger.gapsToRequest("T", gaps, 0L)
+
+        assertEquals("Only the unanswered hole is still missing", 10L, ledger.openRows("T", gaps))
+        assertEquals("Another tracker's holes stay open", 50L, ledger.openRows("U", listOf(SequenceGap(1, 40), waiting)))
+    }
+
+    @Test
+    fun aHoleInFlightOrTimedOutStaysOpen() {
+        val all = gaps(2)
+        send(all)
+        assertEquals("Asked, not answered", 4L, ledger.openRows("T", all))
+
+        ledger.gapsToRequest("T", all, 30_000L)
+        assertEquals("Timed out: the Sensor may still hold them", 4L, ledger.openRows("T", all))
+    }
+
+    @Test
     fun anotherTrackerIsNotCoveredByTheseRanges() {
         val all = gaps(1)
         val request = send(all, deviceId = "T").single()

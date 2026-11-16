@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov16.4 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov16.5 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -987,8 +987,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **197.2 Screen (unit):** `MonitorInfoScreenTest`: an Info without the list shows the summary (`9 used / 31 in view`) and marks the list pending; a received list, or no satellite in view, is not pending; an Info from a Sensor before Nov16.4 (list only) shows the counts from the list.
 *   **197.3 Live (device):** both debug apps paired on the A15; open the Monitor's Info: the Satellites line shows the counts with the list closed; tap it: the list (or briefly `Waiting for the Sensor's satellite list...`) shows within a few seconds; Back closes only the list and the counts stay current. Read the screens with `uiautomator dump`.
 
+## Chapter 198 - Missing Means Still To Come (Nov16.5)
+**Status: A / L** - `BackfillLedgerTest` 12/12; 198.2 verified on the A15 (ISSUE-NOV15.6-O100 parts 2 and 5, SOT 1.437)
+*   **198.1 Count (unit):** `BackfillLedgerTest`: `openRows` leaves out a hole inside a range the Sensor answered and counts a hole outside it, also for another tracker; a hole in flight or timed out stays counted.
+*   **198.2 Live (device):** with a Monitor trail holding holes the Sensor's buffer cannot fill (after a Sensor reinstall), install the debug Monitor and open it; `run-as com.jd.app.monitor tail -n 3 files/graph_history_monitor.jsonl`: the last field (Missing) falls to 0 within a minute of the answers (`adb logcat -d -s REV_Backfill:*`), where it stayed in the hundreds of thousands before.
+
 ---
-**Active Testing Chapters: 186 of 197**
+**Active Testing Chapters: 187 of 198**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

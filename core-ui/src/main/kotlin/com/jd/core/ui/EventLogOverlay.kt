@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
-import com.jd.core.shared.EventPeriod
+import com.jd.core.shared.ViewPeriod
 import com.jd.core.shared.EventSource
 import com.jd.core.shared.eventLogText
 import com.jd.core.shared.shown
@@ -49,7 +49,7 @@ import java.util.Locale
 @Composable
 fun EventLogOverlay(events: List<EventEntry>, showSource: Boolean, onClear: () -> Unit, onClose: () -> Unit) {
     val context = LocalContext.current
-    var period by rememberSaveable { mutableStateOf(EventPeriod.DAY) }
+    var period by rememberSaveable { mutableStateOf(ViewPeriod.DAY) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var isConfirmingClear by rememberSaveable { mutableStateOf(false) }
@@ -102,7 +102,7 @@ fun EventLogOverlay(events: List<EventEntry>, showSource: Boolean, onClear: () -
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                EventPeriod.entries.forEach { option ->
+                ViewPeriod.entries.forEach { option ->
                     EventChip(option.label, isOn = option == period, onClick = { period = option })
                 }
                 Spacer(Modifier.weight(1f))
@@ -223,7 +223,7 @@ private fun sourceColor(source: EventSource): Color = when (source) {
  * Writes [events], oldest first, to a text file in the app's cache and opens the share sheet for it, so the user can
  * save or send it. The file goes through a FileProvider, as a list of 7 days can exceed what an Intent may carry.
  */
-private fun shareEvents(context: Context, events: List<EventEntry>, period: EventPeriod) {
+private fun shareEvents(context: Context, events: List<EventEntry>, period: ViewPeriod) {
     try {
         val directory = File(context.cacheDir, EXPORT_DIRECTORY).apply { mkdirs() }
         directory.listFiles()?.forEach { it.delete() } // Only the newest export is kept.

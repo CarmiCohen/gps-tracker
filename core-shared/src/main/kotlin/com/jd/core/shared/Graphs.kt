@@ -5,7 +5,7 @@ import java.util.Locale
 /**
  * What the menu's Graphs screen shows (ISSUE-NOV10.8-O84 part 3, user decisions 2026-11-15): Sensor motion (vibration
  * and tilt with their limits, noise), GNSS (accuracy, satellites, mean signal), Connection (relay link, latency, rows
- * held offline) and Phone health (battery with charging, temperature), each over the chosen [EventPeriod]; a Monitor
+ * held offline) and Phone health (battery with charging, temperature), each over the chosen [ViewPeriod]; a Monitor
  * adds its own connection (relay link, latency, the Sensor's rows live, backfilled and missing). Built here, drawn by
  * core-ui's `GraphsOverlay`.
  */
@@ -63,7 +63,7 @@ data class GraphScreenState(
 const val MAX_GRAPH_POINTS = 360
 
 /** One point a minute up to [MAX_GRAPH_POINTS]: 60 for an hour, 360 for 6 hours and more. */
-fun graphPointCount(period: EventPeriod): Int =
+fun graphPointCount(period: ViewPeriod): Int =
     (period.durationMs / GRAPH_SAMPLE_INTERVAL_MS).toInt().coerceIn(1, MAX_GRAPH_POINTS)
 
 /**
@@ -180,7 +180,7 @@ private fun panelSummary(spec: GraphPanelSpec, line: GraphLine): String {
 }
 
 /** The Sensor's own Graphs screen: the period of [period] ending [nowMs]. */
-fun sensorGraphScreen(samples: List<GraphSample>, period: EventPeriod, nowMs: Long): GraphScreenState {
+fun sensorGraphScreen(samples: List<GraphSample>, period: ViewPeriod, nowMs: Long): GraphScreenState {
     val startMs = nowMs - period.durationMs
     val count = graphPointCount(period)
     return GraphScreenState(
@@ -196,7 +196,7 @@ fun sensorGraphScreen(samples: List<GraphSample>, period: EventPeriod, nowMs: Lo
  * note tells how old the newest Sensor sample is, since the Sensor's samples arrive only while the screen is open and
  * the Sensor is online.
  */
-fun monitorGraphScreen(sensorSamples: List<GraphSample>, ownSamples: List<GraphSample>, period: EventPeriod, nowMs: Long): GraphScreenState {
+fun monitorGraphScreen(sensorSamples: List<GraphSample>, ownSamples: List<GraphSample>, period: ViewPeriod, nowMs: Long): GraphScreenState {
     val startMs = nowMs - period.durationMs
     val count = graphPointCount(period)
     val newestSensorMs = sensorSamples.lastOrNull()?.timeMs

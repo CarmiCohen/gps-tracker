@@ -16,10 +16,10 @@ class GraphsTest {
 
     @Test
     fun `a graph has one point a minute up to 360`() {
-        assertEquals(60, graphPointCount(EventPeriod.HOUR))
-        assertEquals(360, graphPointCount(EventPeriod.SIX_HOURS))
-        assertEquals(360, graphPointCount(EventPeriod.DAY))
-        assertEquals(360, graphPointCount(EventPeriod.WEEK))
+        assertEquals(60, graphPointCount(ViewPeriod.HOUR))
+        assertEquals(360, graphPointCount(ViewPeriod.SIX_HOURS))
+        assertEquals(360, graphPointCount(ViewPeriod.DAY))
+        assertEquals(360, graphPointCount(ViewPeriod.WEEK))
     }
 
     @Test
@@ -82,25 +82,25 @@ class GraphsTest {
 
     @Test
     fun `the Sensor's screen has the four agreed sections`() {
-        val screen = sensorGraphScreen(listOf(sample(1, GraphField.VIBRATION_G to 0.1)), EventPeriod.DAY, nowMs)
+        val screen = sensorGraphScreen(listOf(sample(1, GraphField.VIBRATION_G to 0.1)), ViewPeriod.DAY, nowMs)
         assertEquals(listOf("MOTION", "GNSS", "CONNECTION", "PHONE HEALTH"), screen.sections.map { it.title })
-        assertEquals(nowMs - EventPeriod.DAY.durationMs, screen.startMs)
+        assertEquals(nowMs - ViewPeriod.DAY.durationMs, screen.startMs)
         assertNull(screen.note)
-        assertTrue(sensorGraphScreen(emptyList(), EventPeriod.DAY, nowMs).note!!.startsWith("No samples yet"))
+        assertTrue(sensorGraphScreen(emptyList(), ViewPeriod.DAY, nowMs).note!!.startsWith("No samples yet"))
     }
 
     @Test
     fun `the Monitor shows the Sensor's graphs, then its own connection, and says when the Sensor's are old`() {
         val sensor = listOf(sample(10, GraphField.VIBRATION_G to 0.1))
         val own = listOf(sample(1, GraphField.ROWS_LIVE to 6, GraphField.ROWS_MISSING to 0))
-        val screen = monitorGraphScreen(sensor, own, EventPeriod.HOUR, nowMs)
+        val screen = monitorGraphScreen(sensor, own, ViewPeriod.HOUR, nowMs)
         assertEquals(
             listOf("SENSOR - MOTION", "SENSOR - GNSS", "SENSOR - CONNECTION", "SENSOR - PHONE HEALTH", "THIS MONITOR - CONNECTION"),
             screen.sections.map { it.title }
         )
         assertEquals("Newest Sensor sample 10 min 0 s ago", screen.note)
         assertTrue(screen.sections.last().panels.single { it.title == "Sensor rows" }.hasData)
-        assertNull(monitorGraphScreen(listOf(sample(1, GraphField.VIBRATION_G to 0.1)), own, EventPeriod.HOUR, nowMs).note)
-        assertTrue(monitorGraphScreen(emptyList(), own, EventPeriod.HOUR, nowMs).note!!.startsWith("No Sensor samples yet"))
+        assertNull(monitorGraphScreen(listOf(sample(1, GraphField.VIBRATION_G to 0.1)), own, ViewPeriod.HOUR, nowMs).note)
+        assertTrue(monitorGraphScreen(emptyList(), own, ViewPeriod.HOUR, nowMs).note!!.startsWith("No Sensor samples yet"))
     }
 }

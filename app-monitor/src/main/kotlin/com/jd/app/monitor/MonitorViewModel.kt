@@ -12,7 +12,7 @@ import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
 import com.jd.core.shared.EventLog
-import com.jd.core.shared.EventPeriod
+import com.jd.core.shared.ViewPeriod
 import com.jd.core.shared.GRAPH_REQUEST_INTERVAL_MS
 import com.jd.core.shared.GraphScreenState
 import com.jd.core.shared.graphScreenClock
@@ -403,12 +403,12 @@ class MonitorViewModel @Inject constructor(
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), InfoScreenState())
 
-    private val _graphPeriod = MutableStateFlow(EventPeriod.DAY)
+    private val _graphPeriod = MutableStateFlow(ViewPeriod.DAY)
 
     /** The period the Graphs screen shows; kept here so it survives a rotation (ISSUE-NOV10.8-O84 part 3). */
-    val graphPeriod: StateFlow<EventPeriod> = _graphPeriod.asStateFlow()
+    val graphPeriod: StateFlow<ViewPeriod> = _graphPeriod.asStateFlow()
 
-    fun setGraphPeriod(period: EventPeriod) {
+    fun setGraphPeriod(period: ViewPeriod) {
         _graphPeriod.value = period
     }
 

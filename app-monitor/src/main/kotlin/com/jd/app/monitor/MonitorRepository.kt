@@ -51,7 +51,10 @@ class MonitorRepository @Inject constructor(
 
     fun getTrail(trackerId: String): Flow<List<TrailEntity>> = trailDao.getTrail(trackerId)
 
-    /** The rows received live and by backfill since the last call, and the rows missing at the newest gap scan. */
+    /**
+     * The rows received live and by backfill since the last call, and the rows still missing at the newest gap scan:
+     * rows the Sensor answered it no longer holds are not counted (ISSUE-NOV15.6-O100 part 2).
+     */
     fun takeRowCounts(): RowCounts = RowCounts(liveRows.getAndSet(0), backfilledRows.getAndSet(0), missingRows)
 
     /** Clears all stored trail entries (ISSUE-NOV7.1-O35). */
@@ -159,11 +162,11 @@ class MonitorRepository @Inject constructor(
     private suspend fun requestMissingRanges(deviceId: String) {
         lastScanMs = System.currentTimeMillis()
         val gaps = findGaps(deviceId)
-        missingRows = gaps.sumOf { it.lastMissing - it.firstMissing + 1 }
 
         ledgerMutex.withLock {
             val now = System.currentTimeMillis()
             val toRequest = ledger.gapsToRequest(deviceId, gaps, now)
+            missingRows = ledger.openRows(deviceId, gaps)
             if (toRequest.isNotEmpty()) {
                 SystemLogger.w("Backfill", "${gaps.size} gaps stored. Requesting ${toRequest.size}.")
             }

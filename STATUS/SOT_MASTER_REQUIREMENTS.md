@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov16.4)
+# SOT Master Requirements & Hardening Status (Nov16.5)
 
-## 🏗️ Architectural Master Rules (510 Rules)
+## 🏗️ Architectural Master Rules (511 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -137,6 +137,7 @@
 *   **1.434 Auto Backup**: both apps MUST keep their setup stores in `files/datastore` (device storage for the pairing and the Sensor's settings, so Direct Boot still reads them), never in `no_backup`, moving an older file there once, and MUST name in `backup_rules.xml` and `data_extraction_rules.xml` exactly what Auto Backup and device transfer copy: the Sensor's settings and identity; the Monitor's settings (with Home Points and distance), identity and trail database. Event logs, graph history and the forensic buffer MUST NOT be backed up (ISSUE-NOV10.8-O80 part 2, chapter 195).
 *   **1.435 Unrecorded Sensor Stops**: on each start, before recording it, the Sensor MUST record a stop the previous run left out (its last start without a stop), with Android's exit reason and time when an exit record follows that start, else after its last event as a phone restart or an unknown reason (ISSUE-NOV15.4-O98 part 3, chapter 196).
 *   **1.436 The Satellite List On Demand**: the Sensor's Info MUST always carry its satellite summary (used, in view, mean signal) and MUST carry the satellite list only while a Monitor's satellite list is open, so an open Info screen costs a fraction of the data (ISSUE-NOV15.5-O99 part 1, chapter 197).
+*   **1.437 Missing Means Still To Come**: the Monitor's `Missing` graph line MUST count only the Sensor's rows that may still arrive: a range the Sensor has answered as complete is no longer missing, as its forensic buffer no longer holds the rest (ISSUE-NOV15.6-O100 part 2, chapter 198).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

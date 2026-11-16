@@ -21,6 +21,14 @@ class BackfillLedger(
     private val active = mutableMapOf<String, ActiveRequest>()
     private val answered = mutableListOf<BackfillRequest>()
 
+    /**
+     * The rows of [gaps] the Sensor may still send: answered ranges are left out, as the Sensor no longer holds
+     * them (ISSUE-NOV15.6-O100 part 2). Call after [gapsToRequest], which forgets answers whose hole is gone.
+     */
+    fun openRows(deviceId: String, gaps: List<SequenceGap>): Long =
+        gaps.filterNot { gap -> answered.any { gap.isInside(it, deviceId) } }
+            .sumOf { it.lastMissing - it.firstMissing + 1 }
+
     /** Returns the gaps to request now, in the given order. The rest wait for a free slot. */
     fun gapsToRequest(deviceId: String, gaps: List<SequenceGap>, nowMs: Long): List<SequenceGap> {
         active.values.removeAll { nowMs - it.lastActivityMs >= timeoutMs }
