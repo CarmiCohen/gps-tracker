@@ -15,10 +15,15 @@ data class InfoLine(val label: String, val value: String, val tone: InfoTone = I
 /** A titled group of lines; [isStale] draws it gray, as its values are old. */
 data class InfoSection(val title: String, val lines: List<InfoLine>, val isStale: Boolean = false)
 
-/** What an Info screen shows: its sections, the satellites its satellite line opens, and a note above them. */
+/**
+ * What an Info screen shows: its sections, the satellites its satellite line opens, and a note above them.
+ * [isSatelliteListPending] is true while satellites are in view but their list has not come yet: a Monitor asks for it
+ * only while its satellite list is open (ISSUE-NOV15.5-O99 part 1).
+ */
 data class InfoScreenState(
     val sections: List<InfoSection> = emptyList(),
     val satellites: List<SatelliteReading> = emptyList(),
+    val isSatelliteListPending: Boolean = false,
     val note: String? = null
 )
 
@@ -65,7 +70,7 @@ fun linkLines(link: LinkStats, now: Long): List<InfoLine> = listOfNotNull(
 )
 
 private fun positionLines(info: SensorInfo, now: Long): List<InfoLine> {
-    val gnss = gnssSummary(info.satellites)
+    val gnss = info.satelliteSummary()
     val satelliteLines = listOf(
         InfoLine("Satellites", "${gnss.used} used / ${gnss.inView} in view", if (gnss.used < MIN_GOOD_SATELLITES) InfoTone.WARN else InfoTone.NORMAL, opensSatellites = true),
         InfoLine("Signal (mean)", signalText(gnss.meanCn0DbHz), signalTone(gnss.meanCn0DbHz))

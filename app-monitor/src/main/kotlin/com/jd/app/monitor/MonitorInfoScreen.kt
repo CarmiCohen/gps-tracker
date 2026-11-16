@@ -13,6 +13,7 @@ import com.jd.core.shared.SpatialMath
 import com.jd.core.shared.durationText
 import com.jd.core.shared.monitorPhoneSection
 import com.jd.core.shared.newestRowSection
+import com.jd.core.shared.satelliteSummary
 import com.jd.core.shared.sensorInfoSections
 import com.jd.core.ui.DeviceInfoOverlay
 
@@ -20,7 +21,7 @@ import com.jd.core.ui.DeviceInfoOverlay
 @Composable
 fun MonitorInfoScreen(viewModel: MonitorViewModel, onClose: () -> Unit) {
     val state by viewModel.infoScreen.collectAsStateWithLifecycle()
-    DeviceInfoOverlay(title = "INFO", state = state, onClose = onClose)
+    DeviceInfoOverlay(title = "INFO", state = state, onClose = onClose, onSatelliteListShown = viewModel::setSatelliteListOpen)
 }
 
 /** The Monitor's Graphs screen (ISSUE-NOV10.8-O84 part 3); open, it asks the Sensor for its newer samples. */
@@ -71,6 +72,7 @@ fun monitorInfoScreen(
             InfoScreenState(
                 sections = sensorInfoSections(received.info, isStale, SENSOR_TITLE_PREFIX) + own,
                 satellites = received.info.satellites,
+                isSatelliteListPending = received.info.satellites.isEmpty() && received.info.satelliteSummary().inView > 0,
                 note = if (isStale) "No Info from the Sensor for ${durationText(ageMs)}: the gray values are from then." else null
             )
         }

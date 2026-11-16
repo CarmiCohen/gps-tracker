@@ -62,8 +62,8 @@ class SignalingClientTest {
             override fun registerPushToken(token: String) = Unit
             override val linkStats = kotlinx.coroutines.flow.MutableStateFlow(com.jd.core.shared.LinkStats())
             override fun queuedRowCount() = 0
-            override val infoRequestFlow = kotlinx.coroutines.flow.emptyFlow<Unit>()
-            override suspend fun requestSensorInfo(targetId: String) = true
+            override val infoRequestFlow = kotlinx.coroutines.flow.emptyFlow<Boolean>()
+            override suspend fun requestSensorInfo(targetId: String, withSatellites: Boolean) = true
             override val sensorInfoFlow = kotlinx.coroutines.flow.MutableStateFlow<com.jd.core.shared.ReceivedSensorInfo?>(null)
             override suspend fun sendSensorInfo(info: com.jd.core.shared.SensorInfo) = true
             override val graphRequestFlow = kotlinx.coroutines.flow.emptyFlow<Long>()

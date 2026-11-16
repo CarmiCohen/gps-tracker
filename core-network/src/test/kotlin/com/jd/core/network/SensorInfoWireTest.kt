@@ -9,6 +9,8 @@ import com.jd.core.shared.PhoneState
 import com.jd.core.shared.SatelliteReading
 import com.jd.core.shared.SensorInfo
 import com.jd.core.shared.SensorSetupReport
+import com.jd.core.shared.satelliteSummary
+import com.jd.core.shared.withoutSatelliteList
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -101,19 +103,19 @@ class SensorInfoWireTest {
         val sensorSocket = FakeSocket()
         val sensor = client(sensorSocket)
         try {
-            assertFalse("Nothing can be asked before connecting", monitor.requestSensorInfo("T"))
+            assertFalse("Nothing can be asked before connecting", monitor.requestSensorInfo("T", withSatellites = false))
             monitor.connect("http://localhost", "V", "T")
             monitorSocket.simulateConnect()
             sensor.connect("http://localhost", "T", "T")
             sensorSocket.simulateConnect()
             runCurrent()
 
-            assertTrue(monitor.requestSensorInfo("T"))
+            assertTrue(monitor.requestSensorInfo("T", withSatellites = false))
             val request = monitorSocket.emittedEvents.single { it.first == "settings_update" }.second as JSONObject
             assertEquals("T", request.getString("id"))
             val heard = async(start = CoroutineStart.UNDISPATCHED) { sensor.infoRequestFlow.first() }
             sensorSocket.relay("settings_relay", request)
-            heard.await()
+            assertFalse("A closed satellite list does not ask for the list", heard.await())
             assertNull("A request is no Info", sensor.sensorInfoFlow.value)
 
             assertTrue(sensor.sendSensorInfo(info))
@@ -125,6 +127,30 @@ class SensorInfoWireTest {
             sensor.disconnect()
         }
         assertNull("Leaving on purpose forgets the Info: the next session may watch another Sensor", monitor.sensorInfoFlow.value)
+    }
+
+    /** Chapter 197 (ISSUE-NOV15.5-O99 part 1): the satellite list travels only while a Monitor's list is open. */
+    @Test
+    fun `the request tells whether the satellite list is wanted, and a request from an older Monitor wants it`() {
+        assertTrue(InfoRequestWire.wantsSatellites(JSONObject(InfoRequestWire.encode("T", withSatellites = true).toString())))
+        assertFalse(InfoRequestWire.wantsSatellites(JSONObject(InfoRequestWire.encode("T", withSatellites = false).toString())))
+        val older = JSONObject().put("id", "T").put("type", InfoRequestWire.TYPE)
+        assertTrue("A Monitor before Nov16.4 reads the summary from the list", InfoRequestWire.wantsSatellites(older))
+    }
+
+    /** Chapter 197: without the list the Info keeps the summary and is a fraction of the size. */
+    @Test
+    fun `the Info without the satellite list keeps its summary and is much smaller`() {
+        val many = (1..55).map { SatelliteReading(it, 1 + it % 6, 20f + it % 25, it % 3 == 0) }
+        val gnss = com.jd.core.shared.gnssSummary(many)
+        val full = info.copy(satellites = many, satellitesUsed = gnss.used, satellitesInView = gnss.inView, meanCn0DbHz = gnss.meanCn0DbHz)
+        val lean = full.withoutSatelliteList()
+        val fullBytes = SensorInfoWire.encode("T", full).toString().length
+        val leanBytes = SensorInfoWire.encode("T", lean).toString().length
+        assertTrue("Full $fullBytes, without the list $leanBytes", leanBytes * 3 < fullBytes)
+        val received = SensorInfoWire.decode(JSONObject(SensorInfoWire.encode("T", lean).toString()))!!
+        assertTrue(received.satellites.isEmpty())
+        assertEquals(gnss, received.satelliteSummary())
     }
 
     @Test

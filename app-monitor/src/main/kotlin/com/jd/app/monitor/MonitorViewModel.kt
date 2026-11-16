@@ -361,11 +361,23 @@ class MonitorViewModel @Inject constructor(
         received?.takeIf { it.info.sensorId == target }
     }
 
-    /** Asks the paired Sensor for its Info every [SENSOR_INFO_REQUEST_INTERVAL_MS] while collected. Emits nothing. */
+    private val satelliteListOpen = MutableStateFlow(false)
+
+    /** The Info screen's satellite list opened or closed: only an open list asks for it (ISSUE-NOV15.5-O99 part 1). */
+    fun setSatelliteListOpen(open: Boolean) {
+        satelliteListOpen.value = open
+    }
+
+    /**
+     * Asks the paired Sensor for its Info every [SENSOR_INFO_REQUEST_INTERVAL_MS] while collected, with the satellite
+     * list while it is open; opening the list asks at once. Emits nothing.
+     */
     private val sensorInfoRequests = flow<InfoScreenState> {
-        while (true) {
-            identityManager.targetId.first()?.let { signalingClient.requestSensorInfo(it) }
-            delay(SENSOR_INFO_REQUEST_INTERVAL_MS)
+        satelliteListOpen.collectLatest { withSatellites ->
+            while (true) {
+                identityManager.targetId.first()?.let { signalingClient.requestSensorInfo(it, withSatellites) }
+                delay(SENSOR_INFO_REQUEST_INTERVAL_MS)
+            }
         }
     }
 

@@ -43,6 +43,21 @@ class MonitorInfoScreenTest {
         assertEquals("About 0.01 degrees of longitude apart", "943 m", state.sections.last().lines.single { it.label == "Distance to Sensor" }.value)
     }
 
+    /** Chapter 197 (ISSUE-NOV15.5-O99 part 1): an Info sent without the satellite list still shows its summary. */
+    @Test
+    fun `an Info without the satellite list shows the summary and the list as pending`() {
+        val lean = info.copy(satellites = emptyList(), satellitesUsed = 9, satellitesInView = 31, meanCn0DbHz = 30.5f)
+        val state = screen(ReceivedSensorInfo(lean, receivedAtMs = now - 3_000L))
+        val position = state.sections[2].lines
+        assertEquals("9 used / 31 in view", position.single { it.label == "Satellites" }.value)
+        assertTrue("The list comes once the Monitor's list asks for it", state.isSatelliteListPending)
+        val olderSensor = screen(ReceivedSensorInfo(info, receivedAtMs = now - 3_000L))
+        assertFalse("A received list is not pending", olderSensor.isSatelliteListPending)
+        assertEquals("A Sensor before Nov16.4 sends only the list", "1 used / 1 in view", olderSensor.sections[2].lines.single { it.label == "Satellites" }.value)
+        val none = info.copy(satellites = emptyList())
+        assertFalse("No satellite in view is no pending list", screen(ReceivedSensorInfo(none, receivedAtMs = now - 3_000L)).isSatelliteListPending)
+    }
+
     @Test
     fun `an old Info grays the Sensor's sections and says since when`() {
         val state = screen(ReceivedSensorInfo(info, receivedAtMs = now - SENSOR_INFO_STALE_MS - 1_000L))

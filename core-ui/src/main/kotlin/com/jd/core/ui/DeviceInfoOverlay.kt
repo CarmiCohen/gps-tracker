@@ -30,12 +30,18 @@ import java.util.Locale
 
 /**
  * The menu's Info screen of both apps (ISSUE-NOV10.8-O84 part 2): the detailed, live state of the phones in titled
- * sections, warnings in amber or red, old values in gray. The Satellites line opens the satellite list.
+ * sections, warnings in amber or red, old values in gray. The Satellites line opens the satellite list;
+ * [onSatelliteListShown] tells when it opens and closes, as the Monitor asks for it only then (ISSUE-NOV15.5-O99 part 1).
  */
 @Composable
-fun DeviceInfoOverlay(title: String, state: InfoScreenState, onClose: () -> Unit) {
+fun DeviceInfoOverlay(title: String, state: InfoScreenState, onClose: () -> Unit, onSatelliteListShown: (Boolean) -> Unit = {}) {
     var showSatellites by rememberSaveable { mutableStateOf(false) }
-    if (showSatellites) SatelliteListDialog(state.satellites, onClose = { showSatellites = false })
+    val currentOnShown by rememberUpdatedState(onSatelliteListShown)
+    DisposableEffect(showSatellites) {
+        currentOnShown(showSatellites)
+        onDispose { if (showSatellites) currentOnShown(false) }
+    }
+    if (showSatellites) SatelliteListDialog(state.satellites, state.isSatelliteListPending, onClose = { showSatellites = false })
 
     // English labels and numbers: a right-to-left phone language must not mirror them.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -98,14 +104,16 @@ private fun InfoLineRow(line: InfoLine, isStale: Boolean, onOpenSatellites: () -
 
 /** The satellites in view, those used in the fix first, strongest first, as in the pre-split GNSS detail. */
 @Composable
-private fun SatelliteListDialog(satellites: List<SatelliteReading>, onClose: () -> Unit) {
+private fun SatelliteListDialog(satellites: List<SatelliteReading>, isPending: Boolean, onClose: () -> Unit) {
     val sorted = remember(satellites) { satellites.sortedWith(compareByDescending<SatelliteReading> { it.usedInFix }.thenByDescending { it.cn0DbHz }) }
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text("Satellites: ${satellites.count { it.usedInFix }} used / ${satellites.size} in view") },
+        title = { Text(if (isPending) "Satellites" else "Satellites: ${satellites.count { it.usedInFix }} used / ${satellites.size} in view") },
         text = {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                if (sorted.isEmpty()) {
+                if (isPending) {
+                    Text("Waiting for the Sensor's satellite list...")
+                } else if (sorted.isEmpty()) {
                     Text("No satellite in view")
                 } else {
                     LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {

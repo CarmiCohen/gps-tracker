@@ -5,7 +5,9 @@ import kotlinx.serialization.Serializable
 /**
  * The detailed Info of the menu's Info screen (ISSUE-NOV10.8-O84 part 2, user decisions 2026-11-15): what each phone
  * knows about itself. The Sensor builds a [SensorInfo] every second for its own screen, and sends one every
- * [SENSOR_INFO_SEND_INTERVAL_MS] while a Monitor's Info screen asks for it ([SENSOR_INFO_REQUEST_INTERVAL_MS]).
+ * [SENSOR_INFO_SEND_INTERVAL_MS] while a Monitor's Info screen asks for it ([SENSOR_INFO_REQUEST_INTERVAL_MS]); the
+ * satellite list goes with it only while a Monitor's satellite list is open ([SENSOR_INFO_SATELLITE_WINDOW_MS],
+ * ISSUE-NOV15.5-O99 part 1).
  */
 
 /** One satellite as the phone's GNSS chip reports it. [constellation] is an Android `GnssStatus` constellation type. */
@@ -110,7 +112,12 @@ data class SensorInfo(
     /** Distance to the nearest home point, null without home points or a fix. */
     val homeDistanceM: Double? = null,
     val homeRadiusM: Double? = null,
+    /** The satellites in view; sent to a Monitor only while its satellite list is open (ISSUE-NOV15.5-O99 part 1). */
     val satellites: List<SatelliteReading> = emptyList(),
+    /** The summary of [satellites], always sent, so the Monitor shows it without the list; read by [satelliteSummary]. */
+    val satellitesUsed: Int = 0,
+    val satellitesInView: Int = 0,
+    val meanCn0DbHz: Float? = null,
     // Sensors: null when the phone lacks the sensor or it is off
     val vibrationG: Float? = null,
     val vibrationPeakG: Float? = null,
@@ -126,6 +133,16 @@ data class SensorInfo(
     val phone: PhoneState = PhoneState()
 )
 
+/** This Info with its satellite list left out, keeping the list's summary (ISSUE-NOV15.5-O99 part 1). */
+fun SensorInfo.withoutSatelliteList(): SensorInfo = copy(satellites = emptyList())
+
+/**
+ * The satellite summary of this Info: from the list when it came, else from the summary fields; an Info from a Sensor
+ * older than Nov16.4 has only the list.
+ */
+fun SensorInfo.satelliteSummary(): GnssSummary =
+    if (satellites.isNotEmpty()) gnssSummary(satellites) else GnssSummary(satellitesUsed, satellitesInView, meanCn0DbHz)
+
 /** A [SensorInfo] with the receiving phone's own clock time, so its age needs no clock agreement. */
 data class ReceivedSensorInfo(val info: SensorInfo, val receivedAtMs: Long)
 
@@ -137,6 +154,13 @@ const val SENSOR_INFO_SEND_INTERVAL_MS = 5_000L
 
 /** ... for this long, so a closed screen costs at most this much more data. */
 const val SENSOR_INFO_ANSWER_WINDOW_MS = 30_000L
+
+/**
+ * After a request that asks for the satellite list, the Sensor adds the list for this long: longer than
+ * [SENSOR_INFO_REQUEST_INTERVAL_MS], so an open list never misses it, and short, so a closed list soon stops costing
+ * data (about 4 KB per Info with 55 satellites in view, ISSUE-NOV15.5-O99 part 1).
+ */
+const val SENSOR_INFO_SATELLITE_WINDOW_MS = 15_000L
 
 /** A Monitor shows the Sensor's Info as old (gray) when none arrived for this long. */
 const val SENSOR_INFO_STALE_MS = 20_000L

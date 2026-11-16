@@ -138,14 +138,17 @@ interface SignalingClient {
     /** Sensor: the rows held while offline, waiting to be sent, for its Info (ISSUE-NOV10.8-O84 part 2). */
     fun queuedRowCount(): Int
 
-    /** Sensor: each time a Monitor's Info screen asks for the Sensor's Info (ISSUE-NOV10.8-O84 part 2). */
-    val infoRequestFlow: Flow<Unit>
+    /**
+     * Sensor: each time a Monitor's Info screen asks for the Sensor's Info (ISSUE-NOV10.8-O84 part 2); true when it
+     * also asks for the satellite list (ISSUE-NOV15.5-O99 part 1).
+     */
+    val infoRequestFlow: Flow<Boolean>
 
     /**
-     * Monitor: asks the tracker [targetId] for its Info while the Info screen is open (ISSUE-NOV10.8-O84 part 2).
-     * Returns false when not connected.
+     * Monitor: asks the tracker [targetId] for its Info while the Info screen is open (ISSUE-NOV10.8-O84 part 2), with
+     * the satellite list only [withSatellites] (ISSUE-NOV15.5-O99 part 1). Returns false when not connected.
      */
-    suspend fun requestSensorInfo(targetId: String): Boolean
+    suspend fun requestSensorInfo(targetId: String, withSatellites: Boolean): Boolean
 
     /**
      * Monitor: the newest Info received from a Sensor, or null when none arrived since [connect] (ISSUE-NOV10.8-O84

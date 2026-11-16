@@ -86,8 +86,8 @@ class SocketioSignalingClient @Inject constructor(
     private val _linkStats = MutableStateFlow(LinkStats())
     override val linkStats: StateFlow<LinkStats> = _linkStats.asStateFlow()
 
-    private val _infoRequestFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
-    override val infoRequestFlow: SharedFlow<Unit> = _infoRequestFlow.asSharedFlow()
+    private val _infoRequestFlow = MutableSharedFlow<Boolean>(extraBufferCapacity = 4)
+    override val infoRequestFlow: SharedFlow<Boolean> = _infoRequestFlow.asSharedFlow()
 
     private val _sensorInfoFlow = MutableStateFlow<ReceivedSensorInfo?>(null)
     override val sensorInfoFlow: StateFlow<ReceivedSensorInfo?> = _sensorInfoFlow.asStateFlow()
@@ -233,7 +233,7 @@ class SocketioSignalingClient @Inject constructor(
                 SensorSetupWire.decode(data)?.let { _sensorSetupFlow.value = it }
                 SensorEventsWire.decode(data)?.let { _sensorEventsFlow.tryEmit(it) }
                 SensorInfoWire.decode(data)?.let { _sensorInfoFlow.value = ReceivedSensorInfo(it, System.currentTimeMillis()) }
-                if (InfoRequestWire.isRequest(data)) _infoRequestFlow.tryEmit(Unit)
+                if (InfoRequestWire.isRequest(data)) _infoRequestFlow.tryEmit(InfoRequestWire.wantsSatellites(data))
                 GraphRequestWire.afterMs(data)?.let { _graphRequestFlow.tryEmit(it) }
                 GraphSamplesWire.decode(data)?.let { _graphSamplesFlow.tryEmit(it) }
             }
@@ -517,9 +517,9 @@ class SocketioSignalingClient @Inject constructor(
         return true
     }
 
-    override suspend fun requestSensorInfo(targetId: String): Boolean {
+    override suspend fun requestSensorInfo(targetId: String, withSatellites: Boolean): Boolean {
         if (!_isConnected.value) return false
-        val payload = InfoRequestWire.encode(targetId)
+        val payload = InfoRequestWire.encode(targetId, withSatellites)
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true

@@ -36,17 +36,23 @@ internal object SensorInfoWire {
 
 /**
  * A Monitor's Info screen asking the Sensor of room `id` for its Info (ISSUE-NOV10.8-O84 part 2); the Sensor answers
- * for [com.jd.core.shared.SENSOR_INFO_ANSWER_WINDOW_MS], so only an open screen costs data.
+ * for [com.jd.core.shared.SENSOR_INFO_ANSWER_WINDOW_MS], so only an open screen costs data. `sats` asks for the
+ * satellite list too, sent only while the Monitor's satellite list is open (ISSUE-NOV15.5-O99 part 1); a request
+ * without it comes from a Monitor older than Nov16.4, which shows the list's summary from the list, so it gets the list.
  */
 internal object InfoRequestWire {
     const val TYPE = "info_request"
+    private const val SATELLITES = "sats"
 
-    fun encode(targetId: String): JSONObject = JSONObject().apply {
+    fun encode(targetId: String, withSatellites: Boolean): JSONObject = JSONObject().apply {
         put("id", targetId)
         put("type", TYPE)
+        put(SATELLITES, withSatellites)
     }
 
     fun isRequest(data: JSONObject): Boolean = data.optString("type") == TYPE
+
+    fun wantsSatellites(data: JSONObject): Boolean = data.optBoolean(SATELLITES, true)
 }
 
 /**

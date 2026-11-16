@@ -538,14 +538,20 @@ class SensorService : Service(), SensorEventListener {
 
     /**
      * Sends this phone's Info to the Monitors every [SENSOR_INFO_SEND_INTERVAL_MS] for [SENSOR_INFO_ANSWER_WINDOW_MS] after
-     * each request; an open Monitor Info screen asks again before the window ends (ISSUE-NOV10.8-O84 part 2).
+     * each request; an open Monitor Info screen asks again before the window ends (ISSUE-NOV10.8-O84 part 2). The
+     * satellite list, most of the Info's size, goes with it only for [SENSOR_INFO_SATELLITE_WINDOW_MS] after a request
+     * that asks for it, so one Monitor's open list is not ended by another Monitor's request (ISSUE-NOV15.5-O99 part 1).
      */
     private fun setupInfoAnswering() {
         serviceScope.launch {
-            signalingClient.infoRequestFlow.collectLatest {
-                val untilMs = SystemClock.elapsedRealtime() + SENSOR_INFO_ANSWER_WINDOW_MS
+            var satellitesUntilMs = 0L
+            signalingClient.infoRequestFlow.collectLatest { wantsSatellites ->
+                val requestedAtMs = SystemClock.elapsedRealtime()
+                if (wantsSatellites) satellitesUntilMs = requestedAtMs + SENSOR_INFO_SATELLITE_WINDOW_MS
+                val untilMs = requestedAtMs + SENSOR_INFO_ANSWER_WINDOW_MS
                 while (SystemClock.elapsedRealtime() < untilMs) {
-                    signalingClient.sendSensorInfo(buildInfo())
+                    val info = buildInfo()
+                    signalingClient.sendSensorInfo(if (SystemClock.elapsedRealtime() < satellitesUntilMs) info else info.withoutSatelliteList())
                     delay(SENSOR_INFO_SEND_INTERVAL_MS)
                 }
             }
@@ -562,6 +568,8 @@ class SensorService : Service(), SensorEventListener {
         val fix = lastLocation
         val home = geofence
         val hasAccelerometer = motion.isRunning
+        val inView = satellites // one read, so the list and its summary agree
+        val gnss = gnssSummary(inView)
         return SensorInfo(
             capturedAtMs = nowMs,
             sensorId = selfId,
@@ -585,7 +593,10 @@ class SensorService : Service(), SensorEventListener {
                 home.points.minOf { SpatialMath.calculateDistance(loc.latitude, loc.longitude, it.lat, it.lng) }
             },
             homeRadiusM = home.takeIf { it.isActive }?.radiusMeters,
-            satellites = satellites,
+            satellites = inView,
+            satellitesUsed = gnss.used,
+            satellitesInView = gnss.inView,
+            meanCn0DbHz = gnss.meanCn0DbHz,
             vibrationG = if (hasAccelerometer) (motionSentinel.vibration / STANDARD_GRAVITY).toFloat() else null,
             vibrationPeakG = if (hasAccelerometer) (motionSentinel.vibrationPeak / STANDARD_GRAVITY).toFloat() else null,
             vibrationLimitG = (motionSentinel.vibrationThreshold / STANDARD_GRAVITY).toFloat(),

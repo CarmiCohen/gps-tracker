@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov16.3 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov16.4 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -981,8 +981,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **196.2 Past event (unit):** `EventLogTest`: `recordFrom` decides from the loaded log before any later record, adds the event at its own time in order, and a null or failing decision adds nothing. `MonitorEventsTest`: an acknowledged alarm whose condition then clears records `Ended` (part 1).
 *   **196.3 Live (device):** install the debug Sensor over the running one, then `am force-stop com.jd.app.sensor` and open the app; `run-as com.jd.app.sensor cat /data/user_de/0/com.jd.app.sensor/files/event_log.jsonl` shows `Sensor service stopped: app updated`, then `Sensor service stopped: force-stopped or app reinstalled`, each before the next `Sensor service started`.
 
+## Chapter 197 - The Satellite List On Demand (Nov16.4)
+**Status: A / L** - `SensorInfoWireTest` 9/9, `MonitorInfoScreenTest` 4/4; 197.3 verified on the A15 (ISSUE-NOV15.5-O99 part 1, SOT 1.436)
+*   **197.1 Wire (unit):** `SensorInfoWireTest`: the Info request says whether the satellite list is wanted, and one without the flag (a Monitor before Nov16.4) wants it; an Info without the list keeps its summary across the wire and is under a third of the size with 55 satellites.
+*   **197.2 Screen (unit):** `MonitorInfoScreenTest`: an Info without the list shows the summary (`9 used / 31 in view`) and marks the list pending; a received list, or no satellite in view, is not pending; an Info from a Sensor before Nov16.4 (list only) shows the counts from the list.
+*   **197.3 Live (device):** both debug apps paired on the A15; open the Monitor's Info: the Satellites line shows the counts with the list closed; tap it: the list (or briefly `Waiting for the Sensor's satellite list...`) shows within a few seconds; Back closes only the list and the counts stay current. Read the screens with `uiautomator dump`.
+
 ---
-**Active Testing Chapters: 185 of 196**
+**Active Testing Chapters: 186 of 197**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
