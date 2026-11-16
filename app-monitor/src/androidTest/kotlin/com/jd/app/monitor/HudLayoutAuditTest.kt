@@ -67,12 +67,12 @@ class HudLayoutAuditTest {
         composeRule.setContent {
             RevolutionTheme {
                 Box(Modifier.width(320.dp)) {
-                    MonitorMenuBar("MONITOR-LONG-ID", "TRACKER-LONG-ID", {}, {}, {}, {}, {}, {})
+                    MonitorMenuBar("MONITOR-LONG-ID", "TRACKER-LONG-ID", {}, {}, {}, {}, {}, {}, {})
                 }
             }
         }
 
-        listOf("Setup", "Settings / Re-pair", "Map", "Events", "Info", "Close").forEach {
+        listOf("Setup", "Settings / Re-pair", "Map", "Events", "Info", "Graphs", "Close").forEach {
             val bounds = composeRule.onNodeWithContentDescription(it).getUnclippedBoundsInRoot()
             assertTrue("$it must stay visible", bounds.right > bounds.left && bounds.right.value <= 320f)
         }

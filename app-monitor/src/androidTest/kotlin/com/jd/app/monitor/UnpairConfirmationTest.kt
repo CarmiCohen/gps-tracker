@@ -16,7 +16,8 @@ import org.junit.runner.RunWith
 
 /**
  * Verifies Chapter 127: no control on the real Monitor screen unpairs without confirmation (ISSUE-NOV5.2-O15),
- * and chapter 183: the red X closes the screen and never unpairs; the Tools, Events and Graphs buttons are gone (ISSUE-NOV10.8-O76).
+ * and chapter 183: the red X closes the screen and never unpairs; the Tools and Disconnect buttons are gone (ISSUE-NOV10.8-O76).
+ * Events (chapter 190) and Graphs (chapter 192) came back with ISSUE-NOV10.8-O84.
  */
 @RunWith(AndroidJUnit4::class)
 class UnpairConfirmationTest {
@@ -53,7 +54,16 @@ class UnpairConfirmationTest {
                     onClearHomePoints = { maintenanceCalls += "clear" },
                     onResetStats = { maintenanceCalls += "stats" },
                     onFullInit = { fullInitCount++ },
-                    onClose = { closeCount++ }
+                    onClose = { closeCount++ },
+                    graphsOverlay = { onClose ->
+                        com.jd.core.ui.GraphsOverlay(
+                            title = "GRAPHS",
+                            state = com.jd.core.shared.monitorGraphScreen(emptyList(), emptyList(), com.jd.core.shared.EventPeriod.DAY, System.currentTimeMillis()),
+                            period = com.jd.core.shared.EventPeriod.DAY,
+                            onPeriod = {},
+                            onClose = onClose
+                        )
+                    }
                 )
             }
         }
@@ -91,7 +101,7 @@ class UnpairConfirmationTest {
     @Test
     fun deadMenuButtonsAreGone() {
         showMonitorScreen()
-        listOf("Tools", "Graphs", "Disconnect").forEach {
+        listOf("Tools", "Disconnect").forEach {
             composeRule.onNodeWithContentDescription(it).assertDoesNotExist()
         }
     }
@@ -105,6 +115,18 @@ class UnpairConfirmationTest {
         composeRule.onNodeWithText("24 h").assertExists()
         composeRule.onNodeWithContentDescription("Close").performClick()
         composeRule.onNodeWithText("EVENTS").assertDoesNotExist()
+    }
+
+    /** The menu's Graphs button opens the Graphs, and its Close button returns to the map (ISSUE-NOV10.8-O84 part 3). */
+    @Test
+    fun graphsButtonOpensTheGraphs() {
+        showMonitorScreen()
+        composeRule.onNodeWithContentDescription("Graphs").performClick()
+        composeRule.onNodeWithText("GRAPHS").assertExists()
+        composeRule.onNodeWithText("SENSOR - MOTION").assertExists()
+        composeRule.onNodeWithText("7 d").assertExists()
+        composeRule.onNodeWithContentDescription("Close").performClick()
+        composeRule.onNodeWithText("GRAPHS").assertDoesNotExist()
     }
 
     /** Phone Setup's Home Points item opens the map's home point editor (ISSUE-NOV10.8-O76). */

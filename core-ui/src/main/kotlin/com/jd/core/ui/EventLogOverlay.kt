@@ -190,8 +190,9 @@ private fun EventDetail(event: EventEntry, onClose: () -> Unit) {
     }
 }
 
+/** A period or filter chip of the Events list, also used by the Graphs (ISSUE-NOV10.8-O84 part 3). */
 @Composable
-private fun EventChip(label: String, isOn: Boolean, onClick: () -> Unit) {
+internal fun EventChip(label: String, isOn: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
     Box(
         modifier = Modifier

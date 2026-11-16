@@ -189,6 +189,17 @@ object TestMonitorModule {
         return com.jd.core.shared.EventLog(java.io.File(context.cacheDir, "event_log_test.jsonl"), com.jd.core.shared.EventSource.MONITOR)
     }
 
+    /** The tests' own sample files, so a run never writes into the installed Monitor's Graphs (ISSUE-NOV10.8-O84 part 3). */
+    @Provides
+    @Singleton
+    fun provideMonitorGraphs(): MonitorGraphs {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        return MonitorGraphs(
+            sensor = com.jd.core.shared.GraphHistory(java.io.File(context.cacheDir, "graph_history_sensor_test.jsonl")),
+            own = com.jd.core.shared.GraphHistory(java.io.File(context.cacheDir, "graph_history_monitor_test.jsonl"))
+        )
+    }
+
     @Provides
     @Singleton
     fun provideMonitorRepository(
@@ -246,6 +257,10 @@ class FakeSignalingClient : SignalingClient {
     override suspend fun requestSensorInfo(targetId: String): Boolean = true
     override val sensorInfoFlow: StateFlow<com.jd.core.shared.ReceivedSensorInfo?> = MutableStateFlow(null)
     override suspend fun sendSensorInfo(info: com.jd.core.shared.SensorInfo): Boolean = true
+    override val graphRequestFlow: Flow<Long> = MutableSharedFlow()
+    override suspend fun requestGraphSamples(targetId: String, afterMs: Long): Boolean = true
+    override val graphSamplesFlow: Flow<com.jd.core.shared.SensorGraphBatch> = MutableSharedFlow()
+    override suspend fun sendGraphSamples(samples: List<com.jd.core.shared.GraphSample>): Boolean = true
 
     fun emitTelemetry(update: LocationUpdate) {
         _telemetryFlow.tryEmit(update)

@@ -10,6 +10,9 @@ import com.jd.core.network.SignalingClient
 import com.jd.core.network.peerDeliveries
 import com.jd.core.shared.EventLog
 import com.jd.core.shared.ForensicIdentity
+import com.jd.core.shared.LinkStats
+import com.jd.core.shared.graphSampleTimes
+import com.jd.core.shared.linkUpPercent
 import com.jd.core.shared.linkChanges
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.SystemLogger
@@ -35,6 +38,7 @@ class MonitorSessionService : Service() {
     @Inject lateinit var dataStore: MonitorDataStore
     @Inject lateinit var alarmEngine: MonitorAlarmEngine
     @Inject lateinit var eventLog: EventLog
+    @Inject lateinit var graphs: MonitorGraphs
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var signalingJob: Job? = null
@@ -105,6 +109,21 @@ class MonitorSessionService : Service() {
             }
             launch {
                 signalingClient.isConnected.linkChanges().collect { relayLinkEvent(it).let { event -> eventLog.record(event.level, event.message) } }
+            }
+
+            // The paired Sensor's samples arrive while the Graphs screen asks for them; this phone samples its own link (ISSUE-NOV10.8-O84 part 3).
+            launch {
+                signalingClient.graphSamplesFlow.filter { it.trackerId == targetId }.collect { graphs.sensor.add(it.samples) }
+            }
+            launch {
+                var previousLink: LinkStats? = null
+                var previousMs = 0L
+                graphSampleTimes().collect { timeMs ->
+                    val link = signalingClient.linkStats.value
+                    graphs.own.add(monitorGraphSample(timeMs, linkUpPercent(previousLink, previousMs, link, timeMs), link.latencyMs, repository.takeRowCounts()))
+                    previousLink = link
+                    previousMs = timeMs
+                }
             }
 
             // Get last sequence ID for initial backfill handshake (R-ID 768)

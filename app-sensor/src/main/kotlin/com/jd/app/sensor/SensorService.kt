@@ -69,6 +69,7 @@ class SensorService : Service(), SensorEventListener {
     @Inject lateinit var serviceStatus: SensorServiceStatus
     @Inject lateinit var eventLog: EventLog
     @Inject lateinit var infoSource: SensorInfoSource
+    @Inject lateinit var graphHistory: GraphHistory
     private lateinit var forensicBuffer: ForensicBuffer
     private lateinit var sensorManager: SensorManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -129,6 +130,10 @@ class SensorService : Service(), SensorEventListener {
     @Volatile private var lux: Float? = null
     @Volatile private var selfId = ""
     @Volatile private var isMonitorOnline = false
+
+    // The minute's peaks for the Graphs (ISSUE-NOV10.8-O84 part 3): offered on the motion sensor thread, taken each minute.
+    private val vibrationPeaks = PeakTracker()
+    private val tiltPeaks = PeakTracker()
 
     private val gnssCallback = object : GnssStatusCompat.Callback() {
         override fun onSatelliteStatusChanged(status: GnssStatusCompat) {
@@ -220,6 +225,7 @@ class SensorService : Service(), SensorEventListener {
         setupSetupReporting()
         setupEventReporting()
         setupInfoAnswering()
+        setupGraphs()
         registerSensors()
         startLocationUpdates()
         connectSignaling()
@@ -569,6 +575,51 @@ class SensorService : Service(), SensorEventListener {
         )
     }
 
+    /**
+     * Takes one sample a minute for the Graphs, and answers each request of a Monitor's Graphs screen with the samples
+     * newer than the newest it holds, oldest first, so a request cut short still leaves the Monitor without holes
+     * (ISSUE-NOV10.8-O84 part 3).
+     */
+    private fun setupGraphs() {
+        var previousLink: LinkStats? = null
+        var previousMs = 0L
+        graphSampleTimes()
+            .onEach { timeMs ->
+                val link = signalingClient.linkStats.value
+                graphHistory.add(
+                    sensorGraphSample(
+                        timeMs = timeMs,
+                        vibrationPeakMps2 = vibrationPeaks.take(),
+                        tiltPeakDeg = tiltPeaks.take(),
+                        noisePeakDbfs = acousticMonitor.levelPeaks.take(),
+                        behaviour = sensorBehaviour,
+                        vibrationLimitMps2 = motionSentinel.vibrationThreshold,
+                        tiltLimitDeg = motionSentinel.tiltThresholdDegrees,
+                        fixAccuracyM = lastLocation?.takeIf { isFixFresh(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) }?.accuracy,
+                        gnss = if (isGnssRegistered) gnssSummary(satellites) else null,
+                        linkUpPercent = linkUpPercent(previousLink, previousMs, link, timeMs),
+                        latencyMs = link.latencyMs,
+                        queuedRows = signalingClient.queuedRowCount(),
+                        batteryPercent = lastBatteryLevel,
+                        isCharging = lastIsCharging,
+                        temperatureC = lastTempCelsius
+                    )
+                )
+                previousLink = link
+                previousMs = timeMs
+            }
+            .launchIn(serviceScope)
+        signalingClient.graphRequestFlow
+            .onEach { afterMs ->
+                val newer = graphHistory.samples.value.filter { it.timeMs > afterMs }
+                for (chunk in newer.chunked(GRAPH_SAMPLES_PER_MESSAGE)) {
+                    if (!signalingClient.sendGraphSamples(chunk)) break
+                }
+                SystemLogger.i("SensorGraphs", "Graph request after $afterMs: ${newer.size} samples sent")
+            }
+            .launchIn(serviceScope)
+    }
+
     private suspend fun sendSetupReport(report: SensorSetupReport) {
         val sent = signalingClient.sendSensorSetup(report)
         SystemLogger.i("SensorSetup", "Report sent: $sent (missing ${report.missing}, faults ${report.faults}, behaviour rev ${report.behaviourRevision})")
@@ -660,6 +711,8 @@ class SensorService : Service(), SensorEventListener {
                 lastAccel[1] = event.values[1].toDouble()
                 lastAccel[2] = event.values[2].toDouble()
                 motionSentinel.onAccelerometer(lastAccel[0], lastAccel[1], lastAccel[2], eventMs).forEach(::onMotionAlert)
+                vibrationPeaks.offer(motionSentinel.vibration)
+                motionSentinel.tiltDegrees?.let(tiltPeaks::offer)
                 if (motionSentinel.isArmed != publishedMotionArmed) {
                     publishedMotionArmed = motionSentinel.isArmed
                     publishMotion()

@@ -80,7 +80,7 @@ fun eventLogText(events: List<EventEntry>): String {
  * The Monitor's log also holds the Sensor's events, which it receives with [merge].
  */
 class EventLog(
-    private val file: File,
+    file: File,
     private val source: EventSource,
     private val clock: () -> Long = System::currentTimeMillis,
     writer: CoroutineDispatcher = Executors.newSingleThreadExecutor { Thread(it, "EventLog").apply { isDaemon = true } }
@@ -88,6 +88,7 @@ class EventLog(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + writer)
     private val json = Json { ignoreUnknownKeys = true }
+    private val lines = JsonLinesFile(file, "EventLog")
 
     private val _events = MutableStateFlow<List<EventEntry>>(emptyList())
 
@@ -117,7 +118,7 @@ class EventLog(
     fun clear() {
         scope.launch {
             _events.value = emptyList()
-            if (file.exists() && !file.delete()) SystemLogger.e("EventLog", "Could not delete ${file.name}")
+            lines.delete()
         }
     }
 
@@ -126,46 +127,18 @@ class EventLog(
         val all = (_events.value + new).sortedBy { it.timestampMs }
         val kept = retained(all, clock())
         _events.value = kept
-        if (kept.size == all.size) appendLines(new) else rewrite(kept)
+        if (kept.size == all.size) lines.append(new.map(::encode)) else lines.rewrite(kept.map(::encode))
     }
 
     private fun load() {
-        if (!file.exists()) return
-        val lines = try {
-            file.readLines()
-        } catch (e: Exception) {
-            SystemLogger.e("EventLog", "Read failed: ${e.message}")
-            return
-        }
-        val read = lines.mapNotNull { line -> runCatching { json.decodeFromString<EventEntry>(line) }.getOrNull() }
+        val stored = lines.readLines() ?: return
+        val read = stored.mapNotNull { line -> runCatching { json.decodeFromString<EventEntry>(line) }.getOrNull() }
         val kept = retained(read.sortedBy { it.timestampMs }, clock())
         _events.value = kept
-        if (kept.size != lines.size) rewrite(kept) // Drops expired events and lines cut short.
+        if (kept.size != stored.size) lines.rewrite(kept.map(::encode)) // Drops expired events and lines cut short.
     }
 
-    private fun appendLines(entries: List<EventEntry>) {
-        try {
-            file.parentFile?.mkdirs()
-            file.appendText(entries.joinToString(separator = "") { json.encodeToString(it) + "\n" })
-        } catch (e: Exception) {
-            SystemLogger.e("EventLog", "Write failed: ${e.message}")
-        }
-    }
-
-    /** Replaces the file through a temporary one, so a crash leaves either the old or the new file. */
-    private fun rewrite(entries: List<EventEntry>) {
-        try {
-            file.parentFile?.mkdirs()
-            val temporary = File(file.parentFile, file.name + ".tmp")
-            temporary.writeText(entries.joinToString(separator = "") { json.encodeToString(it) + "\n" })
-            if (!temporary.renameTo(file)) {
-                file.delete()
-                temporary.renameTo(file)
-            }
-        } catch (e: Exception) {
-            SystemLogger.e("EventLog", "Rewrite failed: ${e.message}")
-        }
-    }
+    private fun encode(entry: EventEntry): String = json.encodeToString(entry)
 
     private fun newId(nowMs: Long): String =
         "${source.name.first()}${nowMs.toString(36)}-${Random.nextInt(0, Int.MAX_VALUE).toString(36)}"

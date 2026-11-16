@@ -151,6 +151,7 @@ class MonitorActivity : ComponentActivity() {
                         events = events,
                         onClearEvents = viewModel::clearEvents,
                         infoOverlay = { onClose -> MonitorInfoScreen(viewModel, onClose) },
+                        graphsOverlay = { onClose -> MonitorGraphsScreen(viewModel, onClose) },
                         onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
                         onUpdateSirenType = { viewModel.updateSirenType(it) },
                         onUpdateAlarmVolume = { viewModel.updateAlarmVolume(it) },
@@ -301,7 +302,9 @@ fun MonitorScreen(
     events: List<EventEntry> = emptyList(),
     onClearEvents: () -> Unit = {},
     /** The detailed Info screen (ISSUE-NOV10.8-O84 part 2), given its close action. */
-    infoOverlay: @Composable (onClose: () -> Unit) -> Unit = {}
+    infoOverlay: @Composable (onClose: () -> Unit) -> Unit = {},
+    /** The Graphs screen (ISSUE-NOV10.8-O84 part 3), given its close action. */
+    graphsOverlay: @Composable (onClose: () -> Unit) -> Unit = {}
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
@@ -312,6 +315,7 @@ fun MonitorScreen(
     var showAlertsOverlay by rememberSaveable { mutableStateOf(false) }
     var showEventsOverlay by rememberSaveable { mutableStateOf(false) }
     var showInfoOverlay by rememberSaveable { mutableStateOf(false) }
+    var showGraphsOverlay by rememberSaveable { mutableStateOf(false) }
     var showSoundOverlay by rememberSaveable { mutableStateOf(false) }
     var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
     var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
@@ -381,6 +385,12 @@ fun MonitorScreen(
     if (showInfoOverlay) {
         BackHandler { showInfoOverlay = false }
         infoOverlay { showInfoOverlay = false }
+        return
+    }
+
+    if (showGraphsOverlay) {
+        BackHandler { showGraphsOverlay = false }
+        graphsOverlay { showGraphsOverlay = false }
         return
     }
 
@@ -592,6 +602,7 @@ fun MonitorScreen(
                     onMap = { followMode = MapFollowMode.AUTO },
                     onEvents = { showEventsOverlay = true },
                     onInfo = { showInfoOverlay = true },
+                    onGraphs = { showGraphsOverlay = true },
                     onClose = onClose
                 )
                 // Line 1: Local Device Status
@@ -788,9 +799,10 @@ fun MonitorMenuBar(
     onMap: () -> Unit,
     onEvents: () -> Unit,
     onInfo: () -> Unit,
+    onGraphs: () -> Unit,
     onClose: () -> Unit
 ) {
-    // Events since ISSUE-NOV10.8-O84 Nov15.4, the detailed Info since Nov15.5; Graphs follow with O84. Unpairing is only behind the gear, the red X
+    // Events since ISSUE-NOV10.8-O84 Nov15.4, the detailed Info since Nov15.5, the Graphs since Nov15.6. Unpairing is only behind the gear, the red X
     // sends the app to the background (ISSUE-NOV10.8-O76).
     Surface(
         color = Color.Black.copy(alpha = 0.85f),
@@ -820,6 +832,9 @@ fun MonitorMenuBar(
                 }
                 IconButton(onClick = onInfo, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
+                }
+                IconButton(onClick = onGraphs, modifier = Modifier.size(28.dp)) {
+                    Icon(com.jd.core.ui.GraphsIcon, contentDescription = "Graphs", tint = Color(0xFFA78BFA), modifier = Modifier.size(15.dp))
                 }
             }
             Text(

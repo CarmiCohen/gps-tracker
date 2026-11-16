@@ -3,6 +3,8 @@ package com.jd.core.network
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.EventEntry
+import com.jd.core.shared.GraphSample
+import com.jd.core.shared.SensorGraphBatch
 import com.jd.core.shared.SensorEventBatch
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
@@ -89,6 +91,13 @@ class SocketioSignalingClient @Inject constructor(
 
     private val _sensorInfoFlow = MutableStateFlow<ReceivedSensorInfo?>(null)
     override val sensorInfoFlow: StateFlow<ReceivedSensorInfo?> = _sensorInfoFlow.asStateFlow()
+
+    private val _graphRequestFlow = MutableSharedFlow<Long>(extraBufferCapacity = 4)
+    override val graphRequestFlow: SharedFlow<Long> = _graphRequestFlow.asSharedFlow()
+
+    // A week's first sync arrives as 14 messages at once; tryEmit drops what does not fit, which the next request asks for again.
+    private val _graphSamplesFlow = MutableSharedFlow<SensorGraphBatch>(extraBufferCapacity = 32)
+    override val graphSamplesFlow: SharedFlow<SensorGraphBatch> = _graphSamplesFlow.asSharedFlow()
 
     private var currentRoom: String? = null // The room joined as `secret`, where the latency pings go.
     private var pingJob: Job? = null
@@ -225,6 +234,8 @@ class SocketioSignalingClient @Inject constructor(
                 SensorEventsWire.decode(data)?.let { _sensorEventsFlow.tryEmit(it) }
                 SensorInfoWire.decode(data)?.let { _sensorInfoFlow.value = ReceivedSensorInfo(it, System.currentTimeMillis()) }
                 if (InfoRequestWire.isRequest(data)) _infoRequestFlow.tryEmit(Unit)
+                GraphRequestWire.afterMs(data)?.let { _graphRequestFlow.tryEmit(it) }
+                GraphSamplesWire.decode(data)?.let { _graphSamplesFlow.tryEmit(it) }
             }
 
             // Every ping of the room comes here; only this device's own echo is its latency (ISSUE-NOV10.8-O84 part 2).
@@ -518,6 +529,23 @@ class SocketioSignalingClient @Inject constructor(
         val deviceId = currentDeviceId ?: return false
         if (!_isConnected.value) return false
         val payload = SensorInfoWire.encode(info.sensorId.ifEmpty { deviceId }, info)
+        socket?.emit("settings_update", payload)
+        bytesSent += payload.toString().length.toLong()
+        return true
+    }
+
+    override suspend fun requestGraphSamples(targetId: String, afterMs: Long): Boolean {
+        if (!_isConnected.value) return false
+        val payload = GraphRequestWire.encode(targetId, afterMs)
+        socket?.emit("settings_update", payload)
+        bytesSent += payload.toString().length.toLong()
+        return true
+    }
+
+    override suspend fun sendGraphSamples(samples: List<GraphSample>): Boolean {
+        val deviceId = currentDeviceId ?: return false
+        if (!_isConnected.value) return false
+        val payload = GraphSamplesWire.encode(deviceId, samples)
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true

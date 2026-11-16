@@ -10,6 +10,11 @@ import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLog
+import com.jd.core.shared.EventPeriod
+import com.jd.core.shared.GraphHistory
+import com.jd.core.shared.GraphScreenState
+import com.jd.core.shared.graphScreenClock
+import com.jd.core.shared.sensorGraphScreen
 import com.jd.core.shared.InfoScreenState
 import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.RelayConfig
@@ -34,6 +39,7 @@ class SensorViewModel @Inject constructor(
     private val serviceStatus: SensorServiceStatus,
     private val eventLog: EventLog,
     private val infoSource: SensorInfoSource,
+    private val graphHistory: GraphHistory,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -55,6 +61,22 @@ class SensorViewModel @Inject constructor(
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), InfoScreenState())
+
+    private val _graphPeriod = MutableStateFlow(EventPeriod.DAY)
+
+    /** The period the Graphs screen shows; kept here so it survives a rotation (ISSUE-NOV10.8-O84 part 3). */
+    val graphPeriod: StateFlow<EventPeriod> = _graphPeriod.asStateFlow()
+
+    fun setGraphPeriod(period: EventPeriod) {
+        _graphPeriod.value = period
+    }
+
+    /** The Graphs screen, rebuilt at each new sample, period and minute while it is open (ISSUE-NOV10.8-O84 part 3). */
+    val graphScreen: StateFlow<GraphScreenState> = combine(graphHistory.samples, graphPeriod, graphScreenClock()) { samples, period, now ->
+        sensorGraphScreen(samples, period, now)
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), GraphScreenState())
 
     /** Reported by [SensorService] itself; shown in the Setup dialog (ISSUE-NOV6.4-O34). */
     val isServiceRunning: StateFlow<Boolean> = serviceStatus.isRunning

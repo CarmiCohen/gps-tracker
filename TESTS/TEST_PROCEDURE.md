@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov15.5 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov15.6 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -950,8 +950,16 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **191.4 Screens (unit and instrumented):** `SensorInfoScreenTest`: a stopped service shows a note, a running one its sections and satellites; `MonitorInfoScreenTest`: a fresh Info (ages by the Monitor's receive time) then this phone, an old one grayed with its age, the newest row while none came, only this phone without either. `HudLayoutAuditTest`: Info stays visible with long IDs; `RotationStateRestorationTest`: the `Monitor Setup` dialog survives rotation. Run the Monitor in airplane mode (O90).
 *   **191.5 Live (device):** with both apps paired, open the Sensor's Info (tap `System Idle`, then Info): five sections with live values, a latency in ms, the Satellites line opens the list (used first); open the Monitor's Info: within 10 s the `SENSOR - ` sections arrive with the Sensor's latency, and `THIS PHONE (MONITOR)` shows its own link, GPS and distance. Read the screens with `uiautomator dump`; acknowledge any alarm screen first.
 
+## Chapter 192 - The Graphs (Nov15.6)
+**Status: A / L** - `GraphHistoryTest` 10/10, `GraphsTest` 7/7, `GraphWireTest` 2/2, `SensorGraphsTest` 2/2, `MonitorGraphsTest` 1/1, `UnpairConfirmationTest.graphsButtonOpensTheGraphs` and `HudLayoutAuditTest` passed on the A15; 192.5 verified on the A15 (ISSUE-NOV10.8-O84 part 3, SOT 1.431)
+*   **192.1 Sample store (unit):** `GraphHistoryTest`: a sample keeps the field order, rounds its values and leaves unknown and trailing values out; a newer phone's extra fields are ignored and a malformed sample skipped; 12 hours of busy samples stay under 100 KB; samples survive a restart, a minute is kept once and appended without a rewrite; an older sample is put in its place; expired samples go after the 1-hour slack, and all at once on loading; a line cut short is skipped; Clear deletes the file; a peak is taken once; the link's share of a minute up counts its drops; samples fall on the whole minute.
+*   **192.2 Graphs (unit):** `GraphsTest`: one point a minute up to 360; peaks stay peaks, the rest is averaged, an empty point is null; a sample covers the minute before it and one a minute after the end still counts; a panel keeps its floor and ceiling, says its newest value and range, and shades charging; vibration and tilt carry their limit lines; the Sensor's four sections; the Monitor's `SENSOR - ` sections, its own connection, and the note on old Sensor samples.
+*   **192.3 Wire and samples (unit):** `GraphWireTest`: `graph_request` and `graph_samples` survive the round trip, are not read as other settings types, travel only while connected and reach the peer's flows; `SensorGraphsTest`: the Sensor's minute sample (vibration in g, limits only while their kind is on, unknown readings stay unknown); `MonitorGraphsTest`: the Monitor's own sample.
+*   **192.4 Menu (instrumented):** `UnpairConfirmationTest.graphsButtonOpensTheGraphs`: the Monitor's Graphs button opens the Graphs with their periods and Close returns; `HudLayoutAuditTest`: Graphs stays visible with long IDs. Run the Monitor in airplane mode (O90).
+*   **192.5 Live (device):** install both debug apps over their data and wait 3 minutes; `adb shell run-as com.jd.app.sensor cat /data/user_de/0/com.jd.app.sensor/files/graph_history_sensor.jsonl` shows one array a minute; open the Sensor's Graphs: the four sections with points for the last minutes; open the Monitor's Graphs: `REV_SensorGraphs: Graph request after ...: N samples sent` in the Sensor's log and the `SENSOR - ` graphs filled within a minute, then `THIS MONITOR - CONNECTION`. Read the screens with `uiautomator dump`.
+
 ---
-**Active Testing Chapters: 180 of 191**
+**Active Testing Chapters: 181 of 192**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

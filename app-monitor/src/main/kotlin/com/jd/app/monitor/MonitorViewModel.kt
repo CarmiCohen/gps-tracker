@@ -11,6 +11,11 @@ import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
 import com.jd.core.shared.EventLog
+import com.jd.core.shared.EventPeriod
+import com.jd.core.shared.GRAPH_REQUEST_INTERVAL_MS
+import com.jd.core.shared.GraphScreenState
+import com.jd.core.shared.graphScreenClock
+import com.jd.core.shared.monitorGraphScreen
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
 import com.jd.core.shared.InfoScreenState
@@ -47,6 +52,7 @@ class MonitorViewModel @Inject constructor(
     private val locationSource: MonitorLocationSource,
     private val alarmEngine: MonitorAlarmEngine,
     private val eventLog: EventLog,
+    private val graphs: MonitorGraphs,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -169,6 +175,8 @@ class MonitorViewModel @Inject constructor(
             _latestTelemetry.value = null
             alarmEngine.acknowledge()
         }
+        graphs.sensor.clear()
+        graphs.own.clear()
         eventLog.record(EventLevel.WARNING, "Full re-initialization: unpaired from ${pairing.value?.trackerId}, settings reset")
     }
 
@@ -339,6 +347,39 @@ class MonitorViewModel @Inject constructor(
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), InfoScreenState())
 
+    private val _graphPeriod = MutableStateFlow(EventPeriod.DAY)
+
+    /** The period the Graphs screen shows; kept here so it survives a rotation (ISSUE-NOV10.8-O84 part 3). */
+    val graphPeriod: StateFlow<EventPeriod> = _graphPeriod.asStateFlow()
+
+    fun setGraphPeriod(period: EventPeriod) {
+        _graphPeriod.value = period
+    }
+
+    /**
+     * Asks the paired Sensor for the samples newer than the newest held, at once and every [GRAPH_REQUEST_INTERVAL_MS]
+     * while collected. Emits nothing.
+     */
+    private val graphRequests = flow<GraphScreenState> {
+        while (true) {
+            identityManager.targetId.first()?.let { signalingClient.requestGraphSamples(it, graphs.sensor.newestTimeMs) }
+            delay(GRAPH_REQUEST_INTERVAL_MS)
+        }
+    }
+
+    /**
+     * The Graphs screen (ISSUE-NOV10.8-O84 part 3): the Sensor's samples and this phone's own, rebuilt at each new sample,
+     * period and minute while it is open; only then is the Sensor asked for its samples, so a closed screen costs no data.
+     */
+    val graphScreen: StateFlow<GraphScreenState> = merge(
+        graphRequests,
+        combine(graphs.sensor.samples, graphs.own.samples, graphPeriod, graphScreenClock()) { sensorSamples, ownSamples, period, now ->
+            monitorGraphScreen(sensorSamples, ownSamples, period, now)
+        }
+    )
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), GraphScreenState())
+
     fun setTargetId(id: String) {
         viewModelScope.launch {
             identityManager.setTargetId(id)
@@ -348,6 +389,7 @@ class MonitorViewModel @Inject constructor(
 
     fun clearTargetId() {
         eventLog.record(EventLevel.WARNING, "Unpaired from tracker ${pairing.value?.trackerId}")
+        graphs.sensor.clear() // The next Sensor's samples must not mix with this one's (ISSUE-NOV10.8-O84 part 3).
         viewModelScope.launch {
             identityManager.clearTargetId()
         }

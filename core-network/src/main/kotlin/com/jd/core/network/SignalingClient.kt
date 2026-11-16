@@ -3,6 +3,8 @@ package com.jd.core.network
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.EventEntry
+import com.jd.core.shared.GraphSample
+import com.jd.core.shared.SensorGraphBatch
 import com.jd.core.shared.SensorEventBatch
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.LinkStats
@@ -153,4 +155,25 @@ interface SignalingClient {
 
     /** Sensor: sends its [info] to the Monitors of its room (ISSUE-NOV10.8-O84 part 2). Returns false when not connected. */
     suspend fun sendSensorInfo(info: SensorInfo): Boolean
+
+    /**
+     * Sensor: each time a Monitor's Graphs screen asks for the samples newer than the given time on the Sensor's clock
+     * (ISSUE-NOV10.8-O84 part 3).
+     */
+    val graphRequestFlow: Flow<Long>
+
+    /**
+     * Monitor: asks the tracker [targetId] for its samples newer than [afterMs], the newest the Monitor holds, while the
+     * Graphs screen is open (ISSUE-NOV10.8-O84 part 3). Returns false when not connected.
+     */
+    suspend fun requestGraphSamples(targetId: String, afterMs: Long): Boolean
+
+    /** Monitor: each batch of samples a Sensor sends (ISSUE-NOV10.8-O84 part 3). */
+    val graphSamplesFlow: Flow<SensorGraphBatch>
+
+    /**
+     * Sensor: sends [samples] to the Monitors of its room, at most [com.jd.core.shared.GRAPH_SAMPLES_PER_MESSAGE] a call
+     * (ISSUE-NOV10.8-O84 part 3). Returns false when not connected.
+     */
+    suspend fun sendGraphSamples(samples: List<GraphSample>): Boolean
 }

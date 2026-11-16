@@ -108,6 +108,7 @@ class AdminActivity : ComponentActivity() {
                     var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
                     var showEventsOverlay by rememberSaveable { mutableStateOf(false) }
                     var showInfoOverlay by rememberSaveable { mutableStateOf(false) }
+                    var showGraphsOverlay by rememberSaveable { mutableStateOf(false) }
 
                     val sensorBehaviour by viewModel.sensorBehaviour.collectAsStateWithLifecycle()
 
@@ -147,6 +148,17 @@ class AdminActivity : ComponentActivity() {
                                     title = "SENSOR INFO",
                                     state = infoScreen,
                                     onClose = { showInfoOverlay = false }
+                                )
+                            } else if (showGraphsOverlay) {
+                                BackHandler { showGraphsOverlay = false }
+                                val graphScreen by viewModel.graphScreen.collectAsStateWithLifecycle()
+                                val graphPeriod by viewModel.graphPeriod.collectAsStateWithLifecycle()
+                                com.jd.core.ui.GraphsOverlay(
+                                    title = "SENSOR GRAPHS",
+                                    state = graphScreen,
+                                    period = graphPeriod,
+                                    onPeriod = viewModel::setGraphPeriod,
+                                    onClose = { showGraphsOverlay = false }
                                 )
                             } else if (showEventsOverlay) {
                                 BackHandler { showEventsOverlay = false }
@@ -213,6 +225,7 @@ class AdminActivity : ComponentActivity() {
                                     onSettingsClick = { showSettings = true },
                                     onEventsClick = { showEventsOverlay = true },
                                     onInfoClick = { showInfoOverlay = true },
+                                    onGraphsClick = { showGraphsOverlay = true },
                                     onClose = { moveTaskToBack(true) },
                                     onOpenPhoneSetup = { showPhoneSetupOverlay = true }
                                 )
@@ -498,6 +511,7 @@ fun SensorAdminConsole(
     onSettingsClick: () -> Unit,
     onEventsClick: () -> Unit,
     onInfoClick: () -> Unit,
+    onGraphsClick: () -> Unit,
     onClose: () -> Unit,
     onOpenPhoneSetup: () -> Unit
 ) {
@@ -511,7 +525,7 @@ fun SensorAdminConsole(
 
     Column {
         // Menu Upper Line: Setup, Settings and Info; the red X sends the app to the background (ISSUE-NOV10.8-O76).
-        // Events since ISSUE-NOV10.8-O84 Nov15.4, the detailed Info since Nov15.5; Graphs follow with O84. The Sensor has
+        // Events since ISSUE-NOV10.8-O84 Nov15.4, the detailed Info since Nov15.5, the Graphs since Nov15.6. The Sensor has
         // no map (user decision, 2026-11-12).
         Surface(
             color = Color.Black.copy(alpha = 0.85f),
@@ -540,6 +554,9 @@ fun SensorAdminConsole(
                     }
                     IconButton(onClick = onInfoClick, modifier = Modifier.size(28.dp)) {
                         Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
+                    }
+                    IconButton(onClick = onGraphsClick, modifier = Modifier.size(28.dp)) {
+                        Icon(com.jd.core.ui.GraphsIcon, contentDescription = "Graphs", tint = Color(0xFFA78BFA), modifier = Modifier.size(15.dp))
                     }
                 }
                 Text(

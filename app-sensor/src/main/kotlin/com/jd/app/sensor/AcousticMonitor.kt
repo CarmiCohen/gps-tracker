@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import com.jd.core.shared.ACOUSTIC_FRAME_MS
 import com.jd.core.shared.ACOUSTIC_JUMP_DB
 import com.jd.core.shared.AcousticDetector
+import com.jd.core.shared.PeakTracker
 import com.jd.core.shared.SystemLogger
 import com.jd.core.shared.acousticLevelDbfs
 import kotlin.math.max
@@ -43,6 +44,9 @@ class AcousticMonitor(
         private set
     @Volatile var floorDbfs: Double? = null
         private set
+
+    /** Every frame's level, so the Graphs keep the loudest of each minute (ISSUE-NOV10.8-O84 part 3). */
+    val levelPeaks = PeakTracker()
 
     /** Starts listening; does nothing while already listening. */
     fun start(context: Context) {
@@ -123,6 +127,7 @@ class AcousticMonitor(
                     continue
                 }
                 silentSinceMs = null
+                levelPeaks.offer(level)
                 report(MicrophoneState.LISTENING)
                 val floor = detector.floorDbfs
                 floorDbfs = floor

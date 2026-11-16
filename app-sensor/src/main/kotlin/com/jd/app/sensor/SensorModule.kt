@@ -3,6 +3,7 @@ package com.jd.app.sensor
 import android.content.Context
 import com.jd.core.shared.EventLog
 import com.jd.core.shared.EventSource
+import com.jd.core.shared.GraphHistory
 import com.jd.core.shared.TickOrchestrator
 import dagger.Module
 import dagger.Provides
@@ -41,4 +42,17 @@ object EventLogModule {
     @Singleton
     fun provideEventLog(@ApplicationContext context: Context): EventLog =
         EventLog(File(context.createDeviceProtectedStorageContext().filesDir, EventLog.FILE_NAME), EventSource.SENSOR)
+}
+
+/**
+ * The Sensor's samples for the Graphs (ISSUE-NOV10.8-O84 part 3), in device-protected storage like its events, and in a
+ * module of its own for the same reason: instrumented tests replace it.
+ */
+@Module
+@InstallIn(SingletonComponent::class)
+object GraphHistoryModule {
+    @Provides
+    @Singleton
+    fun provideGraphHistory(@ApplicationContext context: Context): GraphHistory =
+        GraphHistory(File(context.createDeviceProtectedStorageContext().filesDir, GraphHistory.SENSOR_FILE_NAME))
 }

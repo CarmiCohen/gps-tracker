@@ -16,7 +16,7 @@ The Sensor is a high-precision, background-persistent engine and acts as the aut
 
 ## 4. Security & HUD Admin Console
 - **Upper Menu Header**: Top control line in `AdminActivity` containing Setup (`Build`), Settings (`Settings`), and Close controls.
-- **Sensor Setup**: Accessible via the Setup icon; displays Device ID, active Relay URL, App Version, and Service Status, with a **CHANGE RELAY URL** shortcut. The Info icon opens the detailed Info screen (Nov15.5, ISSUE-NOV10.8-O84 part 2; see `UPPER_MENU_LINE_AND_VIEWS.md`).
+- **Sensor Setup**: Accessible via the Setup icon; displays Device ID, active Relay URL, App Version, and Service Status, with a **CHANGE RELAY URL** shortcut. The Info icon opens the detailed Info screen (Nov15.5, ISSUE-NOV10.8-O84 part 2), the Graphs icon the graphs of its minute samples, kept 7 days in device-protected storage and sent to a Monitor whose Graphs ask for them (Nov15.6, part 3; see `UPPER_MENU_LINE_AND_VIEWS.md`).
 - **Passcode Protection**: Admin HUD requires a 4-digit PIN for access to calibration and config.
 - **Setup QR**: Displays a secure pairing code containing TrackerID + SecretKey.
 - **Notification Stealth**: Titles are non-descriptive (e.g., "System Maintenance") to avoid thief detection.

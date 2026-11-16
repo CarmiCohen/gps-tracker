@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.EventLog
 import com.jd.core.shared.EventSource
+import com.jd.core.shared.GraphHistory
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -43,6 +44,14 @@ object MonitorModule {
     @Singleton
     fun provideEventLog(@ApplicationContext context: Context): EventLog =
         EventLog(File(context.filesDir, EventLog.FILE_NAME), EventSource.MONITOR)
+
+    /** The paired Sensor's samples it received and the Monitor's own, for the Graphs (ISSUE-NOV10.8-O84 part 3). */
+    @Provides
+    @Singleton
+    fun provideMonitorGraphs(@ApplicationContext context: Context): MonitorGraphs = MonitorGraphs(
+        sensor = GraphHistory(File(context.filesDir, GraphHistory.SENSOR_FILE_NAME)),
+        own = GraphHistory(File(context.filesDir, GraphHistory.MONITOR_FILE_NAME))
+    )
 
     @Provides
     @Singleton

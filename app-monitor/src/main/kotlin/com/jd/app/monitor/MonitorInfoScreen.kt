@@ -23,6 +23,14 @@ fun MonitorInfoScreen(viewModel: MonitorViewModel, onClose: () -> Unit) {
     DeviceInfoOverlay(title = "INFO", state = state, onClose = onClose)
 }
 
+/** The Monitor's Graphs screen (ISSUE-NOV10.8-O84 part 3); open, it asks the Sensor for its newer samples. */
+@Composable
+fun MonitorGraphsScreen(viewModel: MonitorViewModel, onClose: () -> Unit) {
+    val state by viewModel.graphScreen.collectAsStateWithLifecycle()
+    val period by viewModel.graphPeriod.collectAsStateWithLifecycle()
+    com.jd.core.ui.GraphsOverlay(title = "GRAPHS", state = state, period = period, onPeriod = viewModel::setGraphPeriod, onClose = onClose)
+}
+
 /**
  * What the Monitor's Info screen shows (user decisions 2026-11-15): the Sensor's own Info when one came (gray when it
  * is older than [SENSOR_INFO_STALE_MS]), else the Sensor's newest row, then a short section about this phone.

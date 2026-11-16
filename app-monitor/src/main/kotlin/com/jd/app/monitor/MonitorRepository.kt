@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,6 +38,11 @@ class MonitorRepository @Inject constructor(
     @Volatile
     private var lastScanMs = 0L
 
+    // The Sensor's rows for the Monitor's own Graphs (ISSUE-NOV10.8-O84 part 3): counted as they arrive, taken each minute.
+    private val liveRows = AtomicInteger()
+    private val backfilledRows = AtomicInteger()
+    @Volatile private var missingRows = 0L
+
     init {
         observeTelemetry()
         observeBackfill()
@@ -45,9 +51,13 @@ class MonitorRepository @Inject constructor(
 
     fun getTrail(trackerId: String): Flow<List<TrailEntity>> = trailDao.getTrail(trackerId)
 
+    /** The rows received live and by backfill since the last call, and the rows missing at the newest gap scan. */
+    fun takeRowCounts(): RowCounts = RowCounts(liveRows.getAndSet(0), backfilledRows.getAndSet(0), missingRows)
+
     /** Clears all stored trail entries (ISSUE-NOV7.1-O35). */
     suspend fun clearTrail() {
         trailDao.deleteAll()
+        missingRows = 0L
     }
 
     /**
@@ -91,6 +101,7 @@ class MonitorRepository @Inject constructor(
                     update.toEntity()
                 }
                 trailDao.insertAll(entities)
+                backfilledRows.addAndGet(entities.size)
 
                 ledgerMutex.withLock {
                     ledger.onChunkReceived(response.requestId, System.currentTimeMillis())
@@ -117,6 +128,7 @@ class MonitorRepository @Inject constructor(
 
         // Stored first: a hole can only be read from the table once a newer row exists.
         trailDao.insert(update.toEntity())
+        liveRows.incrementAndGet()
 
         val isSequenceJump = update.sequenceId > lastSeq + 1
         if (isSequenceJump || System.currentTimeMillis() - lastScanMs >= GAP_RESCAN_MS) {
@@ -147,6 +159,7 @@ class MonitorRepository @Inject constructor(
     private suspend fun requestMissingRanges(deviceId: String) {
         lastScanMs = System.currentTimeMillis()
         val gaps = findGaps(deviceId)
+        missingRows = gaps.sumOf { it.lastMissing - it.firstMissing + 1 }
 
         ledgerMutex.withLock {
             val now = System.currentTimeMillis()
