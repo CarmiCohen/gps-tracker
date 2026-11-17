@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov17.2)
+# SOT Master Requirements & Hardening Status (Nov17.3)
 
-## 🏗️ Architectural Master Rules (516 Rules)
+## 🏗️ Architectural Master Rules (517 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -143,6 +143,7 @@
 *   **1.440 Scale And Version On The Map**: the Monitor's map MUST show a metric scale bar at its bottom right and the installed version name at its bottom left, on left-to-right and right-to-left phones alike (ISSUE-NOV17.0-O101, chapter 200).
 *   **1.441 One Map Path**: the Monitor's map MUST be built in one place, `MonitorScreen` (`MonitorActivity.kt`); no second, uncalled map stack is kept, and `DOCS/MAP_FUNCTIONALITY_SPEC.md` describes only what that map shows (SIMP-NOV17.0-S1, SIMP-NOV5.0-S1, chapter 201).
 *   **1.442 Small Graph Sync, Paired Sensor's Stops**: the Sensor MUST answer a Monitor that asks for it with its graph samples gzipped (plain to older Monitors), and send with each answer its service start and stop events among those samples; a Monitor MUST shade only the stops of events received from its paired Sensor (ISSUE-NOV15.6-O100 parts 1 and 7, chapter 202).
+*   **1.443 Backfill As Complete As Live, Counted Since**: the forensic buffer MUST keep a row's satellites, mean signal and noise level, and a backfilled row MUST carry them like a live row; an older buffer file MUST be upgraded keeping its entries and sequence numbers. The Info link lines MUST say since when the dropouts are counted (ISSUE-NOV15.5-O99 parts 2 to 4, chapters 203 and 204).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

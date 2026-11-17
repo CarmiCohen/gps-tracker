@@ -1,5 +1,7 @@
 package com.jd.core.shared
 
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -55,6 +57,13 @@ private fun connectionLines(info: SensorInfo, now: Long) = linkLines(info.link, 
     InfoLine("Rows held offline", info.queuedRows.toString(), if (info.queuedRows > 0) InfoTone.WARN else InfoTone.NORMAL)
 )
 
+/** Clock time of [ms] in the phone's time zone, as `HH:mm` (with the date when not today). */
+fun clockText(ms: Long, now: Long = System.currentTimeMillis()): String {
+    val day = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    val sameDay = day.format(Date(ms)) == day.format(Date(now))
+    return SimpleDateFormat(if (sameDay) "HH:mm" else "yyyy-MM-dd HH:mm", Locale.US).format(Date(ms))
+}
+
 /** The relay link lines of both apps. */
 fun linkLines(link: LinkStats, now: Long): List<InfoLine> = listOfNotNull(
     InfoLine("Relay", if (link.isConnected) "Connected" else "Disconnected", if (link.isConnected) InfoTone.GOOD else InfoTone.BAD),
@@ -66,6 +75,8 @@ fun linkLines(link: LinkStats, now: Long): List<InfoLine> = listOfNotNull(
         if (link.drops == 0) "None" else "${link.drops} (longest ${durationText(link.longestDropMs)}, total ${durationText(link.totalDropMs)})",
         if (link.drops == 0) InfoTone.NORMAL else InfoTone.WARN
     ),
+    // The counts start with the app process (ISSUE-NOV15.5-O99 part 3).
+    link.countingSinceMs.takeIf { it > 0L }?.let { InfoLine("Counting since", clockText(it, now)) },
     InfoLine("Latency", link.latencyMs?.let { "$it ms" } ?: NO_VALUE, if ((link.latencyMs ?: 0L) > SLOW_LATENCY_MS) InfoTone.WARN else InfoTone.NORMAL)
 )
 

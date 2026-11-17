@@ -84,7 +84,7 @@ class SocketioSignalingClient @Inject constructor(
     private val _sensorEventsFlow = MutableSharedFlow<SensorEventBatch>(extraBufferCapacity = 16)
     override val sensorEventsFlow: SharedFlow<SensorEventBatch> = _sensorEventsFlow.asSharedFlow()
 
-    private val _linkStats = MutableStateFlow(LinkStats())
+    private val _linkStats = MutableStateFlow(LinkStats(countingSinceMs = System.currentTimeMillis())) // ISSUE-NOV15.5-O99 part 3
     override val linkStats: StateFlow<LinkStats> = _linkStats.asStateFlow()
 
     private val _infoRequestFlow = MutableSharedFlow<Boolean>(extraBufferCapacity = 4)
@@ -395,27 +395,7 @@ class SocketioSignalingClient @Inject constructor(
 
         val batchArray = JSONArray()
         updates.forEach { update ->
-            batchArray.put(JSONObject().apply {
-                put("id", update.deviceId.ifEmpty { deviceId })
-                put("lat", update.lat)
-                put("lng", update.lng)
-                put("ts", update.timestamp)
-                put("seq", update.sequenceId)
-                put("status", update.status)
-                put("vib", update.sensorSnapshot.vibration)
-                put("acc", update.accuracy)
-                put("spd", update.speed)
-                put("batt", update.batteryLevel)
-                put("chg", update.isCharging)
-                put("temp", update.tempCelsius)
-                put("noiseOff", update.isNoiseDetectionOff) // Live rows only; the buffer does not keep it, so backfill omits it.
-                // Live rows only, like noiseOff (ISSUE-NOV10.8-O84 part 2); a value not known is left out.
-                if (update.satsUsed >= 0) put("sats", update.satsUsed)
-                if (update.satsInView >= 0) put("satsView", update.satsInView)
-                update.meanCn0DbHz?.let { put("snr", it.toDouble()) }
-                update.noiseDbfs?.let { put("noise", it.toDouble()) }
-                if (update.isCritical) put("crit", true) // Tells the relay to push this row to the Monitors as well (ISSUE-NOV10.8-O86).
-            })
+            batchArray.put(LocationRowWire.encode(update, deviceId, live = true))
         }
 
         socket?.emit("location_batch", batchArray)
@@ -462,20 +442,7 @@ class SocketioSignalingClient @Inject constructor(
             put("done", response.isComplete)
             val updatesArr = JSONArray()
             response.updates.forEach { update ->
-                updatesArr.put(JSONObject().apply {
-                    put("id", update.deviceId.ifEmpty { deviceId })
-                    put("lat", update.lat)
-                    put("lng", update.lng)
-                    put("ts", update.timestamp)
-                    put("seq", update.sequenceId)
-                    put("status", update.status)
-                    put("vib", update.sensorSnapshot.vibration)
-                    put("acc", update.accuracy)
-                    put("spd", update.speed)
-                    put("batt", update.batteryLevel)
-                    put("chg", update.isCharging)
-                    put("temp", update.tempCelsius)
-                })
+                updatesArr.put(LocationRowWire.encode(update, deviceId, live = false))
             }
             put("updates", updatesArr)
         }
@@ -564,6 +531,34 @@ class SocketioSignalingClient @Inject constructor(
 /** The wire form of a telemetry row as the receiver reads it, from the relay socket or from an alarm push (ISSUE-NOV10.8-O86). */
 object LocationRowWire {
 
+    /**
+     * One row as the Sensor sends it, live or as backfill. [live] adds what the forensic buffer does not keep:
+     * `noiseOff`, and `crit`, which tells the relay to push the row to the Monitors as well (ISSUE-NOV10.8-O86).
+     * Satellites, signal and noise travel on both since Nov17.3 (ISSUE-NOV15.5-O99 part 2); a value not known is left out.
+     */
+    fun encode(update: LocationUpdate, deviceId: String, live: Boolean): JSONObject = JSONObject().apply {
+        put("id", update.deviceId.ifEmpty { deviceId })
+        put("lat", update.lat)
+        put("lng", update.lng)
+        put("ts", update.timestamp)
+        put("seq", update.sequenceId)
+        put("status", update.status)
+        put("vib", update.sensorSnapshot.vibration)
+        put("acc", update.accuracy)
+        put("spd", update.speed)
+        put("batt", update.batteryLevel)
+        put("chg", update.isCharging)
+        put("temp", update.tempCelsius)
+        if (update.satsUsed >= 0) put("sats", update.satsUsed)
+        if (update.satsInView >= 0) put("satsView", update.satsInView)
+        update.meanCn0DbHz?.let { put("snr", it.toDouble()) }
+        update.noiseDbfs?.let { put("noise", it.toDouble()) }
+        if (live) {
+            put("noiseOff", update.isNoiseDetectionOff)
+            if (update.isCritical) put("crit", true)
+        }
+    }
+
     fun decode(data: JSONObject): LocationUpdate {
         return LocationUpdate(
             deviceId = data.optString("id", ""),
@@ -578,7 +573,7 @@ object LocationRowWire {
             isCharging = data.optBoolean("chg", false),
             tempCelsius = data.optDouble("temp", 0.0).toFloat(),
             isNoiseDetectionOff = data.optBoolean("noiseOff", false), // Absent from Sensors before Nov9.1: no warning.
-            // Absent from Sensors before Nov15.5, from backfilled rows, and while not known (ISSUE-NOV10.8-O84 part 2).
+            // Absent from Sensors before Nov15.5, from backfill before Nov17.3, and while not known (O84 part 2, O99 part 2).
             satsUsed = data.optInt("sats", -1),
             satsInView = data.optInt("satsView", -1),
             meanCn0DbHz = if (data.has("snr")) data.optDouble("snr").toFloat() else null,

@@ -6,14 +6,17 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
+import java.util.zip.CRC32
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
  * Verifies Chapter 121: stored entries survive interrupted writes, power loss, damaged headers,
- * and the upgrade from file version 2 (ISSUE-NOV6.0-O20).
+ * and the upgrade from file version 2 (ISSUE-NOV6.0-O20). Chapter 203: version 4 keeps satellites, signal
+ * and noise, and versions 2 and 3 are upgraded to it (ISSUE-NOV15.5-O99 part 2).
  *
  * Interruptions are simulated by editing the file into the state they leave behind, because a
  * unit test cannot cut power.
@@ -23,7 +26,9 @@ class ForensicEntryIntegrityTest {
     private val capacity = 10
     private val headerSize = 64
     private val entrySize = 128
-    private val checksumOffset = 84
+    /** Where versions 2 and 3 end their stored fields, and version 3 puts its checksum. */
+    private val legacyChecksumOffset = 84
+    private val currentVersion = 4
 
     private val offVersion = 4
     private val offWriteIdx = 8
@@ -125,14 +130,14 @@ class ForensicEntryIntegrityTest {
         withFile { file ->
             file.putInt(offVersion, 2)
             file.putLong(offReservedSeq, 0L)
-            (0 until capacity).forEach { file.putInt(slotOffset(it) + checksumOffset, 0) }
+            (0 until capacity).forEach { file.putInt(slotOffset(it) + legacyChecksumOffset, 0) }
         }
 
         val upgraded = openBuffer()
 
         assertEquals((5L..14L).toList(), sequences(upgraded))
         assertEquals(15L, upgraded.nextSequenceId())
-        assertEquals(3, withFile { it.getInt(offVersion) })
+        assertEquals(currentVersion, withFile { it.getInt(offVersion) })
         assertEquals((5L..14L).toList(), sequences(openBuffer()))
     }
 
@@ -141,13 +146,68 @@ class ForensicEntryIntegrityTest {
         writeSequences(0L..3L)
         withFile { file ->
             file.putInt(offVersion, 2)
-            (0 until capacity).forEach { file.putInt(slotOffset(it) + checksumOffset, 0) }
+            (0 until capacity).forEach { file.putInt(slotOffset(it) + legacyChecksumOffset, 0) }
         }
 
         val upgraded = openBuffer()
         upgraded.writeTrace(update(4))
 
         assertEquals((0L..4L).toList(), sequences(upgraded))
+    }
+
+    @Test
+    fun satellitesSignalAndNoiseAreKeptAndUnknownStaysUnknown() {
+        val buffer = openBuffer()
+        buffer.writeTrace(update(0).apply { satsUsed = 7; satsInView = 21; meanCn0DbHz = 31.5f; noiseDbfs = -62.25f })
+        buffer.writeTrace(update(1))
+
+        val (known, unknown) = openBuffer().readTraces()
+        assertEquals(7, known.satsUsed)
+        assertEquals(21, known.satsInView)
+        assertEquals(31.5f, known.meanCn0DbHz)
+        assertEquals(-62.25f, known.noiseDbfs)
+        assertEquals(-1, unknown.satsUsed)
+        assertEquals(-1, unknown.satsInView)
+        assertNull(unknown.meanCn0DbHz)
+        assertNull(unknown.noiseDbfs)
+    }
+
+    /** Rewrites the file as version 3 left it: legacy fields, their checksum at byte 84, nothing after. */
+    private fun downgradeToVersionThree(tornSlot: Int? = null) = withFile { file ->
+        val legacy = ByteArray(legacyChecksumOffset)
+        for (slot in 0 until capacity) {
+            val offset = slotOffset(slot)
+            for (i in legacy.indices) legacy[i] = file.get(offset + i)
+            val crc = CRC32().apply { update(legacy) }.value.toInt()
+            file.putInt(offset + legacyChecksumOffset, if (slot == tornSlot) crc.inv() else crc)
+            (legacyChecksumOffset + 4 until entrySize).forEach { file.put(offset + it, 0) }
+        }
+        file.putInt(offVersion, 3)
+    }
+
+    @Test
+    fun versionThreeFileKeepsItsEntriesWithUnknownSatellitesAfterUpgrade() {
+        writeSequences(0L..14L)
+        downgradeToVersionThree()
+
+        val upgraded = openBuffer()
+        val traces = upgraded.readTraces()
+
+        assertEquals((5L..14L).toList(), traces.map { it.sequenceId })
+        assertEquals(32.0 + 14, traces.last().lat)
+        assertTrue(traces.all { it.satsUsed == -1 && it.meanCn0DbHz == null && it.noiseDbfs == null })
+        assertEquals(100L, upgraded.nextSequenceId(), "The stored reservation survives the upgrade")
+        assertEquals(currentVersion, withFile { it.getInt(offVersion) })
+        assertEquals((5L..14L).toList(), sequences(openBuffer()))
+    }
+
+    @Test
+    fun tornVersionThreeEntryStaysSkippedAfterUpgrade() {
+        writeSequences(0L..14L)
+        downgradeToVersionThree(tornSlot = 7) // Holds sequence 7.
+
+        assertEquals((5L..14L).toList() - 7L, sequences(openBuffer()))
+        assertEquals((5L..14L).toList() - 7L, sequences(openBuffer()))
     }
 
     @Test

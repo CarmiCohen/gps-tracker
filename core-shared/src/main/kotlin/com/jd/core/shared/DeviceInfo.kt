@@ -42,6 +42,8 @@ fun constellationName(type: Int): String = when (type) {
  * The relay link since the app started: [changedAtMs] is the wall-clock time of the last connect or disconnect (0
  * before the first connect), a drop is a disconnection after a connect, and its length counts once the link is back.
  * [latencyMs] is the newest round trip to the relay and back, null while unknown or disconnected.
+ * [countingSinceMs] is when the counting started, the app process's start; Info shows it, so counts that a restart
+ * set back to zero are marked as such (ISSUE-NOV15.5-O99 part 3, user decision 2026-11-17). 0 from Sensors before Nov17.3.
  */
 @Serializable
 data class LinkStats(
@@ -50,7 +52,8 @@ data class LinkStats(
     val drops: Int = 0,
     val longestDropMs: Long = 0L,
     val totalDropMs: Long = 0L,
-    val latencyMs: Long? = null
+    val latencyMs: Long? = null,
+    val countingSinceMs: Long = 0L
 ) {
     /** These statistics after the link became [connected] at [nowMs]; a repeated state changes nothing. */
     fun afterLink(connected: Boolean, nowMs: Long): LinkStats = when {

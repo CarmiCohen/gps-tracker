@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.2 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.3 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1015,8 +1015,19 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **202.3 Stops (unit):** `GraphsTest`: with the paired Sensor's ID, stops marked with another Sensor are not shaded, unmarked ones are; the Sensor sends every start and stop on a first sync, those after the run going on at the newest sample held (with its stop dated before it) later, and none while that run goes on. `SensorEventsWireTest`: received events are marked with the Sensor's ID.
 *   **202.4 Live (device):** install both debug apps over the running ones, open the Monitor's Graphs: `REV_SensorGraphs` logs `samples sent (compressed)` with a count of start and stop events; the Monitor lists the Sensor's stops. Read the screen with `uiautomator dump`.
 
+## Chapter 203 - Backfilled Rows Keep Satellites, Signal And Noise (Nov17.3)
+**Status: A / L** - `ForensicEntryIntegrityTest`, `LocationRowWireTest` pass; 203.3 verified on the A15 (ISSUE-NOV15.5-O99 part 2, SOT 1.443)
+*   **203.1 Buffer (unit):** `ForensicEntryIntegrityTest`: satellites used and in view, mean signal and noise are read back as written, and not known stays not known; a version 3 file is upgraded to version 4 keeping its entries and sequence reservation, with the new fields not known; a version 3 entry that failed its checksum stays skipped after the upgrade; the version 2 upgrade ends at version 4.
+*   **203.2 Wire (unit):** `LocationRowWireTest`: a backfilled row carries and reads back the four fields; only live rows carry `noiseOff` and `crit`; a value not known is left out and read back as not known.
+*   **203.3 Upgrade (device):** install the debug Sensor over an older one: `REV_SensorService` logs `ForensicBuffer initialized ... Next seq:` continuing the old numbers, and no `Skipped ... damaged entries`.
+
+## Chapter 204 - Since When The Dropouts Are Counted (Nov17.3)
+**Status: A / L** - `InfoSectionsTest` passes; 204.2 verified on the A15 (ISSUE-NOV15.5-O99 parts 3 and 4, SOT 1.443)
+*   **204.1 Lines (unit):** `InfoSectionsTest`: the link lines show `Counting since` with the clock time (with the date when not another day), and no such line when the start is not known (Sensors before Nov17.3).
+*   **204.2 Live (device):** open the Monitor's Info: `Counting since` shows the apps' start time in the Sensor and Monitor sections; in a lit room `Light` is close to the newest value in `dumpsys sensorservice` (`Light: last 50 events`). Read the screen with `uiautomator dump`.
+
 ---
-**Active Testing Chapters: 191 of 202**
+**Active Testing Chapters: 193 of 204**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

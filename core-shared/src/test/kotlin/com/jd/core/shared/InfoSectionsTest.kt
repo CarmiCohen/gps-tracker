@@ -66,6 +66,17 @@ class InfoSectionsTest {
     }
 
     @Test
+    fun `the link lines say since when the dropouts are counted`() {
+        // Chapter 204 (ISSUE-NOV15.5-O99 part 3): counts start with the app process, so Info shows that start.
+        val since = now - 60_000L // A minute, so no time zone puts it on another day.
+        val lines = linkLines(LinkStats(isConnected = true, changedAtMs = now - 5_000L, countingSinceMs = since), now)
+        assertEquals(clockText(since, now), lines.single { it.label == "Counting since" }.value)
+        assertTrue("From Sensors before Nov17.3: no line", linkLines(LinkStats(), now).none { it.label == "Counting since" })
+        assertFalse("Today: time only", clockText(since, now).contains("-"))
+        assertTrue("Another day: with the date", clockText(now - 3 * 86_400_000L, now).matches(Regex("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}")))
+    }
+
+    @Test
     fun `the signal is the mean of the satellites used in the fix`() {
         assertEquals(GnssSummary(used = 4, inView = 5, meanCn0DbHz = 35f), gnssSummary(info.satellites))
         assertEquals(GnssSummary(0, 1, null), gnssSummary(listOf(SatelliteReading(5, 1, 30f, false))))
