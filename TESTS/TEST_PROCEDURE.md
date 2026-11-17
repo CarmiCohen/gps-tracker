@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov16.8 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.0 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -998,8 +998,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **199.2 Event time (unit):** `GraphsTest`: with an event time the period is centred on it but never ends past now, the event's position is its share of the width, and the event's minute is drawn.
 *   **199.3 Live (device):** install the debug Sensor over the running one (a `app updated` stop); its Graphs list the stop; Events, 1 h, select the stop, `Graphs at this time`: `Now` chip, `Around the event of ...`, the stops listed; Back shows the Events list still at 1 h with the event selected; the same on the Monitor; `Now` returns to the period ending now. Read the screens with `uiautomator dump`.
 
+## Chapter 200 - Scale And Version On The Map (Nov17.0)
+**Status: A / L** - `UnpairConfirmationTest` 11/11 on the A15; 200.2 verified on the A15 (ISSUE-NOV17.0-O101, SOT 1.440)
+*   **200.1 Version (instrumented):** `UnpairConfirmationTest.theMapShowsTheVersion`: the Monitor's map screen shows `Version: <installed versionName>`.
+*   **200.2 Live (device):** open the paired Monitor's map on the A15 (a right-to-left phone): the version is at the bottom left and a metric scale bar (for example `199 m`) at the bottom right, neither covering the other nor the map buttons; zooming changes the scale's distance. Check with a screenshot.
+
 ---
-**Active Testing Chapters: 188 of 199**
+**Active Testing Chapters: 189 of 200**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

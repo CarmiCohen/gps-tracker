@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov16.8)
+# SOT Master Requirements & Hardening Status (Nov17.0)
 
-## 🏗️ Architectural Master Rules (513 Rules)
+## 🏗️ Architectural Master Rules (514 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -140,6 +140,7 @@
 *   **1.437 Missing Means Still To Come**: the Monitor's `Missing` graph line MUST count only the Sensor's rows that may still arrive: a range the Sensor has answered as complete is no longer missing, as its forensic buffer no longer holds the rest (ISSUE-NOV15.6-O100 part 2, chapter 198).
 *   **1.438 Pruned Holes Are Not Gaps**: a Monitor trail table at its cap is pruned by time, so its gap scan MUST NOT request its missing start nor a hole whose next row is its oldest row by time; pruning stays by time, so the newest rows are kept even after a Sensor counter reset (ISSUE-NOV15.6-O100 part 6, chapter 125.6).
 *   **1.439 Why A Gap, And The Graphs Of An Event**: the Graphs MUST shade and list the Sensor's service stops, taken from its own stop and start events, in the Sensor's graphs only; an event's details MUST open the Graphs centred on its time, never past now, with the time marked and a way back to now, and the Events list keeps its period and selection meanwhile (ISSUE-NOV15.6-O100 parts 3 and 4, chapter 199).
+*   **1.440 Scale And Version On The Map**: the Monitor's map MUST show a metric scale bar at its bottom right and the installed version name at its bottom left, on left-to-right and right-to-left phones alike (ISSUE-NOV17.0-O101, chapter 200).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

@@ -51,6 +51,7 @@ import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Polygon
+import org.osmdroid.views.overlay.ScaleBarOverlay
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -204,6 +205,9 @@ class MonitorActivity : ComponentActivity() {
 const val SETTINGS_FILE_MIME_TYPE = "application/json"
 
 private const val WORLD_ZOOM = 3.0
+
+/** The scale bar's distance from the map's right and bottom edges, in pixels. */
+private const val SCALE_BAR_OFFSET_PX = 24
 private const val DEVICE_ZOOM = 18.0
 
 @Composable
@@ -555,6 +559,16 @@ fun MonitorScreen(
             controller.setZoom(WORLD_ZOOM)
         }
     }
+    // A metric scale at the bottom right (ISSUE-NOV17.0-O101, user decision 2026-11-17); the overlays are rebuilt
+    // below, so it is added again each time.
+    val scaleBar = remember(mapView) {
+        ScaleBarOverlay(mapView).apply {
+            setUnitsOfMeasure(ScaleBarOverlay.UnitsOfMeasure.metric)
+            setAlignBottom(true)
+            setAlignRight(true)
+            setScaleBarOffset(SCALE_BAR_OFFSET_PX, SCALE_BAR_OFFSET_PX)
+        }
+    }
     var hasCentered by remember(mapView) { mutableStateOf(false) }
     val sensorTrail = remember(trail) { knownPositions(trail) }
     val sensorPosition = sensorTrail.firstOrNull()
@@ -564,6 +578,7 @@ fun MonitorScreen(
     // Automatic Centering & Connection Logic
     LaunchedEffect(remoteHudState.isPeerActive, trail, localTrail, followMode, localPosition, geofence, isEditingHome) {
         mapView.overlays.clear()
+        mapView.overlays.add(scaleBar)
 
         // Bottom overlay: taps that no marker takes add a Home Point while editing.
         mapView.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
@@ -690,6 +705,19 @@ fun MonitorScreen(
                 modifier = Modifier.fillMaxSize()
             )
             
+            // The version at the bottom left, opposite the scale (ISSUE-NOV17.0-O101); left also on a right-to-left
+            // phone, where the osmdroid scale stays at the right.
+            Text(
+                text = "Version: ${getAppVersionName(LocalContext.current)}",
+                fontSize = 10.sp,
+                color = Color.DarkGray,
+                modifier = Modifier
+                    .align(androidx.compose.ui.AbsoluteAlignment.BottomLeft)
+                    .absolutePadding(left = 8.dp, bottom = 8.dp)
+                    .background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 4.dp, vertical = 1.dp)
+            )
+
             if (sensorTrail.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Waiting for Telemetry...", color = Color.Gray, fontWeight = FontWeight.Medium)
