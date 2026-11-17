@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.7 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.8 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1045,8 +1045,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **207.3 Upgrade (device):** install the debug Sensor over a version 4 one: `REV_SensorService` logs `ForensicBuffer initialized ... Next seq:` continuing the old numbers, and no `Skipped ... damaged entries`.
 *   **207.4 Live (device, Two-phone):** with the Monitor phone in airplane mode for a minute, then back online, the backfilled rows in the Monitor's graphs show battery and temperature with no gap for that minute.
 
+## Chapter 208 - `run_tests.ps1` Counts Every Test (Nov17.8)
+**Status: A** - verified on the PC (ISSUE-NOV12.6-O94, SOT 1.447)
+*   **208.1 Repeat run (PC):** run `TESTS/run_tests.ps1` twice with no change in between: both print the same full count (878 in Nov17.8), not only the modules that changed.
+*   **208.2 One module (PC):** `TESTS/run_tests.ps1 :core-shared:test` run twice prints the `core-shared` count both times (190 in Nov17.8).
+
 ---
-**Active Testing Chapters: 196 of 207**
+**Active Testing Chapters: 197 of 208**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

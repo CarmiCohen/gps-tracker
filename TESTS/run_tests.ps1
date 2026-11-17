@@ -15,7 +15,8 @@ $gradleArgs = @()
 foreach ($t in $Tasks) { $gradleArgs += ($t -split ' ') }
 Push-Location $root
 try {
-    & (Join-Path $root "gradlew.bat") @gradleArgs --warning-mode all --console=plain *> $log
+    # -PrerunTests reruns every requested test task (root build.gradle.kts, O94), so the count is never partial.
+    & (Join-Path $root "gradlew.bat") @gradleArgs -PrerunTests --warning-mode all --console=plain *> $log
     $exit = $LASTEXITCODE
 } finally { Pop-Location }
 
@@ -23,8 +24,7 @@ $tests = 0; $failures = 0; $skipped = 0; $failed = @()
 $results = Get-ChildItem -Path $root -Recurse -Filter "TEST-*.xml" -File |
     Where-Object { $_.FullName -match '[\\/]build[\\/]test-results[\\/]' }
 $fresh = @($results | Where-Object { $_.LastWriteTime -ge $start })
-# Up-to-date test tasks write no new results. Old result files may belong to deleted tests, so they are not counted.
-$cached = ($fresh.Count -eq 0 -and $exit -eq 0 -and (Select-String -Path $log -Pattern 'UP-TO-DATE|FROM-CACHE' -Quiet))
+# Only fresh files count: old result files may belong to deleted tests. Every test task reruns, so all results are fresh.
 $fresh |
     ForEach-Object {
         [xml]$x = Get-Content -Raw $_.FullName
@@ -37,8 +37,7 @@ $fresh |
     }
 $warnings = @(Select-String -Path $log -Pattern '^w: |deprecat' ).Count
 $status = if ($exit -eq 0 -and $failures -eq 0) { "PASSED" } else { "FAILED" }
-if ($cached) { $tests = "up-to-date" }
-"TESTS $status tests=$tests failures=$failures skipped=$skipped cached=$cached warningLines=$warnings gradleExit=$exit tasks='$($Tasks -join ' ')' log=build/run_tests.log"
+"TESTS $status tests=$tests failures=$failures skipped=$skipped warningLines=$warnings gradleExit=$exit tasks='$($Tasks -join ' ')' log=build/run_tests.log"
 $failed
 if ($exit -ne 0 -and $failures -eq 0) {
     Select-String -Path $log -Pattern '^e: |FAILURE: |What went wrong' -Context 0, 2 | Select-Object -First 5 | ForEach-Object { "  $($_.Line)" }

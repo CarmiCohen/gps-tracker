@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov17.7)
+# SOT Master Requirements & Hardening Status (Nov17.8)
 
-## 🏗️ Architectural Master Rules (520 Rules)
+## 🏗️ Architectural Master Rules (521 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -147,6 +147,7 @@
 *   **1.444 Every Sensor Event, And The Sensor's Presence, In The Monitor's Log**: the Monitor MUST log the Sensor going offline and returning whatever its alarm settings, and MUST receive every Sensor event it missed while offline, not only the newest ones, without holes when an answer is cut short (ISSUE-NOV15.4-O98 parts 2 and 4, chapter 205).
 *   **1.445 Icons That Tell The Apps And The Devices Apart**: each app MUST have its own launcher icon in its device color (Monitor cyan eye, Sensor green pin), and the Monitor's map MUST show each device's position in that color (ISSUE-NOV17.6-O103, chapter 206).
 *   **1.446 Backfill Keeps Battery And Temperature**: the forensic buffer MUST keep a row's battery level, charging state and temperature, and a backfilled row MUST carry them like a live row; an older buffer file MUST be upgraded keeping its entries and sequence numbers, with these fields not known (ISSUE-NOV17.3-O102, chapter 207).
+*   **1.447 `run_tests.ps1` Counts Every Test**: `TESTS/run_tests.ps1` MUST rerun every requested test task (Gradle property `rerunTests`), so its count never leaves out up-to-date modules, without recompiling unchanged code (ISSUE-NOV12.6-O94, chapter 208).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*
