@@ -28,6 +28,7 @@ The following rules **MUST** be followed strictly for every task:
 14. **Stealth Authority**: For all siren and alarm triggers, role-based suppression (Tracker vs Viewer) MUST be enforced at the engine level to ensure absolute operational stealth (R872).
 15. **Testing & Test Procedure Synchronization**: Every implemented feature, hardening update, or bug fix **MUST** be accompanied by automated unit or instrumented tests and explicitly documented as a new test chapter in `TESTS/TEST_PROCEDURE.md` (incrementing total testing chapters accordingly).
 16. **Build Warning Auditing**: During build verification phases, run Gradle builds with `--warning-mode all` (e.g., `./gradlew assembleDebug --warning-mode all`) to inspect deprecation warnings and ensure no new deprecations or configuration warnings are introduced by project code or scripts.
+17. **No Test Removal Without Confirmation**: Do not remove any test, whether a chapter or sub-item of `TESTS/TEST_PROCEDURE.md` or an automated unit or instrumented test, without the user's explicit confirmation (user decision 2026-11-17).
 
 ---
 

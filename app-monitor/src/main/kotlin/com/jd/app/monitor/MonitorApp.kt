@@ -1,11 +1,15 @@
 package com.jd.app.monitor
 
 import android.app.Application
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.jd.core.shared.SystemLogger
@@ -67,7 +71,7 @@ fun createMonitorNotificationChannels(context: Context) {
             enableLights(true)
             enableVibration(false)
             setSound(null, null)
-            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
     )
     manager.createNotificationChannel(
@@ -75,4 +79,29 @@ fun createMonitorNotificationChannels(context: Context) {
             description = "Shown while the Monitor receives a paired tracker."
         }
     )
+}
+
+/**
+ * Opens the Monitor the way the launcher does: an open Monitor task comes back to the front with its screen, otherwise
+ * the Monitor starts. Android's Active apps list and the session notification open the app through it (ISSUE-NOV17.14-O113).
+ */
+fun monitorOpenIntent(context: Context): Intent =
+    Intent(context, MonitorActivity::class.java)
+        .setAction(Intent.ACTION_MAIN)
+        .addCategory(Intent.CATEGORY_LAUNCHER)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+
+/** The ongoing tracking session notification; a tap opens the Monitor ([monitorOpenIntent]). */
+fun buildSessionNotification(context: Context): Notification {
+    val open = PendingIntent.getActivity(
+        context, 0, monitorOpenIntent(context),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
+    return NotificationCompat.Builder(context, MonitorApp.SESSION_CHANNEL_ID)
+        .setContentTitle("Active Tracking Session")
+        .setContentText("Monitoring remote sensor traces...")
+        .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+        .setPriority(NotificationCompat.PRIORITY_LOW)
+        .setContentIntent(open)
+        .build()
 }

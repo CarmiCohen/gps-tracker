@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.13 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.14 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1071,8 +1071,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: A** - text-only change, both builds and the A15 release Sensor audit pass; 212.1 not run on the device (it stops the service) (ISSUE-NOV12.7-O96, SOT 1.451)
 *   **212.1 Dialog (device):** in the Sensor console tap `STOP SERVICE`: the confirmation reads `... until the phone restarts, the app is updated, or the Sensor app is opened again.`; confirm, then reopen the Sensor app: the service runs again.
 
+## Chapter 213 - Tapping an App in Android's Active Apps List Opens It (Nov17.14)
+**Status: A** - `SessionNotificationDeviceTest` 2/2 on the A15; the Sensor's notification tap opened its console on the A15; 213.2 waits for a Two-phone test (the Monitor posts its session notification only while paired) (ISSUE-NOV17.14-O113, SOT 1.452)
+*   **213.1 Session notification (device):** `SessionNotificationDeviceTest`: `monitorOpenIntent` targets `MonitorActivity` with `ACTION_MAIN`, `CATEGORY_LAUNCHER`, `FLAG_ACTIVITY_NEW_TASK` and `FLAG_ACTIVITY_RESET_TASK_IF_NEEDED` and resolves to the launcher activity; the session notification has a tap action from the Monitor's package on the session channel.
+*   **213.2 Live (device):** with the Monitor paired and in the background, tap the Monitor in the notification shade and in Android's Active apps list (quick settings): the Monitor comes to the front with the screen it had; the same taps on the Sensor open its console.
+
 ---
-**Active Testing Chapters: 201 of 212**
+**Active Testing Chapters: 202 of 213**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

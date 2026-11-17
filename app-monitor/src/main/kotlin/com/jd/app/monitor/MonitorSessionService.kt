@@ -3,7 +3,6 @@ package com.jd.app.monitor
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
-import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessaging
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
@@ -51,12 +50,7 @@ class MonitorSessionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val notification = NotificationCompat.Builder(this, MonitorApp.SESSION_CHANNEL_ID)
-            .setContentTitle("Active Tracking Session")
-            .setContentText("Monitoring remote sensor traces...")
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+        val notification = buildSessionNotification(this)
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             startForeground(1001, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
