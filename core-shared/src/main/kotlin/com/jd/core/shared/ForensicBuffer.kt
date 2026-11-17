@@ -25,15 +25,16 @@ import java.util.zip.CRC32
  * exist on older Android versions, and neither does force(int, int) (ISSUE-NOV6.0-O25).
  *
  * Version 4 (Nov17.3) also keeps the satellites used and in view, the mean signal and the noise level, so
- * backfilled rows carry them like live rows (ISSUE-NOV15.5-O99 part 2). Older files are upgraded in place.
+ * backfilled rows carry them like live rows (ISSUE-NOV15.5-O99 part 2). Version 5 (Nov17.7) also keeps the
+ * battery level, charging and temperature (ISSUE-NOV17.3-O102). Older files are upgraded in place.
  */
 class ForensicBuffer(
     private val storageDir: File,
     val capacity: Int = 10000
 ) {
     private val magic = 0x5245564F 
-    private val version = 4
-    private val versionWithChecksums = 3
+    private val version = 5
+    private val versionWithSatellites = 4
     private val versionWithoutChecksums = 2
     private val entrySize = 128
     private val headerSize = 64
@@ -60,9 +61,14 @@ class ForensicBuffer(
     private val offSatsInView = offSatsUsed + 4
     private val offMeanCn0 = offSatsInView + 4 // NaN when not known
     private val offNoise = offMeanCn0 + 4 // NaN when not known
-    private val entryDataSize = offNoise + 4
-    /** The stored fields of versions 2 and 3; the version 3 checksum follows them. */
-    private val legacyDataSize = offSatsUsed
+    private val offBattery = offNoise + 4 // -1 when not known
+    private val offCharging = offBattery + 4 // 1 when charging
+    private val offTemp = offCharging + 4 // -1 when not known, as in LocationUpdate
+    private val entryDataSize = offTemp + 4
+
+    /** The stored fields of an older version; its checksum, from version 3 on, follows them. */
+    private fun legacyDataSize(storedVersion: Int) =
+        if (storedVersion == versionWithSatellites) offBattery else offSatsUsed
 
     /** Sequence numbers reserved per header sync; a restart can skip at most this many. */
     private val sequenceReserve = 100L
@@ -132,7 +138,7 @@ class ForensicBuffer(
     private fun loadHeader(buffer: MappedByteBuffer) {
         synchronized(this) {
             val storedVersion = buffer.getInt(offVersion)
-            val known = storedVersion == version || storedVersion == versionWithChecksums || storedVersion == versionWithoutChecksums
+            val known = storedVersion in versionWithoutChecksums..version
             if (buffer.getInt(offMagic) != magic || !known) {
                 buffer.putInt(offMagic, magic)
                 buffer.putInt(offVersion, version)
@@ -145,27 +151,29 @@ class ForensicBuffer(
             hasWrapped = buffer.getInt(offHasWrapped) == 1
             reservedSequence = buffer.getLong(offReservedSeq)
 
-            if (storedVersion != version) upgradeEntries(buffer, checked = storedVersion == versionWithChecksums)
+            if (storedVersion != version) upgradeEntries(buffer, storedVersion)
             if (!isHeaderConsistent()) rebuildHeader(buffer)
         }
     }
 
     /**
-     * Upgrades a version 2 or 3 file to version 4, keeping its entries: a reset would restart sequence
-     * numbers at 0. The new fields are stored as not known. A version 3 entry that failed its checksum stays
-     * failed. Entries are rewritten whole from their legacy bytes, and the version changes last, so an
-     * interrupted upgrade simply repeats.
+     * Upgrades a version 2, 3 or 4 file to version 5, keeping its entries: a reset would restart sequence
+     * numbers at 0. The fields the old version lacks are stored as not known. An entry that failed its
+     * checksum stays failed. Entries are rewritten whole from their legacy bytes, and the version changes last,
+     * so an interrupted upgrade simply repeats.
      */
-    private fun upgradeEntries(buffer: MappedByteBuffer, checked: Boolean) {
-        val legacy = ByteArray(legacyDataSize)
+    private fun upgradeEntries(buffer: MappedByteBuffer, storedVersion: Int) {
+        val legacySize = legacyDataSize(storedVersion)
+        val checked = storedVersion != versionWithoutChecksums
+        val legacy = ByteArray(legacySize)
         for (slot in 0 until count.get().coerceIn(0, capacity)) {
             val offset = slotOffset(slot)
-            for (i in 0 until legacyDataSize) legacy[i] = buffer.get(offset + i)
+            for (i in 0 until legacySize) legacy[i] = buffer.get(offset + i)
             crc.reset()
-            crc.update(legacy, 0, legacyDataSize)
-            val valid = !checked || buffer.getInt(offset + legacyDataSize) == crc.value.toInt()
-            System.arraycopy(legacy, 0, entryData, 0, legacyDataSize)
-            putUnknownExtras()
+            crc.update(legacy, 0, legacySize)
+            val valid = !checked || buffer.getInt(offset + legacySize) == crc.value.toInt()
+            System.arraycopy(legacy, 0, entryData, 0, legacySize)
+            putUnknownExtras(from = legacySize)
             storeSlot(buffer, slot)
             if (!valid) buffer.putInt(offset + entryDataSize, entryChecksum().inv())
         }
@@ -174,11 +182,17 @@ class ForensicBuffer(
         buffer.force()
     }
 
-    private fun putUnknownExtras() {
-        entryView.putInt(offSatsUsed, -1)
-        entryView.putInt(offSatsInView, -1)
-        entryView.putFloat(offMeanCn0, Float.NaN)
-        entryView.putFloat(offNoise, Float.NaN)
+    /** Stores as not known every field from [from] on, the ones an older version lacks. */
+    private fun putUnknownExtras(from: Int) {
+        if (from <= offSatsUsed) {
+            entryView.putInt(offSatsUsed, -1)
+            entryView.putInt(offSatsInView, -1)
+            entryView.putFloat(offMeanCn0, Float.NaN)
+            entryView.putFloat(offNoise, Float.NaN)
+        }
+        entryView.putInt(offBattery, -1)
+        entryView.putInt(offCharging, 0)
+        entryView.putFloat(offTemp, -1f)
     }
 
     private fun isHeaderConsistent(): Boolean {
@@ -333,6 +347,9 @@ class ForensicBuffer(
                             this.satsInView = entryView.getInt(offSatsInView)
                             this.meanCn0DbHz = entryView.getFloat(offMeanCn0).takeUnless { it.isNaN() }
                             this.noiseDbfs = entryView.getFloat(offNoise).takeUnless { it.isNaN() }
+                            this.batteryLevel = entryView.getInt(offBattery)
+                            this.isCharging = entryView.getInt(offCharging) == 1
+                            this.tempCelsius = entryView.getFloat(offTemp)
                         }
                         result.add(update)
                     }
@@ -394,6 +411,9 @@ class ForensicBuffer(
                 entryView.putInt(offSatsInView, update.satsInView)
                 entryView.putFloat(offMeanCn0, update.meanCn0DbHz ?: Float.NaN)
                 entryView.putFloat(offNoise, update.noiseDbfs ?: Float.NaN)
+                entryView.putInt(offBattery, update.batteryLevel)
+                entryView.putInt(offCharging, if (update.isCharging) 1 else 0)
+                entryView.putFloat(offTemp, update.tempCelsius)
                 storeSlot(buffer, currentWrite)
 
                 // Prepare next indices

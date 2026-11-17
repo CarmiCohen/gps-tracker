@@ -547,6 +547,7 @@ object LocationRowWire {
      * One row as the Sensor sends it, live or as backfill. [live] adds what the forensic buffer does not keep:
      * `noiseOff`, and `crit`, which tells the relay to push the row to the Monitors as well (ISSUE-NOV10.8-O86).
      * Satellites, signal and noise travel on both since Nov17.3 (ISSUE-NOV15.5-O99 part 2); a value not known is left out.
+     * Backfilled battery, charging and temperature are real since Nov17.7 (ISSUE-NOV17.3-O102), -1 when not known.
      */
     fun encode(update: LocationUpdate, deviceId: String, live: Boolean): JSONObject = JSONObject().apply {
         put("id", update.deviceId.ifEmpty { deviceId })

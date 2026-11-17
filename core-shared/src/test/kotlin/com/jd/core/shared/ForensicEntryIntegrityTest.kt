@@ -16,7 +16,8 @@ import kotlin.test.assertTrue
 /**
  * Verifies Chapter 121: stored entries survive interrupted writes, power loss, damaged headers,
  * and the upgrade from file version 2 (ISSUE-NOV6.0-O20). Chapter 203: version 4 keeps satellites, signal
- * and noise, and versions 2 and 3 are upgraded to it (ISSUE-NOV15.5-O99 part 2).
+ * and noise, and versions 2 and 3 are upgraded to it (ISSUE-NOV15.5-O99 part 2). Chapter 207: version 5 keeps
+ * battery, charging and temperature, and version 4 is upgraded to it (ISSUE-NOV17.3-O102).
  *
  * Interruptions are simulated by editing the file into the state they leave behind, because a
  * unit test cannot cut power.
@@ -28,7 +29,9 @@ class ForensicEntryIntegrityTest {
     private val entrySize = 128
     /** Where versions 2 and 3 end their stored fields, and version 3 puts its checksum. */
     private val legacyChecksumOffset = 84
-    private val currentVersion = 4
+    /** Where version 4 ends its stored fields and puts its checksum. */
+    private val versionFourChecksumOffset = 100
+    private val currentVersion = 5
 
     private val offVersion = 4
     private val offWriteIdx = 8
@@ -172,17 +175,50 @@ class ForensicEntryIntegrityTest {
         assertNull(unknown.noiseDbfs)
     }
 
-    /** Rewrites the file as version 3 left it: legacy fields, their checksum at byte 84, nothing after. */
-    private fun downgradeToVersionThree(tornSlot: Int? = null) = withFile { file ->
-        val legacy = ByteArray(legacyChecksumOffset)
+    @Test
+    fun batteryChargingAndTemperatureAreKeptAndUnknownStaysUnknown() {
+        val buffer = openBuffer()
+        buffer.writeTrace(update(0).apply { batteryLevel = 57; isCharging = true; tempCelsius = 31.4f })
+        buffer.writeTrace(update(1))
+
+        val (known, unknown) = openBuffer().readTraces()
+        assertEquals(57, known.batteryLevel)
+        assertTrue(known.isCharging)
+        assertEquals(31.4f, known.tempCelsius)
+        assertEquals(-1, unknown.batteryLevel)
+        assertFalse(unknown.isCharging)
+        assertEquals(-1f, unknown.tempCelsius)
+    }
+
+    /** Rewrites the file as an older version left it: its fields, their checksum at [dataSize], nothing after. */
+    private fun downgrade(toVersion: Int, dataSize: Int, tornSlot: Int? = null) = withFile { file ->
+        val legacy = ByteArray(dataSize)
         for (slot in 0 until capacity) {
             val offset = slotOffset(slot)
             for (i in legacy.indices) legacy[i] = file.get(offset + i)
             val crc = CRC32().apply { update(legacy) }.value.toInt()
-            file.putInt(offset + legacyChecksumOffset, if (slot == tornSlot) crc.inv() else crc)
-            (legacyChecksumOffset + 4 until entrySize).forEach { file.put(offset + it, 0) }
+            file.putInt(offset + dataSize, if (slot == tornSlot) crc.inv() else crc)
+            (dataSize + 4 until entrySize).forEach { file.put(offset + it, 0) }
         }
-        file.putInt(offVersion, 3)
+        file.putInt(offVersion, toVersion)
+    }
+
+    private fun downgradeToVersionThree(tornSlot: Int? = null) = downgrade(3, legacyChecksumOffset, tornSlot)
+
+    @Test
+    fun versionFourFileKeepsItsSatellitesWithUnknownBatteryAfterUpgrade() {
+        val buffer = openBuffer()
+        (0L..14L).forEach { buffer.writeTrace(update(it).apply { satsUsed = 9; batteryLevel = 80; tempCelsius = 30f }) }
+        downgrade(4, versionFourChecksumOffset, tornSlot = 7) // Slot 7 holds sequence 7.
+
+        val upgraded = openBuffer()
+        val traces = upgraded.readTraces()
+
+        assertEquals((5L..14L).toList() - 7L, traces.map { it.sequenceId })
+        assertTrue(traces.all { it.satsUsed == 9 })
+        assertTrue(traces.all { it.batteryLevel == -1 && !it.isCharging && it.tempCelsius == -1f })
+        assertEquals(currentVersion, withFile { it.getInt(offVersion) })
+        assertEquals((5L..14L).toList() - 7L, sequences(openBuffer()))
     }
 
     @Test

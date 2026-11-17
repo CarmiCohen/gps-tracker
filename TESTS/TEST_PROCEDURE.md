@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.6 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.7 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1038,8 +1038,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **206.1 Launcher (device):** the launcher shows GPS Monitor as a white eye on cyan and GPS Sensor as a white pin on green.
 *   **206.2 Map (device):** in the Monitor's map the Monitor's own position is a cyan dot and the Sensor's a green dot, each in a white ring; Home Points stay green squares, OUT points red dots.
 
+## Chapter 207 - Backfill Keeps Battery And Temperature (Nov17.7)
+**Status: A / L** - `ForensicEntryIntegrityTest`, `LocationRowWireTest` pass; 207.3 verified on the A15; 207.4 waits for a Two-phone test (ISSUE-NOV17.3-O102, SOT 1.446)
+*   **207.1 Buffer (unit):** `ForensicEntryIntegrityTest`: battery level, charging and temperature are read back as written, and not known (-1, not charging, -1) stays not known; a version 4 file is upgraded to version 5 keeping its entries and satellites, with the three fields not known; a version 4 entry that failed its checksum stays skipped; the version 2 and 3 upgrades end at version 5.
+*   **207.2 Wire (unit):** `LocationRowWireTest`: a backfilled row carries and reads back battery, charging and temperature.
+*   **207.3 Upgrade (device):** install the debug Sensor over a version 4 one: `REV_SensorService` logs `ForensicBuffer initialized ... Next seq:` continuing the old numbers, and no `Skipped ... damaged entries`.
+*   **207.4 Live (device, Two-phone):** with the Monitor phone in airplane mode for a minute, then back online, the backfilled rows in the Monitor's graphs show battery and temperature with no gap for that minute.
+
 ---
-**Active Testing Chapters: 195 of 206**
+**Active Testing Chapters: 196 of 207**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
