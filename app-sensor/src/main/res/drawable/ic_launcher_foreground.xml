@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sensor launcher glyph: a location pin (Nov17.6). Green matches the Sensor color of the HUD and the map. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M54,28 C44.6,28 37,35.6 37,45 C37,57.75 54,78 54,78 C54,78 71,57.75 71,45 C71,35.6 63.4,28 54,28 Z M54,38 A7,7 0 1,0 54,52 A7,7 0 1,0 54,38 Z" />
+</vector>

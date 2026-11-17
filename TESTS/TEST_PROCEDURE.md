@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.5 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.6 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1033,8 +1033,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **205.3 Wire (unit):** `SensorEventsWireTest`: `after` and the `events_request` round trip; neither is read as the other nor as a graph request.
 *   **205.4 Live (device, Two-phone):** with the Monitor phone in airplane mode, make the Sensor log over 50 events (toggle its airplane mode); the Monitor logs `Sensor offline`; after its network returns: `Sensor online`, `REV_MonitorService` `Sensor events missed: asked for those after`, and on the Sensor `REV_SensorEvents` `Events request after ...: N events` with N over 50. Restore both phones' airplane mode, Wi-Fi and Bluetooth.
 
+## Chapter 206 - Icons That Tell The Apps And The Devices Apart (Nov17.6)
+**Status: L** - verified by the user on the A15 (ISSUE-NOV17.6-O103, SOT 1.445)
+*   **206.1 Launcher (device):** the launcher shows GPS Monitor as a white eye on cyan and GPS Sensor as a white pin on green.
+*   **206.2 Map (device):** in the Monitor's map the Monitor's own position is a cyan dot and the Sensor's a green dot, each in a white ring; Home Points stay green squares, OUT points red dots.
+
 ---
-**Active Testing Chapters: 194 of 205**
+**Active Testing Chapters: 195 of 206**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

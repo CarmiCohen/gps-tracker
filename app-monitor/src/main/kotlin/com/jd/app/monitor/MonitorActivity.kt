@@ -635,7 +635,8 @@ fun MonitorScreen(
         localPosition?.let { pos ->
             val localMarker = Marker(mapView).apply {
                 position = GeoPoint(pos.lat, pos.lng)
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = deviceMarkerIcon(context, MONITOR_MARKER_COLOR)
                 title = "Local Device"
             }
             mapView.overlays.add(localMarker)
@@ -653,7 +654,8 @@ fun MonitorScreen(
             val latest = sensorTrail.first()
             val marker = Marker(mapView).apply {
                 position = GeoPoint(latest.lat, latest.lng)
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = deviceMarkerIcon(context, SENSOR_MARKER_COLOR)
                 title = "Tracker Location"
             }
             mapView.overlays.add(marker)
@@ -1078,7 +1080,28 @@ private fun breachMarkerIcon(context: android.content.Context): android.graphics
         intrinsicHeight = sizePx
     }
 
-/** A green square, so a Home Point cannot be mistaken for the tracker's pin or an OUT dot. */
+/** Device colors of the HUD (HudStatusBar): cyan for the Monitor, green for the Sensor (Nov17.6). */
+internal const val MONITOR_MARKER_COLOR = 0xFF06B6D4.toInt()
+internal const val SENSOR_MARKER_COLOR = 0xFF10B981.toInt()
+
+/** A device's location: a dot in the device color inside a white ring with a dark edge, readable on any map tile. */
+private fun deviceMarkerIcon(context: android.content.Context, color: Int): android.graphics.drawable.Drawable {
+    val density = context.resources.displayMetrics.density
+    val sizePx = (24 * density).toInt()
+    val bitmap = android.graphics.Bitmap.createBitmap(sizePx, sizePx, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    val c = sizePx / 2f
+    paint.color = android.graphics.Color.argb(160, 0, 0, 0)
+    canvas.drawCircle(c, c, c, paint)
+    paint.color = android.graphics.Color.WHITE
+    canvas.drawCircle(c, c, c - 1.5f * density, paint)
+    paint.color = color
+    canvas.drawCircle(c, c, c - 4.5f * density, paint)
+    return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
+}
+
+/** A green square, so a Home Point cannot be mistaken for the tracker's dot or an OUT dot. */
 private fun homeMarkerIcon(context: android.content.Context): android.graphics.drawable.Drawable =
     android.graphics.drawable.ShapeDrawable(android.graphics.drawable.shapes.RectShape()).apply {
         val sizePx = (20 * context.resources.displayMetrics.density).toInt()

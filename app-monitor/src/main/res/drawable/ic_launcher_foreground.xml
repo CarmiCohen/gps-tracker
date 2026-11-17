@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monitor launcher glyph: a watching eye (Nov17.6). Cyan matches the Monitor color of the HUD and the map. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,54 C32,40 42,34 54,34 C66,34 76,40 84,54 C76,68 66,74 54,74 C42,74 32,68 24,54 Z" />
+    <path
+        android:fillColor="#0E7490"
+        android:pathData="M54,41 A13,13 0 1,1 54,67 A13,13 0 1,1 54,41 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,49 A5,5 0 1,1 54,59 A5,5 0 1,1 54,49 Z" />
+</vector>
