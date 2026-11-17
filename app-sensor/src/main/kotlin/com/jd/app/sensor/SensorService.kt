@@ -105,6 +105,7 @@ class SensorService : Service(), SensorEventListener {
     
     private var lastBatteryLevel = -1
     private var lastIsCharging = false
+    private var lastIsPluggedIn = false // A charger is connected, even if the battery is held (ISSUE-NOV17.15-O114).
     private var lastTempCelsius = -1f
     // The Monitor user's Home Points, enforced here so the Monitor does no per-fix work (ISSUE-NOV8.13-O51).
     @Volatile private var geofence = GeofenceConfig() // Written by the geofence collector, read by the sensing loop.
@@ -173,9 +174,12 @@ class SensorService : Service(), SensorEventListener {
         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
         lastBatteryLevel = if (level >= 0 && scale > 0) level * 100 / scale else -1
         
-        val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-        lastIsCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || 
-                         status == BatteryManager.BATTERY_STATUS_FULL
+        val power = batteryPower(
+            status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1),
+            plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
+        )
+        lastIsCharging = power.isCharging
+        lastIsPluggedIn = power.isPluggedIn
                          
         val tempTenths = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
         lastTempCelsius = if (tempTenths != Int.MIN_VALUE) tempTenths / 10.0f else -1f
@@ -753,7 +757,7 @@ class SensorService : Service(), SensorEventListener {
         val speed = if (lastLocation != null && lastLocation!!.hasSpeed()) lastLocation!!.speed else 0f
         val newInterval = SensingEngine.getOptimalIntervalMs(
             currentTemp = lastTempCelsius,
-            isCharging = lastIsCharging,
+            isCharging = lastIsPluggedIn, // On outside power the fast rate costs no battery (ISSUE-NOV17.15-O114).
             batteryLevel = lastBatteryLevel,
             velocityMps = speed
         )
@@ -836,6 +840,7 @@ class SensorService : Service(), SensorEventListener {
                 update.status = "VALID"
                 update.batteryLevel = lastBatteryLevel
                 update.isCharging = lastIsCharging
+                update.isPluggedIn = lastIsPluggedIn
                 update.tempCelsius = lastTempCelsius
                 update.isNoiseDetectionOff = serviceStatus.microphone.value.isNoiseDetectionOff // ISSUE-NOV8.103-O60
                 // For the Monitor's Info now and the graphs later (ISSUE-NOV10.8-O84 part 2); unknown without GNSS status.

@@ -63,6 +63,17 @@ class MonitorAlarmsTest {
         assertEquals(emptySet<AlarmType>(), conditions(reading(at = start + 10_000), now = start + TRACKER_PRESENT_MS))
     }
 
+    /** Chapter 214 (ISSUE-NOV17.15-O114): a held battery on a charger is not a cut cable; older rows still use charging. */
+    @Test
+    fun powerFollowsThePluggedInFlagAndFallsBackToCharging() {
+        val power = setOf(AlarmType.POWER_DISCONNECTED)
+        assertEquals(emptySet<AlarmType>(), conditions(reading(charging = false).copy(isPluggedIn = true)))
+        assertEquals(power, conditions(reading(charging = false).copy(isPluggedIn = false)))
+        assertEquals(power, conditions(reading(charging = true).copy(isPluggedIn = false)))
+        assertEquals(power, conditions(reading(charging = false)))
+        assertEquals(emptySet<AlarmType>(), conditions(reading(charging = true)))
+    }
+
     @Test
     fun powerBatteryAndTemperatureFollowTheirLimits() {
         assertEquals(setOf(AlarmType.POWER_DISCONNECTED), conditions(reading(charging = false)))

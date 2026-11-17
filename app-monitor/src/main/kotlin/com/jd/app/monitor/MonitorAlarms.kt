@@ -87,8 +87,13 @@ data class TrackerReading(
     val lng: Double = 0.0,
     val accuracy: Float = 0f,
     val status: String = "VALID",
-    val isNoiseDetectionOff: Boolean = false
-)
+    val isNoiseDetectionOff: Boolean = false,
+    /** Null from a Sensor before Nov17.15 or a backfilled row (ISSUE-NOV17.15-O114). */
+    val isPluggedIn: Boolean? = null
+) {
+    /** A charger is connected; without the plugged-in flag, charging is the best guess. */
+    val hasPower: Boolean get() = isPluggedIn ?: isCharging
+}
 
 fun LocationUpdate.toTrackerReading(receivedAtMs: Long) =
     TrackerReading(
@@ -101,7 +106,8 @@ fun LocationUpdate.toTrackerReading(receivedAtMs: Long) =
         lng = lng,
         accuracy = accuracy,
         status = status,
-        isNoiseDetectionOff = isNoiseDetectionOff
+        isNoiseDetectionOff = isNoiseDetectionOff,
+        isPluggedIn = isPluggedIn
     )
 
 fun TrackerReading.hasGpsSignal(): Boolean =
@@ -150,7 +156,8 @@ fun alarmConditions(
     val isOtherViolation = hasViolation && violationType !in SENSOR_VIOLATION_ALARMS
     if ("JUMP" in flagged || "OUTLIER" in flagged || isOtherViolation) add(AlarmType.GPS_JUMP)
     if (reading == null) return@buildSet
-    if (!reading.isCharging) add(AlarmType.POWER_DISCONNECTED)
+    // Plugged in, not charging: a held battery is not a cut cable (ISSUE-NOV17.15-O114).
+    if (!reading.hasPower) add(AlarmType.POWER_DISCONNECTED)
     if (reading.isNoiseDetectionOff) add(AlarmType.NOISE_DETECTION_OFF)
     val batteryLimit = if (AlarmType.LOW_BATTERY in active) LOW_BATTERY_CLEARS_AT else LOW_BATTERY_BELOW
     if (reading.batteryLevel >= 0 && reading.batteryLevel < batteryLimit) add(AlarmType.LOW_BATTERY)

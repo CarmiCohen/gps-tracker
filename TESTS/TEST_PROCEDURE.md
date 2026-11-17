@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.14 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.15 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1039,7 +1039,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **206.2 Map (device):** in the Monitor's map the Monitor's own position is a cyan dot and the Sensor's a green dot, each in a white ring; Home Points stay green squares, OUT points red dots.
 
 ## Chapter 207 - Backfill Keeps Battery And Temperature (Nov17.7)
-**Status: A / L** - `ForensicEntryIntegrityTest`, `LocationRowWireTest` pass; 207.3 verified on the A15; 207.4 waits for a Two-phone test (ISSUE-NOV17.3-O102, SOT 1.446)
+**Status: A / L** - `ForensicEntryIntegrityTest`, `LocationRowWireTest` pass; 207.3 verified on the A15; 207.4 verified in the Nov17.15 Two-phone test (S21FE offline about 21:45:00 to 21:46:37, no gap in the 1 h graphs) (ISSUE-NOV17.3-O102, SOT 1.446)
 *   **207.1 Buffer (unit):** `ForensicEntryIntegrityTest`: battery level, charging and temperature are read back as written, and not known (-1, not charging, -1) stays not known; a version 4 file is upgraded to version 5 keeping its entries and satellites, with the three fields not known; a version 4 entry that failed its checksum stays skipped; the version 2 and 3 upgrades end at version 5.
 *   **207.2 Wire (unit):** `LocationRowWireTest`: a backfilled row carries and reads back battery, charging and temperature.
 *   **207.3 Upgrade (device):** install the debug Sensor over a version 4 one: `REV_SensorService` logs `ForensicBuffer initialized ... Next seq:` continuing the old numbers, and no `Skipped ... damaged entries`.
@@ -1057,7 +1057,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **209.3 Microphone (device):** with noise switched off on the Monitor, force-stop and launch the Sensor: the service starts, `Detection settings applied` is logged, the console shows `Microphone: Off (noise detection switched off on the Monitor)`, and `logcat --pid` of the Sensor has no `AudioRecord` line.
 
 ## Chapter 210 - State Alarms End When Cleared (Nov17.11)
-**Status: A** - `MonitorAlarmsTest`, `MonitorEventsTest`, `NoiseDetectionOffAlarmTest` pass; 210.3 waits for a device run with the Monitor installed (ISSUE-NOV17.10-O110, SOT 1.449)
+**Status: A** - `MonitorAlarmsTest`, `MonitorEventsTest`, `NoiseDetectionOffAlarmTest` pass; 210.3 verified in the Nov17.15 Two-phone test (Alarm 21:43:33, Ended 21:44:39 without acknowledgement) (ISSUE-NOV17.10-O110, SOT 1.449)
 *   **210.1 Book (unit):** `MonitorAlarmsTest` (129.4 block): an unacknowledged state alarm (power disconnected) leaves the book when its condition clears and the siren stops; exactly the six event alarms (GPS jump, geofence breach, noise, tilt, lift, vibration) stay as `(cleared)` until acknowledged; a cleared state alarm leaves a latched event alarm sounding. `NoiseDetectionOffAlarmTest`: the noise-detection-off warning ends without acknowledgement once the Sensor listens again.
 *   **210.2 Events log (unit):** `MonitorEventsTest`: a state alarm that ends unacknowledged records `Alarm: ...` then `Ended: ...`, and leaves nothing to acknowledge.
 *   **210.3 Live (device):** unplug the Sensor phone's charger: the Monitor sounds `Tracker power disconnected`; plug it back in without acknowledging: within one row the siren, the red screen and the alarm notification end, and the Events log shows the alarm and its end.
@@ -1072,12 +1072,17 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **212.1 Dialog (device):** in the Sensor console tap `STOP SERVICE`: the confirmation reads `... until the phone restarts, the app is updated, or the Sensor app is opened again.`; confirm, then reopen the Sensor app: the service runs again.
 
 ## Chapter 213 - Tapping an App in Android's Active Apps List Opens It (Nov17.14)
-**Status: A** - `SessionNotificationDeviceTest` 2/2 on the A15; the Sensor's notification tap opened its console on the A15; 213.2 waits for a Two-phone test (the Monitor posts its session notification only while paired) (ISSUE-NOV17.14-O113, SOT 1.452)
+**Status: A** - `SessionNotificationDeviceTest` 2/2 on the A15; the Sensor's notification tap opened its console on the A15; 213.2: the shade tap on the paired S21FE Monitor brought it to the front (Nov17.15); the Active apps list tap not run (the entry was not found in One UI 8 quick settings) (ISSUE-NOV17.14-O113, SOT 1.452)
 *   **213.1 Session notification (device):** `SessionNotificationDeviceTest`: `monitorOpenIntent` targets `MonitorActivity` with `ACTION_MAIN`, `CATEGORY_LAUNCHER`, `FLAG_ACTIVITY_NEW_TASK` and `FLAG_ACTIVITY_RESET_TASK_IF_NEEDED` and resolves to the launcher activity; the session notification has a tap action from the Monitor's package on the session channel.
 *   **213.2 Live (device):** with the Monitor paired and in the background, tap the Monitor in the notification shade and in Android's Active apps list (quick settings): the Monitor comes to the front with the screen it had; the same taps on the Sensor open its console.
 
+## Chapter 214 - A Plugged-In Phone That Is Not Charging Has Power (Nov17.15)
+**Status: A** - `BatteryPowerTest` (4), `MonitorAlarmsTest`, `LocationRowWireTest` pass; 214.2 verified on the A15 and S21FE (ISSUE-NOV17.15-O114, SOT 1.453)
+*   **214.1 Units:** `BatteryPowerTest`: battery status not charging with USB plugged is plugged in but not charging; charging and full are both; on battery is neither; charging without a plugged value counts as plugged in. `MonitorAlarmsTest`: plugged in and not charging raises no `POWER_DISCONNECTED`, not plugged in raises it, a row without the flag falls back to charging. `LocationRowWireTest`: `plg` travels and reads back; a row without it reads back as not known.
+*   **214.2 Live (device, Two-phone):** with Global Mute off on the Monitor, the Sensor phone on USB but not charging (battery protection, status 4) raises no power alarm; `adb shell dumpsys battery unplug` raises `Tracker power disconnected`; `dumpsys battery reset` ends it without acknowledgement, and the Events log shows `Alarm:` and `Ended:`.
+
 ---
-**Active Testing Chapters: 202 of 213**
+**Active Testing Chapters: 203 of 214**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

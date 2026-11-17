@@ -21,6 +21,11 @@ data class LocationUpdate(
     var serverArrivalTs: Long = 0L, 
     var sequenceId: Long = 0L,
     var isCharging: Boolean = false,
+    /**
+     * A charger is connected, also while a held battery is not charging; null when not known (rows from Sensors before
+     * Nov17.15 and backfilled rows), and the Monitor then falls back to [isCharging] (ISSUE-NOV17.15-O114).
+     */
+    var isPluggedIn: Boolean? = null,
     var batteryLevel: Int = -1,
     var gsmSignalDbm: Int = 0,
     var networkType: String = "--",
@@ -52,7 +57,7 @@ data class LocationUpdate(
     fun reset() {
         deviceId = ""; lat = 0.0; lng = 0.0; accuracy = 0f; speed = -1f; bearing = 0f; altitude = 0.0
         timestamp = 0L; monotonicNanos = 0L; serverArrivalTs = 0L; sequenceId = 0L
-        isCharging = false; batteryLevel = -1; gsmSignalDbm = 0; networkType = "--"
+        isCharging = false; isPluggedIn = null; batteryLevel = -1; gsmSignalDbm = 0; networkType = "--"
         isBuffered = false; isHistoricalLkg = false; tempCelsius = -1f
         isThermalThrottled = false; cumulativeBytesSent = 0L; status = "VALID"; isNoiseDetectionOff = false; isCritical = false
         satsUsed = -1; satsInView = -1; meanCn0DbHz = null; noiseDbfs = null

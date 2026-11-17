@@ -58,4 +58,17 @@ class LocationRowWireTest {
         assertNull(decoded.meanCn0DbHz)
         assertNull(decoded.noiseDbfs)
     }
+
+    /** Chapter 214 (ISSUE-NOV17.15-O114): plugged in travels as `plg`; a row without it reads back as not known. */
+    @Test
+    fun pluggedInTravelsAndIsUnknownWhenLeftOut() {
+        val held = row().apply { isCharging = false; isPluggedIn = true }
+        val decoded = LocationRowWire.decode(LocationRowWire.encode(held, "S1", live = true))
+        assertFalse(decoded.isCharging)
+        assertEquals(true, decoded.isPluggedIn)
+
+        val older = LocationRowWire.encode(row(), "S1", live = true)
+        assertFalse(older.has("plg"))
+        assertNull(LocationRowWire.decode(older).isPluggedIn)
+    }
 }

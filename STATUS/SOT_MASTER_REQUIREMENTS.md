@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov17.14)
+# SOT Master Requirements & Hardening Status (Nov17.15)
 
-## 🏗️ Architectural Master Rules (526 Rules)
+## 🏗️ Architectural Master Rules (527 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -153,6 +153,7 @@
 *   **1.450 The Sensor Debounces Its Event Alerts**: before sending an alert the Sensor MUST debounce each kind: vibration needs 3 hits at least 300 ms apart within 10 s, tilt must last 2 s, an accelerometer lift must stay 20 cm up for 1 s, and noise must be loud for 1 s within 2 s; after an alert the same kind MUST NOT alert again for 60 s (other kinds are not held back), and a held-back alert MUST be recorded as a detail event. One kind that passes MUST still raise its alarm on the Monitor; no combination of kinds is required (user decision 2026-11-17, ISSUE-NOV17.10-O111, chapter 211).
 *   **1.451 The STOP SERVICE Dialog Tells When Sensing Resumes**: a console STOP is not stored; the Sensor's `STOP SERVICE` confirmation MUST say that sensing stays stopped until the phone restarts, the app is updated, or the Sensor app is opened again, and MUST NOT promise a stop "until manually restarted" (user decision 2026-11-17, option 2; ISSUE-NOV12.7-O96, chapter 212).
 *   **1.452 Ongoing Notifications Open Their App**: every ongoing foreground-service notification MUST carry a tap action that opens its app, so a tap in the notification shade or in Android's Active apps list brings the app up; the Monitor's session notification opens the Monitor like the launcher (an open Monitor task comes back to the front, no second screen), the Sensor's opens its console (ISSUE-NOV17.14-O113, chapter 213).
+*   **1.453 A Plugged-In Phone Has Power**: the Sensor MUST send whether a charger is connected (`plg`, from `EXTRA_PLUGGED`) apart from whether the battery charges (`chg`); the Monitor's `Tracker power disconnected` follows the plugged-in flag, so a phone that holds its battery at a limit while plugged in raises no alarm, and falls back to charging for rows without the flag (older Sensors, backfill); the sampling rate follows plugged in, the graphs' Charging band stays real charging (ISSUE-NOV17.15-O114, chapter 214).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

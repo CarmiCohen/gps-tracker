@@ -561,6 +561,7 @@ object LocationRowWire {
         put("spd", update.speed)
         put("batt", update.batteryLevel)
         put("chg", update.isCharging)
+        update.isPluggedIn?.let { put("plg", it) } // ISSUE-NOV17.15-O114; left out while not known.
         put("temp", update.tempCelsius)
         if (update.satsUsed >= 0) put("sats", update.satsUsed)
         if (update.satsInView >= 0) put("satsView", update.satsInView)
@@ -584,6 +585,8 @@ object LocationRowWire {
             speed = data.optDouble("spd", 0.0).toFloat(),
             batteryLevel = data.optInt("batt", 0),
             isCharging = data.optBoolean("chg", false),
+            // Absent from Sensors before Nov17.15 and from backfill: the Monitor then reads `chg` (ISSUE-NOV17.15-O114).
+            isPluggedIn = if (data.has("plg")) data.optBoolean("plg") else null,
             tempCelsius = data.optDouble("temp", 0.0).toFloat(),
             isNoiseDetectionOff = data.optBoolean("noiseOff", false), // Absent from Sensors before Nov9.1: no warning.
             // Absent from Sensors before Nov15.5, from backfill before Nov17.3, and while not known (O84 part 2, O99 part 2).
