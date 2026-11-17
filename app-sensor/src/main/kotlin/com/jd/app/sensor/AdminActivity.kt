@@ -723,7 +723,7 @@ fun SensorAdminConsole(
             onDismissRequest = { showStopConfirmDialog = false },
             title = { Text("Stop Sensor Service") },
             text = {
-                Text("Are you sure you want to stop background sensing? The Sensor will stop collecting and transmitting location telemetry until manually restarted.")
+                Text("Are you sure you want to stop background sensing? The Sensor will stop collecting and transmitting location telemetry until the phone restarts, the app is updated, or the Sensor app is opened again.")
             },
             confirmButton = {
                 Button(
