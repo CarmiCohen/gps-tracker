@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov17.9)
+# SOT Master Requirements & Hardening Status (Nov17.11)
 
-## 🏗️ Architectural Master Rules (522 Rules)
+## 🏗️ Architectural Master Rules (523 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -149,6 +149,7 @@
 *   **1.446 Backfill Keeps Battery And Temperature**: the forensic buffer MUST keep a row's battery level, charging state and temperature, and a backfilled row MUST carry them like a live row; an older buffer file MUST be upgraded keeping its entries and sequence numbers, with these fields not known (ISSUE-NOV17.3-O102, chapter 207).
 *   **1.447 `run_tests.ps1` Counts Every Test**: `TESTS/run_tests.ps1` MUST rerun every requested test task (Gradle property `rerunTests`), so its count never leaves out up-to-date modules, without recompiling unchanged code (ISSUE-NOV12.6-O94, chapter 208).
 *   **1.448 The Sensor Shows And Obeys The Monitor's Switches From The Start**: the Sensor's `Tilt, Lift & Vibration` line MUST name the kinds switched off on the Monitor, and a service start MUST NOT open the microphone before the stored detection settings are read (ISSUE-NOV15.2-O97, chapter 209).
+*   **1.449 State Alarms End When Cleared**: a Monitor state alarm (tracker offline, power, battery, temperature, relay, Monitor internet, GPS signal loss, noise detection off) MUST end its siren, red screen and notification as soon as its condition clears, acknowledged or not; the event alarms (GPS jump, geofence breach, noise, tilt, lift, vibration) MUST stay until acknowledged; the Events log MUST record each alarm's start and end (ISSUE-NOV17.10-O110, chapter 210).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

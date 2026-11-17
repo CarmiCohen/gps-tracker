@@ -25,7 +25,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** "Tracker battery low since 14:03:12", or "... (cleared)" once the condition no longer holds. */
+/** "Tracker tilted since 14:03:12", or "... (cleared)" once an event alarm's condition no longer holds. */
 fun Alarm.description(trackerId: String?): String {
     val since = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date(raisedAtMs))
     val tracker = trackerId?.let { " $it" } ?: ""

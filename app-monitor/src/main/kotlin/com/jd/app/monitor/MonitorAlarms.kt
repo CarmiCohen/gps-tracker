@@ -35,8 +35,12 @@ const val HIGH_TEMPERATURE_ABOVE = 46f
 private const val LOW_BATTERY_CLEARS_AT = 22
 private const val HIGH_TEMPERATURE_CLEARS_AT = 44f
 
-/** The Monitor-side alarms, each switched by the Alert Settings entry named in [AlertSettings.allows]. */
-enum class AlarmType(val title: String) {
+/**
+ * The Monitor-side alarms, each switched by the Alert Settings entry named in [AlertSettings.allows].
+ * An event alarm ([isEvent]) reports something that happened in one row, so it stays until acknowledged; a state
+ * alarm reports a condition that lasts, so it ends as soon as the condition clears (ISSUE-NOV17.10-O110).
+ */
+enum class AlarmType(val title: String, val isEvent: Boolean = false) {
     TRACKER_OFFLINE("Tracker offline"),
     POWER_DISCONNECTED("Tracker power disconnected"),
     LOW_BATTERY("Tracker battery low"),
@@ -44,12 +48,12 @@ enum class AlarmType(val title: String) {
     RELAY_DISCONNECTED("Relay disconnected"),
     LOCAL_INTERNET_OFFLINE("Monitor internet lost"),
     GPS_SIGNAL_LOSS("Tracker GPS signal loss"),
-    GPS_JUMP("Tracker GPS jump"),
-    GEOFENCE_BREACH("Geofence boundary breach"),
-    ACOUSTIC_ALERT("Tracker noise detected"),
-    TILT_ALERT("Tracker tilted"),
-    LIFT_ALERT("Tracker lifted"),
-    VIBRATION_ALERT("Tracker vibration detected"),
+    GPS_JUMP("Tracker GPS jump", isEvent = true),
+    GEOFENCE_BREACH("Geofence boundary breach", isEvent = true),
+    ACOUSTIC_ALERT("Tracker noise detected", isEvent = true),
+    TILT_ALERT("Tracker tilted", isEvent = true),
+    LIFT_ALERT("Tracker lifted", isEvent = true),
+    VIBRATION_ALERT("Tracker vibration detected", isEvent = true),
     NOISE_DETECTION_OFF("Tracker noise detection off")
 }
 
@@ -163,7 +167,7 @@ private val SENSOR_VIOLATION_ALARMS = mapOf(
     com.jd.core.shared.VIBRATION_ALERT_STATUS to AlarmType.VIBRATION_ALERT
 )
 
-/** One raised alarm. [isActive] is false once its condition has cleared. */
+/** One raised alarm. [isActive] is false once its condition has cleared, which only an event alarm outlives. */
 data class Alarm(
     val type: AlarmType,
     val raisedAtMs: Long,
@@ -172,8 +176,9 @@ data class Alarm(
 )
 
 /**
- * Every raised alarm. An alarm is raised when its condition starts to hold, and stays until it is acknowledged,
- * even if its condition clears first. An acknowledged alarm is raised again only after its condition has cleared.
+ * Every raised alarm. An alarm is raised when its condition starts to hold. An event alarm stays until it is
+ * acknowledged, even if its condition clears first; a state alarm ends as soon as its condition clears, acknowledged
+ * or not (ISSUE-NOV17.10-O110). An acknowledged alarm is raised again only after its condition has cleared.
  * A switched-off or muted alarm is dropped at once.
  *
  * [isTrackerOnline] tells whether the tracker is heard, whatever the alarm settings, so the Events log records its
@@ -189,7 +194,7 @@ data class AlarmBook(val alarms: List<Alarm> = emptyList(), val isTrackerOnline:
         val kept = alarms.filter { settings.allows(it.type) }.mapNotNull { alarm ->
             when {
                 alarm.type in allowed -> alarm.copy(isActive = true)
-                alarm.isAcknowledged -> null
+                alarm.isAcknowledged || !alarm.type.isEvent -> null
                 else -> alarm.copy(isActive = false)
             }
         }

@@ -108,7 +108,7 @@ class MonitorAlarmDeviceTest {
         var acknowledged = 0
         val pending = listOf(
             Alarm(AlarmType.POWER_DISCONNECTED, raisedAtMs = 0L, isActive = true, isAcknowledged = false),
-            Alarm(AlarmType.TRACKER_OFFLINE, raisedAtMs = 0L, isActive = false, isAcknowledged = false)
+            Alarm(AlarmType.TILT_ALERT, raisedAtMs = 0L, isActive = false, isAcknowledged = false)
         )
         composeRule.setContent {
             RevolutionTheme { AlarmAlertScreen(pending, trackerId = "T", onAcknowledge = { acknowledged++ }) }

@@ -41,6 +41,18 @@ class MonitorEventsTest {
         assertEquals(listOf(LoggedEvent(EventLevel.INFO, "Ended: ${AlarmType.TILT_ALERT.title}")), alarmEvents(acknowledged, cleared))
     }
 
+    /** ISSUE-NOV17.10-O110: a state alarm that ends unacknowledged still records its start and its end. */
+    @Test
+    fun `an unacknowledged state alarm that clears records Alarm then Ended`() {
+        val empty = AlarmBook()
+        val raised = empty.update(setOf(AlarmType.POWER_DISCONNECTED), settings, nowMs = 1_000L)
+        val cleared = raised.update(emptySet(), settings, nowMs = 2_000L)
+
+        assertEquals(listOf(LoggedEvent(EventLevel.ALARM, "Alarm: ${AlarmType.POWER_DISCONNECTED.title}")), alarmEvents(empty, raised))
+        assertEquals(listOf(LoggedEvent(EventLevel.INFO, "Ended: ${AlarmType.POWER_DISCONNECTED.title}")), alarmEvents(raised, cleared))
+        assertNull("Nothing is left to acknowledge", acknowledgementEvent(cleared))
+    }
+
     /** ISSUE-NOV15.4-O98 part 2. */
     @Test
     fun `the tracker going offline and returning is recorded, not before it is first heard`() {

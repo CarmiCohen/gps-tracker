@@ -65,7 +65,7 @@ class NoiseDetectionOffAlarmTest {
     }
 
     @Test
-    fun `the warning clears once the Sensor listens again and goes after acknowledgement`() = runBlocking {
+    fun `the warning ends without acknowledgement once the Sensor listens again`() = runBlocking {
         val watch = Watch(this)
         watch.settings.emit(AlertSettings())
         watch.ready()
@@ -73,10 +73,8 @@ class NoiseDetectionOffAlarmTest {
         watch.telemetry.emit(row(noiseOff = true, timestamp = 1L))
         watch.awaitBook { it.needsSiren }
         watch.telemetry.emit(row(noiseOff = false, timestamp = 2L))
-        val cleared = watch.awaitBook { book -> book.alarms.any { it.type == AlarmType.NOISE_DETECTION_OFF && !it.isActive } }
-        assertTrue(cleared.needsSiren)
 
-        watch.acks.emit(Unit)
+        // A state alarm, so it ends with its condition (ISSUE-NOV17.10-O110).
         assertTrue(watch.awaitBook { !it.needsSiren }.alarms.isEmpty())
         watch.job.cancel()
     }

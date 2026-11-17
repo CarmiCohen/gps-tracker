@@ -112,12 +112,46 @@ class MonitorAlarmsTest {
     }
 
     @Test
-    fun anUnacknowledgedAlarmStaysAfterItsConditionClears() {
-        val cleared = AlarmBook().update(power, settings, start).update(emptySet(), settings, start + 1_000)
+    fun anUnacknowledgedEventAlarmStaysAfterItsConditionClears() {
+        val tilt = setOf(AlarmType.TILT_ALERT)
+        val cleared = AlarmBook().update(tilt, settings, start).update(emptySet(), settings, start + 1_000)
 
         assertTrue(cleared.needsSiren)
         assertFalse(cleared.alarms.single().isActive)
         assertEquals(emptyList<Alarm>(), cleared.acknowledge().alarms)
+    }
+
+    // 129.4 State alarms end when cleared (ISSUE-NOV17.10-O110)
+
+    @Test
+    fun anUnacknowledgedStateAlarmEndsWhenItsConditionClears() {
+        val cleared = AlarmBook().update(power, settings, start).update(emptySet(), settings, start + 1_000)
+
+        assertEquals(emptyList<Alarm>(), cleared.alarms)
+        assertFalse(cleared.needsSiren)
+    }
+
+    @Test
+    fun onlyTheEventAlarmsLatch() {
+        val events = setOf(
+            AlarmType.GPS_JUMP, AlarmType.GEOFENCE_BREACH, AlarmType.ACOUSTIC_ALERT,
+            AlarmType.TILT_ALERT, AlarmType.LIFT_ALERT, AlarmType.VIBRATION_ALERT
+        )
+        assertEquals(events, AlarmType.entries.filter { it.isEvent }.toSet())
+
+        val all = AlarmType.entries.toSet()
+        val cleared = AlarmBook().update(all, settings, start).update(emptySet(), settings, start + 1_000)
+        assertEquals(events, cleared.pending.mapTo(mutableSetOf()) { it.type })
+        assertTrue(cleared.pending.none { it.isActive })
+    }
+
+    @Test
+    fun aClearedStateAlarmLeavesTheLatchedEventSounding() {
+        val both = setOf(AlarmType.POWER_DISCONNECTED, AlarmType.LIFT_ALERT)
+        val cleared = AlarmBook().update(both, settings, start).update(emptySet(), settings, start + 1_000)
+
+        assertEquals(listOf(AlarmType.LIFT_ALERT), cleared.pending.map { it.type })
+        assertTrue(cleared.needsSiren)
     }
 
     @Test

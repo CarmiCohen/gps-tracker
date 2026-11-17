@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.8 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.11 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1056,8 +1056,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **209.2 Console (device):** with vibration switched off on the Monitor, the Sensor console (and its Setup dialog) shows `Tilt, Lift & Vibration: Armed (accelerometer); vibration off on the Monitor`.
 *   **209.3 Microphone (device):** with noise switched off on the Monitor, force-stop and launch the Sensor: the service starts, `Detection settings applied` is logged, the console shows `Microphone: Off (noise detection switched off on the Monitor)`, and `logcat --pid` of the Sensor has no `AudioRecord` line.
 
+## Chapter 210 - State Alarms End When Cleared (Nov17.11)
+**Status: A** - `MonitorAlarmsTest`, `MonitorEventsTest`, `NoiseDetectionOffAlarmTest` pass; 210.3 waits for a device run with the Monitor installed (ISSUE-NOV17.10-O110, SOT 1.449)
+*   **210.1 Book (unit):** `MonitorAlarmsTest` (129.4 block): an unacknowledged state alarm (power disconnected) leaves the book when its condition clears and the siren stops; exactly the six event alarms (GPS jump, geofence breach, noise, tilt, lift, vibration) stay as `(cleared)` until acknowledged; a cleared state alarm leaves a latched event alarm sounding. `NoiseDetectionOffAlarmTest`: the noise-detection-off warning ends without acknowledgement once the Sensor listens again.
+*   **210.2 Events log (unit):** `MonitorEventsTest`: a state alarm that ends unacknowledged records `Alarm: ...` then `Ended: ...`, and leaves nothing to acknowledge.
+*   **210.3 Live (device):** unplug the Sensor phone's charger: the Monitor sounds `Tracker power disconnected`; plug it back in without acknowledging: within one row the siren, the red screen and the alarm notification end, and the Events log shows the alarm and its end.
+
 ---
-**Active Testing Chapters: 198 of 209**
+**Active Testing Chapters: 199 of 210**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
