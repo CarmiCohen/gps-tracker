@@ -103,4 +103,71 @@ class GraphsTest {
         assertNull(monitorGraphScreen(listOf(sample(1, GraphField.VIBRATION_G to 0.1)), own, ViewPeriod.HOUR, nowMs).note)
         assertTrue(monitorGraphScreen(emptyList(), own, ViewPeriod.HOUR, nowMs).note!!.startsWith("No Sensor samples yet"))
     }
+
+    // Chapter 199 (ISSUE-NOV15.6-O100 parts 3 and 4, Nov16.8): why a gap, and the graphs of an event's time.
+
+    private fun event(ageMinutes: Int, message: String, source: EventSource = EventSource.SENSOR) =
+        EventEntry("e$ageMinutes-$message", nowMs - ageMinutes * GRAPH_SAMPLE_INTERVAL_MS, source, EventLevel.WARNING, message)
+
+    private val minute = GRAPH_SAMPLE_INTERVAL_MS
+
+    @Test
+    fun `a service stop lasts to the next start, or to now while none came`() {
+        val events = listOf(
+            event(50, "$SERVICE_STARTED (version Nov16.7)"),
+            event(40, "$SERVICE_STOPPED: app updated"),
+            event(38, SERVICE_STOPPED), // The same stop, reported again: still the first one.
+            event(30, "$SERVICE_STARTED (version Nov16.8)"),
+            event(25, SERVICE_STOPPED, EventSource.MONITOR), // Not the Sensor's: ignored.
+            event(10, SERVICE_STOPPED)
+        )
+        val stops = serviceStops(events, nowMs - 3_600_000L, nowMs, nowMs)
+        assertEquals(
+            listOf(
+                ServiceStop(nowMs - 40 * minute, nowMs - 30 * minute, "app updated", isOngoing = false),
+                ServiceStop(nowMs - 10 * minute, nowMs, "stopped on the Sensor phone", isOngoing = true)
+            ),
+            stops
+        )
+        assertTrue("A start without a stop before it is no stop", serviceStops(events.take(1), nowMs - 3_600_000L, nowMs, nowMs).isEmpty())
+        assertEquals(
+            "Only the stops overlapping the period",
+            listOf(stops.first()),
+            serviceStops(events, nowMs - 45 * minute, nowMs - 35 * minute, nowMs)
+        )
+        val format: (Long) -> String = { "${(nowMs - it) / minute}m" }
+        assertEquals("40m for 10 min 0 s: app updated", stops[0].describe(format))
+        assertEquals("10m until now: stopped on the Sensor phone", stops[1].describe(format))
+    }
+
+    @Test
+    fun `a stop is shaded in the Sensor's graphs only, cut at the period's ends`() {
+        val stop = ServiceStop(nowMs - 70 * minute, nowMs - 30 * minute, "app crashed", isOngoing = false)
+        assertEquals(listOf(GraphSpan(0f, 0.5f)), stoppedSpans(listOf(stop), nowMs - 60 * minute, nowMs))
+        assertTrue(stoppedSpans(listOf(stop), nowMs - 20 * minute, nowMs).isEmpty())
+
+        val events = listOf(event(45, "$SERVICE_STOPPED: app crashed"), event(15, "$SERVICE_STARTED (version Nov16.8)"))
+        val sensor = sensorGraphScreen(emptyList(), ViewPeriod.HOUR, nowMs, events)
+        assertEquals(listOf("app crashed"), sensor.serviceStops.map { it.reason })
+        assertTrue(sensor.sections.all { it.stoppedSpans == listOf(GraphSpan(0.25f, 0.75f)) })
+        val monitor = monitorGraphScreen(emptyList(), emptyList(), ViewPeriod.HOUR, nowMs, events)
+        assertTrue(monitor.sections.dropLast(1).all { it.stoppedSpans == listOf(GraphSpan(0.25f, 0.75f)) })
+        assertTrue("The Monitor's own connection did not stop", monitor.sections.last().stoppedSpans.isEmpty())
+    }
+
+    @Test
+    fun `the graphs of an event are centred on its time, but never run past now`() {
+        assertEquals(nowMs, graphPeriodEndMs(ViewPeriod.HOUR, nowMs, null))
+        assertEquals(nowMs - 90 * minute, graphPeriodEndMs(ViewPeriod.HOUR, nowMs, nowMs - 120 * minute))
+        assertEquals(nowMs, graphPeriodEndMs(ViewPeriod.HOUR, nowMs, nowMs - 10 * minute))
+
+        val focusMs = nowMs - 120 * minute
+        val screen = sensorGraphScreen(listOf(sample(120, GraphField.VIBRATION_G to 0.8)), ViewPeriod.HOUR, nowMs, focusMs = focusMs)
+        assertEquals(nowMs - 150 * minute, screen.startMs)
+        assertEquals(nowMs - 90 * minute, screen.endMs)
+        assertEquals(0.5f, screen.focusFraction!!, 0.0001f)
+        assertTrue("The event's minute is drawn", screen.sections.first().panels.first().hasData)
+        assertEquals(focusMs, monitorGraphScreen(emptyList(), emptyList(), ViewPeriod.HOUR, nowMs, focusMs = focusMs).focusMs)
+        assertNull(sensorGraphScreen(emptyList(), ViewPeriod.HOUR, nowMs).focusFraction)
+    }
 }

@@ -33,6 +33,8 @@ import com.jd.core.shared.ViewPeriod
 import com.jd.core.shared.GraphLine
 import com.jd.core.shared.GraphPanel
 import com.jd.core.shared.GraphScreenState
+import com.jd.core.shared.GraphSpan
+import com.jd.core.shared.ServiceStop
 import com.jd.core.shared.GraphTone
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,9 +42,11 @@ import java.util.Locale
 
 /**
  * The menu's Graphs screen of both apps (ISSUE-NOV10.8-O84 part 3): each section's graphs over the chosen [period],
- * built by core-shared (`sensorGraphScreen`, `monitorGraphScreen`). A gap in a line is a time without samples (the
- * Sensor's service stopped, or the Monitor did not receive them yet); a limit line is dashed red, and the battery's
- * green background marks charging.
+ * built by core-shared (`sensorGraphScreen`, `monitorGraphScreen`). A gap in a line is a time without samples; where
+ * the Sensor's service was stopped its graphs are shaded gray and the stops are listed with their reasons
+ * (ISSUE-NOV15.6-O100 part 3), so a remaining gap means the Monitor did not receive those samples yet. A limit line is
+ * dashed red, and the battery's green background marks charging. Opened from an event, the period is centred on the
+ * event's time, marked by a dashed white line, and [onNow] returns to the period ending now (part 4).
  */
 @Composable
 fun GraphsOverlay(
@@ -50,7 +54,8 @@ fun GraphsOverlay(
     state: GraphScreenState,
     period: ViewPeriod,
     onPeriod: (ViewPeriod) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onNow: () -> Unit = {}
 ) {
     // English labels and a time axis running left to right, also on a right-to-left phone (as the Events list).
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -66,11 +71,26 @@ fun GraphsOverlay(
                     ViewPeriod.entries.forEach { option ->
                         EventChip(option.label, isOn = option == period, onClick = { onPeriod(option) })
                     }
+                    if (state.focusMs != null) {
+                        Spacer(Modifier.weight(1f))
+                        EventChip("Now", isOn = false, onClick = onNow)
+                    }
+                }
+                state.focusMs?.let {
+                    Text(
+                        "Around the event of " + SimpleDateFormat("dd/MM HH:mm:ss", Locale.getDefault()).format(Date(it)),
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
                 state.note?.let { Text(it, color = BrandGold, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp)) }
-                val timeFormat = remember(period) { SimpleDateFormat(if (period.durationMs >= DAY_MS) "dd/MM HH:mm" else "HH:mm", Locale.getDefault()) }
+                // A period centred on an older event needs its date as well.
+                val withDate = period.durationMs >= DAY_MS || state.focusMs != null
+                val timeFormat = remember(withDate) { SimpleDateFormat(if (withDate) "dd/MM HH:mm" else "HH:mm", Locale.getDefault()) }
                 val startText = timeFormat.format(Date(state.startMs))
                 val endText = timeFormat.format(Date(state.endMs))
+                ServiceStopList(state.serviceStops) { timeFormat.format(Date(it)) }
                 LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     state.sections.forEach { section ->
                         item(key = "section-${section.title}") {
@@ -83,7 +103,7 @@ fun GraphsOverlay(
                             )
                         }
                         items(section.panels, key = { "${section.title}-${it.title}" }) { panel ->
-                            GraphPanelView(panel, startText, endText)
+                            GraphPanelView(panel, section.stoppedSpans, state.focusFraction, startText, endText)
                         }
                     }
                 }
@@ -92,8 +112,22 @@ fun GraphsOverlay(
     }
 }
 
+/** The Sensor's service stops of the period, newest first, at most [MAX_STOPS_LISTED] (ISSUE-NOV15.6-O100 part 3). */
 @Composable
-private fun GraphPanelView(panel: GraphPanel, startText: String, endText: String) {
+private fun ServiceStopList(stops: List<ServiceStop>, timeText: (Long) -> String) {
+    if (stops.isEmpty()) return
+    Column(modifier = Modifier.padding(top = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Legend(if (stops.size == 1) "Sensor service stopped:" else "Sensor service stopped ${stops.size} times, newest:", STOPPED_COLOR)
+        }
+        stops.takeLast(MAX_STOPS_LISTED).reversed().forEach {
+            Text(it.describe(timeText), color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp, modifier = Modifier.padding(start = 11.dp))
+        }
+    }
+}
+
+@Composable
+private fun GraphPanelView(panel: GraphPanel, stoppedSpans: List<GraphSpan>, focusFraction: Float?, startText: String, endText: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -119,7 +153,11 @@ private fun GraphPanelView(panel: GraphPanel, startText: String, endText: String
             }
             Spacer(Modifier.width(4.dp))
             Box(modifier = Modifier.weight(1f).height(GRAPH_HEIGHT)) {
-                Canvas(modifier = Modifier.fillMaxSize()) { drawPanel(panel) }
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawStoppedSpans(stoppedSpans)
+                    drawPanel(panel)
+                    focusFraction?.let { drawFocus(it) }
+                }
                 if (!panel.hasData) {
                     Text("No data", color = Slate500, fontSize = 11.sp, modifier = Modifier.align(Alignment.Center))
                 }
@@ -156,6 +194,26 @@ private fun DrawScope.drawPanel(panel: GraphPanel) {
     val range = panel.maxY - panel.minY
     fun y(value: Float) = size.height - (value - panel.minY) / range * size.height
     panel.lines.forEach { line -> drawGraphLine(line, step, ::y) }
+}
+
+/** The times the Sensor's service was stopped, shaded gray; at least a pixel wide, so a short stop in a week shows. */
+private fun DrawScope.drawStoppedSpans(spans: List<GraphSpan>) {
+    spans.forEach { span ->
+        val left = span.start * size.width
+        drawRect(STOPPED_COLOR.copy(alpha = 0.3f), topLeft = Offset(left, 0f), size = Size(maxOf(1f, (span.end - span.start) * size.width), size.height))
+    }
+}
+
+/** The time of the event the Graphs were opened from (ISSUE-NOV15.6-O100 part 4). */
+private fun DrawScope.drawFocus(fraction: Float) {
+    val x = fraction * size.width
+    drawLine(
+        Color.White.copy(alpha = 0.7f),
+        Offset(x, 0f),
+        Offset(x, size.height),
+        strokeWidth = 1.dp.toPx(),
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f))
+    )
 }
 
 private fun DrawScope.drawGraphLine(line: GraphLine, step: Float, y: (Float) -> Float) {
@@ -213,4 +271,6 @@ val GraphsIcon: ImageVector = materialIcon(name = "Filled.ShowChart") {
 
 private val GRAPH_HEIGHT = 80.dp
 private val BAND_COLOR = StatusGreen
+private val STOPPED_COLOR = Slate500
+private const val MAX_STOPS_LISTED = 3
 private const val DAY_MS = 24 * 3_600_000L

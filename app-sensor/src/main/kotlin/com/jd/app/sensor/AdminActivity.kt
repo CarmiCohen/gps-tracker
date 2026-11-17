@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import com.jd.core.ui.EVENTS_STATE_KEY
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -120,6 +122,13 @@ class AdminActivity : ComponentActivity() {
                     var showEventsOverlay by rememberSaveable { mutableStateOf(false) }
                     var showInfoOverlay by rememberSaveable { mutableStateOf(false) }
                     var showGraphsOverlay by rememberSaveable { mutableStateOf(false) }
+                    // The Events list keeps its period and selection while the Graphs of an event cover it
+                    // (ISSUE-NOV15.6-O100 part 4); closing the list forgets them.
+                    val overlayStates = rememberSaveableStateHolder()
+                    val closeEvents = {
+                        showEventsOverlay = false
+                        overlayStates.removeState(EVENTS_STATE_KEY)
+                    }
 
                     val sensorBehaviour by viewModel.sensorBehaviour.collectAsStateWithLifecycle()
 
@@ -169,17 +178,24 @@ class AdminActivity : ComponentActivity() {
                                     state = graphScreen,
                                     period = graphPeriod,
                                     onPeriod = viewModel::setGraphPeriod,
-                                    onClose = { showGraphsOverlay = false }
+                                    onClose = { showGraphsOverlay = false },
+                                    onNow = { viewModel.showGraphsAt(null) }
                                 )
                             } else if (showEventsOverlay) {
-                                BackHandler { showEventsOverlay = false }
+                                BackHandler(onBack = closeEvents)
                                 val events by viewModel.events.collectAsStateWithLifecycle()
-                                com.jd.core.ui.EventLogOverlay(
-                                    events = events,
-                                    showSource = false,
-                                    onClear = viewModel::clearEvents,
-                                    onClose = { showEventsOverlay = false }
-                                )
+                                overlayStates.SaveableStateProvider(EVENTS_STATE_KEY) {
+                                    com.jd.core.ui.EventLogOverlay(
+                                        events = events,
+                                        showSource = false,
+                                        onClear = viewModel::clearEvents,
+                                        onClose = closeEvents,
+                                        onShowGraphs = { timeMs ->
+                                            viewModel.showGraphsAt(timeMs)
+                                            showGraphsOverlay = true
+                                        }
+                                    )
+                                }
                             } else if (showAlertsOverlay) {
                                 BackHandler { showAlertsOverlay = false }
                                 // Read-only: the Monitor sets the detection settings (ISSUE-NOV10.8-O83).
@@ -238,7 +254,10 @@ class AdminActivity : ComponentActivity() {
                                     onSettingsClick = { showSettings = true },
                                     onEventsClick = { showEventsOverlay = true },
                                     onInfoClick = { showInfoOverlay = true },
-                                    onGraphsClick = { showGraphsOverlay = true },
+                                    onGraphsClick = {
+                                        viewModel.showGraphsAt(null)
+                                        showGraphsOverlay = true
+                                    },
                                     onClose = { moveTaskToBack(true) },
                                     onOpenPhoneSetup = { showPhoneSetupOverlay = true }
                                 )

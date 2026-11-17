@@ -49,15 +49,80 @@ data class GraphPanel(
     val hasData: Boolean get() = lines.any { line -> line.points.any { it != null } }
 }
 
-data class GraphSection(val title: String, val panels: List<GraphPanel>)
+/** A part of the period as shares of its width, from 0 (the start) to 1 (the end). */
+data class GraphSpan(val start: Float, val end: Float)
 
-/** The Graphs screen: the period from [startMs] to [endMs], its sections, and a [note] above them when there is one. */
+/** A section's graphs; [stoppedSpans] are the times the Sensor's service did not run, shaded in each of its graphs. */
+data class GraphSection(val title: String, val panels: List<GraphPanel>, val stoppedSpans: List<GraphSpan> = emptyList())
+
+/**
+ * A time the Sensor's service did not run, so it took no samples (ISSUE-NOV15.6-O100 part 3): from a stop event to the
+ * next start event on the Sensor's clock, or to now while [isOngoing]. [reason] is the stop event's own, as recorded.
+ */
+data class ServiceStop(val startMs: Long, val endMs: Long, val reason: String, val isOngoing: Boolean) {
+    /** The stop for the Graphs' list: its start written by [timeText], how long it lasted, and its reason. */
+    fun describe(timeText: (Long) -> String): String =
+        "${timeText(startMs)} ${if (isOngoing) "until now" else "for ${durationText(endMs - startMs)}"}: $reason"
+}
+
+/**
+ * The Graphs screen: the period from [startMs] to [endMs], its sections, and a [note] above them when there is one.
+ * [focusMs] is the event time the period is centred on (ISSUE-NOV15.6-O100 part 4), null for the period ending now;
+ * [serviceStops] are the Sensor's service stops within the period, oldest first.
+ */
 data class GraphScreenState(
     val startMs: Long = 0L,
     val endMs: Long = 0L,
     val sections: List<GraphSection> = emptyList(),
-    val note: String? = null
-)
+    val note: String? = null,
+    val focusMs: Long? = null,
+    val serviceStops: List<ServiceStop> = emptyList()
+) {
+    /** Where [focusMs] falls in the period, as a share of its width; null without one or outside the period. */
+    val focusFraction: Float?
+        get() = focusMs?.takeIf { endMs > startMs && it in startMs..endMs }?.let { (it - startMs).toFloat() / (endMs - startMs) }
+}
+
+/**
+ * The end of the period the Graphs show: now, or with a [focusMs] the end of the period centred on it, but never past
+ * now (ISSUE-NOV15.6-O100 part 4).
+ */
+fun graphPeriodEndMs(period: ViewPeriod, nowMs: Long, focusMs: Long?): Long =
+    if (focusMs == null) nowMs else minOf(nowMs, focusMs + period.durationMs / 2)
+
+/**
+ * The Sensor's service stops that overlap the period from [startMs] to [endMs] (ISSUE-NOV15.6-O100 part 3), from its
+ * [SERVICE_STOPPED] and [SERVICE_STARTED] events, oldest first: each stop lasts to the next start, or to [nowMs] when
+ * none came yet. A second stop before the next start (a clean stop that Android's exit record reported again) belongs
+ * to the first. Only the Sensor's events count, so a Monitor's own events are ignored.
+ */
+fun serviceStops(events: List<EventEntry>, startMs: Long, endMs: Long, nowMs: Long): List<ServiceStop> {
+    val stops = ArrayList<ServiceStop>()
+    var open: EventEntry? = null
+    events.filter { it.source == EventSource.SENSOR }.sortedBy { it.timestampMs }.forEach { event ->
+        when {
+            event.message.startsWith(SERVICE_STOPPED) -> if (open == null) open = event
+            event.message.startsWith(SERVICE_STARTED) -> open?.let { stop ->
+                stops += ServiceStop(stop.timestampMs, event.timestampMs, stopReason(stop.message), isOngoing = false)
+                open = null
+            }
+        }
+    }
+    open?.let { stops += ServiceStop(it.timestampMs, maxOf(nowMs, it.timestampMs), stopReason(it.message), isOngoing = true) }
+    return stops.filter { it.endMs > startMs && it.startMs < endMs }
+}
+
+/** The reason of a stop event: Android's when recorded after the fact, else a stop through the service's own end. */
+private fun stopReason(message: String): String =
+    message.removePrefix(SERVICE_STOPPED).removePrefix(":").trim().ifEmpty { "stopped on the Sensor phone" }
+
+/** The [stops] as parts of the period from [startMs] to [endMs], cut at its ends. */
+fun stoppedSpans(stops: List<ServiceStop>, startMs: Long, endMs: Long): List<GraphSpan> {
+    if (endMs <= startMs) return emptyList()
+    val width = (endMs - startMs).toFloat()
+    return stops.map { GraphSpan(((it.startMs - startMs) / width).coerceIn(0f, 1f), ((it.endMs - startMs) / width).coerceIn(0f, 1f)) }
+        .filter { it.end > it.start }
+}
 
 /** A graph has at most this many points, so a week is drawn as fast as an hour. */
 const val MAX_GRAPH_POINTS = 360
@@ -148,8 +213,14 @@ val monitorGraphSection = GraphSectionSpec(
     )
 )
 
-fun graphSection(spec: GraphSectionSpec, samples: List<GraphSample>, startMs: Long, endMs: Long, count: Int): GraphSection =
-    GraphSection(spec.title, spec.panels.map { graphPanel(it, samples, startMs, endMs, count) })
+fun graphSection(
+    spec: GraphSectionSpec,
+    samples: List<GraphSample>,
+    startMs: Long,
+    endMs: Long,
+    count: Int,
+    stoppedSpans: List<GraphSpan> = emptyList()
+): GraphSection = GraphSection(spec.title, spec.panels.map { graphPanel(it, samples, startMs, endMs, count) }, stoppedSpans)
 
 fun graphPanel(spec: GraphPanelSpec, samples: List<GraphSample>, startMs: Long, endMs: Long, count: Int): GraphPanel {
     val lines = spec.lines.map { GraphLine(it.label, it.tone, graphPoints(samples, it.field, startMs, endMs, count)) }
@@ -179,37 +250,64 @@ private fun panelSummary(spec: GraphPanelSpec, line: GraphLine): String {
     return "Newest ${text(line.points.last { it != null }!!)} · range $range"
 }
 
-/** The Sensor's own Graphs screen: the period of [period] ending [nowMs]. */
-fun sensorGraphScreen(samples: List<GraphSample>, period: ViewPeriod, nowMs: Long): GraphScreenState {
-    val startMs = nowMs - period.durationMs
+/**
+ * The Sensor's own Graphs screen: the period of [period] ending [nowMs], or centred on [focusMs]; its service stops
+ * are taken from its [events].
+ */
+fun sensorGraphScreen(
+    samples: List<GraphSample>,
+    period: ViewPeriod,
+    nowMs: Long,
+    events: List<EventEntry> = emptyList(),
+    focusMs: Long? = null
+): GraphScreenState {
+    val endMs = graphPeriodEndMs(period, nowMs, focusMs)
+    val startMs = endMs - period.durationMs
     val count = graphPointCount(period)
+    val stops = serviceStops(events, startMs, endMs, nowMs)
+    val spans = stoppedSpans(stops, startMs, endMs)
     return GraphScreenState(
         startMs = startMs,
-        endMs = nowMs,
-        sections = sensorGraphSections().map { graphSection(it, samples, startMs, nowMs, count) },
-        note = if (samples.isEmpty()) "No samples yet: the Sensor takes one a minute while its service runs" else null
+        endMs = endMs,
+        sections = sensorGraphSections().map { graphSection(it, samples, startMs, endMs, count, spans) },
+        note = if (samples.isEmpty()) "No samples yet: the Sensor takes one a minute while its service runs" else null,
+        focusMs = focusMs,
+        serviceStops = stops
     )
 }
 
 /**
- * A Monitor's Graphs screen: the paired Sensor's samples it received ([sensorSamples]), then its own connection. The
- * note tells how old the newest Sensor sample is, since the Sensor's samples arrive only while the screen is open and
- * the Sensor is online.
+ * A Monitor's Graphs screen: the paired Sensor's samples it received ([sensorSamples]), then its own connection, over
+ * the period ending [nowMs] or centred on [focusMs]. The Sensor's service stops come from its events in this phone's
+ * log ([events]), which keeps the Sensor's newest ones. The note tells how old the newest Sensor sample is, since the
+ * Sensor's samples arrive only while the screen is open and the Sensor is online.
  */
-fun monitorGraphScreen(sensorSamples: List<GraphSample>, ownSamples: List<GraphSample>, period: ViewPeriod, nowMs: Long): GraphScreenState {
-    val startMs = nowMs - period.durationMs
+fun monitorGraphScreen(
+    sensorSamples: List<GraphSample>,
+    ownSamples: List<GraphSample>,
+    period: ViewPeriod,
+    nowMs: Long,
+    events: List<EventEntry> = emptyList(),
+    focusMs: Long? = null
+): GraphScreenState {
+    val endMs = graphPeriodEndMs(period, nowMs, focusMs)
+    val startMs = endMs - period.durationMs
     val count = graphPointCount(period)
     val newestSensorMs = sensorSamples.lastOrNull()?.timeMs
+    val stops = serviceStops(events, startMs, endMs, nowMs)
+    val spans = stoppedSpans(stops, startMs, endMs)
     return GraphScreenState(
         startMs = startMs,
-        endMs = nowMs,
-        sections = sensorGraphSections("SENSOR - ").map { graphSection(it, sensorSamples, startMs, nowMs, count) } +
-            graphSection(monitorGraphSection, ownSamples, startMs, nowMs, count),
+        endMs = endMs,
+        sections = sensorGraphSections("SENSOR - ").map { graphSection(it, sensorSamples, startMs, endMs, count, spans) } +
+            graphSection(monitorGraphSection, ownSamples, startMs, endMs, count),
         note = when {
             newestSensorMs == null -> "No Sensor samples yet: they are asked for while this screen is open and the Sensor is online"
             nowMs - newestSensorMs > SENSOR_GRAPH_STALE_MS -> "Newest Sensor sample ${durationText(nowMs - newestSensorMs)} ago"
             else -> null
-        }
+        },
+        focusMs = focusMs,
+        serviceStops = stops
     )
 }
 

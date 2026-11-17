@@ -4,6 +4,8 @@ import android.app.ApplicationExitInfo
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
 import com.jd.core.shared.PastEvent
+import com.jd.core.shared.SERVICE_STARTED
+import com.jd.core.shared.SERVICE_STOPPED
 import com.jd.core.shared.SensorSetupReport
 
 /** An event to record: its level and text (ISSUE-NOV10.8-O84). */
@@ -25,9 +27,6 @@ fun relayLinkEvent(isConnected: Boolean): LoggedEvent =
 
 fun monitorLinkEvent(isOnline: Boolean): LoggedEvent =
     if (isOnline) LoggedEvent(EventLevel.INFO, "A Monitor is connected") else LoggedEvent(EventLevel.INFO, "No Monitor connected")
-
-const val SERVICE_STARTED = "Sensor service started"
-const val SERVICE_STOPPED = "Sensor service stopped"
 
 fun serviceStartedMessage(versionName: String): String = "$SERVICE_STARTED (version $versionName)"
 

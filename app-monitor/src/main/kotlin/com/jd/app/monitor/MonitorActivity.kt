@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import com.jd.core.ui.EVENTS_STATE_KEY
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -168,6 +170,7 @@ class MonitorActivity : ComponentActivity() {
                         onClearEvents = viewModel::clearEvents,
                         infoOverlay = { onClose -> MonitorInfoScreen(viewModel, onClose) },
                         graphsOverlay = { onClose -> MonitorGraphsScreen(viewModel, onClose) },
+                        onShowGraphsAt = viewModel::showGraphsAt,
                         onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
                         onUpdateSirenType = { viewModel.updateSirenType(it) },
                         onUpdateAlarmVolume = { viewModel.updateAlarmVolume(it) },
@@ -347,7 +350,9 @@ fun MonitorScreen(
     /** The detailed Info screen (ISSUE-NOV10.8-O84 part 2), given its close action. */
     infoOverlay: @Composable (onClose: () -> Unit) -> Unit = {},
     /** The Graphs screen (ISSUE-NOV10.8-O84 part 3), given its close action. */
-    graphsOverlay: @Composable (onClose: () -> Unit) -> Unit = {}
+    graphsOverlay: @Composable (onClose: () -> Unit) -> Unit = {},
+    /** Sets the time the Graphs open around: an event's, or null for now (ISSUE-NOV15.6-O100 part 4). */
+    onShowGraphsAt: (timeMs: Long?) -> Unit = {}
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
@@ -359,6 +364,13 @@ fun MonitorScreen(
     var showEventsOverlay by rememberSaveable { mutableStateOf(false) }
     var showInfoOverlay by rememberSaveable { mutableStateOf(false) }
     var showGraphsOverlay by rememberSaveable { mutableStateOf(false) }
+    // The Events list keeps its period and selection while the Graphs of an event cover it (ISSUE-NOV15.6-O100 part 4);
+    // closing the list forgets them.
+    val overlayStates = rememberSaveableStateHolder()
+    val closeEvents = {
+        showEventsOverlay = false
+        overlayStates.removeState(EVENTS_STATE_KEY)
+    }
     var showSoundOverlay by rememberSaveable { mutableStateOf(false) }
     var showPhoneSetupOverlay by rememberSaveable { mutableStateOf(false) }
     var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
@@ -439,13 +451,19 @@ fun MonitorScreen(
     }
 
     if (showEventsOverlay) {
-        BackHandler { showEventsOverlay = false }
-        com.jd.core.ui.EventLogOverlay(
-            events = events,
-            showSource = true,
-            onClear = onClearEvents,
-            onClose = { showEventsOverlay = false }
-        )
+        BackHandler(onBack = closeEvents)
+        overlayStates.SaveableStateProvider(EVENTS_STATE_KEY) {
+            com.jd.core.ui.EventLogOverlay(
+                events = events,
+                showSource = true,
+                onClear = onClearEvents,
+                onClose = closeEvents,
+                onShowGraphs = { timeMs ->
+                    onShowGraphsAt(timeMs)
+                    showGraphsOverlay = true
+                }
+            )
+        }
         return
     }
 
@@ -648,7 +666,10 @@ fun MonitorScreen(
                     onMap = { followMode = MapFollowMode.AUTO },
                     onEvents = { showEventsOverlay = true },
                     onInfo = { showInfoOverlay = true },
-                    onGraphs = { showGraphsOverlay = true },
+                    onGraphs = {
+                        onShowGraphsAt(null)
+                        showGraphsOverlay = true
+                    },
                     onClose = onClose
                 )
                 // Line 1: Local Device Status

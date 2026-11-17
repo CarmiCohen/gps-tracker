@@ -113,9 +113,29 @@ class SensorViewModel @Inject constructor(
         _graphPeriod.value = period
     }
 
-    /** The Graphs screen, rebuilt at each new sample, period and minute while it is open (ISSUE-NOV10.8-O84 part 3). */
-    val graphScreen: StateFlow<GraphScreenState> = combine(graphHistory.samples, graphPeriod, graphScreenClock()) { samples, period, now ->
-        sensorGraphScreen(samples, period, now)
+    private val graphFocus = MutableStateFlow<Long?>(null)
+
+    /**
+     * Opens the Graphs around an event's [timeMs], over the hour around it, or with null over the period ending now
+     * (ISSUE-NOV15.6-O100 part 4).
+     */
+    fun showGraphsAt(timeMs: Long?) {
+        graphFocus.value = timeMs
+        if (timeMs != null) _graphPeriod.value = ViewPeriod.HOUR
+    }
+
+    /**
+     * The Graphs screen, rebuilt at each new sample, event, period and minute while it is open (ISSUE-NOV10.8-O84 part 3);
+     * the events give the service's stops (ISSUE-NOV15.6-O100 part 3).
+     */
+    val graphScreen: StateFlow<GraphScreenState> = combine(
+        graphHistory.samples,
+        eventLog.events,
+        graphPeriod,
+        graphFocus,
+        graphScreenClock()
+    ) { samples, events, period, focus, now ->
+        sensorGraphScreen(samples, period, now, events, focus)
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), GraphScreenState())

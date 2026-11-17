@@ -44,10 +44,17 @@ import java.util.Locale
 /**
  * The menu's Events list of both apps (ISSUE-NOV10.8-O84): the [events] of the chosen period, newest first, with a
  * Details filter, Export through the share sheet, and Clear after a confirmation. [showSource] marks each event with
- * the phone it happened on, for the Monitor, whose list also holds the Sensor's events.
+ * the phone it happened on, for the Monitor, whose list also holds the Sensor's events. A selected event's details
+ * open the Graphs around its time with [onShowGraphs] (ISSUE-NOV15.6-O100 part 4).
  */
 @Composable
-fun EventLogOverlay(events: List<EventEntry>, showSource: Boolean, onClear: () -> Unit, onClose: () -> Unit) {
+fun EventLogOverlay(
+    events: List<EventEntry>,
+    showSource: Boolean,
+    onClear: () -> Unit,
+    onClose: () -> Unit,
+    onShowGraphs: (timeMs: Long) -> Unit = {}
+) {
     val context = LocalContext.current
     var period by rememberSaveable { mutableStateOf(ViewPeriod.DAY) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
@@ -127,7 +134,7 @@ fun EventLogOverlay(events: List<EventEntry>, showSource: Boolean, onClear: () -
                     }
                 }
             }
-            selected?.let { EventDetail(it, onClose = { selectedId = null }) }
+            selected?.let { EventDetail(it, onClose = { selectedId = null }, onShowGraphs = { onShowGraphs(it.timestampMs) }) }
         }
     }
     }
@@ -167,7 +174,7 @@ private fun EventRow(event: EventEntry, time: String, showSource: Boolean, isSel
 }
 
 @Composable
-private fun EventDetail(event: EventEntry, onClose: () -> Unit) {
+private fun EventDetail(event: EventEntry, onClose: () -> Unit, onShowGraphs: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.6f), contentColor = Color.White)
@@ -186,6 +193,11 @@ private fun EventDetail(event: EventEntry, onClose: () -> Unit) {
             }
             Text("${event.source.label} phone - ${event.level.name}", color = levelColor(event.level), fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Text(event.message, fontSize = 13.sp)
+            TextButton(onClick = onShowGraphs, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                Icon(GraphsIcon, contentDescription = null, tint = ViewerCyan, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Graphs at this time", color = ViewerCyan, fontSize = 12.sp)
+            }
         }
     }
 }
@@ -242,6 +254,12 @@ private fun shareEvents(context: Context, events: List<EventEntry>, period: View
         Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
     }
 }
+
+/**
+ * The key under which an app's `SaveableStateHolder` keeps the Events list's period and selection while the Graphs of
+ * an event cover it (ISSUE-NOV15.6-O100 part 4).
+ */
+const val EVENTS_STATE_KEY = "events"
 
 private const val NOW_REFRESH_MS = 30_000L
 private const val DAY_MS = 24 * 3_600_000L

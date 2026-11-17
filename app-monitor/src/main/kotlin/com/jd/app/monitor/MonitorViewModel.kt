@@ -412,6 +412,17 @@ class MonitorViewModel @Inject constructor(
         _graphPeriod.value = period
     }
 
+    private val graphFocus = MutableStateFlow<Long?>(null)
+
+    /**
+     * Opens the Graphs around an event's [timeMs], over the hour around it, or with null over the period ending now
+     * (ISSUE-NOV15.6-O100 part 4).
+     */
+    fun showGraphsAt(timeMs: Long?) {
+        graphFocus.value = timeMs
+        if (timeMs != null) _graphPeriod.value = ViewPeriod.HOUR
+    }
+
     /**
      * Asks the paired Sensor for the samples newer than the newest held, at once and every [GRAPH_REQUEST_INTERVAL_MS]
      * while collected. Emits nothing.
@@ -426,11 +437,18 @@ class MonitorViewModel @Inject constructor(
     /**
      * The Graphs screen (ISSUE-NOV10.8-O84 part 3): the Sensor's samples and this phone's own, rebuilt at each new sample,
      * period and minute while it is open; only then is the Sensor asked for its samples, so a closed screen costs no data.
+     * The Sensor's events in this phone's log give its service stops (ISSUE-NOV15.6-O100 part 3).
      */
     val graphScreen: StateFlow<GraphScreenState> = merge(
         graphRequests,
-        combine(graphs.sensor.samples, graphs.own.samples, graphPeriod, graphScreenClock()) { sensorSamples, ownSamples, period, now ->
-            monitorGraphScreen(sensorSamples, ownSamples, period, now)
+        combine(
+            graphs.sensor.samples,
+            graphs.own.samples,
+            eventLog.events,
+            combine(graphPeriod, graphFocus, ::Pair),
+            graphScreenClock()
+        ) { sensorSamples, ownSamples, events, (period, focus), now ->
+            monitorGraphScreen(sensorSamples, ownSamples, period, now, events, focus)
         }
     )
         .flowOn(Dispatchers.Default)

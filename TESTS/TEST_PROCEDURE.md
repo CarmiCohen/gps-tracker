@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov16.7 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov16.8 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -992,8 +992,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **198.1 Count (unit):** `BackfillLedgerTest`: `openRows` leaves out a hole inside a range the Sensor answered and counts a hole outside it, also for another tracker; a hole in flight or timed out stays counted.
 *   **198.2 Live (device):** with a Monitor trail holding holes the Sensor's buffer cannot fill (after a Sensor reinstall), install the debug Monitor and open it; `run-as com.jd.app.monitor tail -n 3 files/graph_history_monitor.jsonl`: the last field (Missing) falls to 0 within a minute of the answers (`adb logcat -d -s REV_Backfill:*`), where it stayed in the hundreds of thousands before.
 
+## Chapter 199 - Why A Gap, And The Graphs Of An Event (Nov16.8)
+**Status: A / L** - `GraphsTest` 10/10; 199.3 verified on the A15 (ISSUE-NOV15.6-O100 parts 3 and 4, SOT 1.439)
+*   **199.1 Stops (unit):** `GraphsTest`: a Sensor stop event lasts to the next start event, or to now while none came; a second stop before the start belongs to the first; a Monitor's own events and a start without a stop give none; only stops overlapping the period are kept; each is shaded in the Sensor's sections only, cut at the period's ends, and described as `<start> for <duration>: <reason>` or `until now`.
+*   **199.2 Event time (unit):** `GraphsTest`: with an event time the period is centred on it but never ends past now, the event's position is its share of the width, and the event's minute is drawn.
+*   **199.3 Live (device):** install the debug Sensor over the running one (a `app updated` stop); its Graphs list the stop; Events, 1 h, select the stop, `Graphs at this time`: `Now` chip, `Around the event of ...`, the stops listed; Back shows the Events list still at 1 h with the event selected; the same on the Monitor; `Now` returns to the period ending now. Read the screens with `uiautomator dump`.
+
 ---
-**Active Testing Chapters: 187 of 198**
+**Active Testing Chapters: 188 of 199**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

@@ -5,6 +5,7 @@ import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
 import com.jd.core.shared.EventSource
 import com.jd.core.shared.PastEvent
+import com.jd.core.shared.SERVICE_STOPPED
 import com.jd.core.shared.SensorFault
 import com.jd.core.shared.SensorSetupItem
 import com.jd.core.shared.SensorSetupReport

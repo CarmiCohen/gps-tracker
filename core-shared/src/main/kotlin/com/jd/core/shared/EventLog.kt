@@ -38,6 +38,13 @@ data class EventEntry(
     val message: String
 )
 
+/**
+ * The start of the Sensor's service start and stop events (ISSUE-NOV15.4-O98); the Graphs read them to explain a gap in
+ * the Sensor's samples (ISSUE-NOV15.6-O100 part 3), so they live here and not in the Sensor app.
+ */
+const val SERVICE_STARTED = "Sensor service started"
+const val SERVICE_STOPPED = "Sensor service stopped"
+
 /** An event learned after the fact, at the time it happened (ISSUE-NOV15.4-O98). */
 data class PastEvent(val level: EventLevel, val message: String, val timestampMs: Long)
 

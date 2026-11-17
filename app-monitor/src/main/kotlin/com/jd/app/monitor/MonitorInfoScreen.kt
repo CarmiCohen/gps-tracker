@@ -29,7 +29,14 @@ fun MonitorInfoScreen(viewModel: MonitorViewModel, onClose: () -> Unit) {
 fun MonitorGraphsScreen(viewModel: MonitorViewModel, onClose: () -> Unit) {
     val state by viewModel.graphScreen.collectAsStateWithLifecycle()
     val period by viewModel.graphPeriod.collectAsStateWithLifecycle()
-    com.jd.core.ui.GraphsOverlay(title = "GRAPHS", state = state, period = period, onPeriod = viewModel::setGraphPeriod, onClose = onClose)
+    com.jd.core.ui.GraphsOverlay(
+        title = "GRAPHS",
+        state = state,
+        period = period,
+        onPeriod = viewModel::setGraphPeriod,
+        onClose = onClose,
+        onNow = { viewModel.showGraphsAt(null) }
+    )
 }
 
 /**
