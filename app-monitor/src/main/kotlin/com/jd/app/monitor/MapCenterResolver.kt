@@ -2,6 +2,8 @@ package com.jd.app.monitor
 
 data class MapPosition(val lat: Double, val lng: Double)
 
+enum class MapFollowMode { TRACKER, VIEWER, AUTO, NONE }
+
 /** Trail positions in stored order, without the (0,0) rows sent before the sensor had a fix. */
 fun knownPositions(trail: List<TrailEntity>): List<MapPosition> =
     trail.filter { it.lat != 0.0 || it.lng != 0.0 }.map { MapPosition(it.lat, it.lng) }

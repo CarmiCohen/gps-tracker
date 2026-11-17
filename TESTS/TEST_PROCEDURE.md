@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.0 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.1 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1003,8 +1003,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **200.1 Version (instrumented):** `UnpairConfirmationTest.theMapShowsTheVersion`: the Monitor's map screen shows `Version: <installed versionName>`.
 *   **200.2 Live (device):** open the paired Monitor's map on the A15 (a right-to-left phone): the version is at the bottom left and a metric scale bar (for example `199 m`) at the bottom right, neither covering the other nor the map buttons; zooming changes the scale's distance. Check with a screenshot.
 
+## Chapter 201 - One Map Path (Nov17.1)
+**Status: A / L** - 852 unit tests and both builds pass without the removed classes; 201.2 verified on the A15 (SIMP-NOV17.0-S1, SIMP-NOV5.0-S1, SOT 1.441)
+*   **201.1 Build (automated):** `TESTS/run_tests.ps1 test assembleDebug assembleRelease`: passes, and no `app-monitor` source declares `OsmMap`, `MapController`, `MapOverlayManager` or `MapToolsOverlay`.
+*   **201.2 Live (device):** open the paired Monitor's map on the A15: trail, position marker, `IN`/`OUT`/`SENSOR`/`LOCAL`/`HOME`, scale and version all show as before. Check with a screenshot.
+
 ---
-**Active Testing Chapters: 189 of 200**
+**Active Testing Chapters: 190 of 201**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
