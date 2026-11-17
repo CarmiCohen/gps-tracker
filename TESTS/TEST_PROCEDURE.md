@@ -1050,8 +1050,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **208.1 Repeat run (PC):** run `TESTS/run_tests.ps1` twice with no change in between: both print the same full count (878 in Nov17.8), not only the modules that changed.
 *   **208.2 One module (PC):** `TESTS/run_tests.ps1 :core-shared:test` run twice prints the `core-shared` count both times (190 in Nov17.8).
 
+## Chapter 209 - The Sensor Shows And Obeys The Monitor's Switches From The Start (Nov17.9)
+**Status: A / L** - `SensorServiceStatusTest` passes; 209.2 and 209.3 verified on the A15 (ISSUE-NOV15.2-O97, SOT 1.448)
+*   **209.1 Text (unit):** `SensorServiceStatusTest.motionLineNamesTheKindsSwitchedOffOnTheMonitor`: one or two kinds off add `; <kinds> off on the Monitor`, all three give `Off (switched off on the Monitor)`, a stopped service stays `Off`, noise does not change the line.
+*   **209.2 Console (device):** with vibration switched off on the Monitor, the Sensor console (and its Setup dialog) shows `Tilt, Lift & Vibration: Armed (accelerometer); vibration off on the Monitor`.
+*   **209.3 Microphone (device):** with noise switched off on the Monitor, force-stop and launch the Sensor: the service starts, `Detection settings applied` is logged, the console shows `Microphone: Off (noise detection switched off on the Monitor)`, and `logcat --pid` of the Sensor has no `AudioRecord` line.
+
 ---
-**Active Testing Chapters: 197 of 208**
+**Active Testing Chapters: 198 of 209**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

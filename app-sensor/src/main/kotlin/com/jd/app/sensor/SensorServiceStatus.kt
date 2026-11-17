@@ -1,5 +1,6 @@
 package com.jd.app.sensor
 
+import com.jd.core.shared.SensorBehaviour
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -161,17 +162,27 @@ data class MotionState(
     val isVibrationArmed: Boolean = false
 )
 
-/** The motion line of the Sensor Setup dialog. */
-fun motionStatusText(state: MotionState): String {
+/** The motion kinds [behaviour] switches off on the Monitor, in the order of the line's title (ISSUE-NOV15.2-O97). */
+fun switchedOffMotionKinds(behaviour: SensorBehaviour): List<String> = listOfNotNull(
+    "tilt".takeUnless { behaviour.tiltAlert },
+    "lift".takeUnless { behaviour.liftAlert },
+    "vibration".takeUnless { behaviour.vibrationAlert }
+)
+
+/** The motion line of the Sensor Setup dialog; it names the kinds switched off on the Monitor (ISSUE-NOV15.2-O97). */
+fun motionStatusText(state: MotionState, behaviour: SensorBehaviour = SensorBehaviour()): String {
     val rest = "after the phone rests ${com.jd.core.shared.MOTION_ARM_AFTER_STILL_MS / 1000} s"
+    val off = switchedOffMotionKinds(behaviour)
+    val switchedOff = if (state.isRunning && off.size in 1..2) "; ${off.joinToString(" and ")} off on the Monitor" else ""
     return "Tilt, Lift & Vibration: " + when {
         !state.isRunning -> "Off"
+        off.size == 3 -> "Off (switched off on the Monitor)"
         state.isArmed && state.isVibrationArmed ->
             "Armed (" + (if (state.hasBarometer) "accelerometer + barometer" else "accelerometer") + ")"
         state.isArmed -> "Tilt and lift armed, vibration $rest"
         state.isVibrationArmed -> "Vibration armed, tilt and lift $rest"
         else -> "Arms $rest"
-    }
+    } + switchedOff
 }
 
 /** The microphone line of the Sensor Setup dialog. */

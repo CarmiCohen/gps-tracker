@@ -46,6 +46,7 @@ import com.jd.core.ui.getAppVersionName
 import com.jd.core.shared.SystemLogger
 import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.RelayConfig
+import com.jd.core.shared.SensorBehaviour
 import com.jd.core.network.ForensicIdentityManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
@@ -248,6 +249,7 @@ class AdminActivity : ComponentActivity() {
                                     serviceUptimeText = serviceUptimeText,
                                     microphoneState = microphoneState,
                                     motionState = motionState,
+                                    sensorBehaviour = sensorBehaviour,
                                     trackerId = trackerId,
                                     relayUrl = relayUrl,
                                     logs = logs,
@@ -540,6 +542,7 @@ fun SensorAdminConsole(
     serviceUptimeText: String,
     microphoneState: MicrophoneState,
     motionState: MotionState,
+    sensorBehaviour: SensorBehaviour,
     trackerId: String,
     relayUrl: String,
     logs: List<SystemLogger.LogEntry>, 
@@ -645,7 +648,7 @@ fun SensorAdminConsole(
                 color = if (isAllowedAllTheTime) Color(0xFF10B981) else Color(0xFFF59E0B)
             )
             Text(
-                text = motionStatusText(motionState),
+                text = motionStatusText(motionState, sensorBehaviour),
                 fontSize = 12.sp,
                 color = if (motionState.isArmed) Color(0xFF10B981) else Color(0xFFF59E0B)
             )
@@ -757,7 +760,7 @@ fun SensorAdminConsole(
                     Text(relayStatusText(hudState.isRelayConnected))
                     Text(microphoneStatusText(microphoneState))
                     Text(backgroundLocationStatusText(isAllowedAllTheTime))
-                    Text(motionStatusText(motionState))
+                    Text(motionStatusText(motionState, sensorBehaviour))
                 }
             },
             confirmButton = {

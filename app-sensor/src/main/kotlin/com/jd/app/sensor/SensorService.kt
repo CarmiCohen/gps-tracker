@@ -114,6 +114,8 @@ class SensorService : Service(), SensorEventListener {
     private val pendingAlerts = java.util.concurrent.ConcurrentLinkedQueue<PendingAlert>()
     // The Monitor's switches and limits (ISSUE-NOV10.8-O83): written by the behaviour collector, read on the sensor threads.
     @Volatile private var sensorBehaviour = SensorBehaviour()
+    // False until the stored behaviour is read, so a start does not open the microphone of a switched-off noise detection (ISSUE-NOV15.2-O97).
+    @Volatile private var isBehaviourRead = false
     // What the Monitor is told about this phone's setup (ISSUE-NOV10.8-O83 part 2); null until first read.
     private val setupReport = MutableStateFlow<SensorSetupReport?>(null)
     // Main thread only: what the last start command obtained; the noise switch can change after it.
@@ -365,7 +367,7 @@ class SensorService : Service(), SensorEventListener {
      * microphone is refused only while noise detection is on, so a switched-off microphone posts no tap-to-enable notification.
      */
     private fun applyAccess() {
-        if (!hasForegroundStart) return
+        if (!hasForegroundStart || !isBehaviourRead) return // The first read of the stored behaviour applies it.
         val isNoiseOn = sensorBehaviour.noiseAlert
         val refused = RefusedAccess(location = isLocationRefused, microphone = isNoiseOn && !hasMicrophoneType && hasMicrophonePermission())
         serviceStatus.setRefusedAccess(refused)
@@ -473,12 +475,14 @@ class SensorService : Service(), SensorEventListener {
         sensorDataStore.sensorBehaviour
             .onEach { behaviour ->
                 val previous = sensorBehaviour
+                val isFirstRead = !isBehaviourRead
                 sensorBehaviour = behaviour
+                isBehaviourRead = true
                 motionSentinel.tiltThresholdDegrees = tiltThresholdForSensitivity(behaviour.tiltSensitivity)
                 motionSentinel.vibrationThreshold = vibrationThresholdForSensitivity(behaviour.vibrationSensitivity)
                 acousticMonitor.jumpDb = noiseJumpForSensitivity(behaviour.noiseSensitivity)
                 eventLog.record(EventLevel.INFO, "Detection settings applied (rev ${behaviour.revision}): ${sensorBehaviourLines(behaviour).joinToString("; ")}")
-                if (behaviour.noiseAlert != previous.noiseAlert) withContext(Dispatchers.Main) { applyAccess() }
+                if (isFirstRead || behaviour.noiseAlert != previous.noiseAlert) withContext(Dispatchers.Main) { applyAccess() }
             }
             .launchIn(serviceScope)
     }
@@ -585,7 +589,7 @@ class SensorService : Service(), SensorEventListener {
             sensorId = selfId,
             version = getAppVersionName(this),
             serviceStartedAtMs = if (startedElapsedMs > 0L) nowMs - (nowElapsedMs - startedElapsedMs) else 0L,
-            motion = motionStatusText(motion).substringAfter(": "),
+            motion = motionStatusText(motion, sensorBehaviour).substringAfter(": "),
             isMotionArmed = motion.isArmed && motion.isVibrationArmed,
             microphone = microphoneStatusText(microphone).substringAfter(": "),
             isMicrophoneFaulty = microphone.isNoiseDetectionOff,

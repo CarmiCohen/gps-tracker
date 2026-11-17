@@ -145,6 +145,28 @@ class SensorServiceStatusTest {
         assertEquals(MotionState(), status.motion.value)
     }
 
+    /** Chapter 209 (ISSUE-NOV15.2-O97 item 1): the motion line names the kinds switched off on the Monitor. */
+    @Test
+    fun motionLineNamesTheKindsSwitchedOffOnTheMonitor() {
+        val armed = MotionState(isRunning = true, isArmed = true, isVibrationArmed = true)
+        val behaviour = com.jd.core.shared.SensorBehaviour()
+        assertEquals("Tilt, Lift & Vibration: Armed (accelerometer)", motionStatusText(armed, behaviour))
+        assertEquals(
+            "Tilt, Lift & Vibration: Armed (accelerometer); vibration off on the Monitor",
+            motionStatusText(armed, behaviour.copy(vibrationAlert = false))
+        )
+        assertEquals(
+            "Tilt, Lift & Vibration: Arms after the phone rests 30 s; tilt and lift off on the Monitor",
+            motionStatusText(MotionState(isRunning = true), behaviour.copy(tiltAlert = false, liftAlert = false))
+        )
+        val allOff = behaviour.copy(tiltAlert = false, liftAlert = false, vibrationAlert = false)
+        assertEquals("Tilt, Lift & Vibration: Off (switched off on the Monitor)", motionStatusText(armed, allOff))
+        // A stopped service says Off, whatever the switches.
+        assertEquals("Tilt, Lift & Vibration: Off", motionStatusText(MotionState(), allOff))
+        // Noise is the microphone line's, not this one's.
+        assertEquals("Tilt, Lift & Vibration: Armed (accelerometer)", motionStatusText(armed, behaviour.copy(noiseAlert = false)))
+    }
+
     @Test
     fun microphoneIsAskedForButNotRequired() {
         assertEquals(android.Manifest.permission.RECORD_AUDIO, OPTIONAL_MICROPHONE_PERMISSION)
