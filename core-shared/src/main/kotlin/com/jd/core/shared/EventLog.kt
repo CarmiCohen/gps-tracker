@@ -29,13 +29,18 @@ enum class EventSource(val label: String) { MONITOR("Monitor"), SENSOR("Sensor")
 @Serializable
 enum class EventLevel { ALARM, WARNING, INFO, DETAIL }
 
+/**
+ * One event. [trackerId] is the Sensor a Monitor received a Sensor event from (ISSUE-NOV15.6-O100 part 7, Nov17.2), so
+ * a re-paired Monitor can tell the Sensors apart; null for a phone's own events and for Sensor events received before.
+ */
 @Serializable
 data class EventEntry(
     val id: String,
     val timestampMs: Long,
     val source: EventSource,
     val level: EventLevel,
-    val message: String
+    val message: String,
+    val trackerId: String? = null
 )
 
 /**
@@ -44,6 +49,19 @@ data class EventEntry(
  */
 const val SERVICE_STARTED = "Sensor service started"
 const val SERVICE_STOPPED = "Sensor service stopped"
+
+fun EventEntry.isServiceLifecycle(): Boolean = message.startsWith(SERVICE_STARTED) || message.startsWith(SERVICE_STOPPED)
+
+/**
+ * The Sensor's service start and stop events a Monitor needs to shade the stops among the samples after [afterMs]
+ * (ISSUE-NOV15.6-O100 part 7, Nov17.2): those after the last start at or before [afterMs], oldest first. A stop learned
+ * after the fact may be dated before [afterMs], but never before the start of the run it ended.
+ */
+fun List<EventEntry>.serviceLifecycleSince(afterMs: Long): List<EventEntry> {
+    val lifecycle = filter { it.isServiceLifecycle() }.sortedBy { it.timestampMs }
+    val runStart = lifecycle.indexOfLast { it.timestampMs <= afterMs && it.message.startsWith(SERVICE_STARTED) }
+    return lifecycle.drop(runStart + 1)
+}
 
 /** An event learned after the fact, at the time it happened (ISSUE-NOV15.4-O98). */
 data class PastEvent(val level: EventLevel, val message: String, val timestampMs: Long)

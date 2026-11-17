@@ -3,8 +3,10 @@ package com.jd.core.network
 import com.jd.core.network.SignalingBatchTest.FakeSocket
 import com.jd.core.network.SignalingBatchTest.FakeSocketFactory
 import com.jd.core.shared.GraphField
+import com.jd.core.shared.GraphRequest
 import com.jd.core.shared.GraphSample
 import com.jd.core.shared.SensorBehaviour
+import com.jd.core.shared.SensorGraphBatch
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -42,7 +44,7 @@ class GraphWireTest {
     fun `requests and samples survive the round trip and other settings types do not read them`() {
         val request = JSONObject(GraphRequestWire.encode("T", 1_800_000_000_000L).toString())
         assertEquals("The relay routes by id to the Sensor's own room", "T", request.getString("id"))
-        assertEquals(1_800_000_000_000L, GraphRequestWire.afterMs(request))
+        assertEquals(GraphRequest(1_800_000_000_000L, compressed = true), GraphRequestWire.decode(request))
         assertNull(GraphSamplesWire.decode(request))
 
         val batch = JSONObject(GraphSamplesWire.encode("T", samples).toString())
@@ -51,7 +53,7 @@ class GraphWireTest {
             assertEquals("T", trackerId)
             assertEquals(samples, this.samples)
         }
-        assertNull(GraphRequestWire.afterMs(batch))
+        assertNull(GraphRequestWire.decode(batch))
         assertNull("A Sensor before Nov15.6 ignores the new types", SensorBehaviourWire.decode(request))
         assertFalse(InfoRequestWire.isRequest(request))
         assertNull(GraphSamplesWire.decode(JSONObject(SensorBehaviourWire.encode("T", SensorBehaviour()).toString())))
@@ -66,7 +68,7 @@ class GraphWireTest {
         val sensor = client(sensorSocket)
         try {
             assertFalse("Nothing can be asked before connecting", monitor.requestGraphSamples("T", 0L))
-            assertFalse("Nothing can be sent before connecting", sensor.sendGraphSamples(samples))
+            assertFalse("Nothing can be sent before connecting", sensor.sendGraphSamples(samples, compressed = true))
             monitor.connect("http://localhost", "V", "T")
             monitorSocket.simulateConnect()
             sensor.connect("http://localhost", "T", "T")
@@ -77,9 +79,9 @@ class GraphWireTest {
             val request = monitorSocket.emittedEvents.single { it.first == "settings_update" }.second as JSONObject
             val heard = async(start = CoroutineStart.UNDISPATCHED) { sensor.graphRequestFlow.first() }
             sensorSocket.relay("settings_relay", request)
-            assertEquals(1_800_000_000_000L, heard.await())
+            assertEquals(GraphRequest(1_800_000_000_000L, compressed = true), heard.await())
 
-            assertTrue(sensor.sendGraphSamples(samples))
+            assertTrue(sensor.sendGraphSamples(samples, compressed = true))
             val answer = sensorSocket.emittedEvents.single { it.first == "settings_update" }.second as JSONObject
             val received = async(start = CoroutineStart.UNDISPATCHED) { monitor.graphSamplesFlow.first() }
             monitorSocket.relay("settings_relay", answer)
@@ -91,5 +93,24 @@ class GraphWireTest {
             monitor.disconnect()
             sensor.disconnect()
         }
+    }
+
+    // Chapter 202 (ISSUE-NOV15.6-O100 part 1, Nov17.2): the answer is compressed for the Monitors that ask for it.
+
+    @Test
+    fun `a compressed answer carries the same samples, and the older forms still work both ways`() {
+        val compressed = JSONObject(GraphSamplesWire.encode("T", samples, compressed = true).toString())
+        assertFalse("Not also sent plain", compressed.has("samples"))
+        assertEquals(SensorGraphBatch("T", samples), GraphSamplesWire.decode(compressed))
+
+        val plain = JSONObject(GraphSamplesWire.encode("T", samples).toString())
+        assertFalse(plain.has("gz"))
+        assertEquals("A Sensor before Nov17.2 answers plain", SensorGraphBatch("T", samples), GraphSamplesWire.decode(plain))
+
+        val older = JSONObject().put("id", "T").put("type", "graph_request").put("after", 5L)
+        assertEquals("A Monitor before Nov17.2 gets the plain form", GraphRequest(5L, compressed = false), GraphRequestWire.decode(older))
+
+        val broken = JSONObject().put("id", "T").put("type", "graph_samples").put("gz", "not gzip")
+        assertTrue("A malformed compressed text gives no samples", GraphSamplesWire.decode(broken)!!.samples.isEmpty())
     }
 }

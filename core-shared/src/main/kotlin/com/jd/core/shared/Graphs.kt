@@ -94,12 +94,16 @@ fun graphPeriodEndMs(period: ViewPeriod, nowMs: Long, focusMs: Long?): Long =
  * The Sensor's service stops that overlap the period from [startMs] to [endMs] (ISSUE-NOV15.6-O100 part 3), from its
  * [SERVICE_STOPPED] and [SERVICE_STARTED] events, oldest first: each stop lasts to the next start, or to [nowMs] when
  * none came yet. A second stop before the next start (a clean stop that Android's exit record reported again) belongs
- * to the first. Only the Sensor's events count, so a Monitor's own events are ignored.
+ * to the first. Only the Sensor's events count, so a Monitor's own events are ignored; with a [trackerId] (a Monitor's
+ * paired Sensor) the events received from another Sensor are ignored too (ISSUE-NOV15.6-O100 part 7, Nov17.2).
  */
-fun serviceStops(events: List<EventEntry>, startMs: Long, endMs: Long, nowMs: Long): List<ServiceStop> {
+fun serviceStops(events: List<EventEntry>, startMs: Long, endMs: Long, nowMs: Long, trackerId: String? = null): List<ServiceStop> {
     val stops = ArrayList<ServiceStop>()
     var open: EventEntry? = null
-    events.filter { it.source == EventSource.SENSOR }.sortedBy { it.timestampMs }.forEach { event ->
+    val sensorEvents = events.filter {
+        it.source == EventSource.SENSOR && (trackerId == null || it.trackerId == null || it.trackerId == trackerId)
+    }
+    sensorEvents.sortedBy { it.timestampMs }.forEach { event ->
         when {
             event.message.startsWith(SERVICE_STOPPED) -> if (open == null) open = event
             event.message.startsWith(SERVICE_STARTED) -> open?.let { stop ->
@@ -278,8 +282,9 @@ fun sensorGraphScreen(
 
 /**
  * A Monitor's Graphs screen: the paired Sensor's samples it received ([sensorSamples]), then its own connection, over
- * the period ending [nowMs] or centred on [focusMs]. The Sensor's service stops come from its events in this phone's
- * log ([events]), which keeps the Sensor's newest ones. The note tells how old the newest Sensor sample is, since the
+ * the period ending [nowMs] or centred on [focusMs]. The Sensor's service stops come from the events in this phone's
+ * log ([events]) received from the paired Sensor [trackerId]: its newest ones, and with each answer of samples the
+ * starts and stops among them (ISSUE-NOV15.6-O100 part 7). The note tells how old the newest Sensor sample is, since the
  * Sensor's samples arrive only while the screen is open and the Sensor is online.
  */
 fun monitorGraphScreen(
@@ -288,13 +293,14 @@ fun monitorGraphScreen(
     period: ViewPeriod,
     nowMs: Long,
     events: List<EventEntry> = emptyList(),
-    focusMs: Long? = null
+    focusMs: Long? = null,
+    trackerId: String? = null
 ): GraphScreenState {
     val endMs = graphPeriodEndMs(period, nowMs, focusMs)
     val startMs = endMs - period.durationMs
     val count = graphPointCount(period)
     val newestSensorMs = sensorSamples.lastOrNull()?.timeMs
-    val stops = serviceStops(events, startMs, endMs, nowMs)
+    val stops = serviceStops(events, startMs, endMs, nowMs, trackerId)
     val spans = stoppedSpans(stops, startMs, endMs)
     return GraphScreenState(
         startMs = startMs,

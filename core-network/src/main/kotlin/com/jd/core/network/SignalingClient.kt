@@ -3,6 +3,7 @@ package com.jd.core.network
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.EventEntry
+import com.jd.core.shared.GraphRequest
 import com.jd.core.shared.GraphSample
 import com.jd.core.shared.SensorGraphBatch
 import com.jd.core.shared.SensorEventBatch
@@ -161,9 +162,9 @@ interface SignalingClient {
 
     /**
      * Sensor: each time a Monitor's Graphs screen asks for the samples newer than the given time on the Sensor's clock
-     * (ISSUE-NOV10.8-O84 part 3).
+     * (ISSUE-NOV10.8-O84 part 3), and whether it reads the compressed answer (ISSUE-NOV15.6-O100 part 1).
      */
-    val graphRequestFlow: Flow<Long>
+    val graphRequestFlow: Flow<GraphRequest>
 
     /**
      * Monitor: asks the tracker [targetId] for its samples newer than [afterMs], the newest the Monitor holds, while the
@@ -176,7 +177,8 @@ interface SignalingClient {
 
     /**
      * Sensor: sends [samples] to the Monitors of its room, at most [com.jd.core.shared.GRAPH_SAMPLES_PER_MESSAGE] a call
-     * (ISSUE-NOV10.8-O84 part 3). Returns false when not connected.
+     * (ISSUE-NOV10.8-O84 part 3), [compressed] when the asking Monitor reads that form (ISSUE-NOV15.6-O100 part 1).
+     * Returns false when not connected.
      */
-    suspend fun sendGraphSamples(samples: List<GraphSample>): Boolean
+    suspend fun sendGraphSamples(samples: List<GraphSample>, compressed: Boolean): Boolean
 }

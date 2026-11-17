@@ -20,8 +20,12 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.Base64
 import java.util.concurrent.Executors
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 import kotlin.math.pow
 import kotlin.math.roundToLong
 
@@ -135,6 +139,27 @@ fun decodeGraphSamples(text: String): List<GraphSample> = runCatching {
     Json.parseToJsonElement(text).jsonArray.mapNotNull { GraphSample.fromJson(it) }
 }.getOrDefault(emptyList())
 
+/**
+ * [encodeGraphSamples]' text gzipped, in Base64 (ISSUE-NOV15.6-O100 part 1, Nov17.2): about a fifth of the plain text,
+ * since samples repeat their form and most values minute to minute (on the A15 gzip took 68.8 KB to 9.7 KB).
+ */
+fun encodeGraphSamplesCompressed(samples: List<GraphSample>): String {
+    val bytes = ByteArrayOutputStream()
+    GZIPOutputStream(bytes).use { it.write(encodeGraphSamples(samples).toByteArray(Charsets.UTF_8)) }
+    return Base64.getEncoder().encodeToString(bytes.toByteArray())
+}
+
+/** Reads [encodeGraphSamplesCompressed]' text; a malformed text gives none. */
+fun decodeGraphSamplesCompressed(text: String): List<GraphSample> = runCatching {
+    GZIPInputStream(Base64.getDecoder().decode(text).inputStream()).use { String(it.readBytes(), Charsets.UTF_8) }
+}.map(::decodeGraphSamples).getOrDefault(emptyList())
+
+/**
+ * A Monitor's ask for the Sensor's samples after [afterMs] on the Sensor's clock (ISSUE-NOV10.8-O84 part 3); with
+ * [compressed] (Monitors since Nov17.2) it reads them in [encodeGraphSamplesCompressed]' form.
+ */
+data class GraphRequest(val afterMs: Long, val compressed: Boolean)
+
 /** The Sensor's samples as the Monitor receives them (ISSUE-NOV10.8-O84 part 3). */
 data class SensorGraphBatch(val trackerId: String, val samples: List<GraphSample>)
 
@@ -144,7 +169,10 @@ const val GRAPH_SAMPLE_INTERVAL_MS = 60_000L
 /** A Monitor's Graphs screen asks the Sensor for its newer samples this often while it is open. */
 const val GRAPH_REQUEST_INTERVAL_MS = 60_000L
 
-/** The most samples (12 hours) in one message: a week's first sync takes 14 messages of about 60 KB each. */
+/**
+ * The most samples (12 hours) in one message: a week's first sync takes 14 messages of about 60 KB each, or about 10 KB
+ * each compressed (ISSUE-NOV15.6-O100 part 1).
+ */
 const val GRAPH_SAMPLES_PER_MESSAGE = 720
 
 /** The wall-clock time of the next whole minute after [nowMs]. */

@@ -170,4 +170,40 @@ class GraphsTest {
         assertEquals(focusMs, monitorGraphScreen(emptyList(), emptyList(), ViewPeriod.HOUR, nowMs, focusMs = focusMs).focusMs)
         assertNull(sensorGraphScreen(emptyList(), ViewPeriod.HOUR, nowMs).focusFraction)
     }
+
+    // Chapter 202 (ISSUE-NOV15.6-O100 part 7, Nov17.2): only the paired Sensor's stops, and all of them in its samples.
+
+    @Test
+    fun `a re-paired Monitor shades only the paired Sensor's stops`() {
+        val events = listOf(
+            event(50, "$SERVICE_STOPPED: app crashed").copy(trackerId = "OLD"),
+            event(45, "$SERVICE_STARTED (version Nov17.1)").copy(trackerId = "OLD"),
+            event(30, "$SERVICE_STOPPED: app updated").copy(trackerId = "T"),
+            event(25, "$SERVICE_STARTED (version Nov17.2)").copy(trackerId = "T"),
+            event(15, "$SERVICE_STOPPED: received before Nov17.2"), // Not marked: still counted.
+            event(10, "$SERVICE_STARTED (version Nov17.2)")
+        )
+        val periodStart = nowMs - 3_600_000L
+        assertEquals(listOf("app updated", "received before Nov17.2"), serviceStops(events, periodStart, nowMs, nowMs, "T").map { it.reason })
+        assertEquals("Unpaired, or on the Sensor itself: every stop", 3, serviceStops(events, periodStart, nowMs, nowMs).size)
+        val screen = monitorGraphScreen(emptyList(), emptyList(), ViewPeriod.HOUR, nowMs, events, trackerId = "T")
+        assertEquals(listOf("app updated", "received before Nov17.2"), screen.serviceStops.map { it.reason })
+    }
+
+    @Test
+    fun `the Sensor sends the starts and stops among the samples asked for`() {
+        val events = listOf(
+            event(300, "$SERVICE_STARTED (version Nov17.0)"),
+            event(290, "Relay connected"),
+            event(200, "$SERVICE_STARTED (version Nov17.1)"),
+            event(120, "$SERVICE_STOPPED: reason unknown (after this, exact time unknown)"), // Learned at the next start.
+            event(60, "$SERVICE_STARTED (version Nov17.2)"),
+            event(30, "Relay connected")
+        )
+        fun ages(afterAgeMinutes: Int) = events.serviceLifecycleSince(nowMs - afterAgeMinutes * minute).map { (nowMs - it.timestampMs) / minute }
+        assertEquals("A first sync: every start and stop", listOf(300L, 200L, 120L, 60L), events.serviceLifecycleSince(0L).map { (nowMs - it.timestampMs) / minute })
+        assertEquals("The run going on at the newest sample held, then its stop dated before that sample", listOf(120L, 60L), ages(100))
+        assertEquals(listOf(120L, 60L), ages(150))
+        assertTrue("Nothing while the run that began before the request goes on", ages(50).isEmpty())
+    }
 }

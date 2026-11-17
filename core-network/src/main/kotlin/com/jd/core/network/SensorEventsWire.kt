@@ -32,15 +32,17 @@ internal object SensorEventsWire {
     }
 
     /**
-     * Returns null for another settings type or a malformed payload. Every event is the Sensor's; a level this version
-     * does not know, sent by a newer Sensor, is shown as INFO.
+     * Returns null for another settings type or a malformed payload. Every event is the Sensor's, marked with its ID so a
+     * re-paired Monitor can tell the Sensors apart (ISSUE-NOV15.6-O100 part 7); a level this version does not know,
+     * sent by a newer Sensor, is shown as INFO.
      */
     fun decode(data: JSONObject): SensorEventBatch? {
         if (data.optString("type") != TYPE) return null
         return try {
             val array = data.getJSONArray("events")
+            val trackerId = data.getString("id")
             SensorEventBatch(
-                trackerId = data.getString("id"),
+                trackerId = trackerId,
                 events = (0 until array.length()).map { index ->
                     val event = array.getJSONObject(index)
                     EventEntry(
@@ -48,7 +50,8 @@ internal object SensorEventsWire {
                         timestampMs = event.getLong("t"),
                         source = EventSource.SENSOR,
                         level = EventLevel.entries.find { it.name == event.getString("l") } ?: EventLevel.INFO,
-                        message = event.getString("m")
+                        message = event.getString("m"),
+                        trackerId = trackerId
                     )
                 }
             )

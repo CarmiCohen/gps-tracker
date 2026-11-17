@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.1 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.2 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1008,8 +1008,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **201.1 Build (automated):** `TESTS/run_tests.ps1 test assembleDebug assembleRelease`: passes, and no `app-monitor` source declares `OsmMap`, `MapController`, `MapOverlayManager` or `MapToolsOverlay`.
 *   **201.2 Live (device):** open the paired Monitor's map on the A15: trail, position marker, `IN`/`OUT`/`SENSOR`/`LOCAL`/`HOME`, scale and version all show as before. Check with a screenshot.
 
+## Chapter 202 - A Smaller Graph Sync, And Only The Paired Sensor's Stops (Nov17.2)
+**Status: A / L** - `GraphWireTest`, `GraphHistoryTest`, `GraphsTest`, `SensorEventsWireTest` pass; 202.4 verified on the A15 (ISSUE-NOV15.6-O100 parts 1 and 7, SOT 1.442)
+*   **202.1 Compressed answer (unit):** `GraphWireTest`: a Monitor's request asks for the compressed form; the compressed answer carries the same samples and no plain copy; a request without `gz` (a Monitor before Nov17.2) is answered plain, and a plain answer is still read; a malformed compressed text gives no samples.
+*   **202.2 Week size (unit):** `GraphHistoryTest`: a week of samples in 14 messages compressed is under a third of the plain text and reads back the same.
+*   **202.3 Stops (unit):** `GraphsTest`: with the paired Sensor's ID, stops marked with another Sensor are not shaded, unmarked ones are; the Sensor sends every start and stop on a first sync, those after the run going on at the newest sample held (with its stop dated before it) later, and none while that run goes on. `SensorEventsWireTest`: received events are marked with the Sensor's ID.
+*   **202.4 Live (device):** install both debug apps over the running ones, open the Monitor's Graphs: `REV_SensorGraphs` logs `samples sent (compressed)` with a count of start and stop events; the Monitor lists the Sensor's stops. Read the screen with `uiautomator dump`.
+
 ---
-**Active Testing Chapters: 190 of 201**
+**Active Testing Chapters: 191 of 202**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

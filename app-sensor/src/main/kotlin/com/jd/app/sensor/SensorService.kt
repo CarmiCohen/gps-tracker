@@ -645,12 +645,19 @@ class SensorService : Service(), SensorEventListener {
             }
             .launchIn(serviceScope)
         signalingClient.graphRequestFlow
-            .onEach { afterMs ->
-                val newer = graphHistory.samples.value.filter { it.timeMs > afterMs }
+            .onEach { request ->
+                val newer = graphHistory.samples.value.filter { it.timeMs > request.afterMs }
                 for (chunk in newer.chunked(GRAPH_SAMPLES_PER_MESSAGE)) {
-                    if (!signalingClient.sendGraphSamples(chunk)) break
+                    if (!signalingClient.sendGraphSamples(chunk, request.compressed)) break
                 }
-                SystemLogger.i("SensorGraphs", "Graph request after $afterMs: ${newer.size} samples sent")
+                // The starts and stops among these samples, also those older than the newest events a Monitor has
+                // (ISSUE-NOV15.6-O100 part 7); usually none, as the run that began before the request goes on.
+                val lifecycle = eventLog.events.value.serviceLifecycleSince(request.afterMs)
+                for (chunk in lifecycle.chunked(EventLog.PEER_EVENTS_SENT)) {
+                    if (!signalingClient.sendSensorEvents(chunk)) break
+                }
+                val form = if (request.compressed) "compressed" else "plain"
+                SystemLogger.i("SensorGraphs", "Graph request after ${request.afterMs}: ${newer.size} samples sent ($form), ${lifecycle.size} start and stop events")
             }
             .launchIn(serviceScope)
     }

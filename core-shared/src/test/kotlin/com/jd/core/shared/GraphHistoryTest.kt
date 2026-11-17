@@ -73,6 +73,38 @@ class GraphHistoryTest {
         assertTrue("A message of 12 hours stays far below the relay's 1 MB: ${oneMessage.length}", oneMessage.length < 100_000)
     }
 
+    // Chapter 202 (ISSUE-NOV15.6-O100 part 1, Nov17.2): a Monitor's first sync of a week, compressed.
+
+    @Test
+    fun `a week of samples compressed is a small part of the plain text and reads back the same`() {
+        val random = kotlin.random.Random(17)
+        var battery = 100.0
+        var temperature = 31.0
+        val week = List((GraphHistory.RETENTION_MS / GRAPH_SAMPLE_INTERVAL_MS).toInt()) { minute ->
+            battery = (battery - random.nextDouble(0.0, 0.02)).coerceAtLeast(5.0)
+            temperature = (temperature + random.nextDouble(-0.1, 0.1)).coerceIn(25.0, 40.0)
+            GraphSample.of(
+                1_800_000_000_000L + minute * GRAPH_SAMPLE_INTERVAL_MS,
+                mapOf(
+                    GraphField.VIBRATION_G to random.nextDouble(0.01, 0.05), GraphField.VIBRATION_LIMIT_G to 0.13,
+                    GraphField.TILT_DEG to random.nextDouble(0.0, 0.5), GraphField.TILT_LIMIT_DEG to 15.0,
+                    GraphField.NOISE_DBFS to random.nextDouble(-75.0, -45.0), GraphField.ACCURACY_M to random.nextDouble(10.0, 16.0),
+                    GraphField.SATS_USED to random.nextInt(20, 27), GraphField.SATS_IN_VIEW to random.nextInt(50, 56),
+                    GraphField.SIGNAL_DBHZ to random.nextDouble(24.0, 27.0), GraphField.LINK_UP_PERCENT to 100,
+                    GraphField.LATENCY_MS to random.nextInt(200, 500), GraphField.QUEUED_ROWS to 0,
+                    GraphField.BATTERY_PERCENT to battery, GraphField.CHARGING to 0, GraphField.TEMPERATURE_C to temperature
+                )
+            )
+        }
+        val messages = week.chunked(GRAPH_SAMPLES_PER_MESSAGE)
+        val plain = messages.sumOf { encodeGraphSamples(it).length }
+        val compressed = messages.sumOf { encodeGraphSamplesCompressed(it).length }
+        println("A week of ${week.size} samples in ${messages.size} messages: plain $plain, compressed $compressed characters")
+        assertTrue("Compressed $compressed of plain $plain", compressed * 3 < plain)
+        assertEquals(week, messages.flatMap { decodeGraphSamplesCompressed(encodeGraphSamplesCompressed(it)) })
+        assertTrue(decodeGraphSamplesCompressed("not Base64!").isEmpty())
+    }
+
     @Test
     fun `samples are kept across a restart and a minute is kept once`() = runTest {
         val history = history()

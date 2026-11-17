@@ -33,6 +33,9 @@ class SensorEventsWireTest {
         EventEntry("S2", 1_800_000_001_000L, EventSource.SENSOR, EventLevel.INFO, "Relay connected")
     )
 
+    /** As the Monitor keeps them: marked with the Sensor they came from (ISSUE-NOV15.6-O100 part 7, Nov17.2). */
+    private val received = events.map { it.copy(trackerId = "T") }
+
     private fun TestScope.client(socket: FakeSocket) =
         SocketioSignalingClient(FakeSocketFactory(socket), StandardTestDispatcher(testScheduler))
 
@@ -41,7 +44,7 @@ class SensorEventsWireTest {
         val wire = SensorEventsWire.encode("T", events)
         assertEquals("The relay routes by id to the Sensor's own room", "T", wire.getString("id"))
         assertEquals("sensor_events", wire.getString("type"))
-        assertEquals(SensorEventBatch("T", events), SensorEventsWire.decode(JSONObject(wire.toString())))
+        assertEquals(SensorEventBatch("T", received), SensorEventsWire.decode(JSONObject(wire.toString())))
     }
 
     @Test
@@ -67,8 +70,8 @@ class SensorEventsWireTest {
         val sensor = client(sensorSocket)
         val monitorSocket = FakeSocket()
         val monitor = client(monitorSocket)
-        val received = mutableListOf<SensorEventBatch>()
-        val collecting = launch(UnconfinedTestDispatcher(testScheduler)) { monitor.sensorEventsFlow.collect { received.add(it) } }
+        val batches = mutableListOf<SensorEventBatch>()
+        val collecting = launch(UnconfinedTestDispatcher(testScheduler)) { monitor.sensorEventsFlow.collect { batches.add(it) } }
         try {
             assertFalse("Nothing can be sent before connecting", sensor.sendSensorEvents(events))
             sensor.connect("http://localhost", "T", "T")
@@ -81,7 +84,7 @@ class SensorEventsWireTest {
             monitorSocket.simulateConnect()
             runCurrent()
             monitorSocket.listeners["settings_relay"]!!.forEach { it.call(JSONObject(sent.toString())) }
-            assertEquals(listOf(SensorEventBatch("T", events)), received)
+            assertEquals(listOf(SensorEventBatch("T", received)), batches)
         } finally {
             collecting.cancel()
             sensor.disconnect()

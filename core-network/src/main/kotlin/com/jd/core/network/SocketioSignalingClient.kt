@@ -3,6 +3,7 @@ package com.jd.core.network
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.EventEntry
+import com.jd.core.shared.GraphRequest
 import com.jd.core.shared.GraphSample
 import com.jd.core.shared.SensorGraphBatch
 import com.jd.core.shared.SensorEventBatch
@@ -92,8 +93,8 @@ class SocketioSignalingClient @Inject constructor(
     private val _sensorInfoFlow = MutableStateFlow<ReceivedSensorInfo?>(null)
     override val sensorInfoFlow: StateFlow<ReceivedSensorInfo?> = _sensorInfoFlow.asStateFlow()
 
-    private val _graphRequestFlow = MutableSharedFlow<Long>(extraBufferCapacity = 4)
-    override val graphRequestFlow: SharedFlow<Long> = _graphRequestFlow.asSharedFlow()
+    private val _graphRequestFlow = MutableSharedFlow<GraphRequest>(extraBufferCapacity = 4)
+    override val graphRequestFlow: SharedFlow<GraphRequest> = _graphRequestFlow.asSharedFlow()
 
     // A week's first sync arrives as 14 messages at once; tryEmit drops what does not fit, which the next request asks for again.
     private val _graphSamplesFlow = MutableSharedFlow<SensorGraphBatch>(extraBufferCapacity = 32)
@@ -234,7 +235,7 @@ class SocketioSignalingClient @Inject constructor(
                 SensorEventsWire.decode(data)?.let { _sensorEventsFlow.tryEmit(it) }
                 SensorInfoWire.decode(data)?.let { _sensorInfoFlow.value = ReceivedSensorInfo(it, System.currentTimeMillis()) }
                 if (InfoRequestWire.isRequest(data)) _infoRequestFlow.tryEmit(InfoRequestWire.wantsSatellites(data))
-                GraphRequestWire.afterMs(data)?.let { _graphRequestFlow.tryEmit(it) }
+                GraphRequestWire.decode(data)?.let { _graphRequestFlow.tryEmit(it) }
                 GraphSamplesWire.decode(data)?.let { _graphSamplesFlow.tryEmit(it) }
             }
 
@@ -542,10 +543,10 @@ class SocketioSignalingClient @Inject constructor(
         return true
     }
 
-    override suspend fun sendGraphSamples(samples: List<GraphSample>): Boolean {
+    override suspend fun sendGraphSamples(samples: List<GraphSample>, compressed: Boolean): Boolean {
         val deviceId = currentDeviceId ?: return false
         if (!_isConnected.value) return false
-        val payload = GraphSamplesWire.encode(deviceId, samples)
+        val payload = GraphSamplesWire.encode(deviceId, samples, compressed)
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true

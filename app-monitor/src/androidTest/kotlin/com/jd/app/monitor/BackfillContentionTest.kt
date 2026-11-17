@@ -257,10 +257,10 @@ class FakeSignalingClient : SignalingClient {
     override suspend fun requestSensorInfo(targetId: String, withSatellites: Boolean): Boolean = true
     override val sensorInfoFlow: StateFlow<com.jd.core.shared.ReceivedSensorInfo?> = MutableStateFlow(null)
     override suspend fun sendSensorInfo(info: com.jd.core.shared.SensorInfo): Boolean = true
-    override val graphRequestFlow: Flow<Long> = MutableSharedFlow()
+    override val graphRequestFlow: Flow<com.jd.core.shared.GraphRequest> = MutableSharedFlow()
     override suspend fun requestGraphSamples(targetId: String, afterMs: Long): Boolean = true
     override val graphSamplesFlow: Flow<com.jd.core.shared.SensorGraphBatch> = MutableSharedFlow()
-    override suspend fun sendGraphSamples(samples: List<com.jd.core.shared.GraphSample>): Boolean = true
+    override suspend fun sendGraphSamples(samples: List<com.jd.core.shared.GraphSample>, compressed: Boolean): Boolean = true
 
     fun emitTelemetry(update: LocationUpdate) {
         _telemetryFlow.tryEmit(update)

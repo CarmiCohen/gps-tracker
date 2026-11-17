@@ -437,18 +437,18 @@ class MonitorViewModel @Inject constructor(
     /**
      * The Graphs screen (ISSUE-NOV10.8-O84 part 3): the Sensor's samples and this phone's own, rebuilt at each new sample,
      * period and minute while it is open; only then is the Sensor asked for its samples, so a closed screen costs no data.
-     * The Sensor's events in this phone's log give its service stops (ISSUE-NOV15.6-O100 part 3).
+     * The paired Sensor's events in this phone's log give its service stops (ISSUE-NOV15.6-O100 parts 3 and 7).
      */
     val graphScreen: StateFlow<GraphScreenState> = merge(
         graphRequests,
         combine(
             graphs.sensor.samples,
             graphs.own.samples,
-            eventLog.events,
+            combine(eventLog.events, identityManager.targetId, ::Pair),
             combine(graphPeriod, graphFocus, ::Pair),
             graphScreenClock()
-        ) { sensorSamples, ownSamples, events, (period, focus), now ->
-            monitorGraphScreen(sensorSamples, ownSamples, period, now, events, focus)
+        ) { sensorSamples, ownSamples, (events, trackerId), (period, focus), now ->
+            monitorGraphScreen(sensorSamples, ownSamples, period, now, events, focus, trackerId)
         }
     )
         .flowOn(Dispatchers.Default)
