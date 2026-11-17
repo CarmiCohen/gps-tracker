@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.11 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.12-debounce - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1062,8 +1062,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **210.2 Events log (unit):** `MonitorEventsTest`: a state alarm that ends unacknowledged records `Alarm: ...` then `Ended: ...`, and leaves nothing to acknowledge.
 *   **210.3 Live (device):** unplug the Sensor phone's charger: the Monitor sounds `Tracker power disconnected`; plug it back in without acknowledging: within one row the siren, the red screen and the alarm notification end, and the Events log shows the alarm and its end.
 
+## Chapter 211 - The Sensor Debounces Its Event Alerts (Nov17.12-debounce)
+**Status: A** - `MotionSentinelTest`, `AcousticDetectorTest`, `AlertCoolDownTest`, `SensorBehaviourTest` pass; 211.2 waits for a person at the A15 (ISSUE-NOV17.10-O111, SOT 1.450)
+*   **211.1 Detectors (unit):** `MotionSentinelTest`: fewer than 3 hits, hits spread wider than 10 s, the samples of one knock, and a steady buzz do not alert, 3 knocks within 10 s alert once (`3 hits in 2.4 s, strongest ...`); hits during the phone's own ringing do not count; a tilt set back within 2 s does not alert, one held longer does; a phone raised 32 cm and set straight back down is no lift, one held up is. `AcousticDetectorTest`: a bang shorter than 1 s does not alert, 1 s of loud frames (with gaps, within 2 s) alerts, a long noise alerts once, a new noise after quiet alerts again. `AlertCoolDownTest`: the same kind passes once per 60 s, a held-back alert does not extend the wait, other kinds are not held back.
+*   **211.2 Live (device, H):** on the resting, armed A15 (vibration, tilt, lift, noise on): one knock on the table and a door slam raise nothing; three knocks within 10 s, a tilt held 3 s, a pickup held in the hand, and a 2 s shout each raise one alert; a second tilt within a minute gives only the Events line `... not sent, the same kind alerted less than 60 s ago`.
+
 ---
-**Active Testing Chapters: 199 of 210**
+**Active Testing Chapters: 200 of 211**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

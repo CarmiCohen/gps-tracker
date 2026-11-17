@@ -13,21 +13,28 @@ import kotlin.math.sqrt
  * The background follows quiet frames within about a second and loud frames only over about ten seconds, so a
  * noise that goes on (a TV, rain) becomes background instead of raising alerts again and again.
  *
+ * A noise alerts only when it is loud for [ACOUSTIC_CONFIRM_MS] within [ACOUSTIC_CONFIRM_WINDOW_MS], measured against
+ * the background at its first loud frame (ISSUE-NOV17.10-O111: a door slam or a dropped spoon is no intruder). After
+ * an alert the level must fall below the limit before a new noise counts, so one noise raises one alert; the time
+ * between alerts is the Sensor's per-kind cool-down ([AlertCoolDown]), which replaced a lockout here.
+ *
  * Feed one level per audio frame of about [ACOUSTIC_FRAME_MS], timed by a monotonic clock. Not thread-safe: one
  * audio thread owns it.
  */
 class AcousticDetector(
     @Volatile var jumpDb: Double = ACOUSTIC_JUMP_DB,
     private val minAlertDbfs: Double = ACOUSTIC_MIN_ALERT_DBFS,
-    private val warmUpMs: Long = ACOUSTIC_WARM_UP_MS,
-    private val lockoutMs: Long = ACOUSTIC_LOCKOUT_MS
+    private val warmUpMs: Long = ACOUSTIC_WARM_UP_MS
 ) {
     /** The learned background level, or null before the first frame. */
     var floorDbfs: Double? = null
         private set
 
     private var startMs = 0L
-    private var lastAlertMs: Long? = null
+    private var loudSinceMs: Long? = null // The first loud frame of the noise being confirmed.
+    private var loudReference = 0.0 // The background at that frame.
+    private var loudFrames = 0
+    private var needsQuiet = false // After an alert, until the level falls below the limit.
 
     /** Returns true when [levelDbfs] at [nowMs] is an alert. */
     fun onLevel(levelDbfs: Double, nowMs: Long): Boolean {
@@ -38,11 +45,7 @@ class AcousticDetector(
             return false
         }
         val isWarmingUp = nowMs - startMs < warmUpMs
-        val isAlert = !isWarmingUp &&
-            levelDbfs - floor >= jumpDb &&
-            levelDbfs >= minAlertDbfs &&
-            lastAlertMs.let { it == null || nowMs - it >= lockoutMs }
-        if (isAlert) lastAlertMs = nowMs
+        val isAlert = !isWarmingUp && confirm(levelDbfs, floor, nowMs)
         val alpha = when {
             isWarmingUp -> WARM_UP_ALPHA
             levelDbfs < floor -> FALL_ALPHA
@@ -50,6 +53,28 @@ class AcousticDetector(
         }
         floorDbfs = floor + alpha * (levelDbfs - floor)
         return isAlert
+    }
+
+    private fun isLoud(levelDbfs: Double, reference: Double) = levelDbfs - reference >= jumpDb && levelDbfs >= minAlertDbfs
+
+    /** True when this frame completes [ACOUSTIC_CONFIRM_MS] of loud frames within [ACOUSTIC_CONFIRM_WINDOW_MS]. */
+    private fun confirm(levelDbfs: Double, floor: Double, nowMs: Long): Boolean {
+        if (needsQuiet) {
+            if (!isLoud(levelDbfs, floor)) needsQuiet = false
+            return false
+        }
+        if (loudSinceMs?.let { nowMs - it >= ACOUSTIC_CONFIRM_WINDOW_MS } == true) loudSinceMs = null // Too short: a new start.
+        if (loudSinceMs == null) {
+            if (!isLoud(levelDbfs, floor)) return false
+            loudSinceMs = nowMs
+            loudReference = floor
+            loudFrames = 0
+        }
+        if (isLoud(levelDbfs, loudReference)) loudFrames++
+        if (loudFrames * ACOUSTIC_FRAME_MS < ACOUSTIC_CONFIRM_MS) return false
+        loudSinceMs = null
+        needsQuiet = true
+        return true
     }
 
     private companion object {
@@ -82,8 +107,11 @@ const val ACOUSTIC_MIN_ALERT_DBFS = -50.0
 /** No alerts while the background is first learned. */
 const val ACOUSTIC_WARM_UP_MS = 3_000L
 
-/** One noise raises one alert: the next can follow only this much later. */
-const val ACOUSTIC_LOCKOUT_MS = 10_000L
+/** How long a noise must be loud to alert (ISSUE-NOV17.10-O111); its loud frames may have gaps, like speech. */
+const val ACOUSTIC_CONFIRM_MS = 1_000L
+
+/** The loud frames of [ACOUSTIC_CONFIRM_MS] must fall within this time from the first one. */
+const val ACOUSTIC_CONFIRM_WINDOW_MS = 2_000L
 
 /** The length of one audio frame the detector is fed. */
 const val ACOUSTIC_FRAME_MS = 100L

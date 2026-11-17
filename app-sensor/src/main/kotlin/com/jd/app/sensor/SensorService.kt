@@ -112,6 +112,8 @@ class SensorService : Service(), SensorEventListener {
     @Volatile private var geofenceChanged = false
     // Noise, tilt, and lift found on their own threads, each sent by a following sensing tick with the current position.
     private val pendingAlerts = java.util.concurrent.ConcurrentLinkedQueue<PendingAlert>()
+    // One alert per kind a minute, after each detector's own debouncing (ISSUE-NOV17.10-O111).
+    private val alertCoolDown = AlertCoolDown()
     // The Monitor's switches and limits (ISSUE-NOV10.8-O83): written by the behaviour collector, read on the sensor threads.
     @Volatile private var sensorBehaviour = SensorBehaviour()
     // False until the stored behaviour is read, so a start does not open the microphone of a switched-off noise detection (ISSUE-NOV15.2-O97).
@@ -432,6 +434,10 @@ class SensorService : Service(), SensorEventListener {
 
     private fun queueAlert(status: String, logLine: String) {
         if (!sensorBehaviour.allows(status)) return // Switched off on the Monitor (ISSUE-NOV10.8-O83).
+        if (!alertCoolDown.tryPass(status, SystemClock.elapsedRealtime())) {
+            eventLog.record(EventLevel.DETAIL, "$logLine: not sent, the same kind alerted less than ${ALERT_COOL_DOWN_MS / 1000} s ago")
+            return
+        }
         pendingAlerts.add(PendingAlert(status, logLine))
         orchestrator.preemptLoop("sensing_loop") // Sent now, not after up to 10 s of a slow sampling interval.
     }

@@ -17,13 +17,16 @@ import kotlin.math.sqrt
  * - **Tilt**: the gravity direction differs from the reference by at least [tiltThresholdDegrees] for [TILT_CONFIRM_MS].
  * - **Lift (accelerometer)**: from the first motion after arming, the acceleration along the current gravity direction,
  *   minus the resting gravity, is integrated twice over at most [LIFT_WINDOW_MS]; a height of [LIFT_MIN_HEIGHT_M]
- *   alerts. Following the gravity direction keeps a turning phone right, a sideways push adds nothing to first order,
- *   and subtracting the resting magnitude cancels the sensor's own offset.
+ *   held for [LIFT_HOLD_MS] alerts (ISSUE-NOV17.10-O111: a rise that falls back is no lift). Following the gravity
+ *   direction keeps a turning phone right, a sideways push adds nothing to first order, and subtracting the resting
+ *   magnitude cancels the sensor's own offset.
  * - **Lift (barometer)**: the smoothed pressure moves at least [LIFT_BARO_MIN_M] of height away from a reference that
  *   follows slowly (so weather does not count), for [BARO_CONFIRM_MS].
- * - **Vibration**: one sample differs from the estimated gravity by at least [vibrationThreshold] (a knock, a shove, a
- *   shake). It arms after the same rest but on its own ([isVibrationArmed]): a vibration alert does not disarm tilt and
- *   lift, so a rough pickup gives both, and switching one alarm off on the Monitor never hides the other.
+ * - **Vibration**: [VIBRATION_HITS] hits within [VIBRATION_HIT_WINDOW_MS] (ISSUE-NOV17.10-O111: a single knock on the
+ *   table is no intruder); a hit is a rise of the sample's distance from the estimated gravity to [vibrationThreshold]
+ *   or more (a knock, a shove, a shake), [VIBRATION_HIT_GAP_MS] or more after the previous hit. It arms after the same rest but
+ *   on its own ([isVibrationArmed]): a vibration alert does not disarm tilt and lift, so a rough pickup gives both, and
+ *   switching one alarm off on the Monitor never hides the other.
  * - **Own vibration**: while the phone itself rings or vibrates ([isOwnVibrationActive]) and [OWN_VIBRATION_TAIL_MS]
  *   after, no vibration alerts and vibration stays armed (ISSUE-NOV9.2-O62). A vibration alert is held for
  *   [VIBRATION_HOLD_MS] and dropped if the phone's own vibration is reported meanwhile, since the motor may start a
@@ -77,6 +80,8 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
     private var ownVibrationSeenMs: Long? = null
     private var heldVibration: Alert? = null
     private var heldVibrationSinceMs = 0L
+    private val vibrationHits = ArrayDeque<Pair<Long, Double>>() // Time and size of each hit within the window.
+    private var wasOverVibrationLimit = false // The previous sample's; a hit starts with a rise over the limit.
 
     private var refX = 0.0
     private var refY = 0.0
@@ -88,6 +93,7 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
     private var liftVelocity = 0.0
     private var liftHeight = 0.0
     private var liftQuietSinceMs: Long? = null
+    private var liftHeldSinceMs: Long? = null
 
     @Volatile private var pressureSmoothed: Double? = null
     private var pressureReference: Double? = null
@@ -143,16 +149,35 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
         return listOfNotNull(vibrationAlert, tiltOrLift(x, y, z, nowMs, dt, isMoving, hasRested))
     }
 
-    /** A vibration alert, held [VIBRATION_HOLD_MS] first; none while the phone's own motor runs (ISSUE-NOV9.2-O62). */
+    /**
+     * A vibration alert after [VIBRATION_HITS] hits (ISSUE-NOV17.10-O111), held [VIBRATION_HOLD_MS] first; none while the
+     * phone's own motor runs (ISSUE-NOV9.2-O62).
+     */
     private fun checkVibration(vibration: Double, nowMs: Long): Alert? {
+        val isOverLimit = vibration >= vibrationThreshold
+        val wasOverLimit = wasOverVibrationLimit
+        wasOverVibrationLimit = isOverLimit
         if (isOwnVibrationActive) ownVibrationSeenMs = nowMs
         if (ownVibrationSeenMs?.let { nowMs - it <= OWN_VIBRATION_TAIL_MS } == true) {
             heldVibration = null // Its own ringing, not a knock: vibration stays armed.
+            vibrationHits.clear()
             return null
         }
-        if (heldVibration == null && isVibrationArmed && vibration >= vibrationThreshold) {
-            heldVibration = Alert(Kind.VIBRATION, "${"%.2f".format(java.util.Locale.US, vibration / STANDARD_GRAVITY)} g (limit ${"%.2f".format(java.util.Locale.US, vibrationThreshold / STANDARD_GRAVITY)} g)")
-            heldVibrationSinceMs = nowMs
+        while (vibrationHits.isNotEmpty() && nowMs - vibrationHits.first().first > VIBRATION_HIT_WINDOW_MS) vibrationHits.removeFirst()
+        // A rise over the limit, not a lasting deviation (a turn, a pickup), and not the ringing of the last hit.
+        val isNewHit = isOverLimit && !wasOverLimit && vibrationHits.lastOrNull()?.let { nowMs - it.first >= VIBRATION_HIT_GAP_MS } != false
+        if (heldVibration == null && isVibrationArmed && isNewHit) {
+            vibrationHits.addLast(nowMs to vibration)
+            if (vibrationHits.size >= VIBRATION_HITS) {
+                val strongest = vibrationHits.maxOf { it.second }
+                val spanS = (nowMs - vibrationHits.first().first) / 1000.0
+                heldVibration = Alert(
+                    Kind.VIBRATION,
+                    "${vibrationHits.size} hits in ${"%.1f".format(java.util.Locale.US, spanS)} s, strongest ${"%.2f".format(java.util.Locale.US, strongest / STANDARD_GRAVITY)} g (limit ${"%.2f".format(java.util.Locale.US, vibrationThreshold / STANDARD_GRAVITY)} g)"
+                )
+                heldVibrationSinceMs = nowMs
+                vibrationHits.clear()
+            }
         }
         val held = heldVibration ?: return null
         if (nowMs - heldVibrationSinceMs < VIBRATION_HOLD_MS) return null
@@ -183,6 +208,7 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
             liftVelocity = 0.0
             liftHeight = 0.0
             liftQuietSinceMs = null
+            liftHeldSinceMs = null
         }
         val start = liftStartMs ?: return null
         val gravityLength = norm(gx, gy, gz).coerceAtLeast(1.0) // Only near free fall could it be smaller.
@@ -190,8 +216,14 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
         liftVelocity += upward * dt
         liftHeight += liftVelocity * dt
         if (liftHeight >= LIFT_MIN_HEIGHT_M) {
-            return disarm(nowMs, Alert(Kind.LIFT, "accelerometer, about ${(liftHeight * 100).toInt()} cm up"))
+            // Held up, moving or not: the integration goes on until the hold ends (ISSUE-NOV17.10-O111).
+            val heldSince = liftHeldSinceMs ?: nowMs.also { liftHeldSinceMs = it }
+            if (nowMs - heldSince >= LIFT_HOLD_MS) {
+                return disarm(nowMs, Alert(Kind.LIFT, "accelerometer, about ${(liftHeight * 100).toInt()} cm up for ${LIFT_HOLD_MS / 1000.0} s"))
+            }
+            return null
         }
+        liftHeldSinceMs = null // Fell back below the height: put down again, or a rebound.
         liftQuietSinceMs = if (isMoving) null else liftQuietSinceMs ?: nowMs
         val settled = liftQuietSinceMs?.let { nowMs - it >= LIFT_SETTLE_MS } == true
         if (settled || nowMs - start >= LIFT_WINDOW_MS) liftStartMs = null
@@ -237,6 +269,7 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
         refMagnitude = norm(gx, gy, gz)
         tiltSinceMs = null
         liftStartMs = null
+        liftHeldSinceMs = null
         pressureReference = pressureSmoothed
         baroSinceMs = null
     }
@@ -247,6 +280,7 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
         lastMotionMs = nowMs
         tiltSinceMs = null
         liftStartMs = null
+        liftHeldSinceMs = null
         pressureReference = null
         baroSinceMs = null
         return alert
@@ -282,8 +316,11 @@ const val MOTION_ARM_AFTER_STILL_MS = 30_000L
 /** Above this distance from the estimated gravity (m/s²), a sample is motion. */
 const val STILL_MAX_DEVIATION = 0.35
 
-/** A tilt must last this long, so a knock that shakes the gravity estimate does not count. */
-const val TILT_CONFIRM_MS = 500L
+/**
+ * A tilt must last this long, so a knock that shakes the gravity estimate, or a phone tipped and set back, does not
+ * count (0.5 s until ISSUE-NOV17.10-O111).
+ */
+const val TILT_CONFIRM_MS = 2_000L
 
 /** The height the accelerometer must see the phone rise. */
 const val LIFT_MIN_HEIGHT_M = 0.20
@@ -291,8 +328,11 @@ const val LIFT_MIN_HEIGHT_M = 0.20
 /** The longest accelerometer integration; longer, its error grows too much. */
 const val LIFT_WINDOW_MS = 3_000L
 
-/** An integration ends when the phone has been still this long. */
+/** An integration ends when the phone has been still this long, unless it is held up ([LIFT_HOLD_MS]). */
 const val LIFT_SETTLE_MS = 300L
+
+/** The phone must stay [LIFT_MIN_HEIGHT_M] up this long to be a lift (ISSUE-NOV17.10-O111). */
+const val LIFT_HOLD_MS = 1_000L
 
 const val STANDARD_GRAVITY = 9.80665
 
@@ -300,6 +340,17 @@ const val DEFAULT_VIBRATION_SENSITIVITY = 0.5f
 
 /** A vibration alert waits this long, so the phone's own ringing reported a little late still cancels it. */
 const val VIBRATION_HOLD_MS = 200L
+
+/**
+ * The hits within [VIBRATION_HIT_WINDOW_MS] that make a vibration alert (ISSUE-NOV17.10-O111): on the A15 resting on a
+ * desk, single hits over the 0.13 g default came about once in 20 to 60 minutes, each alone.
+ */
+const val VIBRATION_HITS = 3
+
+const val VIBRATION_HIT_WINDOW_MS = 10_000L
+
+/** Samples over the limit closer than this to the last hit belong to it: one knock rings for a few samples. */
+const val VIBRATION_HIT_GAP_MS = 300L
 
 /** Vibration stays ignored this long after the phone's own ringing or notification ends (the motor runs down). */
 const val OWN_VIBRATION_TAIL_MS = 1_000L
