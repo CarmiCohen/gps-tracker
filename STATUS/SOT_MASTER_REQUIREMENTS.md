@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Nov17.3)
+# SOT Master Requirements & Hardening Status (Nov17.4)
 
 ## 🏗️ Architectural Master Rules (517 Rules)
 

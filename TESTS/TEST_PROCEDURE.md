@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.3 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.4 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -999,9 +999,9 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **199.3 Live (device):** install the debug Sensor over the running one (a `app updated` stop); its Graphs list the stop; Events, 1 h, select the stop, `Graphs at this time`: `Now` chip, `Around the event of ...`, the stops listed; Back shows the Events list still at 1 h with the event selected; the same on the Monitor; `Now` returns to the period ending now. Read the screens with `uiautomator dump`.
 
 ## Chapter 200 - Scale And Version On The Map (Nov17.0)
-**Status: A / L** - `UnpairConfirmationTest` 11/11 on the A15; 200.2 verified on the A15 (ISSUE-NOV17.0-O101, SOT 1.440)
+**Status: A / L** - `UnpairConfirmationTest` 11/11 on the A15; 200.2 verified on the A15 and, in the Nov17.4 Two-phone test, on the S21FE (ISSUE-NOV17.0-O101, SOT 1.440)
 *   **200.1 Version (instrumented):** `UnpairConfirmationTest.theMapShowsTheVersion`: the Monitor's map screen shows `Version: <installed versionName>`.
-*   **200.2 Live (device):** open the paired Monitor's map on the A15 (a right-to-left phone): the version is at the bottom left and a metric scale bar (for example `199 m`) at the bottom right, neither covering the other nor the map buttons; zooming changes the scale's distance. Check with a screenshot.
+*   **200.2 Live (device):** open the paired Monitor's map on the Monitor phone (the S21FE in a Two-phone test, otherwise the A15; both right to left), after checking that the installed `versionName` is the current version: the version is at the bottom left and a metric scale bar (for example `199 m`) at the bottom right, neither covering the other nor the map buttons; zooming changes the scale's distance. Check with a screenshot.
 
 ## Chapter 201 - One Map Path (Nov17.1)
 **Status: A / L** - 852 unit tests and both builds pass without the removed classes; 201.2 verified on the A15 (SIMP-NOV17.0-S1, SIMP-NOV5.0-S1, SOT 1.441)
