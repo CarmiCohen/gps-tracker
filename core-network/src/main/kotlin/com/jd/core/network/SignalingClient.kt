@@ -119,10 +119,20 @@ interface SignalingClient {
     val sensorEventsFlow: Flow<SensorEventBatch>
 
     /**
-     * Sensor: sends its newest [events] to the Monitors of its room (ISSUE-NOV10.8-O84). Returns false when not
-     * connected; the caller sends again once a Monitor is reachable.
+     * Sensor: sends [events] to the Monitors of its room (ISSUE-NOV10.8-O84); [completeAfterMs], when set, says they are
+     * all its peer events newer than it (ISSUE-NOV15.4-O98 part 4). Returns false when not connected; the caller sends
+     * again once a Monitor is reachable.
      */
-    suspend fun sendSensorEvents(events: List<EventEntry>): Boolean
+    suspend fun sendSensorEvents(events: List<EventEntry>, completeAfterMs: Long? = null): Boolean
+
+    /** Sensor: each time a Monitor asks for the peer events newer than the given time on the Sensor's clock (ISSUE-NOV15.4-O98 part 4). */
+    val eventsRequestFlow: Flow<Long>
+
+    /**
+     * Monitor: asks the tracker [targetId] for its peer events newer than [afterMs], the time up to which this Monitor
+     * has them all (ISSUE-NOV15.4-O98 part 4). Returns false when not connected.
+     */
+    suspend fun requestSensorEvents(targetId: String, afterMs: Long): Boolean
 
     /**
      * Monitor: gives the relay this phone's push [token], now and after every reconnection, so the paired tracker's

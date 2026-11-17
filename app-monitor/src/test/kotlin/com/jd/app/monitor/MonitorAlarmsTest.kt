@@ -352,6 +352,28 @@ class MonitorAlarmsTest {
         watch.job.cancel()
     }
 
+    /** ISSUE-NOV15.4-O98 part 2: the book tells whether the tracker is heard also with every alarm muted. */
+    @Test
+    fun theTrackerIsKnownOnlineOrOfflineAlsoWhenMuted() = runBlocking {
+        val watch = Watch(this)
+        watch.settings.emit(AlertSettings(globalMute = true))
+        watch.ready()
+        watch.ticks.emit(Unit)
+        assertEquals("Not heard yet", null, watch.awaitBook { true }.isTrackerOnline)
+
+        watch.telemetry.emit(charging("T", time = 2))
+        watch.awaitBook { it.isTrackerOnline == true }
+
+        watch.now += TRACKER_PRESENT_MS
+        watch.ticks.emit(Unit)
+        val offline = watch.awaitBook { it.isTrackerOnline == false }
+        assertEquals("Muted: no alarm", emptyList<Alarm>(), offline.alarms)
+
+        watch.target.value = "NEW"
+        assertEquals("A new pairing starts unheard", null, watch.awaitBook { it.isTrackerOnline == null }.isTrackerOnline)
+        watch.job.cancel()
+    }
+
     @Test
     fun onlyThePairedTrackerRaisesAlarms() = runBlocking {
         val watch = Watch(this)

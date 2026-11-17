@@ -48,6 +48,20 @@ class SensorEventsWireTest {
     }
 
     @Test
+    fun `the time the events are complete after, and the request for missed events, survive the round trip (O98 part 4)`() {
+        val wire = JSONObject(SensorEventsWire.encode("T", events, completeAfterMs = 1_799_999_999_000L).toString())
+        assertEquals(SensorEventBatch("T", received, 1_799_999_999_000L), SensorEventsWire.decode(wire))
+        assertEquals("0 means complete from the start", 0L, SensorEventsWire.decode(JSONObject(SensorEventsWire.encode("T", events, 0L).toString()))?.completeAfterMs)
+
+        val request = JSONObject(EventsRequestWire.encode("T", 1_800_000_000_000L).toString())
+        assertEquals("T", request.getString("id"))
+        assertEquals(1_800_000_000_000L, EventsRequestWire.decode(request))
+        assertNull("A request is not events", SensorEventsWire.decode(request))
+        assertNull("Events are not a request", EventsRequestWire.decode(wire))
+        assertNull(GraphRequestWire.decode(request))
+    }
+
+    @Test
     fun `other settings types are not read as events, nor events as a setup report`() {
         val eventsWire = JSONObject(SensorEventsWire.encode("T", events).toString())
         assertNull(SensorSetupWire.decode(eventsWire))

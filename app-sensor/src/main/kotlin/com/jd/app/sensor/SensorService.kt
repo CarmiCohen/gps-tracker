@@ -523,15 +523,25 @@ class SensorService : Service(), SensorEventListener {
         signalingClient.isConnected.linkChanges().onEach { record(relayLinkEvent(it)) }.launchIn(serviceScope)
         signalingClient.viewerStatusFlow.linkChanges().onEach { record(monitorLinkEvent(it)) }.launchIn(serviceScope)
         signalingClient.viewerStatusFlow.onEach { isMonitorOnline = it }.launchIn(serviceScope)
-        peerDeliveries(eventLog.events.map { it.newestForPeer() }.filter { it.isNotEmpty() }, signalingClient.viewerStatusFlow)
+        peerDeliveries(eventLog.events.map { it.newestForPeer() }.filter { it.events.isNotEmpty() }, signalingClient.viewerStatusFlow)
             .onEach(::sendEvents)
+            .launchIn(serviceScope)
+        // A Monitor that finds it missed events asks for all after the newest it has them up to (ISSUE-NOV15.4-O98 part 4).
+        signalingClient.eventsRequestFlow
+            .onEach { afterMs ->
+                val chunks = eventLog.events.value.peerEventsAfter(afterMs)
+                for (chunk in chunks) {
+                    if (!signalingClient.sendSensorEvents(chunk.events, chunk.afterMs)) break
+                }
+                SystemLogger.i("SensorEvents", "Events request after $afterMs: ${chunks.sumOf { it.events.size }} events in ${chunks.size} messages")
+            }
             .launchIn(serviceScope)
     }
 
-    private suspend fun sendEvents(events: List<EventEntry>) {
-        if (events.isEmpty()) return
-        val sent = signalingClient.sendSensorEvents(events)
-        SystemLogger.i("SensorEvents", "${events.size} newest events sent: $sent")
+    private suspend fun sendEvents(newest: PeerEvents) {
+        if (newest.events.isEmpty()) return
+        val sent = signalingClient.sendSensorEvents(newest.events, newest.afterMs)
+        SystemLogger.i("SensorEvents", "${newest.events.size} newest events sent: $sent")
     }
 
     private fun record(event: LoggedEvent) = eventLog.record(event.level, event.message)

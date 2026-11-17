@@ -11,14 +11,16 @@ import timber.log.Timber
 /**
  * Wire form of the Sensor's newest events inside the relay's generic settings_update / settings_relay event
  * (ISSUE-NOV10.8-O84), so the relay needs no change and an older Monitor ignores it. It travels from the Sensor to the
- * Monitors of its room; `id` is the Sensor's own ID.
+ * Monitors of its room; `id` is the Sensor's own ID. `after`, when present, says the events are all the Sensor's peer
+ * events newer than it (ISSUE-NOV15.4-O98 part 4); a Monitor before Nov17.5 ignores it.
  */
 internal object SensorEventsWire {
     const val TYPE = "sensor_events"
 
-    fun encode(sensorId: String, events: List<EventEntry>): JSONObject = JSONObject().apply {
+    fun encode(sensorId: String, events: List<EventEntry>, completeAfterMs: Long? = null): JSONObject = JSONObject().apply {
         put("id", sensorId)
         put("type", TYPE)
+        completeAfterMs?.let { put("after", it) }
         put("events", JSONArray().apply {
             events.forEach { event ->
                 put(JSONObject().apply {
@@ -53,11 +55,30 @@ internal object SensorEventsWire {
                         message = event.getString("m"),
                         trackerId = trackerId
                     )
-                }
+                },
+                completeAfterMs = if (data.has("after")) data.getLong("after") else null
             )
         } catch (e: Exception) {
             Timber.e(e, "Failed to parse sensor_events settings_relay")
             null
         }
     }
+}
+
+/**
+ * A Monitor asking the Sensor of room `id` for its peer events newer than `after`, on the Sensor's clock, when it finds
+ * it missed some (ISSUE-NOV15.4-O98 part 4). It rides settings_update like the graph request, so the relay needs no
+ * change and a Sensor before Nov17.5 ignores it.
+ */
+internal object EventsRequestWire {
+    const val TYPE = "events_request"
+
+    fun encode(targetId: String, afterMs: Long): JSONObject = JSONObject().apply {
+        put("id", targetId)
+        put("type", TYPE)
+        put("after", afterMs)
+    }
+
+    /** The time asked after, or null for another settings type. */
+    fun decode(data: JSONObject): Long? = if (data.optString("type") == TYPE) data.optLong("after", 0L) else null
 }

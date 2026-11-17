@@ -58,7 +58,9 @@ class SignalingClientTest {
             override val sensorSetupFlow = kotlinx.coroutines.flow.MutableStateFlow<com.jd.core.shared.SensorSetupReport?>(null)
             override suspend fun sendSensorSetup(report: com.jd.core.shared.SensorSetupReport) = true
             override val sensorEventsFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.SensorEventBatch>()
-            override suspend fun sendSensorEvents(events: List<com.jd.core.shared.EventEntry>) = true
+            override suspend fun sendSensorEvents(events: List<com.jd.core.shared.EventEntry>, completeAfterMs: Long?) = true
+            override val eventsRequestFlow = kotlinx.coroutines.flow.emptyFlow<Long>()
+            override suspend fun requestSensorEvents(targetId: String, afterMs: Long) = true
             override fun registerPushToken(token: String) = Unit
             override val linkStats = kotlinx.coroutines.flow.MutableStateFlow(com.jd.core.shared.LinkStats())
             override fun queuedRowCount() = 0

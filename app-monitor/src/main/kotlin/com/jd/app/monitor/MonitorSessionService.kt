@@ -11,6 +11,7 @@ import com.jd.core.network.peerDeliveries
 import com.jd.core.shared.EventLog
 import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.LinkStats
+import com.jd.core.shared.PeerEventCatchUp
 import com.jd.core.shared.graphSampleTimes
 import com.jd.core.shared.linkUpPercent
 import com.jd.core.shared.linkChanges
@@ -103,9 +104,20 @@ class MonitorSessionService : Service() {
                 }
             }
 
-            // The Monitor's events list also holds the paired Sensor's events (ISSUE-NOV10.8-O84).
+            // The Monitor's events list also holds the paired Sensor's events (ISSUE-NOV10.8-O84); those it missed while
+            // offline it asks for, however many (ISSUE-NOV15.4-O98 part 4).
             launch {
-                signalingClient.sensorEventsFlow.filter { it.trackerId == targetId }.collect { eventLog.merge(it.events) }
+                var catchUp: PeerEventCatchUp? = null
+                signalingClient.sensorEventsFlow.filter { it.trackerId == targetId }.collect { batch ->
+                    // Read before the first batch merges, so its newest events do not hide the ones missed before them.
+                    val sync = catchUp
+                        ?: PeerEventCatchUp(PeerEventCatchUp.syncedFrom(eventLog.events.value, targetId), System::currentTimeMillis).also { catchUp = it }
+                    eventLog.merge(batch.events)
+                    sync.received(batch)?.let { afterMs ->
+                        val sent = signalingClient.requestSensorEvents(targetId, afterMs)
+                        SystemLogger.i("MonitorService", "Sensor events missed: asked for those after $afterMs: $sent")
+                    }
+                }
             }
             launch {
                 signalingClient.isConnected.linkChanges().collect { relayLinkEvent(it).let { event -> eventLog.record(event.level, event.message) } }

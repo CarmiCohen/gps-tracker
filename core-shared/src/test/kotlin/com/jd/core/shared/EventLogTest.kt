@@ -176,10 +176,59 @@ class EventLogTest {
     fun `the Sensor sends its newest events without details`() {
         val events = (1..EventLog.PEER_EVENTS_SENT + 5).map { event("e$it", ageMs = 1_000L * (100 - it)) } +
             event("detail", ageMs = 0, level = EventLevel.DETAIL)
-        val sent = events.newestForPeer()
+        val newest = events.newestForPeer()
+        val sent = newest.events
         assertEquals(EventLog.PEER_EVENTS_SENT, sent.size)
         assertEquals("e${EventLog.PEER_EVENTS_SENT + 5}", sent.last().id)
         assertTrue(sent.none { it.level == EventLevel.DETAIL })
+        assertEquals("Complete after the newest one left out", events.single { it.id == "e5" }.timestampMs, newest.afterMs)
+        assertEquals("Nothing left out: complete from the start", 0L, events.take(3).newestForPeer().afterMs)
+    }
+
+    @Test
+    fun `a request is answered with every event after, in chunks without holes (O98 part 4)`() {
+        val events = (1..2 * EventLog.PEER_EVENTS_SENT + 10).map { event("e$it", ageMs = 1_000_000L - 1_000L * it) } +
+            event("detail", ageMs = 0, level = EventLevel.DETAIL)
+        val after = events[4].timestampMs
+        val chunks = events.peerEventsAfter(after)
+        assertEquals(listOf(EventLog.PEER_EVENTS_SENT, EventLog.PEER_EVENTS_SENT, 5), chunks.map { it.events.size })
+        assertEquals("e6", chunks.first().events.first().id)
+        assertEquals(after, chunks[0].afterMs)
+        assertEquals(chunks[0].events.last().timestampMs, chunks[1].afterMs)
+        assertEquals(chunks[1].events.last().timestampMs, chunks[2].afterMs)
+        assertTrue(chunks.flatMap { it.events }.none { it.level == EventLevel.DETAIL })
+        assertEquals(emptyList<PeerEvents>(), events.peerEventsAfter(nowMs))
+    }
+
+    @Test
+    fun `a Monitor asks for the events it missed, once per retry time (O98 part 4)`() {
+        var clockMs = 0L
+        val catchUp = PeerEventCatchUp(syncedMs = 100L, clock = { clockMs })
+        fun batch(after: Long?, vararg times: Long) =
+            SensorEventBatch("T", times.map { EventEntry("s$it", it, EventSource.SENSOR, EventLevel.INFO, "m", "T") }, after)
+
+        assertEquals("Contiguous: moves on", null, catchUp.received(batch(90L, 95L, 120L)))
+        assertEquals("A hole after 120", 120L, catchUp.received(batch(200L, 210L)))
+        clockMs += 1_000
+        assertEquals("Asked already", null, catchUp.received(batch(210L, 220L)))
+        assertEquals("Start and stop events say nothing", null, catchUp.received(batch(null, 500L)))
+        assertEquals("The answer's first chunk", null, catchUp.received(batch(120L, 150L, 200L)))
+        assertEquals("The answer's second chunk", null, catchUp.received(batch(200L, 210L, 220L)))
+        assertEquals("Now the live batch fits", null, catchUp.received(batch(210L, 220L, 230L)))
+        assertEquals(null, catchUp.received(batch(300L, 310L)))
+        clockMs += PeerEventCatchUp.RETRY_MS
+        assertEquals("An answer cut short: asked again after the retry time", 230L, catchUp.received(batch(300L, 320L)))
+    }
+
+    @Test
+    fun `a Monitor starts from the newest event it keeps of its Sensor`() {
+        val events = listOf(
+            EventEntry("a", 10L, EventSource.SENSOR, EventLevel.INFO, "m", "T"),
+            EventEntry("b", 20L, EventSource.SENSOR, EventLevel.INFO, "m", "OTHER"),
+            EventEntry("c", 30L, EventSource.MONITOR, EventLevel.INFO, "m")
+        )
+        assertEquals(10L, PeerEventCatchUp.syncedFrom(events, "T"))
+        assertEquals(0L, PeerEventCatchUp.syncedFrom(events, "NEW"))
     }
 
     @Test

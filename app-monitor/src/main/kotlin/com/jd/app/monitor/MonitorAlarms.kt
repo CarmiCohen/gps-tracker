@@ -175,8 +175,11 @@ data class Alarm(
  * Every raised alarm. An alarm is raised when its condition starts to hold, and stays until it is acknowledged,
  * even if its condition clears first. An acknowledged alarm is raised again only after its condition has cleared.
  * A switched-off or muted alarm is dropped at once.
+ *
+ * [isTrackerOnline] tells whether the tracker is heard, whatever the alarm settings, so the Events log records its
+ * going offline and returning also with the alarm muted (ISSUE-NOV15.4-O98 part 2); null until it is first heard.
  */
-data class AlarmBook(val alarms: List<Alarm> = emptyList()) {
+data class AlarmBook(val alarms: List<Alarm> = emptyList(), val isTrackerOnline: Boolean? = null) {
     val conditions: Set<AlarmType> get() = alarms.filter { it.isActive }.mapTo(mutableSetOf()) { it.type }
     val pending: List<Alarm> get() = alarms.filter { !it.isAcknowledged }
     val needsSiren: Boolean get() = pending.isNotEmpty()
@@ -193,10 +196,10 @@ data class AlarmBook(val alarms: List<Alarm> = emptyList()) {
         val raised = (allowed - kept.mapTo(mutableSetOf()) { it.type })
             .sortedBy { it.ordinal }
             .map { Alarm(it, nowMs, isActive = true, isAcknowledged = false) }
-        return AlarmBook(kept + raised)
+        return copy(alarms = kept + raised)
     }
 
-    fun acknowledge(): AlarmBook = AlarmBook(alarms.filter { it.isActive }.map { it.copy(isAcknowledged = true) })
+    fun acknowledge(): AlarmBook = copy(alarms = alarms.filter { it.isActive }.map { it.copy(isAcknowledged = true) })
 }
 
 /** Emits once a second, so a tracker that goes silent is noticed without new telemetry. */
@@ -269,25 +272,21 @@ fun alarmBooks(
         }
         val alertSettings = next.settings ?: return@scan next
         val nowMs = clock()
-        next.copy(
-            book = next.book.update(
-                alarmConditions(
-                    next.reading,
-                    watchingSinceMs,
-                    nowMs,
-                    next.book.conditions,
-                    isRelayConnected = next.isRelayConnected,
-                    hasRelayConnected = next.hasRelayConnected,
-                    isLocalInternet = next.isLocalInternet,
-                    hasViolation = next.hasViolation,
-                    violationType = next.violationType,
-                    noGpsSignalSinceMs = next.noGpsSignalSinceMs,
-                    isReportedSilent = next.silentAfterSensorMs != null
-                ),
-                alertSettings,
-                nowMs
-            )
+        val holding = alarmConditions(
+            next.reading,
+            watchingSinceMs,
+            nowMs,
+            next.book.conditions,
+            isRelayConnected = next.isRelayConnected,
+            hasRelayConnected = next.hasRelayConnected,
+            isLocalInternet = next.isLocalInternet,
+            hasViolation = next.hasViolation,
+            violationType = next.violationType,
+            noGpsSignalSinceMs = next.noGpsSignalSinceMs,
+            isReportedSilent = next.silentAfterSensorMs != null
         )
+        val isOnline = if (AlarmType.TRACKER_OFFLINE !in holding) true else next.book.isTrackerOnline?.let { false }
+        next.copy(book = next.book.update(holding, alertSettings, nowMs).copy(isTrackerOnline = isOnline))
     }.map { it.book }
 }.distinctUntilChanged()
 

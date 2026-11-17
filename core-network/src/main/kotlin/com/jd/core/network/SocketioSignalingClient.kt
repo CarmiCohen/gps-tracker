@@ -96,6 +96,9 @@ class SocketioSignalingClient @Inject constructor(
     private val _graphRequestFlow = MutableSharedFlow<GraphRequest>(extraBufferCapacity = 4)
     override val graphRequestFlow: SharedFlow<GraphRequest> = _graphRequestFlow.asSharedFlow()
 
+    private val _eventsRequestFlow = MutableSharedFlow<Long>(extraBufferCapacity = 4)
+    override val eventsRequestFlow: SharedFlow<Long> = _eventsRequestFlow.asSharedFlow()
+
     // A week's first sync arrives as 14 messages at once; tryEmit drops what does not fit, which the next request asks for again.
     private val _graphSamplesFlow = MutableSharedFlow<SensorGraphBatch>(extraBufferCapacity = 32)
     override val graphSamplesFlow: SharedFlow<SensorGraphBatch> = _graphSamplesFlow.asSharedFlow()
@@ -236,6 +239,7 @@ class SocketioSignalingClient @Inject constructor(
                 SensorInfoWire.decode(data)?.let { _sensorInfoFlow.value = ReceivedSensorInfo(it, System.currentTimeMillis()) }
                 if (InfoRequestWire.isRequest(data)) _infoRequestFlow.tryEmit(InfoRequestWire.wantsSatellites(data))
                 GraphRequestWire.decode(data)?.let { _graphRequestFlow.tryEmit(it) }
+                EventsRequestWire.decode(data)?.let { _eventsRequestFlow.tryEmit(it) }
                 GraphSamplesWire.decode(data)?.let { _graphSamplesFlow.tryEmit(it) }
             }
 
@@ -476,10 +480,18 @@ class SocketioSignalingClient @Inject constructor(
         return true
     }
 
-    override suspend fun sendSensorEvents(events: List<EventEntry>): Boolean {
+    override suspend fun sendSensorEvents(events: List<EventEntry>, completeAfterMs: Long?): Boolean {
         val deviceId = currentDeviceId ?: return false
         if (!_isConnected.value) return false
-        val payload = SensorEventsWire.encode(deviceId, events)
+        val payload = SensorEventsWire.encode(deviceId, events, completeAfterMs)
+        socket?.emit("settings_update", payload)
+        bytesSent += payload.toString().length.toLong()
+        return true
+    }
+
+    override suspend fun requestSensorEvents(targetId: String, afterMs: Long): Boolean {
+        if (!_isConnected.value) return false
+        val payload = EventsRequestWire.encode(targetId, afterMs)
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true

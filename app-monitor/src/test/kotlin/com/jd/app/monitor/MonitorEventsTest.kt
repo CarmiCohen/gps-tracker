@@ -41,6 +41,20 @@ class MonitorEventsTest {
         assertEquals(listOf(LoggedEvent(EventLevel.INFO, "Ended: ${AlarmType.TILT_ALERT.title}")), alarmEvents(acknowledged, cleared))
     }
 
+    /** ISSUE-NOV15.4-O98 part 2. */
+    @Test
+    fun `the tracker going offline and returning is recorded, not before it is first heard`() {
+        val unheard = AlarmBook()
+        val online = AlarmBook(isTrackerOnline = true)
+        val offline = AlarmBook(isTrackerOnline = false)
+        assertEquals(listOf(LoggedEvent(EventLevel.INFO, "Sensor online")), alarmEvents(unheard, online))
+        assertEquals(EventLevel.WARNING, alarmEvents(online, offline).single().level)
+        assertEquals(listOf(LoggedEvent(EventLevel.INFO, "Sensor online")), alarmEvents(offline, online))
+        assertEquals("No change", emptyList<LoggedEvent>(), alarmEvents(online, online))
+        assertEquals("A new pairing starts over", emptyList<LoggedEvent>(), alarmEvents(online, unheard))
+        assertEquals("Kept by update and acknowledge", true, online.update(setOf(AlarmType.TILT_ALERT), settings, 1_000L).acknowledge().isTrackerOnline)
+    }
+
     @Test
     fun `an acknowledgement names the alarms that waited for it`() {
         val raised = AlarmBook().update(setOf(AlarmType.TILT_ALERT, AlarmType.LIFT_ALERT), settings, nowMs = 1_000L)

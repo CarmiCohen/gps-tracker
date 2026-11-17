@@ -66,20 +66,78 @@ fun List<EventEntry>.serviceLifecycleSince(afterMs: Long): List<EventEntry> {
 /** An event learned after the fact, at the time it happened (ISSUE-NOV15.4-O98). */
 data class PastEvent(val level: EventLevel, val message: String, val timestampMs: Long)
 
-/** The Sensor's newest events as the Monitor receives them (ISSUE-NOV10.8-O84). */
-data class SensorEventBatch(val trackerId: String, val events: List<EventEntry>)
+/**
+ * Sensor events as the Monitor receives them (ISSUE-NOV10.8-O84). [completeAfterMs], when set, says the batch holds all
+ * of the Sensor's peer events (see [forPeer]) newer than it, up to its newest (ISSUE-NOV15.4-O98 part 4); null for the
+ * start and stop events sent with graph samples and for a Sensor before Nov17.5.
+ */
+data class SensorEventBatch(val trackerId: String, val events: List<EventEntry>, val completeAfterMs: Long? = null)
+
+/** Peer events to send, holding all of them newer than [afterMs] (ISSUE-NOV15.4-O98 part 4). */
+data class PeerEvents(val afterMs: Long, val events: List<EventEntry>)
 
 /** The events of [period] before [nowMs], newest first; DETAIL events only when [showDetails]. */
 fun List<EventEntry>.shown(period: ViewPeriod, showDetails: Boolean, nowMs: Long): List<EventEntry> =
     filter { it.timestampMs >= nowMs - period.durationMs && (showDetails || it.level != EventLevel.DETAIL) }
         .sortedByDescending { it.timestampMs }
 
+/** The events the Sensor sends its Monitors (ISSUE-NOV10.8-O84): all but the DETAIL ones, oldest first. */
+fun List<EventEntry>.forPeer(): List<EventEntry> = filter { it.level != EventLevel.DETAIL }
+
 /**
- * What the Sensor sends its Monitors (ISSUE-NOV10.8-O84): its newest events without the DETAIL ones. A Monitor that was
- * offline receives the ones it missed, as far as they are among these, when it comes back.
+ * The newest [EventLog.PEER_EVENTS_SENT] peer events, sent each time a Monitor comes online and at each new event while
+ * one is (ISSUE-NOV10.8-O84), with the time of the newest one left out, so a Monitor that missed older ones asks for
+ * them (ISSUE-NOV15.4-O98 part 4); 0 when none is left out.
  */
-fun List<EventEntry>.newestForPeer(): List<EventEntry> =
-    filter { it.level != EventLevel.DETAIL }.takeLast(EventLog.PEER_EVENTS_SENT)
+fun List<EventEntry>.newestForPeer(): PeerEvents {
+    val peer = forPeer()
+    val sent = peer.takeLast(EventLog.PEER_EVENTS_SENT)
+    return PeerEvents(peer.getOrNull(peer.size - sent.size - 1)?.timestampMs ?: 0L, sent)
+}
+
+/**
+ * The answer to a Monitor's request for the peer events newer than [afterMs] (ISSUE-NOV15.4-O98 part 4): oldest first,
+ * [EventLog.PEER_EVENTS_SENT] a message, each chunk complete after the previous one's newest, so an answer cut short
+ * still leaves the Monitor without holes.
+ */
+fun List<EventEntry>.peerEventsAfter(afterMs: Long): List<PeerEvents> {
+    var after = afterMs
+    return forPeer().filter { it.timestampMs > afterMs }.chunked(EventLog.PEER_EVENTS_SENT).map { chunk ->
+        PeerEvents(after, chunk).also { after = chunk.last().timestampMs }
+    }
+}
+
+/**
+ * The Monitor's side of the Sensor events' catch-up (ISSUE-NOV15.4-O98 part 4). It holds [syncedMs], the time up to
+ * which it has every peer event of the Sensor, on the Sensor's clock: at start, the newest Sensor event it keeps. A
+ * batch complete after a time not later than that moves it on; one complete only after a later time shows a hole, and
+ * [received] returns the time to ask the Sensor for the events after, at most once per [RETRY_MS], so the live batches
+ * that arrive while an answer comes in do not ask again.
+ */
+class PeerEventCatchUp(private var syncedMs: Long, private val clock: () -> Long) {
+    private var requestedAtMs: Long? = null
+
+    fun received(batch: SensorEventBatch): Long? {
+        val completeAfterMs = batch.completeAfterMs ?: return null
+        if (batch.events.isEmpty()) return null
+        if (completeAfterMs <= syncedMs) {
+            syncedMs = maxOf(syncedMs, batch.events.maxOf { it.timestampMs })
+            return null
+        }
+        val nowMs = clock()
+        requestedAtMs?.let { if (nowMs - it in 0 until RETRY_MS) return null }
+        requestedAtMs = nowMs
+        return syncedMs
+    }
+
+    companion object {
+        const val RETRY_MS = 30_000L
+
+        /** Where a Monitor keeping [events] starts for the Sensor [trackerId]: its newest event, or 0 for all. */
+        fun syncedFrom(events: List<EventEntry>, trackerId: String): Long =
+            events.lastOrNull { it.source == EventSource.SENSOR && it.trackerId == trackerId }?.timestampMs ?: 0L
+    }
+}
 
 /** Each change of a link from its first up on, so a phone that starts offline logs no loss before it ever connected. */
 fun Flow<Boolean>.linkChanges(): Flow<Boolean> = distinctUntilChanged().dropWhile { !it }

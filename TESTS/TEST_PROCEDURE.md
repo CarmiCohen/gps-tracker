@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.4 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.5 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1026,8 +1026,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **204.1 Lines (unit):** `InfoSectionsTest`: the link lines show `Counting since` with the clock time (with the date when not another day), and no such line when the start is not known (Sensors before Nov17.3).
 *   **204.2 Live (device):** open the Monitor's Info: `Counting since` shows the apps' start time in the Sensor and Monitor sections; in a lit room `Light` is close to the newest value in `dumpsys sensorservice` (`Light: last 50 events`). Read the screen with `uiautomator dump`.
 
+## Chapter 205 - Every Sensor Event, And The Sensor's Presence, In The Monitor's Log (Nov17.5)
+**Status: A / L** - `EventLogTest`, `SensorEventsWireTest`, `MonitorAlarmsTest`, `MonitorEventsTest` pass; 205.4 verified in a Two-phone test (ISSUE-NOV15.4-O98 parts 2 and 4, SOT 1.444)
+*   **205.1 Presence (unit):** `MonitorAlarmsTest`: with Global Mute on, the book tells the tracker unheard, then online, then offline after 35 s without a row, with no alarm; a new pairing starts unheard. `MonitorEventsTest`: `Sensor online` and `Sensor offline` are logged at each change, not before the tracker is first heard nor when a pairing starts over.
+*   **205.2 Catch-up (unit):** `EventLogTest`: the newest 50 say the time of the newest event left out (0 when none); a request is answered with every peer event after its time, 50 a message, each complete after the previous one's newest; the Monitor moves on with contiguous batches, asks once for a hole, not again within 30 s, and again after; it starts from the newest event it keeps of its Sensor.
+*   **205.3 Wire (unit):** `SensorEventsWireTest`: `after` and the `events_request` round trip; neither is read as the other nor as a graph request.
+*   **205.4 Live (device, Two-phone):** with the Monitor phone in airplane mode, make the Sensor log over 50 events (toggle its airplane mode); the Monitor logs `Sensor offline`; after its network returns: `Sensor online`, `REV_MonitorService` `Sensor events missed: asked for those after`, and on the Sensor `REV_SensorEvents` `Events request after ...: N events` with N over 50. Restore both phones' airplane mode, Wi-Fi and Bluetooth.
+
 ---
-**Active Testing Chapters: 193 of 204**
+**Active Testing Chapters: 194 of 205**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
