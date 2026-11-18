@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.15 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov17.16 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1081,8 +1081,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **214.1 Units:** `BatteryPowerTest`: battery status not charging with USB plugged is plugged in but not charging; charging and full are both; on battery is neither; charging without a plugged value counts as plugged in. `MonitorAlarmsTest`: plugged in and not charging raises no `POWER_DISCONNECTED`, not plugged in raises it, a row without the flag falls back to charging. `LocationRowWireTest`: `plg` travels and reads back; a row without it reads back as not known.
 *   **214.2 Live (device, Two-phone):** with Global Mute off on the Monitor, the Sensor phone on USB but not charging (battery protection, status 4) raises no power alarm; `adb shell dumpsys battery unplug` raises `Tracker power disconnected`; `dumpsys battery reset` ends it without acknowledgement, and the Events log shows `Alarm:` and `Ended:`.
 
+## Chapter 215 - A Test Telemetry Update Is Not Lost Before The Repository Listens (Nov17.16)
+**Status: A** - full Monitor `am instrument` on the A15 OK (63 tests); 215.1 on the S21FE not run (phone disconnected) (ISSUE-NOV12.6-O95, SOT 1.454)
+*   **215.1 Full Monitor run (device):** `am instrument -w com.jd.app.monitor.test/com.jd.app.monitor.HiltTestRunner` on the S21FE (airplane mode on) and the A15: `BackfillGapRecoveryTest.aMissingStartIsRequestedOnAFreshPairing` passes in the full run, not only alone; a `FakeSignalingClient` value without a collector after 5 s fails at once instead of timing out later.
+
 ---
-**Active Testing Chapters: 203 of 214**
+**Active Testing Chapters: 204 of 215**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -264,11 +266,17 @@ class FakeSignalingClient : SignalingClient {
     override val graphSamplesFlow: Flow<com.jd.core.shared.SensorGraphBatch> = MutableSharedFlow()
     override suspend fun sendGraphSamples(samples: List<com.jd.core.shared.GraphSample>, compressed: Boolean): Boolean = true
 
-    fun emitTelemetry(update: LocationUpdate) {
-        _telemetryFlow.tryEmit(update)
-    }
+    fun emitTelemetry(update: LocationUpdate) = deliver(_telemetryFlow, update)
 
-    fun emitBackfillResponse(response: BackfillResponse) {
-        _backfillResponseFlow.tryEmit(response)
+    fun emitBackfillResponse(response: BackfillResponse) = deliver(_backfillResponseFlow, response)
+
+    /**
+     * A shared flow without replay drops a value nobody collects yet, and [MonitorRepository] starts collecting on
+     * Dispatchers.IO only after it is created; so wait for its collector, and fail instead of dropping
+     * (ISSUE-NOV12.6-O95).
+     */
+    private fun <T> deliver(flow: MutableSharedFlow<T>, value: T) {
+        runBlocking { withTimeout(5_000) { flow.subscriptionCount.first { it > 0 } } }
+        check(flow.tryEmit(value)) { "Buffer full, dropped $value" }
     }
 }
