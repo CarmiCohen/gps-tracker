@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov18.6)
+# SOT Master Requirements & Hardening Status (Nov18.8)
 
-## 🏗️ Architectural Master Rules (535 Rules)
+## 🏗️ Architectural Master Rules (536 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -163,6 +163,7 @@
 *   **1.460 Trails Are Saved, Loaded And Cleared From The Map**: the Monitor map MUST offer SAVE (every stored trail row to a `GPS Monitor trails` file the user picks), LOAD (adds a trail file's rows; any other file is refused with a message) and CLEAR (asks first). A cleared trail MUST stay cleared: no row of the paired Sensor older than the clear is stored again, live or by backfill, and its missing start is no gap; a full re-initialization forgets the clear (ISSUE-NOV17.7-O107, chapter 221).
 *   **1.461 The Map Shows The Version Name Alone**: the Monitor map's bottom-left label MUST show the installed version name without a `Version:` prefix (user request 2026-11-18, ISSUE-NOV18.6-O116, chapter 222); the pairing wizard keeps `Version: <name>`.
 *   **1.462 Show Or Hide The Fence, One Setup Icon**: the Monitor map MUST offer a FENCE button that shows or hides the geofence circles (Home markers stay; editing Home Points always shows them), drawn faint (fill alpha 20, edge 160 of 255). Each app's menu MUST have one setup icon (the wrench): the Monitor unpairs from its Setup dialog's UNPAIR (asking first), the Sensor opens Settings from its Setup dialog's SETTINGS (user decision 2026-11-18, ISSUE-NOV17.7-O108, ISSUE-NOV17.7-O109, chapter 223).
+*   **1.463 An Acknowledgement Never Sounds The Siren**: each siren episode (from an alarm needing the siren until none does) sounds for at most 30 s; its timed-out state MUST be cleared only when an episode starts, never by the acknowledgement itself, so acknowledging after the 30 s never starts the siren, not even for milliseconds (ISSUE-NOV10.7-O75, chapter 224).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

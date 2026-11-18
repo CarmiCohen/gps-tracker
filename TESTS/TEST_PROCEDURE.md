@@ -1126,8 +1126,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **223.2 One setup icon (instrumented):** `UnpairConfirmationTest.gearAsksBeforeUnpairing`, `cancelKeepsThePairing`, `confirmUnpairsOnce`: no `Settings / Re-pair` gear; Setup, then UNPAIR, asks first.
 *   **223.3 Live (device):** on a paired Monitor with Home Points, FENCE (green when on) hides and shows the circles, the Home squares stay; the circle is fainter than before; HOME editing shows the circles even when hidden. Both menus show one setup icon (wrench); the Sensor's Setup dialog has SETTINGS, which opens the Settings screen.
 
+## Chapter 224 - An Acknowledgement Never Sounds The Siren (Nov18.8)
+**Status: S** - 224.1 passed on the S21FE (release Monitor Nov18.8) with the A15 Sensor (ISSUE-NOV10.7-O75, SOT 1.463)
+*   **224.1 Two-phone (device):** on the A15 run `adb shell dumpsys battery unplug` to raise a power alarm on the paired Monitor; wait until the Monitor logs `Siren stopped` (30 s), then tap ACKNOWLEDGE ALARM. Verify the Monitor logs `Acknowledged: ...` and `Pending alarms:` (empty) and no `Siren started` after it. Restore with `adb shell dumpsys battery reset`.
+
 ---
-**Active Testing Chapters: 212 of 223**
+**Active Testing Chapters: 213 of 224**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

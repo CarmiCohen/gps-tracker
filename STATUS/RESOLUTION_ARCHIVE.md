@@ -2,6 +2,10 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov18.8)
+- **An acknowledgement chirps the siren (ISSUE-NOV10.7-O75, Low)**: on the S21FE each acknowledgement logged `Acknowledged`, `Pending alarms:` (empty), then `Siren started` and `Siren stopped` within 3 to 50 ms. Cause: `MonitorAlarmEngine.acknowledge()` cleared `sirenTimedOut` at once, while the acknowledged (empty) book arrived a moment later; after the 30 s timeout the siren `combine` therefore saw "needs the siren, not timed out" from the old book and started the siren, then stopped it. Fix: a new `sirenEpisode()`, called from the book's `onEach` for every change of `needsSiren` (no conflation), cancels the timeout and clears `sirenTimedOut` only when an episode starts; `acknowledge()` no longer touches either; the separate `needsSiren` collector is gone. Chapter 224, SOT 1.463.
+- **Verification (Nov18.8)**: Monitor unit tests OK. S21FE (user consent 2026-11-18): release Monitor Nov18.8 (139) installed over Nov17.15; A15: debug Sensor Nov18.8. Two-phone check 224.1: `dumpsys battery unplug` on the A15 raised a power alarm at 19:30:11, the siren timed out at 19:30:41, ACKNOWLEDGE at 19:31:10 logged `Acknowledged` and an empty `Pending alarms:` with no siren start; battery reset, alarm ended 19:31:20. Also the index row Nov18.7 (072430b) and the missing Nov18.7 dashboard row. Release audits not run (Monitor-only change, verified on the release build on the S21FE).
+
 ## ✅ Resolved Issues (Nov18.7)
 - **Show or hide the fence (ISSUE-NOV17.7-O108, Low; user request 2026-11-17)**: the user asked for a map button to show or hide the geofence and a more transparent circle. Fix: `MonitorScreen` (`MonitorActivity.kt`) has a saveable `isFenceVisible` (default on) and a FENCE button in a fifth row of the map buttons (green when on); the circles are drawn only when it is on or while editing Home Points, the Home markers always; fill alpha 40 -> 20, edge 255 -> 160 (`FENCE_FILL_ALPHA`, `FENCE_OUTLINE_ALPHA`). Test: `UnpairConfirmationTest.theFenceButtonToggles`. Chapter 223, SOT 1.462.
 - **One setup icon (ISSUE-NOV17.7-O109, Low; user request 2026-11-17, user decision 2026-11-18: one icon in both apps)**: both menus had a wrench (Setup) and a white gear (Monitor: unpair only; Sensor: the Settings screen). Fix: the gear is removed from both. Monitor: the Setup dialog has a red full-width UNPAIR button that opens the same confirmation (`requestUnpair`); `MonitorMenuBar` lost `onUnpair`. Sensor: the Setup dialog's `CHANGE RELAY URL` button is now `SETTINGS` (it already opened the Settings screen). Tests (none removed, Rule 17): `gearAsksBeforeUnpairing`, `cancelKeepsThePairing`, `confirmUnpairsOnce` go Setup -> UNPAIR, and the first asserts no gear; `HudLayoutAuditTest` checks Setup, Map, Events, Info, Graphs, Close. Chapters 127.1, 183.1, 223; `DOCS/UPPER_MENU_LINE_AND_VIEWS.md`.
@@ -500,6 +504,8 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov18.2: [SOT Count: 1031 (Rules: 531), Open: H:0, M:3, L:17, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 449), QA: 153]**
+- **Nov18.1: [SOT Count: 1030 (Rules: 530), Open: H:0, M:3, L:18, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 447), QA: 152]**
 - **Nov18.0: [SOT Count: 1029 (Rules: 529), Open: H:0, M:3, L:19, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 445), QA: 151]**
 - **Nov17.16: [SOT Count: 1028 (Rules: 528), Open: H:0, M:3, L:19, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 443), QA: 150]**
 - **Nov17.15: [SOT Count: 1027 (Rules: 527), Open: H:0, M:3, L:20, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 442), QA: 149]**

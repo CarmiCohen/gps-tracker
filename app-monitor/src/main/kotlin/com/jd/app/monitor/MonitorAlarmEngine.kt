@@ -92,22 +92,6 @@ class MonitorAlarmEngine @Inject constructor(
     fun watch(scope: CoroutineScope) {
         if (watchJob?.isActive == true) return
         watchJob = scope.launch {
-            launch {
-                _alarms.map { it.needsSiren }.distinctUntilChanged().collect { needsSiren ->
-                    sirenTimeoutJob?.cancel()
-                    if (needsSiren) {
-                        sirenTimedOut.value = false
-                        sirenTimeoutJob = scope.launch {
-                            delay(30.seconds)
-                            sirenTimedOut.value = true
-                            eventLog.record(EventLevel.DETAIL, "Siren stopped after 30 s")
-                        }
-                    } else {
-                        sirenTimedOut.value = false
-                    }
-                }
-            }
-
             alarmBooks(
                 target = identityManager.targetId,
                 telemetry = merge(signalingClient.telemetryFlow, pushedRows.fresh(System::currentTimeMillis)),
@@ -120,11 +104,13 @@ class MonitorAlarmEngine @Inject constructor(
                 isLocalInternet = localInternetFlow(),
                 clock = System::currentTimeMillis
             ).onEach { book ->
-                if (book.pending.map { it.type } != _alarms.value.pending.map { it.type }) {
+                val previous = _alarms.value
+                if (book.pending.map { it.type } != previous.pending.map { it.type }) {
                     SystemLogger.w("Alarm", "Pending alarms: ${book.pending.joinToString { it.type.name }}")
                 }
-                alarmEvents(_alarms.value, book).forEach { eventLog.record(it.level, it.message) }
+                alarmEvents(previous, book).forEach { eventLog.record(it.level, it.message) }
                 _alarms.value = book
+                if (book.needsSiren != previous.needsSiren) sirenEpisode(book.needsSiren, this@launch)
                 showNotification(book)
             }.launchIn(this)
 
@@ -139,6 +125,22 @@ class MonitorAlarmEngine @Inject constructor(
             }.distinctUntilChanged().onEach { sound ->
                 if (sound != null) siren.play(sound) else siren.stop()
             }.launchIn(this)
+        }
+    }
+
+    /**
+     * Starts or ends a siren episode: each one sounds for at most 30 s. The timed-out flag is cleared only when an
+     * episode starts, never when one ends, so the siren never sees "needed and not timed out" from a book that is
+     * about to be acknowledged (ISSUE-NOV10.7-O75: an acknowledgement after the 30 s used to chirp the siren).
+     */
+    private fun sirenEpisode(needsSiren: Boolean, watching: CoroutineScope) {
+        sirenTimeoutJob?.cancel()
+        if (!needsSiren) return
+        sirenTimedOut.value = false
+        sirenTimeoutJob = watching.launch {
+            delay(30.seconds)
+            sirenTimedOut.value = true
+            eventLog.record(EventLevel.DETAIL, "Siren stopped after 30 s")
         }
     }
 
@@ -157,8 +159,6 @@ class MonitorAlarmEngine @Inject constructor(
 
     fun acknowledge() {
         acknowledgementEvent(_alarms.value)?.let { eventLog.record(it.level, it.message) }
-        sirenTimeoutJob?.cancel()
-        sirenTimedOut.value = false
         acknowledgements.tryEmit(Unit)
     }
 
