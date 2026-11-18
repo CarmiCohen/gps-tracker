@@ -81,14 +81,14 @@ class HudStateTest {
 
         assertEquals("This phone: VIEWER", state.idText)
         assertEquals("Sensor: T", HudState(appMode = "sensor", selfId = "T").idText)
-        assertEquals("B:100%|T:30°C|A:±5.0m|AGE:0s", state.telemetryText)
+        assertEquals("${B}100%|${T}30°|A:±5.0m|AGE:0s", state.telemetryText)
     }
 
     @Test
     fun unknownValuesShowNoNumber() {
         val state = HudState()
 
-        assertEquals("B:--|T:--|A:--|AGE:--", state.telemetryText)
+        assertEquals("${B}--|${T}--|A:--|AGE:--", state.telemetryText)
         assertEquals("-- km/h", state.speedText)
         assertEquals(NO_VALUE, state.trackerState)
     }
@@ -97,7 +97,7 @@ class HudStateTest {
     fun knownValuesAreFormatted() {
         val state = HudState(batteryLevel = 7, isCharging = true, tempCelsius = 41.6f, speedKmh = 12.34f)
 
-        assertEquals("B:7%⚡|T:42°C|A:--|AGE:--", state.telemetryText)
+        assertEquals("${B}7%⚡|${T}42°|A:--|AGE:--", state.telemetryText)
         assertEquals("12.3 km/h", state.speedText)
     }
 
@@ -105,7 +105,27 @@ class HudStateTest {
     fun zeroIsAKnownValue() {
         val state = HudState(batteryLevel = 0, tempCelsius = 0f, speedKmh = 0f)
 
-        assertEquals("B:0%|T:0°C|A:--|AGE:--", state.telemetryText)
+        assertEquals("${B}0%|${T}0°|A:--|AGE:--", state.telemetryText)
         assertEquals("0.0 km/h", state.speedText)
+    }
+
+    /** Chapter 219.1: an icon marks the battery and the temperature; no `B:`, no `T:`, no `C` (ISSUE-NOV17.7-O106). */
+    @Test
+    fun batteryAndTemperatureAreMarkedByIconsNotLabels() {
+        val text = HudState(batteryLevel = 55, tempCelsius = 31f).telemetryText
+        val (battery, temperature) = text.split("|")
+
+        assertEquals("🔋", HUD_BATTERY_ICON)
+        assertEquals("🌡️", HUD_TEMPERATURE_ICON)
+        assertEquals("${HUD_BATTERY_ICON}55%", battery)
+        assertEquals("${HUD_TEMPERATURE_ICON}31°", temperature)
+        assertFalse(text, text.contains("B:"))
+        assertFalse(text, text.contains("T:"))
+        assertFalse(text, text.contains("C"))
+    }
+
+    private companion object {
+        const val B = HUD_BATTERY_ICON
+        const val T = HUD_TEMPERATURE_ICON
     }
 }

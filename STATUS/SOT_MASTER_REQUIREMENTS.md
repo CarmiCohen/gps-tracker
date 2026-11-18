@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov18.2)
+# SOT Master Requirements & Hardening Status (Nov18.3)
 
-## 🏗️ Architectural Master Rules (531 Rules)
+## 🏗️ Architectural Master Rules (532 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -158,6 +158,7 @@
 *   **1.455 Opening The Sensor App Starts Its Service**: every return of the Sensor console to the front (launch, launcher icon, Recents, notification) MUST start a stopped `SensorService` when the required permissions are granted, as the `STOP SERVICE` dialog promises; only the recreation of the console by a rotation MUST NOT, so a rotation does not undo a stop (ISSUE-NOV18.0-O115, chapter 216).
 *   **1.456 Small Home Point Squares**: the Monitor map MUST draw each Home Point as a green 10 dp square, smaller than the 24 dp device dots, so the points do not hide the trail (ISSUE-NOV17.7-O104, chapter 217).
 *   **1.457 The HUD Names The Phone It Describes**: each HUD MUST show one ID line naming the phone it describes: `This phone: <ID>` on the Monitor's own HUD, `Sensor: <ID>` on a Sensor HUD (the Monitor's HUD of the paired Sensor, and the Sensor app); no placeholder or swapped ID (ISSUE-NOV17.7-O105, chapter 218).
+*   **1.458 HUD Battery And Temperature Icons**: the HUD telemetry line MUST mark the battery with a battery icon (🔋) and the temperature with a thermometer icon (🌡️), with no `B:` or `T:` label and no `C` after the degree sign: `🔋42%⚡|🌡️34°|A:...|AGE:...` (ISSUE-NOV17.7-O106, chapter 219).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

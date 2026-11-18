@@ -2,6 +2,12 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov18.3)
+- **Battery and temperature labels in the HUD (ISSUE-NOV17.7-O106, Low; user request 2026-11-17)**: `HudState.telemetryText` read `B:42%⚡|T:34°C|A:...|AGE:...`. Fix: the new constants `HUD_BATTERY_ICON` (🔋) and `HUD_TEMPERATURE_ICON` (🌡️, with the emoji presentation selector) replace the `B:` and `T:` labels, and the temperature ends in `°` without `C`: `🔋42%⚡|🌡️34°|A:...|AGE:...`. Emoji in the one text string, like the existing ⚡, so no icon dependency and no layout change in `HudStatusBar`. Tests: `HudStateTest` (+1, `batteryAndTemperatureAreMarkedByIconsNotLabels`; the format checks updated) and `FixReadingTest` (format checks updated); chapters 114.3 and 118.1 quote the new format. Seen on the A15 debug Sensor: `🔋80%|🌡️26°|A:±12.6m|AGE:3s` on one line. Chapter 219, SOT 1.458.
+- **Stale alarm-ending rule in two documents (no issue ID; user question 2026-11-18)**: `DOCS/ALARM_AND_SIREN_MECHANISM.md` section 3a and chapter 129.2 still said every alarm stays until acknowledged, the rule before ISSUE-NOV17.10-O110. Both now say that a state alarm ends with its condition and only an event alarm waits for `ACKNOWLEDGE ALARM` (SOT 1.449, chapter 210).
+- **Noise false alarms recorded under ISSUE-NOV17.12-O112 (still open)**: coughing beside the A15 raised noise alarms (jumps of 39 to 43 dB over a background of -75 dBFS); user decision 2026-11-18: require about 2 s of loud noise within 3 s. Planned for the next version; details in `DOCS/issues.md`.
+- **Verification (Nov18.3)**: `run_tests.ps1 test assembleDebug assembleRelease`: PASSED, 921 tests; one warning line, the known kapt `fileCollection(Spec)` (O72). A15: `ProductionReadinessAuditTest` OK (3); release Sensor and Monitor cold starts `davey_over_500ms=0 stacklog=0 fatal=0`; debug Sensor restored with its service running, Monitor and the test apk uninstalled again. Also the index row Nov18.2 (0c43995).
+
 ## ✅ Resolved Issues (Nov18.2)
 - **The HUD ID line read `TRK:LOCAL | SELF:T` (ISSUE-NOV17.7-O105, Low; user question 2026-11-17)**: the Monitor shows two HUDs. Its own HUD was built with a placeholder `targetId = "LOCAL"`, and the HUD of the paired Sensor swapped the IDs (`selfId = target`, `targetId = self`); the Sensor app set `targetId = "V"`. Fix: `HudState.targetId` removed; `HudState.selfId` is the ID of the phone the HUD describes, and the new `HudState.idText` reads `This phone: <ID>` on the Monitor's own HUD and `Sensor: <ID>` on a Sensor HUD (the Monitor's HUD of the paired Sensor, and the Sensor app). `HudStatusBar` shows `idText`; `MonitorViewModel` and `SensorViewModel` no longer set a target. Tests: `HudStateTest.testHudStatusBarFormattingConstraints` checks both labels. Chapter 218, SOT 1.457.
 - **Verification (Nov18.2)**: `run_tests.ps1 test assembleDebug assembleRelease`: PASSED, 919 tests; the warning lines (kapt options, two unused parameters in `DeviceSetup.kt`) are old, shown after a full `clean`. A15: release Sensor and Monitor cold starts `davey_over_500ms=0 stacklog=0 fatal=0`; debug Sensor restored with its service running, Monitor uninstalled again. 218.2 (the labels on screen) not run: no paired Monitor. Also the index row Nov18.1 (ce5270d).
@@ -477,6 +483,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov17.14: [SOT Count: 1026 (Rules: 526), Open: H:0, M:3, L:20, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 440), QA: 148]**
 - **Nov17.13: [SOT Count: 1025 (Rules: 525), Open: H:0, M:3, L:20, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 438), QA: 147]**
 - **Nov17.12-debounce: [SOT Count: 1024 (Rules: 524), Open: H:0, M:3, L:21, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 437), QA: 146]**
 - **Nov17.11: [SOT Count: 1023 (Rules: 523), Open: H:0, M:3, L:21, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 435), QA: 145]**

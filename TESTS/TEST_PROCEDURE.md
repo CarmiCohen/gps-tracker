@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov18.2 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov18.3 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -482,7 +482,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: L / A** - Since Nov12.3 the Monitor bar's Setup, Settings / Re-pair, Map, Info and Close fit at 320 dp (`HudLayoutAuditTest`); Tools, Events and Graphs are gone (chapter 183)
 *   **114.1 Hardware Deployment & Live Telemetry Monitoring:** Verify deployment of `:app-monitor` to target hardware (Samsung S21FE / connected device R58X40GV2AR) and verify live logcat monitoring and telemetry status handling.
 *   **114.2 Upper Menu Header Single-Line Fitting:** Verify that the upper menu header bar (`Surface` / `Row`) across both Sensor (`AdminActivity`) and Monitor (`MonitorActivity`) applications fits title text (`MONITOR: ...` / `SENSOR: ...`) and all 7 action buttons (Setup, Settings, Tools, Map, Events, Graphs, Info) and Disconnect button without text wrapping or layout distortion.
-*   **114.3 HUD Telemetry Formatting & Text Ellipsization:** Verify that `HudStatusBar` row 2 metadata formatting correctly preserves telemetry status text (`B:100%|T:30°C|A:...|AGE:0s`) without truncating the age parameter, and applies single-line ellipsization (`TextOverflow.Ellipsis`) to device identity strings.
+*   **114.3 HUD Telemetry Formatting & Text Ellipsization:** Verify that `HudStatusBar` row 2 metadata formatting correctly preserves telemetry status text (`🔋100%|🌡️30°|A:...|AGE:0s`, since Nov18.3) without truncating the age parameter, and applies single-line ellipsization (`TextOverflow.Ellipsis`) to device identity strings.
 
 ## Chapter 115 - Dual Device Hardware Deployment & Telemetry Logcat Audit (Nov4.36)
 **Status: L** - Verified
@@ -502,7 +502,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ## Chapter 118 - HUD Direction, Compact Spacing & Real-Position Map Centering (Nov5.0)
 **Status: L** - Verified
-*   **118.1 HUD Left-To-Right Authority:** Verify that `HudStatusBar` keeps left-to-right layout and text order in both Sensor and Monitor applications under an RTL system language (`INT` left of `WDG`, row 2 reads `B:...|T:...|A:...|AGE:...`). Automated by `HudLayoutAuditTest`.
+*   **118.1 HUD Left-To-Right Authority:** Verify that `HudStatusBar` keeps left-to-right layout and text order in both Sensor and Monitor applications under an RTL system language (`INT` left of `WDG`, row 2 reads `🔋...|🌡️...|A:...|AGE:...`). Automated by `HudLayoutAuditTest`.
 *   **118.2 Real-Position Map Centering:** Verify that the Monitor map centers only on real device positions: the local device when disconnected, the sensor when connected, and the locked device after `SENSOR` / `LOCAL` is tapped, including `SENSOR` while the peer is inactive. Automated by `MapCenterResolverTest`.
 *   **118.3 Compact HUD Line Spacing:** Verify that the Monitor HUD uses compact line spacing with no clipped text, and that compact height is under 60% of the standard height. Automated by `HudLayoutAuditTest`.
 *   **118.4 No-Position Behavior:** Verify that with location permission denied or no fix available, the map shows the world view and never a hardcoded city, then moves to device zoom on the first real position.
@@ -591,7 +591,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 129 - Monitor Alarms And Siren (Nov7.3)
 **Status: L / A** - 129.1 to 129.6 automated; 129.7 verified on the A15 through the production relay at low volume. The full-screen start over a locked screen and the maximum-volume path on hardware were not run
 *   **129.1 Alarm Conditions:** Verify that the Monitor raises `Tracker offline` when no update from the paired tracker arrived for 35 seconds, counted from the start of watching when none arrived yet; `Tracker power disconnected` when the tracker reports no charging; `Tracker battery low` below 20%, ending only at 22% or more; and `Tracker temperature high` above 46°C, ending only at 44°C or less. Verify that a late queued update cannot replace a newer one. Automated by `MonitorAlarmsTest` (ISSUE-NOV5.2-O11).
-*   **129.2 Until Acknowledged:** Verify that an alarm is raised once, sounds until acknowledged even after its condition clears, and is then shown as `(cleared)`; that an acknowledged alarm is raised again only after its condition has cleared; and that switching an alarm off in Alert Settings, or turning on Global Mute, drops it at once. The switches are `Peer Connection Offline`, `Power Disconnected / Unplugged`, `Low Battery Level (<20%)`, and `High Device Temperature (>46°C)`. Automated by `MonitorAlarmsTest`.
+*   **129.2 Until Acknowledged:** Verify that an alarm is raised once; that an event alarm sounds until acknowledged and is shown as `(cleared)` once its row has passed, while a state alarm ends as soon as its condition clears (since Nov17.11, ISSUE-NOV17.10-O110, chapter 210); that an acknowledged alarm is raised again only after its condition has cleared; and that switching an alarm off in Alert Settings, or turning on Global Mute, drops it at once. The switches are `Peer Connection Offline`, `Power Disconnected / Unplugged`, `Low Battery Level (<20%)`, and `High Device Temperature (>46°C)`. Automated by `MonitorAlarmsTest`.
 *   **129.3 Pairing And Settings:** Verify that only the paired tracker raises alarms, that a new pairing starts with no alarms, and that nothing is raised before the saved settings are loaded. Automated by `MonitorAlarmsTest`.
 *   **129.4 Siren:** Verify that the siren loops until stopped on the alarm stream, or on the notification stream when `Override ... Silent Mode` is off; that `Force Maximum` sets the alarm volume to maximum and restores the earlier volume when the siren stops, and wins over the custom volume; that each wave type has its own sound; and that `TEST SIREN AUDIO` plays and stops the same siren. Automated by `SirenSoundTest` and `MonitorAlarmDeviceTest`, which plays at gain 0 and restores the phone's alarm volume.
 *   **129.5 Sensor Stays Silent:** Verify that no Sensor, `core-shared`, or `core-network` source uses audio or vibration classes (Rule 14, R872). Automated by `SensorStealthGuardTest`; run it with `--rerun`.
@@ -1100,8 +1100,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **218.1 Labels (unit):** `HudStateTest.testHudStatusBarFormattingConstraints`: a Monitor HUD reads `This phone: <ID>`, a Sensor HUD `Sensor: <ID>`.
 *   **218.2 Live (device):** on a paired Monitor, the upper HUD reads `This phone: <Monitor ID>` and the lower one `Sensor: T`; the Sensor console reads `Sensor: T`.
 
+## Chapter 219 - HUD Battery And Temperature Icons (Nov18.3)
+**Status: L / A** - `HudStateTest` and `FixReadingTest` passed; 219.2 seen on the A15 debug Sensor: `🔋80%|🌡️26°|A:±12.6m|AGE:3s` on one line (ISSUE-NOV17.7-O106, SOT 1.458)
+*   **219.1 Icons (unit):** `HudStateTest.batteryAndTemperatureAreMarkedByIconsNotLabels`: the telemetry line starts `🔋55%|🌡️31°`, with no `B:`, `T:` or `C`; `HudStateTest` and `FixReadingTest` check the full line.
+*   **219.2 Live (device):** the Sensor console's HUD row 2 shows the battery and thermometer icons before their values, legible and on one line with `A:` and `AGE:`.
+
 ---
-**Active Testing Chapters: 207 of 218**
+**Active Testing Chapters: 208 of 219**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

@@ -6,6 +6,12 @@ import java.util.Locale
 /** Shown in place of any HUD value that is not known. */
 const val NO_VALUE = "--"
 
+/** Marks the battery value in the HUD telemetry line, in place of the old `B:` label (ISSUE-NOV17.7-O106). */
+const val HUD_BATTERY_ICON = "🔋" // 🔋
+
+/** Marks the temperature value in the HUD telemetry line, in place of the old `T:` label (ISSUE-NOV17.7-O106). */
+const val HUD_TEMPERATURE_ICON = "🌡️" // 🌡️ (with the emoji presentation selector)
+
 /**
  * HudState: Master state data model for HUD across Monitor and Sensor applications.
  * Adheres to Requirement R960 and HUD LED Specifications (v9.3.6).
@@ -46,12 +52,16 @@ data class HudState(
     val relayStatusText: String
         get() = "Relay Status: ${if (isRelayConnected) "Connected" else "Disconnected"}"
 
+    /**
+     * Battery and temperature are marked by an icon, not a `B:` or `T:` label, and the temperature has no `C`
+     * (ISSUE-NOV17.7-O106): `🔋42%⚡|🌡️34°|A:±5.0m|AGE:0s`.
+     */
     val telemetryText: String
         get() {
             val battery = batteryLevel?.let { "$it%${if (isCharging) "⚡" else ""}" } ?: NO_VALUE
-            val temperature = tempCelsius?.let { String.format(Locale.US, "%.0f°C", it) } ?: NO_VALUE
+            val temperature = tempCelsius?.let { String.format(Locale.US, "%.0f°", it) } ?: NO_VALUE
             val accuracy = if (accuracyMeters > 0) String.format(Locale.US, "±%.1fm", accuracyMeters) else NO_VALUE
             val age = if (telemetryAgeSec >= 0) "${telemetryAgeSec}s" else NO_VALUE
-            return "B:$battery|T:$temperature|A:$accuracy|AGE:$age"
+            return "$HUD_BATTERY_ICON$battery|$HUD_TEMPERATURE_ICON$temperature|A:$accuracy|AGE:$age"
         }
 }
