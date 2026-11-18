@@ -14,7 +14,8 @@ import kotlin.math.sqrt
  * noise that goes on (a TV, rain) becomes background instead of raising alerts again and again.
  *
  * A noise alerts only when it is loud for [ACOUSTIC_CONFIRM_MS] within [ACOUSTIC_CONFIRM_WINDOW_MS], measured against
- * the background at its first loud frame (ISSUE-NOV17.10-O111: a door slam or a dropped spoon is no intruder). After
+ * the background at its first loud frame (ISSUE-NOV17.10-O111: a door slam or a dropped spoon is no intruder;
+ * ISSUE-NOV17.12-O112: nor is a coughing fit). After
  * an alert the level must fall below the limit before a new noise counts, so one noise raises one alert; the time
  * between alerts is the Sensor's per-kind cool-down ([AlertCoolDown]), which replaced a lockout here.
  *
@@ -107,11 +108,14 @@ const val ACOUSTIC_MIN_ALERT_DBFS = -50.0
 /** No alerts while the background is first learned. */
 const val ACOUSTIC_WARM_UP_MS = 3_000L
 
-/** How long a noise must be loud to alert (ISSUE-NOV17.10-O111); its loud frames may have gaps, like speech. */
-const val ACOUSTIC_CONFIRM_MS = 1_000L
+/**
+ * How long a noise must be loud to alert (ISSUE-NOV17.10-O111); its loud frames may have gaps, like speech. 2 s since
+ * ISSUE-NOV17.12-O112 (user decision, 2026-11-18): a coughing fit filled the old 1 s within 2 s.
+ */
+const val ACOUSTIC_CONFIRM_MS = 2_000L
 
 /** The loud frames of [ACOUSTIC_CONFIRM_MS] must fall within this time from the first one. */
-const val ACOUSTIC_CONFIRM_WINDOW_MS = 2_000L
+const val ACOUSTIC_CONFIRM_WINDOW_MS = 3_000L
 
 /** The length of one audio frame the detector is fed. */
 const val ACOUSTIC_FRAME_MS = 100L

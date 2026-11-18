@@ -5,7 +5,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Chapter 161 (ISSUE-NOV5.2-O11 Group 4): the Sensor's noise detection; chapter 211 (ISSUE-NOV17.10-O111): its debouncing. */
+/**
+ * Chapter 161 (ISSUE-NOV5.2-O11 Group 4): the Sensor's noise detection; chapter 211 (ISSUE-NOV17.10-O111): its
+ * debouncing; chapter 220 (ISSUE-NOV17.12-O112): 2 s loud within 3 s, so a coughing fit does not alert.
+ */
 class AcousticDetectorTest {
 
     /** Feeds [level] every 100 ms from [fromMs] for [durationMs]; returns the alert times. */
@@ -18,7 +21,7 @@ class AcousticDetectorTest {
     private fun confirmedAt(fromMs: Long) = fromMs + ACOUSTIC_CONFIRM_MS - ACOUSTIC_FRAME_MS
 
     @Test
-    fun aJumpOf30DbAboveTheBackgroundForOneSecondAlerts() {
+    fun aJumpOf30DbAboveTheBackgroundForTwoSecondsAlerts() {
         val detector = quietRoom()
         assertEquals(listOf(confirmedAt(5_000)), detector.feed(-40.0, 5_000, ACOUSTIC_CONFIRM_MS))
     }
@@ -43,7 +46,7 @@ class AcousticDetectorTest {
         assertEquals(listOf(confirmedAt(8_000)), detector.feed(-50.0, 8_000, ACOUSTIC_CONFIRM_MS))
     }
 
-    /** ISSUE-NOV17.10-O111: a door slam, a dropped spoon: loud, but shorter than a second. */
+    /** ISSUE-NOV17.10-O111: a door slam, a dropped spoon: loud, but shorter than [ACOUSTIC_CONFIRM_MS]. */
     @Test
     fun aShortBangDoesNotAlert() {
         val detector = quietRoom()
@@ -56,17 +59,28 @@ class AcousticDetectorTest {
         }
     }
 
-    /** ISSUE-NOV17.10-O111: loud frames with gaps, like speech, count when they add up to a second within two. */
+    /** ISSUE-NOV17.10-O111: loud frames with gaps, like speech, count when they add up to two seconds within three. */
     @Test
-    fun aNoiseWithGapsAlertsWhenItsLoudFramesAddUpToOneSecond() {
+    fun aNoiseWithGapsAlertsWhenItsLoudFramesAddUpToTwoSeconds() {
         val detector = quietRoom()
-        // Loud and quiet frames in turn: 10 loud frames take 1.9 s.
-        val alerts = (0 until 20).map { 5_000L + it * ACOUSTIC_FRAME_MS }.filter { detector.onLevel(if (it / ACOUSTIC_FRAME_MS % 2 == 0L) -30.0 else -70.0, it) }
-        assertEquals(listOf(5_000L + 18 * ACOUSTIC_FRAME_MS), alerts)
+        // Two loud frames, one quiet: 20 loud frames take 2.9 s.
+        val alerts = (0 until 40).filter { detector.onLevel(if (it % 3 != 2) -30.0 else -70.0, 5_000L + it * ACOUSTIC_FRAME_MS) }
+        assertEquals("The 20th loud frame", listOf(28), alerts)
         // Sparser, the window passes first.
         val sparse = quietRoom()
-        val none = (0 until 60).map { 5_000L + it * ACOUSTIC_FRAME_MS }.filter { sparse.onLevel(if (it / ACOUSTIC_FRAME_MS % 3 == 0L) -30.0 else -70.0, it) }
+        val none = (0 until 90).map { 5_000L + it * ACOUSTIC_FRAME_MS }.filter { sparse.onLevel(if (it / ACOUSTIC_FRAME_MS % 2 == 0L) -30.0 else -70.0, it) }
         assertTrue("$none", none.isEmpty())
+    }
+
+    /**
+     * ISSUE-NOV17.12-O112: the user's coughs beside the A15 rose 39 to 43 dB over a background of -75 dBFS. A coughing
+     * fit (0.3 s loud, 0.2 s pause) for ten seconds filled the old 1 s within 2 s; it never fills 2 s within 3 s.
+     */
+    @Test
+    fun aCoughingFitDoesNotAlert() {
+        val detector = AcousticDetector().apply { feed(-75.0, 0, 5_000) }
+        val alerts = (0 until 100).map { 5_000L + it * ACOUSTIC_FRAME_MS }.filter { detector.onLevel(if (it / ACOUSTIC_FRAME_MS % 5 < 3L) -33.0 else -75.0, it) }
+        assertTrue("$alerts", alerts.isEmpty())
     }
 
     @Test
@@ -82,8 +96,10 @@ class AcousticDetectorTest {
     fun aSecondNoiseAfterQuietAlertsAgain() {
         val detector = quietRoom()
         assertEquals(listOf(confirmedAt(5_000)), detector.feed(-30.0, 5_000, ACOUSTIC_CONFIRM_MS))
-        detector.feed(-70.0, 6_000, 2_000)
-        assertEquals(listOf(confirmedAt(8_000)), detector.feed(-30.0, 8_000, ACOUSTIC_CONFIRM_MS))
+        val quietFromMs = 5_000 + ACOUSTIC_CONFIRM_MS
+        detector.feed(-70.0, quietFromMs, 2_000)
+        val againMs = quietFromMs + 2_000
+        assertEquals(listOf(confirmedAt(againMs)), detector.feed(-30.0, againMs, ACOUSTIC_CONFIRM_MS))
     }
 
     @Test

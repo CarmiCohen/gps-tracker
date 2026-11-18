@@ -2,6 +2,10 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov18.4-noise)
+- **Coughs raised noise alarms (ISSUE-NOV17.12-O112 noise part, Low; user decision 2026-11-18; O112 stays open for the other kinds)**: a coughing fit filled the 1 s of loud frames within 2 s that O111 required. Fix: `ACOUSTIC_CONFIRM_MS` 2000 and `ACOUSTIC_CONFIRM_WINDOW_MS` 3000 in `AcousticDetector.kt`; no other logic changed. Tests: `AcousticDetectorTest` +1 (`aCoughingFitDoesNotAlert`, which failed under the old numbers), the gaps test now two loud frames to one quiet, the times of the second-noise test and `SensorBehaviourTest`'s slider test follow the constants. Measured on the A15 with a temporary level log (removed before closing): cough bursts of 1 to 1.9 s did not alert; a coughing fit at 09:49:54 stayed 32 to 57 dB over the background for about 2 s and alerted; loud talking (27 to 35 dB over, about 2.3 s) and claps (40 to 56 dB peaks in turn with quieter frames) were detected and held back by the 60 s cool-down. A stricter rule (3 s) would also drop the talking, so the user accepted that a long coughing fit can still alert. Chapter 220, SOT 1.459 (1.450 updated).
+- **Verification (Nov18.4-noise)**: `run_tests.ps1 test assembleDebug assembleRelease`: PASSED, 922 tests; one warning line, the known kapt `fileCollection(Spec)` (O72). A15: `ProductionReadinessAuditTest` OK (3); release Sensor and Monitor cold starts `davey_over_500ms=0 stacklog=0 fatal=0`; debug Sensor restored with its service running, Monitor and the test apk uninstalled again. Also the index row Nov18.3 (8b3963e).
+
 ## ✅ Resolved Issues (Nov18.3)
 - **Battery and temperature labels in the HUD (ISSUE-NOV17.7-O106, Low; user request 2026-11-17)**: `HudState.telemetryText` read `B:42%⚡|T:34°C|A:...|AGE:...`. Fix: the new constants `HUD_BATTERY_ICON` (🔋) and `HUD_TEMPERATURE_ICON` (🌡️, with the emoji presentation selector) replace the `B:` and `T:` labels, and the temperature ends in `°` without `C`: `🔋42%⚡|🌡️34°|A:...|AGE:...`. Emoji in the one text string, like the existing ⚡, so no icon dependency and no layout change in `HudStatusBar`. Tests: `HudStateTest` (+1, `batteryAndTemperatureAreMarkedByIconsNotLabels`; the format checks updated) and `FixReadingTest` (format checks updated); chapters 114.3 and 118.1 quote the new format. Seen on the A15 debug Sensor: `🔋80%|🌡️26°|A:±12.6m|AGE:3s` on one line. Chapter 219, SOT 1.458.
 - **Stale alarm-ending rule in two documents (no issue ID; user question 2026-11-18)**: `DOCS/ALARM_AND_SIREN_MECHANISM.md` section 3a and chapter 129.2 still said every alarm stays until acknowledged, the rule before ISSUE-NOV17.10-O110. Both now say that a state alarm ends with its condition and only an event alarm waits for `ACKNOWLEDGE ALARM` (SOT 1.449, chapter 210).
@@ -483,6 +487,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov17.15: [SOT Count: 1027 (Rules: 527), Open: H:0, M:3, L:20, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 442), QA: 149]**
 - **Nov17.14: [SOT Count: 1026 (Rules: 526), Open: H:0, M:3, L:20, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 440), QA: 148]**
 - **Nov17.13: [SOT Count: 1025 (Rules: 525), Open: H:0, M:3, L:20, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 438), QA: 147]**
 - **Nov17.12-debounce: [SOT Count: 1024 (Rules: 524), Open: H:0, M:3, L:21, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 437), QA: 146]**

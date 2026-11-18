@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov18.3 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov18.4-noise - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1105,8 +1105,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **219.1 Icons (unit):** `HudStateTest.batteryAndTemperatureAreMarkedByIconsNotLabels`: the telemetry line starts `🔋55%|🌡️31°`, with no `B:`, `T:` or `C`; `HudStateTest` and `FixReadingTest` check the full line.
 *   **219.2 Live (device):** the Sensor console's HUD row 2 shows the battery and thermometer icons before their values, legible and on one line with `A:` and `AGE:`.
 
+## Chapter 220 - A Noise Must Last Two Seconds (Nov18.4-noise)
+**Status: L / A** - `AcousticDetectorTest` and `SensorBehaviourTest` passed; 220.2 on the A15 with the user, 2026-11-18: cough bursts of 1 to 1.9 s did not alert, a 2 s coughing fit did (accepted limit), loud talking and claps were detected (held back by the 60 s cool-down after the cough alert) (ISSUE-NOV17.12-O112, SOT 1.459)
+*   **220.1 Units:** `AcousticDetectorTest.aCoughingFitDoesNotAlert` (0.3 s loud, 0.2 s pause for 10 s, 42 dB over -75 dBFS: no alert; it alerted under the old 1 s within 2 s); `aNoiseWithGapsAlertsWhenItsLoudFramesAddUpToTwoSeconds` (two loud frames to one quiet: the 20th loud frame alerts; one in two: none); the other tests follow `ACOUSTIC_CONFIRM_MS`.
+*   **220.2 Live (device):** with noise detection on in the A15 Sensor, cough a few short bursts: no noise alert; after 60 s of quiet, talk loudly for 3 s: one noise alert (Monitor Events, or the Sensor's DETAIL `not sent` line within the cool-down).
+
 ---
-**Active Testing Chapters: 208 of 219**
+**Active Testing Chapters: 209 of 220**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

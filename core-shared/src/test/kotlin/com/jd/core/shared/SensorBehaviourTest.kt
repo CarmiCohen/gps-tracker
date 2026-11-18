@@ -71,8 +71,9 @@ class SensorBehaviourTest {
         detector.onLevel(-60.0, 0L)
         assertFalse("20 dB is below the default 30 dB jump", detector.onLevel(-40.0, 100L))
         detector.jumpDb = 15.0
-        // Loud for a second (ISSUE-NOV17.10-O111): the tenth loud frame alerts.
-        val alerts = (2L..11L).map { it * ACOUSTIC_FRAME_MS }.filter { detector.onLevel(-40.0, it) }
-        assertEquals(listOf(11L * ACOUSTIC_FRAME_MS), alerts)
+        // Loud for ACOUSTIC_CONFIRM_MS (ISSUE-NOV17.10-O111, 2 s since ISSUE-NOV17.12-O112): the last loud frame alerts.
+        val frames = ACOUSTIC_CONFIRM_MS / ACOUSTIC_FRAME_MS
+        val alerts = (2L until 2L + frames).map { it * ACOUSTIC_FRAME_MS }.filter { detector.onLevel(-40.0, it) }
+        assertEquals(listOf((1L + frames) * ACOUSTIC_FRAME_MS), alerts)
     }
 }
