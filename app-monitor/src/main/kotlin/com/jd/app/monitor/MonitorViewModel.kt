@@ -304,7 +304,6 @@ class MonitorViewModel @Inject constructor(
         HudState(
             appMode = "monitor", // Cyan local GPS LED
             selfId = self,
-            targetId = "LOCAL",
             isInternet = isInternet,
             isRelayConnected = isConnected,       // SRV: Green ONLY if connected to Relay
             isLocalGpsActive = isLocalGps,
@@ -317,12 +316,11 @@ class MonitorViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "monitor"))
 
     val remoteHudState: StateFlow<HudState> = combine(
-        selfId,
         identityManager.targetId.filterNotNull(),
         signalingClient.isConnected,
         uiTelemetry,
         _ticker
-    ) { self, target, isConnected, latest, now ->
+    ) { target, isConnected, latest, now ->
         val lastTs = latest?.timestamp ?: 0L
         val ageSec = if (lastTs > 0) (now - lastTs) / 1000 else -1L
         val isTrackerPresent = lastTs > 0 && (now - lastTs) < TRACKER_PRESENT_MS
@@ -333,8 +331,7 @@ class MonitorViewModel @Inject constructor(
 
         HudState(
             appMode = "sensor", // Green remote sensor GPS LED
-            selfId = target,
-            targetId = self,
+            selfId = target, // this HUD describes the paired Sensor (ISSUE-NOV17.7-O105)
             isInternet = isInternet,
             isRelayConnected = isConnected,          // SRV: Green ONLY if connected to Relay
             isLocalGpsActive = isGpsActive,

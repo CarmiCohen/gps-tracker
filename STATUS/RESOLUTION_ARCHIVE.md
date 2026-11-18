@@ -2,6 +2,10 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov18.2)
+- **The HUD ID line read `TRK:LOCAL | SELF:T` (ISSUE-NOV17.7-O105, Low; user question 2026-11-17)**: the Monitor shows two HUDs. Its own HUD was built with a placeholder `targetId = "LOCAL"`, and the HUD of the paired Sensor swapped the IDs (`selfId = target`, `targetId = self`); the Sensor app set `targetId = "V"`. Fix: `HudState.targetId` removed; `HudState.selfId` is the ID of the phone the HUD describes, and the new `HudState.idText` reads `This phone: <ID>` on the Monitor's own HUD and `Sensor: <ID>` on a Sensor HUD (the Monitor's HUD of the paired Sensor, and the Sensor app). `HudStatusBar` shows `idText`; `MonitorViewModel` and `SensorViewModel` no longer set a target. Tests: `HudStateTest.testHudStatusBarFormattingConstraints` checks both labels. Chapter 218, SOT 1.457.
+- **Verification (Nov18.2)**: `run_tests.ps1 test assembleDebug assembleRelease`: PASSED, 919 tests; the warning lines (kapt options, two unused parameters in `DeviceSetup.kt`) are old, shown after a full `clean`. A15: release Sensor and Monitor cold starts `davey_over_500ms=0 stacklog=0 fatal=0`; debug Sensor restored with its service running, Monitor uninstalled again. 218.2 (the labels on screen) not run: no paired Monitor. Also the index row Nov18.1 (ce5270d).
+
 ## ✅ Resolved Issues (Nov18.1)
 - **Smaller Home Point Squares (ISSUE-NOV17.7-O104, Low; user request 2026-11-17)**: the Monitor map drew each Home Point as a 20 dp green square, close to the 24 dp device dots. Fix: `MonitorActivity.kt` `homeMarkerIcon` uses the new `HOME_MARKER_SIZE_DP = 10` (half the size) and is `internal` for the test. Tests: `HomeMarkerIconTest` (new, instrumented, 1) passed on the A15. Chapter 217, SOT 1.456.
 - **Verification (Nov18.1)**: `run_tests.ps1 test assembleDebug assembleRelease`: PASSED, 919 tests, no new warning. A15: release Monitor cold start `davey_over_500ms=0 stacklog=0 fatal=0`, then the Monitor was uninstalled again (as before the session). `ProductionReadinessAuditTest` and the Sensor audit not run (Sensor unchanged). 217.2 (looking at the map) not run: no paired Monitor on a phone. Also the index row Nov18.0 (7ead0fb).
@@ -473,6 +477,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov17.13: [SOT Count: 1025 (Rules: 525), Open: H:0, M:3, L:20, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 438), QA: 147]**
 - **Nov17.12-debounce: [SOT Count: 1024 (Rules: 524), Open: H:0, M:3, L:21, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 437), QA: 146]**
 - **Nov17.11: [SOT Count: 1023 (Rules: 523), Open: H:0, M:3, L:21, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 435), QA: 145]**
 - **Nov17.9: [SOT Count: 1022 (Rules: 522), Open: H:0, M:3, L:20, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 432), QA: 144]**

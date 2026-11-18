@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov18.1 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov18.2 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1095,8 +1095,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **217.1 Icon size (device):** `HomeMarkerIconTest`: the Home Point icon is a 10 dp square (`HOME_MARKER_SIZE_DP`), half the former 20 dp.
 *   **217.2 Live (device):** on the Monitor map, a Home Point shows as a green square about half the width of the device dot (24 dp).
 
+## Chapter 218 - The HUD Names The Phone It Describes (Nov18.2)
+**Status: A** - `HudStateTest` passed; 218.2 not run (no paired Monitor) (ISSUE-NOV17.7-O105, SOT 1.457)
+*   **218.1 Labels (unit):** `HudStateTest.testHudStatusBarFormattingConstraints`: a Monitor HUD reads `This phone: <ID>`, a Sensor HUD `Sensor: <ID>`.
+*   **218.2 Live (device):** on a paired Monitor, the upper HUD reads `This phone: <Monitor ID>` and the lower one `Sensor: T`; the Sensor console reads `Sensor: T`.
+
 ---
-**Active Testing Chapters: 206 of 217**
+**Active Testing Chapters: 207 of 218**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

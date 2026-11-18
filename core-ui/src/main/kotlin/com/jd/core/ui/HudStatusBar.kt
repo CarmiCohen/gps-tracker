@@ -132,11 +132,7 @@ private fun HudStatusBarContent(
             Spacer(modifier = Modifier.height(verticalGap))
 
             // Row 2: Metadata / Telemetry
-            val idDisplay = if (isMonitor) {
-                "TRK:${hudState.targetId.take(6).uppercase()} | SELF:${hudState.selfId.take(6).uppercase()}"
-            } else {
-                "SELF:${hudState.selfId.take(6).uppercase()}"
-            }
+            val idDisplay = hudState.idText
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

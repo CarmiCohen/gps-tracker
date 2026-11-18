@@ -14,8 +14,7 @@ const val NO_VALUE = "--"
 @Immutable
 data class HudState(
     val appMode: String = "monitor", // "monitor" (Viewer) or "sensor" (Tracker)
-    val selfId: String = "--",
-    val targetId: String = "--",
+    val selfId: String = "--", // the ID of the phone this HUD describes (ISSUE-NOV17.7-O105)
     val isInternet: Boolean = false,        // INT LED
     val isRelayConnected: Boolean = false,  // SRV LED
     val isLocalGpsActive: Boolean = false,  // GPS LED
@@ -35,6 +34,13 @@ data class HudState(
 ) {
     val speedText: String
         get() = "${speedKmh?.let { String.format(Locale.US, "%.1f", it) } ?: NO_VALUE} km/h"
+
+    /**
+     * Names the phone this HUD describes: the Monitor's own HUD says `This phone`, a Sensor HUD (on the Sensor, or the
+     * Monitor's HUD of the paired Sensor) says `Sensor` (ISSUE-NOV17.7-O105; was `TRK:LOCAL | SELF:T`).
+     */
+    val idText: String
+        get() = "${if (appMode == "monitor") "This phone" else "Sensor"}: ${selfId.take(6).uppercase()}"
 
     /** Uses the same state as the SRV LED, so the two can never disagree. */
     val relayStatusText: String

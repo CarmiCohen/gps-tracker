@@ -220,7 +220,6 @@ class SensorViewModel @Inject constructor(
         HudState(
             appMode = "sensor",
             selfId = id,
-            targetId = "V",
             isInternet = isInternet,
             isRelayConnected = isConnected,
             isLocalGpsActive = isGpsActive,

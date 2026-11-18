@@ -72,7 +72,6 @@ class HudStateTest {
     fun testHudStatusBarFormattingConstraints() {
         val state = HudState(
             appMode = "monitor",
-            targetId = "tracker_123456",
             selfId = "viewer_654321",
             batteryLevel = 100,
             tempCelsius = 30.0f,
@@ -80,9 +79,8 @@ class HudStateTest {
             telemetryAgeSec = 0
         )
 
-        val idDisplay = "TRK:${state.targetId.take(6).uppercase()} | SELF:${state.selfId.take(6).uppercase()}"
-
-        assertEquals("TRK:TRACKE | SELF:VIEWER", idDisplay)
+        assertEquals("This phone: VIEWER", state.idText)
+        assertEquals("Sensor: T", HudState(appMode = "sensor", selfId = "T").idText)
         assertEquals("B:100%|T:30°C|A:±5.0m|AGE:0s", state.telemetryText)
     }
 
