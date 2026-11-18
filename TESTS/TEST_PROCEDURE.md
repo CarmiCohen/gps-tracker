@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov18.9 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov18.10 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1130,8 +1130,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: S** - 224.1 passed on the S21FE (release Monitor Nov18.8) with the A15 Sensor (ISSUE-NOV10.7-O75, SOT 1.463)
 *   **224.1 Two-phone (device):** on the A15 run `adb shell dumpsys battery unplug` to raise a power alarm on the paired Monitor; wait until the Monitor logs `Siren stopped` (30 s), then tap ACKNOWLEDGE ALARM. Verify the Monitor logs `Acknowledged: ...` and `Pending alarms:` (empty) and no `Siren started` after it. Restore with `adb shell dumpsys battery reset`.
 
+## Chapter 225 - Texts Shown Whole, The Noise Jump Printed (Nov18.10)
+**Status: L / A** - `AcousticDetectorTest` passed; `TextFitTest` (3) passed on the A15; 225.3 not run (ISSUE-NOV18.9-O117, O118, O119, O120, SOT 1.464)
+*   **225.1 Units:** `AcousticDetectorTest.theAlertReportsTheBackgroundItWasComparedAgainst` (the alert's background is the one at the first loud frame, not the risen live one; text `level -42 dBFS, background -73 dBFS, jump 31 dB`), `theAlertTextRoundsItsJumpFromTheUnroundedLevels`.
+*   **225.2 Instrumented:** `TextFitTest`: in a 360 dp HUD `This phone: VIEWER` is whole beside a long telemetry line, which wraps uncut; at font scale 2 the Setup dialog scrolls to a whole UNPAIR; at 220 dp and font scale 1.5 a Home Point row shows both coordinates.
+*   **225.3 Live (device):** on the S21FE Monitor, the upper HUD reads `This phone: <ID>` whole with a stale own fix; Setup's UNPAIR label is whole; HOME lists `1.  <lat>, <lng>` whole; a noise alert in Events prints a jump of at least the slider's limit.
+
 ---
-**Active Testing Chapters: 213 of 224**
+**Active Testing Chapters: 214 of 225**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

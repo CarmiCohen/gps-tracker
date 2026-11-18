@@ -432,8 +432,8 @@ class SensorService : Service(), SensorEventListener {
     private fun hasMicrophonePermission(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
-    private fun onAcousticAlert(levelDbfs: Double, floorDbfs: Double) {
-        queueAlert(ACOUSTIC_ALERT_STATUS, "Acoustic alert: level ${levelDbfs.toInt()} dBFS, background ${floorDbfs.toInt()} dBFS")
+    private fun onAcousticAlert(levelDbfs: Double, referenceDbfs: Double) {
+        queueAlert(ACOUSTIC_ALERT_STATUS, acousticAlertText(levelDbfs, referenceDbfs))
     }
 
     private fun queueAlert(status: String, logLine: String) {

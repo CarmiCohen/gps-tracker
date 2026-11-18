@@ -853,7 +853,12 @@ fun MonitorScreen(
             },
             title = { Text("Monitor Setup") }, // The detailed Info has its own screen (ISSUE-NOV10.8-O84 part 2).
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Scrolls: on a small or large-font screen the dialog is taller than its room and clipped the last
+                // button, UNPAIR (ISSUE-NOV18.9-O118).
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text("Tracker ID: $trackerId")
                     Text("Monitor ID: $monitorId")
                     Text("Relay URL: $relayUrl")
@@ -1103,7 +1108,8 @@ fun HomePointEditor(
                     .verticalScroll(rememberScrollState())
             ) {
                 geofence.points.forEachIndexed { index, point ->
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(32.dp)) {
+                    // At least 32 dp, taller when the coordinates wrap on a narrow screen (ISSUE-NOV18.9-O119).
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 32.dp)) {
                         // Left to right always: in a right-to-left locale the bidi algorithm reorders the number
                         // and the coordinates (seen on the A15).
                         Text(

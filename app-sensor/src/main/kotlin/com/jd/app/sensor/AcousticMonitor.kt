@@ -23,7 +23,8 @@ import kotlin.math.max
  * the Monitor never opens a microphone (user decision, 2026-11-08; `MonitorMicrophoneGuardTest`).
  */
 class AcousticMonitor(
-    private val onAlert: (levelDbfs: Double, floorDbfs: Double) -> Unit,
+    /** [referenceDbfs] is the background the noise was compared against (ISSUE-NOV18.9-O120). */
+    private val onAlert: (levelDbfs: Double, referenceDbfs: Double) -> Unit,
     private val onState: (MicrophoneState) -> Unit
 ) {
     private val lock = Any()
@@ -132,7 +133,7 @@ class AcousticMonitor(
                 val floor = detector.floorDbfs
                 floorDbfs = floor
                 detector.jumpDb = jumpDb // A slider change applies at once, without relearning the background.
-                if (detector.onLevel(level, nowMs) && floor != null && !isOwnSoundActive) onAlert(level, floor)
+                if (detector.onLevel(level, nowMs) && !isOwnSoundActive) detector.alertReferenceDbfs?.let { onAlert(level, it) }
             }
         } catch (e: Exception) {
             SystemLogger.e("Acoustic", "Microphone error: ${e.message}")

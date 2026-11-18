@@ -7,7 +7,8 @@ import org.junit.Test
 
 /**
  * Chapter 161 (ISSUE-NOV5.2-O11 Group 4): the Sensor's noise detection; chapter 211 (ISSUE-NOV17.10-O111): its
- * debouncing; chapter 220 (ISSUE-NOV17.12-O112): 2 s loud within 3 s, so a coughing fit does not alert.
+ * debouncing; chapter 220 (ISSUE-NOV17.12-O112): 2 s loud within 3 s, so a coughing fit does not alert; chapter 225
+ * (ISSUE-NOV18.9-O120): the alert prints the background the noise was compared against.
  */
 class AcousticDetectorTest {
 
@@ -111,6 +112,27 @@ class AcousticDetectorTest {
             "-44 dBFS was 6 dB above the old background, and is now over 30 dB above the new one",
             listOf(confirmedAt(10_000)), detector.feed(-44.0, 10_000, ACOUSTIC_CONFIRM_MS)
         )
+    }
+
+    /**
+     * ISSUE-NOV18.9-O120: the background rises during the 2 s noise; the alert reports the one at the first loud frame,
+     * which the jump was measured against, so the printed jump is at least the limit.
+     */
+    @Test
+    fun theAlertReportsTheBackgroundItWasComparedAgainst() {
+        val detector = AcousticDetector().apply { feed(-73.0, 0, 5_000) }
+        assertNull(detector.alertReferenceDbfs)
+        val reference = detector.floorDbfs!!
+        assertEquals(listOf(confirmedAt(5_000)), detector.feed(-42.0, 5_000, ACOUSTIC_CONFIRM_MS))
+        assertTrue("The live background rose during the noise", detector.floorDbfs!! > reference + 1.0)
+        assertEquals(reference, detector.alertReferenceDbfs!!, 0.0)
+        val text = acousticAlertText(-42.0, detector.alertReferenceDbfs!!)
+        assertEquals("Acoustic alert: level -42 dBFS, background -73 dBFS, jump 31 dB", text)
+    }
+
+    @Test
+    fun theAlertTextRoundsItsJumpFromTheUnroundedLevels() {
+        assertEquals("Acoustic alert: level -46 dBFS, background -76 dBFS, jump 30 dB", acousticAlertText(-45.6, -75.8))
     }
 
     @Test

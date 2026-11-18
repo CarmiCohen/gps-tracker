@@ -31,6 +31,13 @@ class AcousticDetector(
     var floorDbfs: Double? = null
         private set
 
+    /**
+     * The background the last alert was compared against: the one at its noise's first loud frame, not [floorDbfs],
+     * which rises during the noise (ISSUE-NOV18.9-O120). Null before the first alert.
+     */
+    var alertReferenceDbfs: Double? = null
+        private set
+
     private var startMs = 0L
     private var loudSinceMs: Long? = null // The first loud frame of the noise being confirmed.
     private var loudReference = 0.0 // The background at that frame.
@@ -75,6 +82,7 @@ class AcousticDetector(
         if (loudFrames * ACOUSTIC_FRAME_MS < ACOUSTIC_CONFIRM_MS) return false
         loudSinceMs = null
         needsQuiet = true
+        alertReferenceDbfs = loudReference
         return true
     }
 
@@ -101,6 +109,15 @@ fun noiseJumpForSensitivity(sensitivity: Float): Double {
 
 /** The noise slider's limit as the user sees it, for example `30 dB` (the limit itself, like ISSUE-NOV9.4-O67). */
 fun noiseLimitLabel(sensitivity: Float): String = "${kotlin.math.round(noiseJumpForSensitivity(sensitivity)).toInt()} dB"
+
+/**
+ * The Sensor's noise alert line: the level, the background it was compared against ([AcousticDetector.alertReferenceDbfs])
+ * and the jump between them, all rounded the same way, so the printed jump is the one that crossed the limit
+ * (ISSUE-NOV18.9-O120: `-46 dBFS, background -73` read as a 27 dB jump under a 30 dB limit).
+ */
+fun acousticAlertText(levelDbfs: Double, referenceDbfs: Double): String =
+    "Acoustic alert: level ${kotlin.math.round(levelDbfs).toInt()} dBFS, background ${kotlin.math.round(referenceDbfs).toInt()} dBFS, " +
+        "jump ${kotlin.math.round(levelDbfs - referenceDbfs).toInt()} dB"
 
 /** A jump that stays quieter than this is ignored, so a microphone near digital silence cannot alert on a whisper. */
 const val ACOUSTIC_MIN_ALERT_DBFS = -50.0

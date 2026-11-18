@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 
@@ -139,14 +140,15 @@ private fun HudStatusBarContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                // The ID is a few characters and always shown whole; a long telemetry line wraps instead
+                // (ISSUE-NOV18.9-O117: `This phone:…` beside `38%⚡|29°|A:±96.0m|AGE:465s`).
                 Text(
                     text = idDisplay,
                     color = Color.Gray,
                     fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    softWrap = false
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
@@ -154,7 +156,10 @@ private fun HudStatusBarContent(
                     color = Color.LightGray,
                     fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace,
-                    maxLines = 1
+                    textAlign = TextAlign.End,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
