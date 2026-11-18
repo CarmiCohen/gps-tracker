@@ -2,6 +2,12 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov18.9)
+- **Live looks on a paired Monitor (no code change)**: S21FE release Monitor Nov18.8 paired with the A15 debug Sensor `T`. 222.2 passed (map label `Nov18.8`); 217.2 passed (Home square about half the device dot); 223.3 passed (FENCE off turns white and hides the circles, the squares stay; HOME editing shows the circles while hidden; one wrench in both apps; the Sensor's Setup SETTINGS opens CONFIGURATION); 218.2 half: `Sensor: T` on both phones, but the Monitor's upper line read `This phone:…` while its own fix was stale (`A:±96.0m|AGE:465s`) and `This phone: V` with a fresh fix (`A:±8.0m|AGE:8s`), opened as ISSUE-NOV18.9-O117.
+- **215.1 (ISSUE-NOV12.6-O95)**: the debug Monitor and its test apk installed over the debug-key-signed release Monitor (`install -r -d`, data and pairing kept); airplane on; `am instrument -w com.jd.app.monitor.test/com.jd.app.monitor.HiltTestRunner`: OK (65 tests, 79.9 s); then airplane off, the test apk uninstalled, release Monitor Nov18.8 (139) reinstalled, still paired V -> T with both Home Points.
+- **O112 Events read**: the user exported the S21FE's 7-day Events (`/sdcard/Download/events-20261118-194521.txt`, 1258 lines). Motion alarms: lift 11-16 21:23 and 21:34; tilt 11-17 20:22 (24°); vibration 11-18 09:04 (3 hits, 0.23 g) and 17:39 (0.17 g); 11-18 18:09 to 18:40 groups of vibration (0.16 to 1.25 g), tilt (40 to 74°) and one lift. Which were false is the user's answer, so O112 stays open. Noise alarms after Nov18.4-noise at 13:56, 14:08 and 18:27; two print a jump under 30 dB, a wording defect (O120). Also opened: O118, O119, O121.
+- **Verification (Nov18.9)**: docs-only version: `:core-shared:test`. Release audits not run (no code change).
+
 ## ✅ Resolved Issues (Nov18.8)
 - **An acknowledgement chirps the siren (ISSUE-NOV10.7-O75, Low)**: on the S21FE each acknowledgement logged `Acknowledged`, `Pending alarms:` (empty), then `Siren started` and `Siren stopped` within 3 to 50 ms. Cause: `MonitorAlarmEngine.acknowledge()` cleared `sirenTimedOut` at once, while the acknowledged (empty) book arrived a moment later; after the 30 s timeout the siren `combine` therefore saw "needs the siren, not timed out" from the old book and started the siren, then stopped it. Fix: a new `sirenEpisode()`, called from the book's `onEach` for every change of `needsSiren` (no conflation), cancels the timeout and clears `sirenTimedOut` only when an episode starts; `acknowledge()` no longer touches either; the separate `needsSiren` collector is gone. Chapter 224, SOT 1.463.
 - **Verification (Nov18.8)**: Monitor unit tests OK. S21FE (user consent 2026-11-18): release Monitor Nov18.8 (139) installed over Nov17.15; A15: debug Sensor Nov18.8. Two-phone check 224.1: `dumpsys battery unplug` on the A15 raised a power alarm at 19:30:11, the siren timed out at 19:30:41, ACKNOWLEDGE at 19:31:10 logged `Acknowledged` and an empty `Pending alarms:` with no siren start; battery reset, alarm ended 19:31:20. Also the index row Nov18.7 (072430b) and the missing Nov18.7 dashboard row. Release audits not run (Monitor-only change, verified on the release build on the S21FE).
@@ -504,6 +510,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov18.3: [SOT Count: 1032 (Rules: 532), Open: H:0, M:3, L:16, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 451), QA: 154]**
 - **Nov18.2: [SOT Count: 1031 (Rules: 531), Open: H:0, M:3, L:17, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 449), QA: 153]**
 - **Nov18.1: [SOT Count: 1030 (Rules: 530), Open: H:0, M:3, L:18, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 447), QA: 152]**
 - **Nov18.0: [SOT Count: 1029 (Rules: 529), Open: H:0, M:3, L:19, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 445), QA: 151]**

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov18.6 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov18.9 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1082,7 +1082,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **214.2 Live (device, Two-phone):** with Global Mute off on the Monitor, the Sensor phone on USB but not charging (battery protection, status 4) raises no power alarm; `adb shell dumpsys battery unplug` raises `Tracker power disconnected`; `dumpsys battery reset` ends it without acknowledgement, and the Events log shows `Alarm:` and `Ended:`.
 
 ## Chapter 215 - A Test Telemetry Update Is Not Lost Before The Repository Listens (Nov17.16)
-**Status: A** - full Monitor `am instrument` on the A15 OK (63 tests); 215.1 on the S21FE not run (phone disconnected) (ISSUE-NOV12.6-O95, SOT 1.454)
+**Status: A / S** - full Monitor `am instrument` on the A15 OK (63 tests); 215.1 passed on the S21FE in Nov18.9 (65 tests, airplane on) (ISSUE-NOV12.6-O95, SOT 1.454)
 *   **215.1 Full Monitor run (device):** `am instrument -w com.jd.app.monitor.test/com.jd.app.monitor.HiltTestRunner` on the S21FE (airplane mode on) and the A15: `BackfillGapRecoveryTest.aMissingStartIsRequestedOnAFreshPairing` passes in the full run, not only alone; a `FakeSignalingClient` value without a collector after 5 s fails at once instead of timing out later.
 
 ## Chapter 216 - Reopening The Sensor App Restarts A Stopped Service (Nov18.0)
@@ -1091,12 +1091,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **216.2 Live (device):** on the A15 Sensor console tap `STOP SERVICE` and confirm, press Home, tap the Sensor's launcher icon: `SensorService` runs again (`dumpsys activity services`); stop again and rotate the phone to landscape and back: the service stays stopped.
 
 ## Chapter 217 - Smaller Home Point Squares (Nov18.1)
-**Status: A** - `HomeMarkerIconTest` 1/1 on the A15; 217.2 not run (no paired Monitor) (ISSUE-NOV17.7-O104, SOT 1.456)
+**Status: A / S** - `HomeMarkerIconTest` 1/1 on the A15; 217.2 passed on the S21FE in Nov18.9 (ISSUE-NOV17.7-O104, SOT 1.456)
 *   **217.1 Icon size (device):** `HomeMarkerIconTest`: the Home Point icon is a 10 dp square (`HOME_MARKER_SIZE_DP`), half the former 20 dp.
 *   **217.2 Live (device):** on the Monitor map, a Home Point shows as a green square about half the width of the device dot (24 dp).
 
 ## Chapter 218 - The HUD Names The Phone It Describes (Nov18.2)
-**Status: A** - `HudStateTest` passed; 218.2 not run (no paired Monitor) (ISSUE-NOV17.7-O105, SOT 1.457)
+**Status: A / S** - `HudStateTest` passed; 218.2 in Nov18.9: `Sensor: T` on both phones passed; the Monitor's `This phone: V` is cut to `This phone:…` while its own telemetry is long (ISSUE-NOV18.9-O117) (ISSUE-NOV17.7-O105, SOT 1.457)
 *   **218.1 Labels (unit):** `HudStateTest.testHudStatusBarFormattingConstraints`: a Monitor HUD reads `This phone: <ID>`, a Sensor HUD `Sensor: <ID>`.
 *   **218.2 Live (device):** on a paired Monitor, the upper HUD reads `This phone: <Monitor ID>` and the lower one `Sensor: T`; the Sensor console reads `Sensor: T`.
 
@@ -1116,12 +1116,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **221.2 Live (device):** on a paired Monitor the map buttons stand in 4 rows of two (IN/OUT, SENSOR/LOCAL, HOME/CLEAR, LOAD/SAVE); SAVE writes the file (toast `Trails saved: N points`); CLEAR asks, then the trail is gone and stays gone over 60 s while the Sensor sends; LOAD of the saved file brings the rows back (toast `Trails loaded: N points`).
 
 ## Chapter 222 - The Map Shows The Version Name Alone (Nov18.6)
-**Status: A** - `UnpairConfirmationTest.theMapShowsTheVersion` passed on the A15; 222.2 not run (no paired Monitor available) (ISSUE-NOV18.6-O116, SOT 1.461)
+**Status: A / S** - `UnpairConfirmationTest.theMapShowsTheVersion` passed on the A15; 222.2 passed on the S21FE in Nov18.9 (ISSUE-NOV18.6-O116, SOT 1.461)
 *   **222.1 Instrumented:** `UnpairConfirmationTest.theMapShowsTheVersion`: the map shows the installed version name and no `Version: <name>` text.
 *   **222.2 Live (device):** the map's bottom-left label reads the version name only (for example `Nov18.6`); the pairing wizard keeps `Version: <name>`.
 
 ## Chapter 223 - Show Or Hide The Fence, One Setup Icon (Nov18.7)
-**Status: A** - `UnpairConfirmationTest` (12) and `HudLayoutAuditTest` passed on the A15; 223.3 not run (ISSUE-NOV17.7-O108, ISSUE-NOV17.7-O109, SOT 1.462)
+**Status: A** - `UnpairConfirmationTest` (12) and `HudLayoutAuditTest` passed on the A15; 223.3 passed on the S21FE and the A15 in Nov18.9 (ISSUE-NOV17.7-O108, ISSUE-NOV17.7-O109, SOT 1.462)
 *   **223.1 Fence (instrumented):** `UnpairConfirmationTest.theFenceButtonToggles`: the map has a FENCE button that can be tapped on and off.
 *   **223.2 One setup icon (instrumented):** `UnpairConfirmationTest.gearAsksBeforeUnpairing`, `cancelKeepsThePairing`, `confirmUnpairsOnce`: no `Settings / Re-pair` gear; Setup, then UNPAIR, asks first.
 *   **223.3 Live (device):** on a paired Monitor with Home Points, FENCE (green when on) hides and shows the circles, the Home squares stay; the circle is fainter than before; HOME editing shows the circles even when hidden. Both menus show one setup icon (wrench); the Sensor's Setup dialog has SETTINGS, which opens the Settings screen.
