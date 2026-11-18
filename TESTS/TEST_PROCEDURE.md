@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov18.10 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov18.11 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1131,13 +1131,19 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **224.1 Two-phone (device):** on the A15 run `adb shell dumpsys battery unplug` to raise a power alarm on the paired Monitor; wait until the Monitor logs `Siren stopped` (30 s), then tap ACKNOWLEDGE ALARM. Verify the Monitor logs `Acknowledged: ...` and `Pending alarms:` (empty) and no `Siren started` after it. Restore with `adb shell dumpsys battery reset`.
 
 ## Chapter 225 - Texts Shown Whole, The Noise Jump Printed (Nov18.10)
-**Status: L / A** - `AcousticDetectorTest` passed; `TextFitTest` (3) passed on the A15; 225.3 not run (ISSUE-NOV18.9-O117, O118, O119, O120, SOT 1.464)
+**Status: L / A** - `AcousticDetectorTest` passed; `TextFitTest` (3) passed on the A15; 225.3 on the S21FE (release Monitor Nov18.10, Nov18.11): HUD ID, UNPAIR and HOME rows passed, the noise alert line waits for a noise alert (ISSUE-NOV18.9-O117, O118, O119, O120, SOT 1.464)
 *   **225.1 Units:** `AcousticDetectorTest.theAlertReportsTheBackgroundItWasComparedAgainst` (the alert's background is the one at the first loud frame, not the risen live one; text `level -42 dBFS, background -73 dBFS, jump 31 dB`), `theAlertTextRoundsItsJumpFromTheUnroundedLevels`.
 *   **225.2 Instrumented:** `TextFitTest`: in a 360 dp HUD `This phone: VIEWER` is whole beside a long telemetry line, which wraps uncut; at font scale 2 the Setup dialog scrolls to a whole UNPAIR; at 220 dp and font scale 1.5 a Home Point row shows both coordinates.
 *   **225.3 Live (device):** on the S21FE Monitor, the upper HUD reads `This phone: <ID>` whole with a stale own fix; Setup's UNPAIR label is whole; HOME lists `1.  <lat>, <lng>` whole; a noise alert in Events prints a jump of at least the slider's limit.
 
+## Chapter 226 - A Short Relay Drop Is Not An Alarm (Nov18.11)
+**Status: L / A** - 226.1 passed (940 unit tests); 226.2 passed on the A15 with the S21FE's Events; 226.3 not run (needs a relay drop) (ISSUE-NOV18.9-O121, SOT 1.465)
+*   **226.1 Units:** `MonitorAlarmsTest.aRelayLostAfterConnectingCountsOnlyAfterTheReconnectGrace` (no alarm until 30 s after the drop), `aRelayThatReconnectsWithinTheGraceRaisesNoAlarm` (three 29 s drops raise nothing), `relayDisconnectEmitsRelayDisconnectedAlarm` (the alarm after the grace).
+*   **226.2 Device:** restart the Sensor (install over it, then open it); its Events (or the paired Monitor's) show `Sensor service started` and no `Detection settings applied` line; changing a detection setting on the Monitor adds one line with the new revision.
+*   **226.3 Live (two phones):** on the paired Monitor, a relay drop shorter than 30 s raises no `Alarm: Relay disconnected`; one of 30 s or more does (for example airplane mode on the Monitor for 10 s, then for 40 s; Local internet lost alarms too).
+
 ---
-**Active Testing Chapters: 214 of 225**
+**Active Testing Chapters: 215 of 226**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

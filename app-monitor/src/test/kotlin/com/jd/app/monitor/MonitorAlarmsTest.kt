@@ -242,6 +242,18 @@ class MonitorAlarmsTest {
     }
 
     @Test
+    fun aRelayLostAfterConnectingCountsOnlyAfterTheReconnectGrace() {
+        fun lost(now: Long) = alarmConditions(
+            reading(at = now), watchingSinceMs = start, nowMs = now, active = emptySet(),
+            isRelayConnected = false, hasRelayConnected = true, relayLostSinceMs = start
+        )
+
+        assertEquals(emptySet<AlarmType>(), lost(start))
+        assertEquals(emptySet<AlarmType>(), lost(start + RELAY_RECONNECT_GRACE_MS - 1))
+        assertEquals(setOf(AlarmType.RELAY_DISCONNECTED), lost(start + RELAY_RECONNECT_GRACE_MS))
+    }
+
+    @Test
     fun gpsSignalLossNeedsNoPositionForTheWholeLimit() {
         val noPosition = reading(lat = 0.0, lng = 0.0, accuracy = 0f)
         fun gps(since: Long?) = alarmConditions(noPosition, watchingSinceMs = start, nowMs = start, active = emptySet(), noGpsSignalSinceMs = since)
@@ -440,7 +452,31 @@ class MonitorAlarmsTest {
         watch.ready()
 
         watch.isRelayConnected.value = false
+        // A short drop the socket reconnects from raises nothing (ISSUE-NOV18.9-O121).
+        watch.ticks.emit(Unit); settle()
+        assertEquals(emptyList<Alarm>(), watch.latest.value?.alarms.orEmpty())
+        watch.now += RELAY_RECONNECT_GRACE_MS
+        watch.telemetry.emit(charging("T", time = 1)) // keeps the tracker present
         assertEquals(listOf(AlarmType.RELAY_DISCONNECTED), watch.awaitBook { it.needsSiren }.pending.map { it.type })
+        watch.job.cancel()
+    }
+
+    @Test
+    fun aRelayThatReconnectsWithinTheGraceRaisesNoAlarm() = runBlocking {
+        val watch = Watch(this)
+        watch.settings.emit(AlertSettings())
+        watch.ready()
+
+        repeat(3) { round ->
+            watch.isRelayConnected.value = false; settle()
+            watch.now += RELAY_RECONNECT_GRACE_MS - 1_000
+            watch.telemetry.emit(charging("T", time = round + 1L)); settle() // keeps the tracker present
+            watch.isRelayConnected.value = true; settle()
+        }
+        watch.ticks.emit(Unit)
+        delay(200)
+
+        assertEquals(emptyList<Alarm>(), watch.latest.value?.alarms.orEmpty())
         watch.job.cancel()
     }
 

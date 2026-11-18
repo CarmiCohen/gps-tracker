@@ -25,6 +25,12 @@ const val TRACKER_PRESENT_MS = 35_000L
  */
 const val RELAY_FIRST_CONNECT_GRACE_MS = 30_000L
 
+/**
+ * Once the relay has been connected, a lost connection counts only after it has lasted this long: the socket reconnects
+ * by itself within seconds, and such short drops filled the Events with alarms (ISSUE-NOV18.9-O121).
+ */
+const val RELAY_RECONNECT_GRACE_MS = 30_000L
+
 /** The tracker's GPS counts as lost once it has reported no position this long, so the time to a first fix does not sound the siren. */
 const val GPS_SIGNAL_LOSS_AFTER_MS = 30_000L
 
@@ -121,7 +127,8 @@ fun newerReading(current: TrackerReading?, incoming: TrackerReading): TrackerRea
  * The alarm conditions that hold at [nowMs]. With nothing heard yet, offline counts from [watchingSinceMs].
  * [active] holds the conditions of the previous evaluation, which decide the clearing margins.
  * [hasRelayConnected] tells whether the relay has been connected since [watchingSinceMs]; until then a relay that is
- * not connected counts as lost only after [RELAY_FIRST_CONNECT_GRACE_MS].
+ * not connected counts as lost only after [RELAY_FIRST_CONNECT_GRACE_MS]. After that, [relayLostSinceMs] is when the
+ * connection was lost; it counts after [RELAY_RECONNECT_GRACE_MS] (null: lost long ago).
  * [noGpsSignalSinceMs] is when the tracker started to report no position, or null while it reports one.
  * [isReportedSilent] is true while the relay's notice that the tracker went silent holds (ISSUE-NOV10.8-O86).
  */
@@ -132,6 +139,7 @@ fun alarmConditions(
     active: Set<AlarmType>,
     isRelayConnected: Boolean = true,
     hasRelayConnected: Boolean = true,
+    relayLostSinceMs: Long? = null,
     isLocalInternet: Boolean = true,
     hasViolation: Boolean = false,
     violationType: String? = null,
@@ -141,8 +149,10 @@ fun alarmConditions(
     if (isReportedSilent || nowMs - (reading?.receivedAtMs ?: watchingSinceMs) >= TRACKER_PRESENT_MS) {
         add(AlarmType.TRACKER_OFFLINE)
     }
-    if (!isRelayConnected && (hasRelayConnected || nowMs - watchingSinceMs >= RELAY_FIRST_CONNECT_GRACE_MS)) {
-        add(AlarmType.RELAY_DISCONNECTED)
+    if (!isRelayConnected) {
+        val isLost = if (hasRelayConnected) relayLostSinceMs == null || nowMs - relayLostSinceMs >= RELAY_RECONNECT_GRACE_MS
+        else nowMs - watchingSinceMs >= RELAY_FIRST_CONNECT_GRACE_MS
+        if (isLost) add(AlarmType.RELAY_DISCONNECTED)
     }
     if (!isLocalInternet) add(AlarmType.LOCAL_INTERNET_OFFLINE)
     if (reading != null && nowMs - reading.receivedAtMs < TRACKER_PRESENT_MS && !reading.hasGpsSignal() &&
@@ -278,7 +288,8 @@ fun alarmBooks(
             BookEvent.Acknowledge -> state.copy(book = state.book.acknowledge(), hasViolation = false, violationType = null)
             is BookEvent.RelayConnection -> state.copy(
                 isRelayConnected = event.isConnected,
-                hasRelayConnected = state.hasRelayConnected || event.isConnected
+                hasRelayConnected = state.hasRelayConnected || event.isConnected,
+                relayLostSinceMs = if (event.isConnected) null else state.relayLostSinceMs ?: clock()
             )
             is BookEvent.LocalInternet -> state.copy(isLocalInternet = event.isConnected)
         }
@@ -291,6 +302,7 @@ fun alarmBooks(
             next.book.conditions,
             isRelayConnected = next.isRelayConnected,
             hasRelayConnected = next.hasRelayConnected,
+            relayLostSinceMs = next.relayLostSinceMs,
             isLocalInternet = next.isLocalInternet,
             hasViolation = next.hasViolation,
             violationType = next.violationType,
@@ -308,6 +320,8 @@ private data class WatchState(
     val book: AlarmBook = AlarmBook(),
     val isRelayConnected: Boolean = true,
     val hasRelayConnected: Boolean = false,
+    /** When the relay connection was lost, or null while it is connected. */
+    val relayLostSinceMs: Long? = null,
     val isLocalInternet: Boolean = true,
     val hasViolation: Boolean = false,
     val violationType: String? = null,

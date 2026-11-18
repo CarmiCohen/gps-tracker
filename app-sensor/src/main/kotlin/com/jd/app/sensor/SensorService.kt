@@ -491,7 +491,10 @@ class SensorService : Service(), SensorEventListener {
                 motionSentinel.tiltThresholdDegrees = tiltThresholdForSensitivity(behaviour.tiltSensitivity)
                 motionSentinel.vibrationThreshold = vibrationThresholdForSensitivity(behaviour.vibrationSensitivity)
                 acousticMonitor.jumpDb = noiseJumpForSensitivity(behaviour.noiseSensitivity)
-                eventLog.record(EventLevel.INFO, "Detection settings applied (rev ${behaviour.revision}): ${sensorBehaviourLines(behaviour).joinToString("; ")}")
+                // Logged when the settings change, not on every start with the stored ones (ISSUE-NOV18.9-O121).
+                if (!isFirstRead && behaviour.revision != previous.revision) {
+                    eventLog.record(EventLevel.INFO, "Detection settings applied (rev ${behaviour.revision}): ${sensorBehaviourLines(behaviour).joinToString("; ")}")
+                }
                 if (isFirstRead || behaviour.noiseAlert != previous.noiseAlert) withContext(Dispatchers.Main) { applyAccess() }
             }
             .launchIn(serviceScope)

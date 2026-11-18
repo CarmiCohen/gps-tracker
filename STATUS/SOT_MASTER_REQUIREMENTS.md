@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov18.10)
+# SOT Master Requirements & Hardening Status (Nov18.11)
 
-## 🏗️ Architectural Master Rules (537 Rules)
+## 🏗️ Architectural Master Rules (538 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -165,6 +165,7 @@
 *   **1.462 Show Or Hide The Fence, One Setup Icon**: the Monitor map MUST offer a FENCE button that shows or hides the geofence circles (Home markers stay; editing Home Points always shows them), drawn faint (fill alpha 20, edge 160 of 255). Each app's menu MUST have one setup icon (the wrench): the Monitor unpairs from its Setup dialog's UNPAIR (asking first), the Sensor opens Settings from its Setup dialog's SETTINGS (user decision 2026-11-18, ISSUE-NOV17.7-O108, ISSUE-NOV17.7-O109, chapter 223).
 *   **1.463 An Acknowledgement Never Sounds The Siren**: each siren episode (from an alarm needing the siren until none does) sounds for at most 30 s; its timed-out state MUST be cleared only when an episode starts, never by the acknowledgement itself, so acknowledging after the 30 s never starts the siren, not even for milliseconds (ISSUE-NOV10.7-O75, chapter 224).
 *   **1.464 Short Labels Are Shown Whole, The Noise Jump As Compared**: the HUD's phone ID, the Setup dialog's buttons and a Home Point's coordinates MUST NOT be cut off: the HUD telemetry wraps instead of the ID, the Setup dialog scrolls, a Home Point row grows. A noise alert MUST print the background it was compared against and the jump (ISSUE-NOV18.9-O117 to O120, chapter 225).
+*   **1.465 A Short Relay Drop Is Not An Alarm**: once the relay has been connected, the Monitor MUST raise Relay disconnected only when the connection has stayed lost for 30 s (`RELAY_RECONNECT_GRACE_MS`), so drops the socket reconnects from raise nothing. The Sensor MUST log `Detection settings applied` only when the settings revision changes, not on each start (ISSUE-NOV18.9-O121, chapter 226).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*
