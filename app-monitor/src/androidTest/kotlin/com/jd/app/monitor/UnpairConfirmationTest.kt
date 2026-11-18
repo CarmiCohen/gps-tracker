@@ -130,12 +130,16 @@ class UnpairConfirmationTest {
     }
 
     /** Phone Setup's Home Points item opens the map's home point editor (ISSUE-NOV10.8-O76). */
-    /** Chapter 200 (ISSUE-NOV17.0-O101): the map shows the installed version at its bottom left. */
+    /**
+     * Chapter 200 (ISSUE-NOV17.0-O101): the map shows the installed version at its bottom left;
+     * chapter 222 (ISSUE-NOV18.6-O116): the name alone, without "Version:".
+     */
     @Test
     fun theMapShowsTheVersion() {
         showMonitorScreen()
         val version = com.jd.core.ui.getAppVersionName(androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext)
-        composeRule.onNodeWithText("Version: $version").assertExists()
+        composeRule.onNodeWithText(version).assertExists()
+        composeRule.onNodeWithText("Version: $version").assertDoesNotExist()
     }
 
     @Test

@@ -744,9 +744,9 @@ fun MonitorScreen(
             )
             
             // The version at the bottom left, opposite the scale (ISSUE-NOV17.0-O101); left also on a right-to-left
-            // phone, where the osmdroid scale stays at the right.
+            // phone, where the osmdroid scale stays at the right. The name alone, without "Version:" (ISSUE-NOV18.6-O116).
             Text(
-                text = "Version: ${getAppVersionName(LocalContext.current)}",
+                text = getAppVersionName(LocalContext.current),
                 fontSize = 10.sp,
                 color = Color.DarkGray,
                 modifier = Modifier

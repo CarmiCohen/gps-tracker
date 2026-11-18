@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov18.5)
+# SOT Master Requirements & Hardening Status (Nov18.6)
 
-## 🏗️ Architectural Master Rules (534 Rules)
+## 🏗️ Architectural Master Rules (535 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -161,6 +161,7 @@
 *   **1.458 HUD Battery And Temperature Icons**: the HUD telemetry line MUST mark the battery with a battery icon (🔋) and the temperature with a thermometer icon (🌡️), with no `B:` or `T:` label and no `C` after the degree sign: `🔋42%⚡|🌡️34°|A:...|AGE:...` (ISSUE-NOV17.7-O106, chapter 219).
 *   **1.459 A Noise Must Last Two Seconds**: the Sensor MUST raise a noise alert only when the noise is loud (the slider's jump over the background) for 2 s of frames within 3 s (`ACOUSTIC_CONFIRM_MS`, `ACOUSTIC_CONFIRM_WINDOW_MS`), so a coughing burst or a short noise does not alert; loud talking and a series of claps still do. A coughing fit that stays loud about 2 s can still alert, an accepted limit (user decision 2026-11-18, ISSUE-NOV17.12-O112, chapter 220).
 *   **1.460 Trails Are Saved, Loaded And Cleared From The Map**: the Monitor map MUST offer SAVE (every stored trail row to a `GPS Monitor trails` file the user picks), LOAD (adds a trail file's rows; any other file is refused with a message) and CLEAR (asks first). A cleared trail MUST stay cleared: no row of the paired Sensor older than the clear is stored again, live or by backfill, and its missing start is no gap; a full re-initialization forgets the clear (ISSUE-NOV17.7-O107, chapter 221).
+*   **1.461 The Map Shows The Version Name Alone**: the Monitor map's bottom-left label MUST show the installed version name without a `Version:` prefix (user request 2026-11-18, ISSUE-NOV18.6-O116, chapter 222); the pairing wizard keeps `Version: <name>`.
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*
