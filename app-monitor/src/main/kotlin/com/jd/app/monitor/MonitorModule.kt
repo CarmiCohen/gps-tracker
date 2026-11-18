@@ -57,8 +57,9 @@ object MonitorModule {
     @Singleton
     fun provideMonitorRepository(
         trailDao: TrailDao,
-        signalingClient: SignalingClient
+        signalingClient: SignalingClient,
+        dataStore: MonitorDataStore
     ): MonitorRepository {
-        return MonitorRepository(trailDao, signalingClient)
+        return MonitorRepository(trailDao, signalingClient, dataStore)
     }
 }

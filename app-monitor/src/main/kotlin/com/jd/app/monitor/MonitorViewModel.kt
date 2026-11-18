@@ -57,6 +57,7 @@ class MonitorViewModel @Inject constructor(
     private val eventLog: EventLog,
     private val graphs: MonitorGraphs,
     private val settingsTransfer: MonitorSettingsTransfer,
+    private val trailTransfer: MonitorTrailTransfer,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -72,7 +73,7 @@ class MonitorViewModel @Inject constructor(
         viewModelScope.launch {
             val message = try {
                 val file = settingsTransfer.export(uri)
-                "Settings exported: ${file.geofence.points.size} home points, ${file.trails.size} trail rows"
+                "Settings exported: ${file.geofence.points.size} home points, ${file.trails.size} trail points"
                     .also { eventLog.record(EventLevel.INFO, it) }
             } catch (e: Exception) {
                 "Export failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
@@ -88,13 +89,47 @@ class MonitorViewModel @Inject constructor(
                 val file = settingsTransfer.import(uri)
                 // Another Sensor's samples must not mix with the imported one's (ISSUE-NOV10.8-O84 part 3).
                 if (file.trackerId != pairedBefore) graphs.sensor.clear()
-                "Settings imported: tracker ${file.trackerId ?: "none"}, ${file.geofence.points.size} home points, ${file.trails.size} trail rows"
+                "Settings imported: tracker ${file.trackerId ?: "none"}, ${file.geofence.points.size} home points, ${file.trails.size} trail points"
                     .also { eventLog.record(EventLevel.INFO, it) }
             } catch (e: Exception) {
                 "Import failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
             }
             _transferMessages.emit(message)
         }
+    }
+
+    /** The name the file picker suggests for the map's SAVE (ISSUE-NOV17.7-O107). */
+    fun suggestedTrailFileName(): String = trailFileName(System.currentTimeMillis())
+
+    fun saveTrails(uri: Uri) {
+        viewModelScope.launch {
+            val message = try {
+                "Trails saved: ${trailTransfer.save(uri).trails.size} points".also { eventLog.record(EventLevel.INFO, it) }
+            } catch (e: Exception) {
+                "Trail save failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
+            }
+            _transferMessages.emit(message)
+        }
+    }
+
+    fun loadTrails(uri: Uri) {
+        viewModelScope.launch {
+            val message = try {
+                val file = trailTransfer.load(uri)
+                val other = file.trackerId?.takeIf { it != pairing.value?.trackerId }
+                ("Trails loaded: ${file.trails.size} points" + (other?.let { ", of tracker $it, not shown on this map" } ?: ""))
+                    .also { eventLog.record(EventLevel.INFO, it) }
+            } catch (e: Exception) {
+                "Trail load failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
+            }
+            _transferMessages.emit(message)
+        }
+    }
+
+    /** The map's CLEAR: the stored trails go, and the Sensor's older rows stay away (ISSUE-NOV17.7-O107). */
+    fun clearTrails() {
+        viewModelScope.launch { repository.clearTrail(pairing.value?.trackerId) }
+        eventLog.record(EventLevel.INFO, "Trails cleared")
     }
 
     private fun Exception.userMessage(): String =
@@ -200,7 +235,7 @@ class MonitorViewModel @Inject constructor(
     /** Resets operational statistics and clears stored trail history (ISSUE-NOV7.1-O35). */
     fun resetOperationalStatistics() {
         viewModelScope.launch {
-            repository.clearTrail()
+            repository.clearTrail(pairing.value?.trackerId)
             _latestTelemetry.value = null
             alarmEngine.acknowledge()
         }
@@ -215,7 +250,7 @@ class MonitorViewModel @Inject constructor(
             dataStore.saveSirenType("Siren")
             dataStore.saveRelayUrl(RelayConfig.DEFAULT_URL)
             dataStore.editGeofence { GeofenceConfig() }
-            repository.clearTrail()
+            repository.clearTrail(trackerId = null) // Unpaired: a new pairing gets the Sensor's whole history.
             _latestTelemetry.value = null
             alarmEngine.acknowledge()
         }

@@ -115,6 +115,13 @@ class MonitorActivity : ComponentActivity() {
                     ActivityResultContracts.OpenDocument()
                 ) { uri -> uri?.let(viewModel::importSettings) }
                 val exportSettings = { exportLauncher.launch(viewModel.exportFileName()) }
+                // The map's trail file (ISSUE-NOV17.7-O107), through the same system picker.
+                val saveTrailsLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument(SETTINGS_FILE_MIME_TYPE)
+                ) { uri -> uri?.let(viewModel::saveTrails) }
+                val loadTrailsLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument()
+                ) { uri -> uri?.let(viewModel::loadTrails) }
                 val importSettings = { importLauncher.launch(arrayOf("*/*")) } // The content is checked on reading.
                 LaunchedEffect(Unit) {
                     viewModel.transferMessages.collect { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
@@ -193,6 +200,9 @@ class MonitorActivity : ComponentActivity() {
                         },
                         onExportSettings = exportSettings,
                         onImportSettings = importSettings,
+                        onSaveTrails = { saveTrailsLauncher.launch(viewModel.suggestedTrailFileName()) },
+                        onLoadTrails = { loadTrailsLauncher.launch(arrayOf("*/*")) }, // The content is checked on reading.
+                        onClearTrails = viewModel::clearTrails,
                         onClose = { moveTaskToBack(true) }
                     )
                 }
@@ -205,6 +215,9 @@ class MonitorActivity : ComponentActivity() {
 const val SETTINGS_FILE_MIME_TYPE = "application/json"
 
 private const val WORLD_ZOOM = 3.0
+
+/** The space between the map's control buttons. */
+private val MAP_BUTTON_GAP = 8.dp
 
 /** The scale bar's distance from the map's right and bottom edges, in pixels. */
 private const val SCALE_BAR_OFFSET_PX = 24
@@ -347,6 +360,10 @@ fun MonitorScreen(
     /** The settings file's file pickers (ISSUE-NOV10.8-O80). */
     onExportSettings: () -> Unit = {},
     onImportSettings: () -> Unit = {},
+    /** The map's trail file pickers and clear (ISSUE-NOV17.7-O107). */
+    onSaveTrails: () -> Unit = {},
+    onLoadTrails: () -> Unit = {},
+    onClearTrails: () -> Unit = {},
     onClose: () -> Unit = {},
     sensorSetup: SensorSetupReport? = null,
     events: List<EventEntry> = emptyList(),
@@ -390,6 +407,25 @@ fun MonitorScreen(
     var isEditingHome by rememberSaveable { mutableStateOf(false) }
     var pendingHomeRemoval by rememberSaveable { mutableStateOf<Int?>(null) }
     val currentOnAddHomePoint by rememberUpdatedState(onAddHomePoint)
+    var isClearTrailsPending by rememberSaveable { mutableStateOf(false) }
+
+    if (isClearTrailsPending) {
+        AlertDialog(
+            onDismissRequest = { isClearTrailsPending = false },
+            title = { Text("Clear the trails?") },
+            text = { Text("The Sensor's and this phone's trails are deleted from this phone. SAVE them first to keep a copy.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isClearTrailsPending = false
+                        onClearTrails()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = com.jd.core.ui.StatusRed)
+                ) { Text("Clear") }
+            },
+            dismissButton = { TextButton(onClick = { isClearTrailsPending = false }) { Text("Cancel") } }
+        )
+    }
 
     pendingHomeRemoval?.let { index ->
         AlertDialog(
@@ -745,27 +781,36 @@ fun MonitorScreen(
                         .align(Alignment.CenterStart)
                         .padding(start = 8.dp)
                 ) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        MapToolButton(label = "IN", symbol = "+", onClick = { mapView.controller.zoomIn() }, iconColor = Color(0xFF800080))
-                        MapToolButton(label = "OUT", symbol = "-", onClick = { mapView.controller.zoomOut() }, iconColor = Color(0xFF800080))
-                        MapToolButton(icon = Icons.Default.Place, label = "SENSOR", onClick = {
-                            followMode = MapFollowMode.TRACKER
-                            sensorPosition?.let { mapView.controller.setCenter(GeoPoint(it.lat, it.lng)) }
-                        }, iconColor = Color(0xFF10B981))
-                        MapToolButton(icon = Icons.Default.Person, label = "LOCAL", onClick = {
-                            followMode = MapFollowMode.VIEWER
-                            localPosition?.let { mapView.controller.setCenter(GeoPoint(it.lat, it.lng)) }
-                        }, iconColor = Color(0xFF06B6D4))
-                        MapToolButton(
-                            icon = Icons.Default.Home,
-                            label = "HOME",
-                            onClick = { isEditingHome = !isEditingHome },
-                            iconColor = if (isEditingHome) Color.White else Color(0xFF10B981),
-                            containerColor = if (isEditingHome) Color(0xFF10B981) else Color.White
-                        )
+                    // Two buttons a row, so the trail buttons (ISSUE-NOV17.7-O107) also fit a landscape map.
+                    Column(verticalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
+                            MapToolButton(label = "IN", symbol = "+", onClick = { mapView.controller.zoomIn() }, iconColor = Color(0xFF800080))
+                            MapToolButton(label = "OUT", symbol = "-", onClick = { mapView.controller.zoomOut() }, iconColor = Color(0xFF800080))
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
+                            MapToolButton(icon = Icons.Default.Place, label = "SENSOR", onClick = {
+                                followMode = MapFollowMode.TRACKER
+                                sensorPosition?.let { mapView.controller.setCenter(GeoPoint(it.lat, it.lng)) }
+                            }, iconColor = Color(0xFF10B981))
+                            MapToolButton(icon = Icons.Default.Person, label = "LOCAL", onClick = {
+                                followMode = MapFollowMode.VIEWER
+                                localPosition?.let { mapView.controller.setCenter(GeoPoint(it.lat, it.lng)) }
+                            }, iconColor = Color(0xFF06B6D4))
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
+                            MapToolButton(
+                                icon = Icons.Default.Home,
+                                label = "HOME",
+                                onClick = { isEditingHome = !isEditingHome },
+                                iconColor = if (isEditingHome) Color.White else Color(0xFF10B981),
+                                containerColor = if (isEditingHome) Color(0xFF10B981) else Color.White
+                            )
+                            MapToolButton(icon = Icons.Default.Delete, label = "CLEAR", onClick = { isClearTrailsPending = true }, iconColor = Color(0xFFF43F5E))
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
+                            MapToolButton(icon = TrailLoadIcon, label = "LOAD", onClick = onLoadTrails, iconColor = Color(0xFF10B981))
+                            MapToolButton(icon = TrailSaveIcon, label = "SAVE", onClick = onSaveTrails, iconColor = Color(0xFF6366F1))
+                        }
                     }
                 }
             }
@@ -777,8 +822,8 @@ fun MonitorScreen(
                     onSetRadius = onSetGeofenceRadius,
                     onRemovePoint = { pendingHomeRemoval = it },
                     onDone = { isEditingHome = false },
-                    // Clear of the map control column, which sits at the start edge.
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(start = 72.dp, end = 8.dp, bottom = 8.dp)
+                    // Clear of the map control columns, which sit at the start edge.
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(start = 124.dp, end = 8.dp, bottom = 8.dp)
                 )
             }
         }
@@ -1117,11 +1162,11 @@ internal fun homeMarkerIcon(context: android.content.Context): android.graphics.
 /** A Monitor action that unpairs the tracker, and what its confirmation dialog tells the user before it runs. */
 internal enum class UnpairAction(val consequence: String, val confirmLabel: String) {
     UNPAIR(
-        consequence = "The Monitor stops receiving this tracker until you pair again. Stored trail rows are kept.",
+        consequence = "The Monitor stops receiving this tracker until you pair again. Stored trails are kept.",
         confirmLabel = "Unpair"
     ),
     FULL_REINITIALIZATION(
-        consequence = "Full re-initialization unpairs this tracker, restores every alert setting, the siren, and the relay URL to their defaults, and deletes all stored trail rows.",
+        consequence = "Full re-initialization unpairs this tracker, restores every alert setting, the siren, and the relay URL to their defaults, and deletes all stored trails.",
         confirmLabel = "Re-initialize"
     )
 }

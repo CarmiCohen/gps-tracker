@@ -26,6 +26,28 @@ class MonitorDataStore(private val context: Context) {
     private val alertSettingsKey = stringPreferencesKey("alert_settings_json")
     private val sirenTypeKey = stringPreferencesKey("siren_type")
     private val geofenceKey = stringPreferencesKey("geofence_json")
+    private val trailClearTrackerKey = stringPreferencesKey("trail_clear_tracker")
+    private val trailClearAtKey = longPreferencesKey("trail_clear_at_ms")
+
+    /** The user's last trail clear, or null (ISSUE-NOV17.7-O107). */
+    val trailClear: Flow<TrailClear?> = context.monitorDataStore.data.map { prefs ->
+        val trackerId = prefs[trailClearTrackerKey]
+        val atMs = prefs[trailClearAtKey]
+        if (trackerId != null && atMs != null) TrailClear(trackerId, atMs) else null
+    }
+
+    /** Stores [clear]; null forgets the last one, so a new pairing gets the Sensor's whole history again. */
+    suspend fun saveTrailClear(clear: TrailClear?) {
+        context.monitorDataStore.edit { prefs ->
+            if (clear == null) {
+                prefs.remove(trailClearTrackerKey)
+                prefs.remove(trailClearAtKey)
+            } else {
+                prefs[trailClearTrackerKey] = clear.trackerId
+                prefs[trailClearAtKey] = clear.atMs
+            }
+        }
+    }
 
     val relayUrl: Flow<String?> = context.monitorDataStore.data.map { it[relayUrlKey] }
     val isDndBypassEnabled: Flow<Boolean> = context.monitorDataStore.data.map { it[isDndBypassEnabledKey] ?: false }

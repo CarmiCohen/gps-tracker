@@ -10,6 +10,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -26,7 +27,8 @@ import javax.inject.Singleton
 @Singleton
 class MonitorRepository @Inject constructor(
     private val trailDao: TrailDao,
-    private val signalingClient: SignalingClient
+    private val signalingClient: SignalingClient,
+    private val dataStore: MonitorDataStore
 ) {
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val ledger = BackfillLedger()
@@ -57,8 +59,12 @@ class MonitorRepository @Inject constructor(
      */
     fun takeRowCounts(): RowCounts = RowCounts(liveRows.getAndSet(0), backfilledRows.getAndSet(0), missingRows)
 
-    /** Clears all stored trail entries (ISSUE-NOV7.1-O35). */
-    suspend fun clearTrail() {
+    /**
+     * Clears all stored trail entries (ISSUE-NOV7.1-O35). With [trackerId] the clear is kept: that Sensor's older rows
+     * are not asked for or stored again (ISSUE-NOV17.7-O107); without it the next pairing gets the whole history.
+     */
+    suspend fun clearTrail(trackerId: String?, nowMs: Long = System.currentTimeMillis()) {
+        dataStore.saveTrailClear(trackerId?.let { TrailClear(it, nowMs) })
         trailDao.deleteAll()
         missingRows = 0L
     }
@@ -100,9 +106,10 @@ class MonitorRepository @Inject constructor(
                 SystemLogger.i("Backfill", "Received backfill chunk for req: ${response.requestId}")
                 
                 // Optimization: Batch ingestion for backfill (SIMP-REVOL30.6-S1)
+                val clear = dataStore.trailClear.first()
                 val entities = response.updates.map { update ->
                     update.toEntity()
-                }
+                }.filter { clear.keeps(it) }
                 trailDao.insertAll(entities)
                 backfilledRows.addAndGet(entities.size)
 
@@ -129,8 +136,11 @@ class MonitorRepository @Inject constructor(
     private suspend fun processIncomingUpdate(update: LocationUpdate) {
         val lastSeq = trailDao.getLastSequenceId(update.deviceId) ?: 0L
 
+        val entity = update.toEntity()
+        if (!dataStore.trailClear.first().keeps(entity)) return
+
         // Stored first: a hole can only be read from the table once a newer row exists.
-        trailDao.insert(update.toEntity())
+        trailDao.insert(entity)
         liveRows.incrementAndGet()
 
         val isSequenceJump = update.sequenceId > lastSeq + 1
@@ -163,6 +173,8 @@ class MonitorRepository @Inject constructor(
             val oldest = trailDao.getOldestSequenceId(deviceId)
             return gaps.filterNot { it.lastMissing + 1 == oldest }
         }
+        // The rows before a clear are not missing (ISSUE-NOV17.7-O107).
+        if (dataStore.trailClear.first().clearedStartOf(deviceId)) return gaps
         return if (first > 1) gaps + SequenceGap(1, first - 1) else gaps
     }
 

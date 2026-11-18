@@ -59,9 +59,14 @@ class BackfillContentionTest {
 
     private val testDeviceId = "test-sensor-123"
 
+    @Inject
+    lateinit var dataStore: MonitorDataStore
+
     @Before
     fun init() {
         hiltRule.inject()
+        // A trail clear made on this phone must not drop the test rows (ISSUE-NOV17.7-O107).
+        kotlinx.coroutines.runBlocking { dataStore.saveTrailClear(null) }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -206,9 +211,10 @@ object TestMonitorModule {
     @Singleton
     fun provideMonitorRepository(
         trailDao: TrailDao,
-        signalingClient: SignalingClient
+        signalingClient: SignalingClient,
+        dataStore: MonitorDataStore
     ): MonitorRepository {
-        return MonitorRepository(trailDao, signalingClient)
+        return MonitorRepository(trailDao, signalingClient, dataStore)
     }
 }
 

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov18.4-noise - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov18.5 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1110,8 +1110,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **220.1 Units:** `AcousticDetectorTest.aCoughingFitDoesNotAlert` (0.3 s loud, 0.2 s pause for 10 s, 42 dB over -75 dBFS: no alert; it alerted under the old 1 s within 2 s); `aNoiseWithGapsAlertsWhenItsLoudFramesAddUpToTwoSeconds` (two loud frames to one quiet: the 20th loud frame alerts; one in two: none); the other tests follow `ACOUSTIC_CONFIRM_MS`.
 *   **220.2 Live (device):** with noise detection on in the A15 Sensor, cough a few short bursts: no noise alert; after 60 s of quiet, talk loudly for 3 s: one noise alert (Monitor Events, or the Sensor's DETAIL `not sent` line within the cool-down).
 
+## Chapter 221 - Save, Load And Clear Trails On The Map (Nov18.5)
+**Status: L / A** - `MonitorTrailFileTest` (6) and `BackfillContentionTest` passed; 221.2 on the A15 with a debug Monitor paired to T: SAVE 10176 rows, CLEAR, after 80 s only 683 rows of T all newer than the clear, LOAD 10176 rows back (ISSUE-NOV17.7-O107, SOT 1.460)
+*   **221.1 Units:** `MonitorTrailFileTest`: every row survives the trail file; a settings file, non-JSON, a file without `format` and a newer `formatVersion` are refused with a message; the name is `GPS-Monitor-trails-yyyyMMdd-HHmm.json`; a `TrailClear` keeps away only the cleared tracker's rows older than the clear, and only that tracker's missing start is no gap.
+*   **221.2 Live (device):** on a paired Monitor the map buttons stand in 4 rows of two (IN/OUT, SENSOR/LOCAL, HOME/CLEAR, LOAD/SAVE); SAVE writes the file (toast `Trails saved: N points`); CLEAR asks, then the trail is gone and stays gone over 60 s while the Sensor sends; LOAD of the saved file brings the rows back (toast `Trails loaded: N points`).
+
 ---
-**Active Testing Chapters: 209 of 220**
+**Active Testing Chapters: 210 of 221**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
