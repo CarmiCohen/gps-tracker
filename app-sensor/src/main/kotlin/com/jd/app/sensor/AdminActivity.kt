@@ -67,13 +67,18 @@ class AdminActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Opening the app starts a stopped Sensor at once, behind the "System Idle" screen, without the unlock tap
-        // (ISSUE-NOV12.6-O92: after a force-stop such as an `am instrument` run nothing else starts it). Only on a fresh
-        // launch, so a rotation does not undo a stop from the console; a running service only gets a new start command.
-        if (savedInstanceState == null && hasRequiredSensorPermissions(this)) {
-            SystemLogger.i("AdminActivity", "App opened: starting SensorService")
-            startSensorService(this)
-        }
+        // Opening the app, or bringing it back to the front, starts a stopped Sensor at once, behind the "System Idle"
+        // screen, without the unlock tap (ISSUE-NOV12.6-O92, ISSUE-NOV18.0-O115); not after a rotation.
+        lifecycle.addObserver(
+            ServiceStartOnOpen(
+                freshLaunch = savedInstanceState == null,
+                canStart = { hasRequiredSensorPermissions(this) },
+                start = {
+                    SystemLogger.i("AdminActivity", "App opened: starting SensorService")
+                    startSensorService(this)
+                }
+            )
+        )
         setContent {
             RevolutionTheme {
                 // Back never closes the Sensor: screens deeper in register their own handlers (composed later,

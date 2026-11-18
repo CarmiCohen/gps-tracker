@@ -2,6 +2,10 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov18.0)
+- **Reopening The Sensor App Restarts A Stopped Service (ISSUE-NOV18.0-O115, Medium; opened and closed in Nov18.0)**: found running chapter 212.1 on the A15: after `STOP SERVICE`, Home and the launcher icon brought back the same `AdminActivity` (no `onCreate`), and the service stayed stopped, against the dialog text `... or the Sensor app is opened again` (O96). Cause: `AdminActivity` started the service only in `onCreate` with `savedInstanceState == null` (O92), so only a fresh launch started it. Fix: `ServiceStartOnOpen.kt` (new, app-sensor), a `DefaultLifecycleObserver` that starts the service (if `hasRequiredSensorPermissions`) at every `onStart`, except the first one of a console recreated by a rotation, so a rotation still does not undo a stop; `AdminActivity` adds it instead of the `onCreate` start. Any return to the console (from Settings during Phone Setup, screen on again) now restarts a stopped service. Tests: `ServiceStartOnOpenTest` (new, 5, plain JVM with `LifecycleRegistry.createUnsafe`); on the A15 (debug): stop, Home, launcher icon: running again on the same activity; stop, rotate to landscape and back (activity recreated): still stopped; 212.1 now passes. Chapter 216, SOT 1.455.
+- **Verification (Nov18.0)**: `run_tests.ps1 test assembleDebug assembleRelease`: PASSED, 919 tests, no new warning (kapt, O72). A15: `ProductionReadinessAuditTest` 3/3; release Sensor cold start `davey_over_500ms=0 stacklog=0 fatal=0`, debug Sensor restored. Monitor unchanged, not audited (not installed on the A15; S21FE disconnected). Also the index row Nov17.16 (d8d25c7).
+
 ## ✅ Resolved Issues (Nov17.16)
 - **A Test Telemetry Update Is No Longer Lost Before The Repository Listens (ISSUE-NOV12.6-O95, Low)**: `BackfillGapRecoveryTest.aMissingStartIsRequestedOnAFreshPairing` timed out (15000 ms) in the full Monitor run on the S21FE (2026-11-12) but passed alone. Cause: `FakeSignalingClient` emitted with `tryEmit` into a `MutableSharedFlow` without replay, which drops a value while it has no collector; `MonitorRepository` starts collecting on `Dispatchers.IO` only after Hilt creates it in `setUp`, and this test is the only one in its class that emits at once, with no database work in between, so on a busy device the update was lost and no backfill request ever came. Fix (test code only, `BackfillContentionTest.kt`): `emitTelemetry` and `emitBackfillResponse` wait up to 5 s for a collector (`subscriptionCount > 0`) and fail on a dropped value instead of silently losing it; the timeout was not raised. Tests: full Monitor `am instrument` on the A15 OK (63 tests); the S21FE run was not done (phone disconnected; user chose to close). O93 (`target=null` after the S21FE run) stays open on its own.
 
@@ -465,6 +469,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov17.11: [SOT Count: 1023 (Rules: 523), Open: H:0, M:3, L:21, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 435), QA: 145]**
 - **Nov17.9: [SOT Count: 1022 (Rules: 522), Open: H:0, M:3, L:20, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 432), QA: 144]**
 - **Nov17.8: [SOT Count: 1021 (Rules: 521), Open: H:0, M:3, L:21, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 429), QA: 143]**
 - **Nov17.7: [SOT Count: 1020 (Rules: 520), Open: H:0, M:3, L:16, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 427), QA: 142]**

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov17.16 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov18.0 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1068,7 +1068,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **211.2 Live (device, H):** on the resting, armed A15 (vibration, tilt, lift, noise on): one knock on the table and a door slam raise nothing; three knocks within 10 s, a tilt held 3 s, a pickup held in the hand, and a 2 s shout each raise one alert; a second tilt within a minute gives only the Events line `... not sent, the same kind alerted less than 60 s ago`.
 
 ## Chapter 212 - The STOP SERVICE Dialog Tells When Sensing Resumes (Nov17.13)
-**Status: A** - text-only change, both builds and the A15 release Sensor audit pass; 212.1 not run on the device (it stops the service) (ISSUE-NOV12.7-O96, SOT 1.451)
+**Status: A** - text-only change, both builds and the A15 release Sensor audit pass; 212.1 failed on the A15 in Nov18.0 (reopening did not restart the service, O115) and passed after the Nov18.0 fix (ISSUE-NOV12.7-O96, SOT 1.451)
 *   **212.1 Dialog (device):** in the Sensor console tap `STOP SERVICE`: the confirmation reads `... until the phone restarts, the app is updated, or the Sensor app is opened again.`; confirm, then reopen the Sensor app: the service runs again.
 
 ## Chapter 213 - Tapping an App in Android's Active Apps List Opens It (Nov17.14)
@@ -1085,8 +1085,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: A** - full Monitor `am instrument` on the A15 OK (63 tests); 215.1 on the S21FE not run (phone disconnected) (ISSUE-NOV12.6-O95, SOT 1.454)
 *   **215.1 Full Monitor run (device):** `am instrument -w com.jd.app.monitor.test/com.jd.app.monitor.HiltTestRunner` on the S21FE (airplane mode on) and the A15: `BackfillGapRecoveryTest.aMissingStartIsRequestedOnAFreshPairing` passes in the full run, not only alone; a `FakeSignalingClient` value without a collector after 5 s fails at once instead of timing out later.
 
+## Chapter 216 - Reopening The Sensor App Restarts A Stopped Service (Nov18.0)
+**Status: A** - `ServiceStartOnOpenTest` 5/5; 216.2 passed on the A15 (debug) (ISSUE-NOV18.0-O115, SOT 1.455)
+*   **216.1 Start on open (unit):** `ServiceStartOnOpenTest`: a fresh launch starts the service; each return of the console to the front starts it again; the first start after a rotation is skipped, a later return starts it; without the required permissions nothing starts.
+*   **216.2 Live (device):** on the A15 Sensor console tap `STOP SERVICE` and confirm, press Home, tap the Sensor's launcher icon: `SensorService` runs again (`dumpsys activity services`); stop again and rotate the phone to landscape and back: the service stays stopped.
+
 ---
-**Active Testing Chapters: 204 of 215**
+**Active Testing Chapters: 205 of 216**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
