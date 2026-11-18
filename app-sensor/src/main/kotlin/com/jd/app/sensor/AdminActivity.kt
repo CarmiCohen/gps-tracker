@@ -589,9 +589,7 @@ fun SensorAdminConsole(
                     IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(28.dp)) {
                         Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(15.dp))
                     }
-                    IconButton(onClick = onSettingsClick, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(15.dp))
-                    }
+                    // One setup icon (ISSUE-NOV17.7-O109): the Settings screen opens from the Setup dialog's SETTINGS button.
                     IconButton(onClick = onEventsClick, modifier = Modifier.size(28.dp)) {
                         Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
                     }
@@ -778,7 +776,7 @@ fun SensorAdminConsole(
                     showSetupDialog = false
                     onSettingsClick()
                 }) {
-                    Text("CHANGE RELAY URL")
+                    Text("SETTINGS")
                 }
             }
         )

@@ -81,10 +81,17 @@ class UnpairConfirmationTest {
         composeRule.onNodeWithText(label).performScrollTo().performClick()
     }
 
+    /** One setup icon (ISSUE-NOV17.7-O109): unpairing is the Setup dialog's UNPAIR button, the menu has no gear. */
+    private fun tapUnpair() {
+        composeRule.onNodeWithContentDescription("Setup").performClick()
+        composeRule.onNodeWithText("UNPAIR").performClick()
+    }
+
     @Test
     fun gearAsksBeforeUnpairing() {
         showMonitorScreen()
-        composeRule.onNodeWithContentDescription("Settings / Re-pair").performClick()
+        composeRule.onNodeWithContentDescription("Settings / Re-pair").assertDoesNotExist()
+        tapUnpair()
         assertConfirmationShownWithoutUnpairing()
     }
 
@@ -142,6 +149,15 @@ class UnpairConfirmationTest {
         composeRule.onNodeWithText("Version: $version").assertDoesNotExist()
     }
 
+    /** ISSUE-NOV17.7-O108: the map has a FENCE button, and tapping it twice leaves the map usable. */
+    @Test
+    fun theFenceButtonToggles() {
+        showMonitorScreen()
+        composeRule.onNodeWithText("FENCE").performClick()
+        composeRule.onNodeWithText("FENCE").performClick()
+        composeRule.onNodeWithText("FENCE").assertExists()
+    }
+
     @Test
     fun phoneSetupOpenMapStartsHomePointEditing() {
         showMonitorScreen()
@@ -189,7 +205,7 @@ class UnpairConfirmationTest {
     @Test
     fun cancelKeepsThePairing() {
         showMonitorScreen()
-        composeRule.onNodeWithContentDescription("Settings / Re-pair").performClick()
+        tapUnpair()
         composeRule.onNodeWithText("Cancel").performClick()
 
         composeRule.onNodeWithText("Unpair from tracker T?").assertDoesNotExist()
@@ -199,7 +215,7 @@ class UnpairConfirmationTest {
     @Test
     fun confirmUnpairsOnce() {
         showMonitorScreen()
-        composeRule.onNodeWithContentDescription("Settings / Re-pair").performClick()
+        tapUnpair()
         composeRule.onNodeWithText("Unpair").performClick()
 
         composeRule.onNodeWithText("Unpair from tracker T?").assertDoesNotExist()

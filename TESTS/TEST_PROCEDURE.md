@@ -577,7 +577,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ## Chapter 127 - Unpair Confirmation (Nov7.1)
 **Status: L / A** - 127.1 and 127.2 automated; 127.3 verified on the A15 through the production relay
-*   **127.1 Every Unpair Control Asks First:** On the paired Monitor screen, tap the `Settings / Re-pair` gear, the `Disconnect` X, and each of the three `CLEAN` actions in turn. Verify that each shows `Unpair from tracker <id>?` and that the pairing is not cleared. Automated by `UnpairConfirmationTest.gearAsksBeforeUnpairing`, `disconnectAsksBeforeUnpairing`, and `cleanActionsAskBeforeUnpairing` (ISSUE-NOV5.2-O15).
+*   **127.1 Every Unpair Control Asks First:** On the paired Monitor screen, tap `Setup` then `UNPAIR` (the gear until Nov18.7, ISSUE-NOV17.7-O109), the `Disconnect` X, and each of the three `CLEAN` actions in turn. Verify that each shows `Unpair from tracker <id>?` and that the pairing is not cleared. Automated by `UnpairConfirmationTest.gearAsksBeforeUnpairing`, `disconnectAsksBeforeUnpairing`, and `cleanActionsAskBeforeUnpairing` (ISSUE-NOV5.2-O15).
 *   **127.2 Cancel And Confirm:** Verify that `Cancel` closes the dialog and keeps the pairing, and that `Unpair` clears it exactly once and returns to the pairing screen. Automated by `cancelKeepsThePairing` and `confirmUnpairsOnce`.
 *   **127.3 Unpair On Hardware:** On the A15, tap the gear and then `Cancel`, and verify that the map screen and telemetry stay. Tap `Disconnect` and then `Unpair`, and verify that the pairing screen opens and the session notification stops. Pair again with `T`.
 
@@ -894,7 +894,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ## Chapter 183 - No Button That Does Nothing (Nov12.3)
 **Status: A / L** - `UnpairConfirmationTest` 8/8 and `HudLayoutAuditTest` 4/4 by `am instrument` on the A15 (airplane mode, ISSUE-NOV12.3-O90); 183.3 verified on the A15 (ISSUE-NOV10.8-O76, SOT 1.422)
-*   **183.1 Menu Bars (instrumented):** `UnpairConfirmationTest` and `HudLayoutAuditTest`: the Monitor bar shows Setup, Settings / Re-pair, Map, Info and Close within 320 dp, and no Tools, Events, Graphs or Disconnect; the red X calls close once and never shows the unpair dialog; the gear still asks before unpairing.
+*   **183.1 Menu Bars (instrumented):** `UnpairConfirmationTest` and `HudLayoutAuditTest`: the Monitor bar shows Setup, Map, Events, Info, Graphs and Close within 320 dp, and no Tools, Disconnect or `Settings / Re-pair` gear (removed in Nov18.7, ISSUE-NOV17.7-O109); the red X calls close once and never shows the unpair dialog; Setup's UNPAIR still asks before unpairing.
 *   **183.2 Setup Pages (instrumented):** Monitor `Setup`, `PHONE`: no `Authorize Exact Alarms`, `Refresh Status` or `Diagnostics`; `Open Map` closes the page and shows the home point editor (`DONE`).
 *   **183.3 Live (device):** on the A15 the Monitor bar holds Setup, Settings, Map, Info and X; X goes to the launcher, the Monitor stays paired and its session runs. The Sensor bar holds Setup, Settings, Info and X; X sends it to the background and the Sensor service keeps running.
 
@@ -1120,8 +1120,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **222.1 Instrumented:** `UnpairConfirmationTest.theMapShowsTheVersion`: the map shows the installed version name and no `Version: <name>` text.
 *   **222.2 Live (device):** the map's bottom-left label reads the version name only (for example `Nov18.6`); the pairing wizard keeps `Version: <name>`.
 
+## Chapter 223 - Show Or Hide The Fence, One Setup Icon (Nov18.7)
+**Status: A** - `UnpairConfirmationTest` (12) and `HudLayoutAuditTest` passed on the A15; 223.3 not run (ISSUE-NOV17.7-O108, ISSUE-NOV17.7-O109, SOT 1.462)
+*   **223.1 Fence (instrumented):** `UnpairConfirmationTest.theFenceButtonToggles`: the map has a FENCE button that can be tapped on and off.
+*   **223.2 One setup icon (instrumented):** `UnpairConfirmationTest.gearAsksBeforeUnpairing`, `cancelKeepsThePairing`, `confirmUnpairsOnce`: no `Settings / Re-pair` gear; Setup, then UNPAIR, asks first.
+*   **223.3 Live (device):** on a paired Monitor with Home Points, FENCE (green when on) hides and shows the circles, the Home squares stay; the circle is fainter than before; HOME editing shows the circles even when hidden. Both menus show one setup icon (wrench); the Sensor's Setup dialog has SETTINGS, which opens the Settings screen.
+
 ---
-**Active Testing Chapters: 211 of 222**
+**Active Testing Chapters: 212 of 223**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

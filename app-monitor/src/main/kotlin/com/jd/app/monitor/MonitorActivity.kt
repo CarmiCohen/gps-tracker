@@ -219,6 +219,10 @@ private const val WORLD_ZOOM = 3.0
 /** The space between the map's control buttons. */
 private val MAP_BUTTON_GAP = 8.dp
 
+/** The geofence circle's alphas (0-255): a faint fill and a half-transparent edge (ISSUE-NOV17.7-O108; were 40 and 255). */
+internal const val FENCE_FILL_ALPHA = 20
+internal const val FENCE_OUTLINE_ALPHA = 160
+
 /** The scale bar's distance from the map's right and bottom edges, in pixels. */
 private const val SCALE_BAR_OFFSET_PX = 24
 private const val DEVICE_ZOOM = 18.0
@@ -377,6 +381,8 @@ fun MonitorScreen(
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
+    // The FENCE button shows or hides the geofence circles (ISSUE-NOV17.7-O108); editing Home Points always shows them.
+    var isFenceVisible by rememberSaveable { mutableStateOf(true) }
     var showSetupDialog by rememberSaveable { mutableStateOf(false) }
     // What the Sensor phone lacks, as the Sensor reports it (ISSUE-NOV10.8-O83 part 2).
     val setupWarnings = remember(sensorSetup, alertSettings.acousticAlert) { sensorSetupWarnings(sensorSetup, alertSettings) }
@@ -612,7 +618,7 @@ fun MonitorScreen(
     val breaches = remember(trail) { geofenceBreaches(trail) }
 
     // Automatic Centering & Connection Logic
-    LaunchedEffect(remoteHudState.isPeerActive, trail, localTrail, followMode, localPosition, geofence, isEditingHome) {
+    LaunchedEffect(remoteHudState.isPeerActive, trail, localTrail, followMode, localPosition, geofence, isEditingHome, isFenceVisible) {
         mapView.overlays.clear()
         mapView.overlays.add(scaleBar)
 
@@ -628,10 +634,12 @@ fun MonitorScreen(
 
         geofence.points.forEachIndexed { index, home ->
             val center = GeoPoint(home.lat, home.lng)
-            mapView.overlays.add(Polygon(mapView).apply {
+            // FENCE hides only the circle; the Home marker stays (ISSUE-NOV17.7-O108).
+            if (isFenceVisible || isEditingHome) mapView.overlays.add(Polygon(mapView).apply {
                 points = Polygon.pointsAsCircle(center, geofence.radiusMeters)
-                fillPaint.color = android.graphics.Color.argb(40, 16, 185, 129)
-                outlinePaint.color = android.graphics.Color.rgb(16, 185, 129)
+                // More transparent, so the map under the fence stays readable (ISSUE-NOV17.7-O108).
+                fillPaint.color = android.graphics.Color.argb(FENCE_FILL_ALPHA, 16, 185, 129)
+                outlinePaint.color = android.graphics.Color.argb(FENCE_OUTLINE_ALPHA, 16, 185, 129)
                 outlinePaint.strokeWidth = 3f
                 setOnClickListener { _, _, _ -> false } // Taps inside the circle still reach the map.
             })
@@ -715,7 +723,6 @@ fun MonitorScreen(
                     monitorId = monitorId,
                     trackerId = trackerId,
                     onSetup = { showSetupDialog = true },
-                    onUnpair = requestUnpair,
                     onMap = { followMode = MapFollowMode.AUTO },
                     onEvents = { showEventsOverlay = true },
                     onInfo = { showInfoOverlay = true },
@@ -811,6 +818,15 @@ fun MonitorScreen(
                             MapToolButton(icon = TrailLoadIcon, label = "LOAD", onClick = onLoadTrails, iconColor = Color(0xFF10B981))
                             MapToolButton(icon = TrailSaveIcon, label = "SAVE", onClick = onSaveTrails, iconColor = Color(0xFF6366F1))
                         }
+                        Row(horizontalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
+                            MapToolButton(
+                                label = "FENCE",
+                                symbol = "◯",
+                                onClick = { isFenceVisible = !isFenceVisible },
+                                iconColor = if (isFenceVisible) Color.White else Color(0xFF10B981),
+                                containerColor = if (isFenceVisible) Color(0xFF10B981) else Color.White
+                            )
+                        }
                     }
                 }
             }
@@ -894,6 +910,17 @@ fun MonitorScreen(
                             Text("CLEAN", fontSize = 10.sp)
                         }
                     }
+                    // Unpairing moved here from the menu's gear (ISSUE-NOV17.7-O109); it still asks first (ISSUE-NOV5.2-O15).
+                    Button(
+                        onClick = {
+                            showSetupDialog = false
+                            requestUnpair()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = com.jd.core.ui.StatusRed)
+                    ) {
+                        Text("UNPAIR", fontSize = 10.sp)
+                    }
 
                     if (isEditingRelayUrl) {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -938,15 +965,14 @@ fun MonitorMenuBar(
     monitorId: String,
     trackerId: String,
     onSetup: () -> Unit,
-    onUnpair: () -> Unit,
     onMap: () -> Unit,
     onEvents: () -> Unit,
     onInfo: () -> Unit,
     onGraphs: () -> Unit,
     onClose: () -> Unit
 ) {
-    // Events since ISSUE-NOV10.8-O84 Nov15.4, the detailed Info since Nov15.5, the Graphs since Nov15.6. Unpairing is only behind the gear, the red X
-    // sends the app to the background (ISSUE-NOV10.8-O76).
+    // Events since ISSUE-NOV10.8-O84 Nov15.4, the detailed Info since Nov15.5, the Graphs since Nov15.6. One setup icon: unpairing
+    // is the Setup dialog's UNPAIR button, no longer a gear (ISSUE-NOV17.7-O109); the red X sends the app to the background (ISSUE-NOV10.8-O76).
     Surface(
         color = Color.Black.copy(alpha = 0.85f),
         contentColor = Color.White
@@ -963,9 +989,6 @@ fun MonitorMenuBar(
             ) {
                 IconButton(onClick = onSetup, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(15.dp))
-                }
-                IconButton(onClick = onUnpair, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings / Re-pair", tint = Color.White, modifier = Modifier.size(15.dp))
                 }
                 IconButton(onClick = onMap, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Place, contentDescription = "Map", tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
