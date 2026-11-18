@@ -2,6 +2,10 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov18.1)
+- **Smaller Home Point Squares (ISSUE-NOV17.7-O104, Low; user request 2026-11-17)**: the Monitor map drew each Home Point as a 20 dp green square, close to the 24 dp device dots. Fix: `MonitorActivity.kt` `homeMarkerIcon` uses the new `HOME_MARKER_SIZE_DP = 10` (half the size) and is `internal` for the test. Tests: `HomeMarkerIconTest` (new, instrumented, 1) passed on the A15. Chapter 217, SOT 1.456.
+- **Verification (Nov18.1)**: `run_tests.ps1 test assembleDebug assembleRelease`: PASSED, 919 tests, no new warning. A15: release Monitor cold start `davey_over_500ms=0 stacklog=0 fatal=0`, then the Monitor was uninstalled again (as before the session). `ProductionReadinessAuditTest` and the Sensor audit not run (Sensor unchanged). 217.2 (looking at the map) not run: no paired Monitor on a phone. Also the index row Nov18.0 (7ead0fb).
+
 ## ✅ Resolved Issues (Nov18.0)
 - **Reopening The Sensor App Restarts A Stopped Service (ISSUE-NOV18.0-O115, Medium; opened and closed in Nov18.0)**: found running chapter 212.1 on the A15: after `STOP SERVICE`, Home and the launcher icon brought back the same `AdminActivity` (no `onCreate`), and the service stayed stopped, against the dialog text `... or the Sensor app is opened again` (O96). Cause: `AdminActivity` started the service only in `onCreate` with `savedInstanceState == null` (O92), so only a fresh launch started it. Fix: `ServiceStartOnOpen.kt` (new, app-sensor), a `DefaultLifecycleObserver` that starts the service (if `hasRequiredSensorPermissions`) at every `onStart`, except the first one of a console recreated by a rotation, so a rotation still does not undo a stop; `AdminActivity` adds it instead of the `onCreate` start. Any return to the console (from Settings during Phone Setup, screen on again) now restarts a stopped service. Tests: `ServiceStartOnOpenTest` (new, 5, plain JVM with `LifecycleRegistry.createUnsafe`); on the A15 (debug): stop, Home, launcher icon: running again on the same activity; stop, rotate to landscape and back (activity recreated): still stopped; 212.1 now passes. Chapter 216, SOT 1.455.
 - **Verification (Nov18.0)**: `run_tests.ps1 test assembleDebug assembleRelease`: PASSED, 919 tests, no new warning (kapt, O72). A15: `ProductionReadinessAuditTest` 3/3; release Sensor cold start `davey_over_500ms=0 stacklog=0 fatal=0`, debug Sensor restored. Monitor unchanged, not audited (not installed on the A15; S21FE disconnected). Also the index row Nov17.16 (d8d25c7).
@@ -469,6 +473,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov17.12-debounce: [SOT Count: 1024 (Rules: 524), Open: H:0, M:3, L:21, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 437), QA: 146]**
 - **Nov17.11: [SOT Count: 1023 (Rules: 523), Open: H:0, M:3, L:21, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 435), QA: 145]**
 - **Nov17.9: [SOT Count: 1022 (Rules: 522), Open: H:0, M:3, L:20, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 432), QA: 144]**
 - **Nov17.8: [SOT Count: 1021 (Rules: 521), Open: H:0, M:3, L:21, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 429), QA: 143]**

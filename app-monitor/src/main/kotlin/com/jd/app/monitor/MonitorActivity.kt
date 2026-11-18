@@ -1101,10 +1101,13 @@ private fun deviceMarkerIcon(context: android.content.Context, color: Int): andr
     return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
 }
 
+/** The Home Point square's side: half the 20 dp it had up to Nov18.0 (ISSUE-NOV17.7-O104). */
+internal const val HOME_MARKER_SIZE_DP = 10
+
 /** A green square, so a Home Point cannot be mistaken for the tracker's dot or an OUT dot. */
-private fun homeMarkerIcon(context: android.content.Context): android.graphics.drawable.Drawable =
+internal fun homeMarkerIcon(context: android.content.Context): android.graphics.drawable.Drawable =
     android.graphics.drawable.ShapeDrawable(android.graphics.drawable.shapes.RectShape()).apply {
-        val sizePx = (20 * context.resources.displayMetrics.density).toInt()
+        val sizePx = (HOME_MARKER_SIZE_DP * context.resources.displayMetrics.density).toInt()
         paint.color = android.graphics.Color.rgb(16, 185, 129)
         intrinsicWidth = sizePx
         intrinsicHeight = sizePx
