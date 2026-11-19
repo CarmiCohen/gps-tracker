@@ -484,20 +484,18 @@ fun MonitorScreen(
         )
     }
 
+    // Each overlay's OverlayHeader handles Back: it closes the overlay (SIMP-NOV10.8-S1).
     if (showInfoOverlay) {
-        BackHandler { showInfoOverlay = false }
         infoOverlay { showInfoOverlay = false }
         return
     }
 
     if (showGraphsOverlay) {
-        BackHandler { showGraphsOverlay = false }
         graphsOverlay { showGraphsOverlay = false }
         return
     }
 
     if (showEventsOverlay) {
-        BackHandler(onBack = closeEvents)
         overlayStates.SaveableStateProvider(EVENTS_STATE_KEY) {
             com.jd.core.ui.EventLogOverlay(
                 events = events,
@@ -514,7 +512,6 @@ fun MonitorScreen(
     }
 
     if (showAlertsOverlay) {
-        BackHandler { showAlertsOverlay = false }
         com.jd.core.ui.AlertManagementOverlay(
             draftAlertSettings = alertSettings,
             onUpdateAlertSettings = onUpdateAlertSettings,
@@ -524,7 +521,6 @@ fun MonitorScreen(
     }
 
     if (showSoundOverlay) {
-        BackHandler { showSoundOverlay = false }
         com.jd.core.ui.AlarmSoundOverlay(
             draftAlertSettings = alertSettings,
             selectedSirenType = sirenType,
@@ -539,7 +535,6 @@ fun MonitorScreen(
     }
 
     if (showPhoneSetupOverlay) {
-        BackHandler { showPhoneSetupOverlay = false }
         com.jd.core.ui.PhoneSetupOverlay(
             homePointsCount = geofence.points.size,
             onOpenAppInfo = {
@@ -580,7 +575,6 @@ fun MonitorScreen(
     }
 
     if (showCleanSetupOverlay) {
-        BackHandler { showCleanSetupOverlay = false }
         com.jd.core.ui.CleanSetupOverlay(
             onClearHomePoints = onClearHomePoints,
             onExportSettings = onExportSettings,

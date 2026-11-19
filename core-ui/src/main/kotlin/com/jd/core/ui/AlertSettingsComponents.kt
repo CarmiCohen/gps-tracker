@@ -41,21 +41,7 @@ fun AlertManagementOverlay(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "ALERTS & SENSORS SETUP",
-                    color = ViewerCyan,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                TextButton(onClick = onClose) {
-                    Text("CLOSE (X)", color = Color.White)
-                }
-            }
+            OverlayHeader(title = "ALERTS & SENSORS SETUP", color = ViewerCyan, onClose = onClose)
 
             Spacer(Modifier.height(12.dp))
 
@@ -251,16 +237,7 @@ fun AlarmSoundOverlay(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("SIREN & AUDIO SETUP", color = StatusOrange, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                TextButton(onClick = onClose) {
-                    Text("CLOSE (X)", color = Color.White)
-                }
-            }
+            OverlayHeader(title = "SIREN & AUDIO SETUP", color = StatusOrange, onClose = onClose)
 
             Spacer(Modifier.height(16.dp))
 

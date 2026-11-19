@@ -32,6 +32,7 @@ android {
 dependencies {
     implementation(project(":core-shared"))
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.activity:activity-compose:1.8.2") // BackHandler in OverlayHeader (SIMP-NOV10.8-S1).
     
     // Compose Dependencies
     val composeBom = platform("androidx.compose:compose-bom:2024.02.01")

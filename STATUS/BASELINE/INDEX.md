@@ -4,13 +4,14 @@ Since Nov8.14 the baseline of a version is its **git tag**: the exact files of t
 `git show <tag>:<path>` (for example `git show Nov8.13:DOCS/issues.md`), or listed with `git ls-tree -r --name-only <tag>`.
 No copies are made any more. User decision, 2026-11-08 (option C).
 
-- **One line per version**, newest first, added at Completion step 10. The commit is the short hash of `git rev-parse --short=7 <tag>^{commit}`, so a tag that is moved or set on the wrong commit is caught by comparing the two. The version being closed has no commit yet, so its row says `pending`; the next session replaces it with the hash once the user has run the Git block. `BaselineIndexTest` (chapter 157) enforces all of this.
+- **One line per version**, newest first, added at Completion step 10. The commit is the short hash of `git rev-parse --short=7 <tag>^{commit}`, so a tag that is moved or set on the wrong commit is caught by comparing the two. The version being closed has no commit yet, so its row says `pending` in its own commit; right after Claude commits, tags and pushes it (Completion step 9, user decision 2026-11-19), Claude replaces `pending` with the hash, and that edit is committed with the next version. `BaselineIndexTest` (chapter 157) enforces all of this.
 - **The subfolders** (`Nov1.0` to `Nov8.13`) are the old hand-made copies. They are frozen and kept for history (Rule 9), but they are not authoritative: many are partial (ISSUE-NOV8.5-O47). When a copy and the tag disagree, the tag is right.
 - **Notes**: `no copy` = no subfolder; `partial copy` = the subfolder lacks files or content; `no tag` = the version was committed inside another version's commit.
 
 | Version | Commit | Notes |
 | :--- | :--- | :--- |
-| Nov19.0 | pending | |
+| Nov19.1 | pending | |
+| Nov19.0 | 554770b | |
 | Nov18.12 | 9be92fb | |
 | Nov18.11 | 4d5532a | |
 | Nov18.10 | 1836d9b | |

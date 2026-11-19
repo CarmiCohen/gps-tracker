@@ -167,8 +167,8 @@ class AdminActivity : ComponentActivity() {
                                     startSensorService(context)
                                 }
                             }
+                            // Each overlay's OverlayHeader handles Back: it closes the overlay (SIMP-NOV10.8-S1).
                             if (showInfoOverlay) {
-                                BackHandler { showInfoOverlay = false }
                                 val infoScreen by viewModel.infoScreen.collectAsStateWithLifecycle()
                                 com.jd.core.ui.DeviceInfoOverlay(
                                     title = "SENSOR INFO",
@@ -176,7 +176,6 @@ class AdminActivity : ComponentActivity() {
                                     onClose = { showInfoOverlay = false }
                                 )
                             } else if (showGraphsOverlay) {
-                                BackHandler { showGraphsOverlay = false }
                                 val graphScreen by viewModel.graphScreen.collectAsStateWithLifecycle()
                                 val graphPeriod by viewModel.graphPeriod.collectAsStateWithLifecycle()
                                 com.jd.core.ui.GraphsOverlay(
@@ -188,7 +187,6 @@ class AdminActivity : ComponentActivity() {
                                     onNow = { viewModel.showGraphsAt(null) }
                                 )
                             } else if (showEventsOverlay) {
-                                BackHandler(onBack = closeEvents)
                                 val events by viewModel.events.collectAsStateWithLifecycle()
                                 overlayStates.SaveableStateProvider(EVENTS_STATE_KEY) {
                                     com.jd.core.ui.EventLogOverlay(
@@ -203,21 +201,18 @@ class AdminActivity : ComponentActivity() {
                                     )
                                 }
                             } else if (showAlertsOverlay) {
-                                BackHandler { showAlertsOverlay = false }
                                 // Read-only: the Monitor sets the detection settings (ISSUE-NOV10.8-O83).
                                 SensorBehaviourOverlay(
                                     behaviour = sensorBehaviour,
                                     onClose = { showAlertsOverlay = false }
                                 )
                             } else if (showPhoneSetupOverlay) {
-                                BackHandler { showPhoneSetupOverlay = false }
                                 // The Sensor's own page: only what the Sensor needs, with live status (ISSUE-NOV10.8-O81).
                                 SensorPhoneSetupOverlay(
                                     isServiceRunning = isServiceRunning,
                                     onClose = { showPhoneSetupOverlay = false }
                                 )
                             } else if (showCleanSetupOverlay) {
-                                BackHandler { showCleanSetupOverlay = false }
                                 com.jd.core.ui.CleanSetupOverlay(
                                     onResetStats = { viewModel.resetOperationalStatistics() },
                                     onFullInit = { viewModel.triggerFullSystemReinitialization() },
@@ -226,7 +221,6 @@ class AdminActivity : ComponentActivity() {
                                     onClose = { showCleanSetupOverlay = false }
                                 )
                             } else if (showSettings) {
-                                BackHandler { showSettings = false }
                                 SettingsOverlay(
                                     currentRelayUrl = relayUrl,
                                     onOpenAlertsSetup = { showAlertsOverlay = true },
@@ -406,10 +400,13 @@ fun SettingsOverlay(
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("CONFIGURATION", style = MaterialTheme.typography.headlineSmall)
-            TextButton(onClick = onClose) { Text("CLOSE (X)") }
-        }
+        com.jd.core.ui.OverlayHeader(
+            title = "CONFIGURATION",
+            color = androidx.compose.material3.LocalContentColor.current,
+            onClose = onClose,
+            fontSize = MaterialTheme.typography.headlineSmall.fontSize,
+            closeTint = androidx.compose.material3.LocalContentColor.current
+        )
         Spacer(modifier = Modifier.height(16.dp))
 
         // The Sensor makes no sound, so it has no siren page (ISSUE-NOV10.8-O82).

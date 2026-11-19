@@ -39,7 +39,7 @@ Documents are written for the next session, which pays to read them. Write each 
 *   **D1. One home per fact**: the full description of a resolved issue (root cause, fix, files, tests, results) is written only in `STATUS/RESOLUTION_ARCHIVE.md`. Everywhere else it is one line with the issue ID and a pointer: the SOT rule states the requirement, `TEST_PROCEDURE.md` describes what the test checks and holds each chapter's one-line `**Status:**`, and `Handover.md` and the commit message summarize. The SOT Core Hardening Baseline and Verification Chapters lists are frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2); stale documents are in `ARCHIVE/`. *(tested: every archived version appears in a dashboard row, and up to Nov8.101 in the SOT baseline, which takes no newer entry)*
 *   **D2. `DOCS/issues.md` is a working file**: it holds only the Next Resumption Focus, the open Work Queue rows, the Open Gaps, the Operational Notes, the Strategic Simplification Ideas, and the newest dashboard rows. A resolved item is removed (its text stays in the previous tag and its record in the archive); no Resolved Gaps sections. When the dashboard has more than 6 rows, the oldest moves unchanged to the Dashboard History at the end of the archive. Open and Ideas are counted from the lists in the file. *(tested: no Resolved Gaps, at most 6 dashboard rows, the dashboard last, at most 40,000 characters)*
 *   **D3. Short Handover and commit message**: `Handover.md` follows the template below and stays within 70 lines *(tested)*. The commit message has at most 12 lines: title with version and issue IDs, one line per issue, tests, version. The final chat message does not repeat the Git block or the archive text; it names the issue IDs, the result, and points to `Handover.md`.
-*   **D4. Git tags are the baselines**: no document copies; one `pending` row in `STATUS/BASELINE/INDEX.md` per version (Nov8.14). *(tested by `BaselineIndexTest`)*
+*   **D4. Git tags are the baselines**: no document copies; one row in `STATUS/BASELINE/INDEX.md` per version (Nov8.14), `pending` in the version's own commit and filled with its hash right after the push (Completion step 9). *(tested by `BaselineIndexTest`)*
 *   **D5. Short Completion Sequence**: the 10 steps below. **Docs-only versions** (no change under `app-*/src/main`, `core-*/src/main`, or build scripts) run only `:core-shared:test` plus the tests of any changed test module at step 1; no builds, no device audit. **Small housekeeping** (instruction files, index rows, queue edits) does not get its own version: it is committed with the next real version (user decision 2026-11-08).
 *   **D6. `chat_session.md` is a milestone log**: decisions, test results, next steps, and any temporary device state that must be restored. Append short lines; do not rewrite it. Changed files are logged automatically by the `PostToolUse` hook in `.claude/settings.json` (`.claude/hooks/log-change.ps1`, one `edited <path>` line per write while the log exists), so they are not written by hand; this also satisfies Rule 6.
 *   **D7. Targeted reads**: find sections with search, read only the needed line ranges, use `git --no-pager` and file hashes or line counts for checks, and do not re-read a file whose content is already known in the session. **Tests while working**: run only the tests of the changed module (for example `:app-monitor:testDebugUnitTest --tests "*Geofence*"`); the full suite and the builds run once, at Completion step 1. **Device checks**: prefer `TESTS/device_check.ps1` (debug-build adb commands answering in one `REV_DEBUG_CMD` line), other `REV_*` logcat lines or a text-only screen dump (`adb shell uiautomator dump /sdcard/ui.xml` then search it for the expected text) over screenshots. The growing files are edited at fixed anchors, never read whole to find the place:
@@ -50,10 +50,10 @@ Documents are written for the next session, which pays to read them. Write each 
 
 ### Handover template (D3)
 ```
-<Git block: git add . / git commit -m "<at most 12 lines>" / git tag <Version> / git push origin main --tags, one command per line, no &&>
+<Commit message: plain code block, at most 12 lines; Claude runs git add -A / git commit / git tag <Version> / git push origin main --tags itself (Completion step 9)>
 
 # Project Handover - Version <Version> (<Title>)
-## ▶️ Resumption State (Read First)      <- at most 8 bullets: git state, pending index row, user decisions, phones, test tips or a pointer to them
+## ▶️ Resumption State (Read First)      <- at most 8 bullets: git state, user decisions, phones, test tips or a pointer to them
 ## 🟢 Status: PASSED (<Version>)          <- at most 5 bullets: issue IDs, result, what was not run and why; details: RESOLUTION_ARCHIVE.md
 **Audit line**: <Version>: [SOT Count: ..., QA: ...]
 ## 🎯 Next Resumption Focus               <- at most 5 items
@@ -72,10 +72,10 @@ Perform these steps in strict sequence once an issue is resolved:
 5.  **Audit line**: compute it with `TESTS/audit_line.ps1 -Version <name>` and write it in the dashboard row in this format:
     **[Version Name]: [SOT Count: X (Rules: Y), Open: H:xx, M:xx, L:xx, Ideas: H:xx, M:xx, L:xx, Testing: C (Sub-items: D), QA: F]**
 6.  **Baseline index (D4, R-ID 744)**: add `| [Version Name] | pending | |` at the top of the table in `STATUS/BASELINE/INDEX.md`.
-7.  **Handover (D3)**: write `Handover.md` from the template, with the Git block at the very top (plain code block, each command on its own line, `git tag [Version Name]` and `git push origin main --tags` included, issue IDs from `chat_session.md` in the commit message).
+7.  **Handover (D3)**: write `Handover.md` from the template, with the commit message at the very top (plain code block, issue IDs from `chat_session.md`).
 8.  **Integrity check**: run `:core-shared:test` (`TrackingDocumentIntegrityTest`, `BaselineIndexTest`, `VersionSourceTest` must pass); check with `git --no-pager diff --numstat` that no `*.md` or `*.xml` file lost lines unexpectedly; verify that all version titles and headers match the version being closed.
-9.  **Resumption verification and cleanup**: if the session resumed from `chat_session.md`, verify that its planned tasks are addressed and documented; then delete `chat_session.md`.
-10. **Final stop**: tell the user the issue IDs, the result, the audit line, and that the Git block is at the top of `Handover.md` (D3). **STOP ALL PROCESSING.**
+9.  **Commit, tag, push, index (user decision 2026-11-19)**: if the session resumed from `chat_session.md`, verify that its planned tasks are addressed and documented; delete `chat_session.md`; then run `git add -A`, `git commit` with the Handover's message, `git tag [Version Name]`, `git push origin main --tags` without asking the user; then replace the version's `pending` in `STATUS/BASELINE/INDEX.md` with `git rev-parse --short=7 [Version Name]^{commit}` (left uncommitted, it goes into the next version's commit). If the push fails, report it; never force-push.
+10. **Final stop**: tell the user the issue IDs, the result, the audit line, and that the version is committed, tagged, and pushed, with its commit hash (D3). **STOP ALL PROCESSING.**
 
 ---
 
@@ -94,7 +94,7 @@ Perform these steps if the session is terminated before an issue is resolved:
 
 Perform these steps when starting a session:
 
-1.  **Index check**: if the top row of `STATUS/BASELINE/INDEX.md` says `pending` and its tag exists, replace `pending` with `git rev-parse --short=7 <tag>^{commit}`; if the tag does not exist, the previous Git block was not run, so tell the user before doing anything else.
+1.  **Index check**: if the top row of `STATUS/BASELINE/INDEX.md` still says `pending` and its tag exists, replace `pending` with `git rev-parse --short=7 <tag>^{commit}`; if the tag does not exist, the previous session did not finish Completion step 9, so tell the user before doing anything else.
 2.  **Context Loading**: read `Handover.md` and, if it exists, `chat_session.md` (D7: `issues.md` only as far as needed).
 3.  **State Verification**: verify whether the planned steps in `chat_session.md` were already partially implemented.
 4.  **Issue Validation**: ensure the `## 🎯 Next Resumption Focus` in `issues.md` aligns with the session log.

@@ -94,18 +94,18 @@ fun EventLogOverlay(
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     Surface(modifier = Modifier.fillMaxSize(), color = Slate900, contentColor = Color.White) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("EVENTS", color = ViewerCyan, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(8.dp))
-                Text(eventCountText(listed.size), color = Slate500, fontSize = 11.sp, modifier = Modifier.weight(1f))
+            OverlayHeader(
+                title = "EVENTS",
+                color = ViewerCyan,
+                onClose = onClose,
+                fontSize = 18.sp,
+                subtitle = eventCountText(listed.size)
+            ) {
                 IconButton(onClick = { shareEvents(context, listed.reversed(), period) }, enabled = listed.isNotEmpty()) {
                     Icon(Icons.Default.Share, contentDescription = "Export", tint = if (listed.isNotEmpty()) Color.White else Slate500)
                 }
                 IconButton(onClick = { isConfirmingClear = true }, enabled = events.isNotEmpty()) {
                     Icon(Icons.Default.Delete, contentDescription = "Clear", tint = if (events.isNotEmpty()) Rose500 else Slate500)
-                }
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {

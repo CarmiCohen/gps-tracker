@@ -33,6 +33,7 @@ import com.jd.core.shared.SensorFault
 import com.jd.core.shared.SensorSetupItem
 import com.jd.core.shared.SensorSetupReport
 import com.jd.core.ui.BrandGold
+import com.jd.core.ui.OverlayHeader
 import com.jd.core.ui.Slate500
 import com.jd.core.ui.Slate900
 import com.jd.core.ui.StatusGreen
@@ -160,23 +161,13 @@ internal fun SensorPhoneSetupOverlay(
             modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Sensor Phone Setup", color = BrandGold, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        "${Build.MANUFACTURER.uppercase()} ${Build.MODEL.uppercase()}, Android ${Build.VERSION.RELEASE}",
-                        color = Slate500,
-                        fontSize = 10.sp
-                    )
-                }
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-                }
-            }
+            OverlayHeader(
+                title = "Sensor Phone Setup",
+                color = BrandGold,
+                onClose = onClose,
+                fontSize = 22.sp,
+                subtitle = "${Build.MANUFACTURER.uppercase()} ${Build.MODEL.uppercase()}, Android ${Build.VERSION.RELEASE}"
+            )
             Spacer(Modifier.height(16.dp))
 
             items.forEachIndexed { index, item ->

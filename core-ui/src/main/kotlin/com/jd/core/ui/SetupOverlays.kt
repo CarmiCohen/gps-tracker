@@ -53,21 +53,7 @@ fun CleanSetupOverlay(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "MAINTENANCE & CLEAN SETUP",
-                    color = Rose500,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-                }
-            }
+            OverlayHeader(title = "MAINTENANCE & CLEAN SETUP", color = Rose500, onClose = onClose)
 
             if (onExportSettings != null && onImportSettings != null) {
                 Spacer(Modifier.height(16.dp))
@@ -174,19 +160,13 @@ fun PhoneSetupOverlay(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Phone Setup & Capabilities", color = BrandGold, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text("Detected Device: $manufacturer $model", color = Slate500, fontSize = 10.sp)
-                }
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-                }
-            }
+            OverlayHeader(
+                title = "Phone Setup & Capabilities",
+                color = BrandGold,
+                onClose = onClose,
+                fontSize = 22.sp,
+                subtitle = "Detected Device: $manufacturer $model"
+            )
 
             Spacer(Modifier.height(16.dp))
 

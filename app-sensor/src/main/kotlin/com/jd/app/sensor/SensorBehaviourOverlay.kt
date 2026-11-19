@@ -8,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jd.core.shared.SensorBehaviour
@@ -16,6 +15,7 @@ import com.jd.core.shared.noiseLimitLabel
 import com.jd.core.shared.tiltLimitLabel
 import com.jd.core.shared.vibrationLimitLabel
 import com.jd.core.ui.BrandGold
+import com.jd.core.ui.OverlayHeader
 import com.jd.core.ui.Slate500
 import com.jd.core.ui.Slate900
 import com.jd.core.ui.StatusGreen
@@ -45,14 +45,7 @@ internal fun SensorBehaviourOverlay(behaviour: SensorBehaviour, onClose: () -> U
             modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.Start
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("DETECTION SETTINGS", color = BrandGold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                TextButton(onClick = onClose) { Text("CLOSE (X)", color = Color.White) }
-            }
+            OverlayHeader(title = "DETECTION SETTINGS", color = BrandGold, onClose = onClose)
             Spacer(Modifier.height(12.dp))
             sensorBehaviourLines(behaviour).forEach { line ->
                 Text(line, color = Color.White, fontSize = 15.sp, modifier = Modifier.padding(vertical = 6.dp))

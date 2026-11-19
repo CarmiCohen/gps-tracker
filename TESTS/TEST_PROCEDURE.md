@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov19.0 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov19.1 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -862,7 +862,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **177.1 Retired In Place:** Run `:core-shared:test`. Verify that a retired rule keeps its `*   **1.x` line, with a `*(Retired <Version>, <ID>: <reason>)*` note after its title, so the run from 1.304 stays unbroken.
 
 ## Chapter 178 - Back Climbs, Never Closes (Nov10.8)
-**Status: A / D** - `SetupNavigationTest` 3/3 on the A15 in Nov10.8; 178.3 passed on the A15 (Sensor: Phone Setup to Settings to Admin to background, service kept; Monitor: map Back and Sound Back) (ISSUE-NOV10.8-O77, ISSUE-NOV10.8-O78, SOT 1.417)
+**Status: A / D** - `SetupNavigationTest` 3/3 on the A15 in Nov10.8 (7/7 with chapter 228 in Nov19.1); 178.3 passed on the A15 (Sensor: Phone Setup to Settings to Admin to background, service kept; Monitor: map Back and Sound Back) (ISSUE-NOV10.8-O77, ISSUE-NOV10.8-O78, SOT 1.417)
 *   **178.1 Back From Phone Setup:** Run `:app-monitor:connectedDebugAndroidTest` with `SetupNavigationTest` (it uninstalls the Monitor afterwards; restore as in the Operational Notes). Verify Back from Phone Setup shows the map and the activity is not finishing.
 *   **178.2 Close Is Reachable:** Same test: the header `Close` X is displayed and closes Phone Setup; the bottom `Close` button closes it too.
 *   **178.3 Top Level And Sensor (device):** On the A15, Back on the Monitor map leaves the Monitor task and process alive (`dumpsys activity activities`). In the Sensor, open Settings, then Phone Setup: Back returns to Settings, Back again to Sensor Admin, Back again sends the Sensor to the background with its service running.
@@ -1149,8 +1149,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **227.3 Live:** with the Monitor paired and in the background, `adb shell "dumpsys deviceidle whitelist -com.jd.app.sensor"` on the Sensor phone: within 30 s `REV_SensorSetup` on the Monitor shows the report `by relay` and `by push` and one `Sensor phone needs attention` notification appears; `+com.jd.app.sensor` brings the fixed report and removes it. Debug `STATE` shows `sentAt=` and `notified=`.
 *   **227.4 Live (two phones):** with the Monitor frozen in the background long enough for the relay to drop its socket (the Sensor logs `Monitor online: false`), the same change still shows the notification, by push only.
 
+## Chapter 228 - The Close X Is Always On Screen (Nov19.1)
+**Status: A / D** - `SetupNavigationTest` 7/7 on the A15 (am instrument, airplane mode); 228.2 passed on the A15 for the Sensor's Configuration, Detection Settings and Events (ISSUE-NOV10.7-O74, SIMP-NOV10.8-S1, SOT 1.467)
+*   **228.1 Instrumented:** `SetupNavigationTest.alertsHeaderAndBackClose`, `sirenHeaderAndBackClose`, `cleanSetupHeaderAndBackClose`: opened from the Setup dialog, the header's `Close` X is displayed and returns to the map; opened again, Back returns to the map with the activity not finishing; `backFromEventsReturnsToTheMap`.
+*   **228.2 Device:** on each overlay of both apps (Alerts, Siren, Phone Setup, Clean Setup, Info, Graphs, Events; Sensor: Configuration, Detection Settings, Sensor Phone Setup) the X is on screen beside the whole title, also on the narrow S21FE; Back closes the overlay one level (Detection Settings to Configuration to Sensor Admin).
+
 ---
-**Active Testing Chapters: 216 of 227**
+**Active Testing Chapters: 217 of 228**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
