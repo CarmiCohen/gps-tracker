@@ -26,6 +26,7 @@ import com.jd.core.ui.EVENTS_STATE_KEY
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -664,7 +665,7 @@ fun MonitorScreen(
             val localPoints = localPath.map { GeoPoint(it.lat, it.lng) }
             val localPolyline = Polyline().apply {
                 setPoints(localPoints)
-                outlinePaint.color = android.graphics.Color.parseColor("#06B6D4")
+                outlinePaint.color = MONITOR_MARKER_COLOR
                 outlinePaint.strokeWidth = 4f
             }
             mapView.overlays.add(localPolyline)
@@ -684,7 +685,7 @@ fun MonitorScreen(
             val points = sensorTrail.map { GeoPoint(it.lat, it.lng) }
             val polyline = Polyline().apply {
                 setPoints(points)
-                outlinePaint.color = android.graphics.Color.BLUE
+                outlinePaint.color = SENSOR_MARKER_COLOR // the trail in the Sensor's dot color (SIMP-NOV17.6-S1)
                 outlinePaint.strokeWidth = 5f
             }
             mapView.overlays.add(polyline)
@@ -796,7 +797,7 @@ fun MonitorScreen(
                             MapToolButton(icon = Icons.Default.Person, label = "LOCAL", onClick = {
                                 followMode = MapFollowMode.VIEWER
                                 localPosition?.let { mapView.controller.setCenter(GeoPoint(it.lat, it.lng)) }
-                            }, iconColor = Color(0xFF06B6D4))
+                            }, iconColor = com.jd.core.ui.MonitorBrown)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
                             MapToolButton(
@@ -987,7 +988,7 @@ fun MonitorMenuBar(
                 horizontalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 IconButton(onClick = onSetup, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(15.dp))
+                    Icon(Icons.Default.Build, contentDescription = "Setup", tint = com.jd.core.ui.MonitorBrown, modifier = Modifier.size(15.dp))
                 }
                 IconButton(onClick = onMap, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Place, contentDescription = "Map", tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
@@ -1004,7 +1005,7 @@ fun MonitorMenuBar(
             }
             Text(
                 text = "MONITOR: ${monitorId.take(6).uppercase()} -> TRK:${trackerId.take(6).uppercase()}",
-                color = Color(0xFF06B6D4),
+                color = com.jd.core.ui.MonitorBrown,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -1148,9 +1149,9 @@ private fun breachMarkerIcon(context: android.content.Context): android.graphics
         intrinsicHeight = sizePx
     }
 
-/** Device colors of the HUD (HudStatusBar): cyan for the Monitor, green for the Sensor (Nov17.6). */
-internal const val MONITOR_MARKER_COLOR = 0xFF06B6D4.toInt()
-internal const val SENSOR_MARKER_COLOR = 0xFF10B981.toInt()
+/** Device colors of the HUD (HudStatusBar): orange-brown for the Monitor, green for the Sensor (ISSUE-NOV19.2-O123). */
+internal val MONITOR_MARKER_COLOR = com.jd.core.ui.MonitorBrown.toArgb()
+internal val SENSOR_MARKER_COLOR = com.jd.core.ui.SensorGreen.toArgb()
 
 /** A device's location: a dot in the device color inside a white ring with a dark edge, readable on any map tile. */
 private fun deviceMarkerIcon(context: android.content.Context, color: Int): android.graphics.drawable.Drawable {

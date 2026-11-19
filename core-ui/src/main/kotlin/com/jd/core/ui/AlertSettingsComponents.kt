@@ -41,7 +41,7 @@ fun AlertManagementOverlay(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            OverlayHeader(title = "ALERTS & SENSORS SETUP", color = ViewerCyan, onClose = onClose)
+            OverlayHeader(title = "ALERTS & SENSORS SETUP", color = MonitorBrown, onClose = onClose)
 
             Spacer(Modifier.height(12.dp))
 
@@ -125,7 +125,7 @@ fun AlertManagementOverlay(
             Spacer(Modifier.height(12.dp))
 
             // Section 2: Location & Geofence
-            Text("LOCATION & GEOFENCE ALARMS", color = ViewerCyan, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text("LOCATION & GEOFENCE ALARMS", color = MonitorBrown, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             AlarmToggle("Geofence Boundary Breach", draftAlertSettings.distance) {
                 onUpdateAlertSettings(draftAlertSettings.copy(distance = it))
             }
@@ -274,7 +274,7 @@ fun AlarmSoundOverlay(
             Spacer(Modifier.height(20.dp))
 
             // Audio Behaviors
-            Text("AUDIO & SIREN BEHAVIORS", color = ViewerCyan, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text("AUDIO & SIREN BEHAVIORS", color = MonitorBrown, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             AlarmToggle("Enable Device Haptic Vibration", draftAlertSettings.vibrationEnabled) {
                 onUpdateAlertSettings(draftAlertSettings.copy(vibrationEnabled = it))
             }
@@ -288,7 +288,7 @@ fun AlarmSoundOverlay(
             Spacer(Modifier.height(20.dp))
 
             // Volume Mode & Custom Slider
-            Text("VOLUME CONTROL MODE", color = ViewerCyan, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text("VOLUME CONTROL MODE", color = MonitorBrown, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 FilterChip(
@@ -344,7 +344,7 @@ fun AlarmToggle(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(checkedThumbColor = StatusGreen, checkedTrackColor = ViewerCyan)
+            colors = SwitchDefaults.colors(checkedThumbColor = StatusGreen, checkedTrackColor = MonitorBrown)
         )
     }
 }
@@ -371,7 +371,7 @@ fun SensitivitySlider(
             onValueChangeFinished = { if (position != value) onValueCommitted(position) },
             valueRange = 0.1f..1.0f,
             modifier = Modifier.fillMaxWidth(),
-            colors = SliderDefaults.colors(thumbColor = ViewerCyan, activeTrackColor = ViewerCyan)
+            colors = SliderDefaults.colors(thumbColor = MonitorBrown, activeTrackColor = MonitorBrown)
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(SENSITIVITY_LESS_END, color = Slate500, fontSize = 10.sp)

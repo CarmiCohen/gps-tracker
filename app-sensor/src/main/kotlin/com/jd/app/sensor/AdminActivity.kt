@@ -584,7 +584,7 @@ fun SensorAdminConsole(
                     modifier = Modifier.weight(1f, fill = false)
                 ) {
                     IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Build, contentDescription = "Setup", tint = Color(0xFF06B6D4), modifier = Modifier.size(15.dp))
+                        Icon(Icons.Default.Build, contentDescription = "Setup", tint = com.jd.core.ui.MonitorBrown, modifier = Modifier.size(15.dp))
                     }
                     // One setup icon (ISSUE-NOV17.7-O109): the Settings screen opens from the Setup dialog's SETTINGS button.
                     IconButton(onClick = onEventsClick, modifier = Modifier.size(28.dp)) {
@@ -599,7 +599,7 @@ fun SensorAdminConsole(
                 }
                 Text(
                     text = "SENSOR: ${trackerId.take(6).uppercase()}",
-                    color = Color(0xFF06B6D4),
+                    color = com.jd.core.ui.SensorGreen, // the Sensor's own color (ISSUE-NOV19.2-O123)
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,

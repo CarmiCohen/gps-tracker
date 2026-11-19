@@ -96,7 +96,7 @@ fun EventLogOverlay(
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp)) {
             OverlayHeader(
                 title = "EVENTS",
-                color = ViewerCyan,
+                color = MonitorBrown,
                 onClose = onClose,
                 fontSize = 18.sp,
                 subtitle = eventCountText(listed.size)
@@ -194,9 +194,9 @@ private fun EventDetail(event: EventEntry, onClose: () -> Unit, onShowGraphs: ()
             Text("${event.source.label} phone - ${event.level.name}", color = levelColor(event.level), fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Text(event.message, fontSize = 13.sp)
             TextButton(onClick = onShowGraphs, contentPadding = PaddingValues(horizontal = 0.dp)) {
-                Icon(GraphsIcon, contentDescription = null, tint = ViewerCyan, modifier = Modifier.size(16.dp))
+                Icon(GraphsIcon, contentDescription = null, tint = MonitorBrown, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Graphs at this time", color = ViewerCyan, fontSize = 12.sp)
+                Text("Graphs at this time", color = MonitorBrown, fontSize = 12.sp)
             }
         }
     }
@@ -208,12 +208,12 @@ internal fun EventChip(label: String, isOn: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
     Box(
         modifier = Modifier
-            .background(if (isOn) ViewerCyan.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f), shape)
-            .border(1.dp, if (isOn) ViewerCyan else Color.White.copy(alpha = 0.15f), shape)
+            .background(if (isOn) MonitorBrown.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f), shape)
+            .border(1.dp, if (isOn) MonitorBrown else Color.White.copy(alpha = 0.15f), shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
-        Text(label, color = if (isOn) ViewerCyan else Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+        Text(label, color = if (isOn) MonitorBrown else Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
     }
 }
 
@@ -226,9 +226,9 @@ private fun levelColor(level: EventLevel): Color = when (level) {
     EventLevel.DETAIL -> Slate500
 }
 
-private fun sourceColor(source: EventSource): Color = when (source) {
-    EventSource.MONITOR -> ViewerCyan
-    EventSource.SENSOR -> StatusGreen
+internal fun sourceColor(source: EventSource): Color = when (source) {
+    EventSource.MONITOR -> MonitorBrown
+    EventSource.SENSOR -> SensorGreen
 }
 
 /**

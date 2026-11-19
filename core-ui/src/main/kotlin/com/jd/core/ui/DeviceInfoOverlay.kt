@@ -45,7 +45,7 @@ fun DeviceInfoOverlay(title: String, state: InfoScreenState, onClose: () -> Unit
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Surface(modifier = Modifier.fillMaxSize(), color = Slate900, contentColor = Color.White) {
             Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp)) {
-                OverlayHeader(title = title, color = ViewerCyan, onClose = onClose, fontSize = 18.sp)
+                OverlayHeader(title = title, color = MonitorBrown, onClose = onClose, fontSize = 18.sp)
                 state.note?.let { Text(it, color = BrandGold, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp)) }
                 LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     state.sections.forEach { section ->
@@ -64,7 +64,7 @@ fun DeviceInfoOverlay(title: String, state: InfoScreenState, onClose: () -> Unit
 private fun SectionTitle(section: InfoSection) {
     Text(
         section.title + if (section.isStale) " (OLD)" else "",
-        color = if (section.isStale) Slate500 else ViewerCyan,
+        color = if (section.isStale) Slate500 else MonitorBrown,
         fontSize = 12.sp,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)

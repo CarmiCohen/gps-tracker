@@ -339,7 +339,7 @@ class MonitorViewModel @Inject constructor(
         val isTrackerPresent = lastTs > 0 && (now - lastTs) < TRACKER_PRESENT_MS
 
         HudState(
-            appMode = "monitor", // Cyan local GPS LED
+            appMode = "monitor", // MonitorBrown local LEDs (ISSUE-NOV19.2-O123)
             selfId = self,
             isInternet = isInternet,
             isRelayConnected = isConnected,       // SRV: Green ONLY if connected to Relay

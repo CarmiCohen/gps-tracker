@@ -61,8 +61,8 @@ private fun HudStatusBarContent(
 ) {
     val isMonitor = hudState.appMode == "monitor"
     val peerBadgeLabel = if (isMonitor) "TRK" else "VWR"
-    val localColor = if (isMonitor) Color(0xFF06B6D4) else Color(0xFF10B981) // Cyan for Monitor, Green for Sensor
-    val peerColor = if (isMonitor) Color(0xFF10B981) else Color(0xFF06B6D4)
+    val localColor = if (isMonitor) MonitorBrown else SensorGreen
+    val peerColor = if (isMonitor) SensorGreen else MonitorBrown
 
     val infiniteTransition = rememberInfiniteTransition(label = "HudPulse")
     val movingAlpha by infiniteTransition.animateFloat(
@@ -111,7 +111,7 @@ private fun HudStatusBarContent(
                     Text(
                         text = if (isMoving) "»${hudState.trackerState}«" else hudState.trackerState,
                         color = if (hudState.isPeerActive || !isMonitor) {
-                            if (isMoving) Color(0xFF10B981).copy(alpha = movingAlpha) else Color(0xFF10B981)
+                            if (isMoving) SensorGreen.copy(alpha = movingAlpha) else SensorGreen
                         } else Color.Gray,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -171,8 +171,8 @@ fun StatusBadge(
     label: String,
     active: Boolean,
     modifier: Modifier = Modifier,
-    activeColor: Color = Color(0xFF10B981),
-    inactiveColor: Color = Color(0xFFF43F5E)
+    activeColor: Color = SensorGreen,
+    inactiveColor: Color = Rose500
 ) {
     val bgColor = if (active) activeColor.copy(alpha = 0.2f) else inactiveColor.copy(alpha = 0.2f)
     val textColor = if (active) activeColor else inactiveColor

@@ -22,7 +22,11 @@ val SurfaceDark = Color(0xFF1E1E1E)
 // Revolution Brand Palette
 val Slate900 = Color(0xFF0F172A)
 val Slate500 = Color(0xFF64748B)
-val ViewerCyan = Color(0xFF06B6D4)
 val BrandGold = Color(0xFFF59E0B)
 val Rose500 = Color(0xFFF43F5E)
+
+// Device colors (ISSUE-NOV19.2-O123): one color per device in the HUD, the map, the launcher and the overlays.
+// The Monitor is orange-brown, near the gold setup headers, so it can no longer be taken for the Sensor green.
+val MonitorBrown = Color(0xFFD2691E)
+val SensorGreen = Color(0xFF10B981)
 

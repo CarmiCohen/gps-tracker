@@ -59,7 +59,7 @@ fun GraphsOverlay(
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Surface(modifier = Modifier.fillMaxSize(), color = Slate900, contentColor = Color.White) {
             Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp)) {
-                OverlayHeader(title = title, color = ViewerCyan, onClose = onClose, fontSize = 18.sp)
+                OverlayHeader(title = title, color = MonitorBrown, onClose = onClose, fontSize = 18.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     ViewPeriod.entries.forEach { option ->
                         EventChip(option.label, isOn = option == period, onClick = { onPeriod(option) })
@@ -89,7 +89,7 @@ fun GraphsOverlay(
                         item(key = "section-${section.title}") {
                             Text(
                                 section.title,
-                                color = ViewerCyan,
+                                color = MonitorBrown,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
@@ -234,9 +234,9 @@ private fun DrawScope.drawGraphLine(line: GraphLine, step: Float, y: (Float) -> 
     )
 }
 
-private fun toneColor(tone: GraphTone): Color = when (tone) {
-    GraphTone.MAIN -> ViewerCyan
-    GraphTone.SECOND -> BrandGold
+internal fun toneColor(tone: GraphTone): Color = when (tone) {
+    GraphTone.MAIN -> MonitorBrown
+    GraphTone.SECOND -> Color(0xFF60A5FA) // light blue: gold is too close to the brown main line (ISSUE-NOV19.2-O123)
     GraphTone.LIMIT -> Rose500
 }
 

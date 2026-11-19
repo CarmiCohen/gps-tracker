@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov19.1 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov19.2 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -33,8 +33,8 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: L** - 4.3 to 4.6 verified; 4.2 verified in Nov7.3: alarms appear on the Monitor only (chapter 129.7), and `SensorStealthGuardTest` keeps the Sensor silent
 *   **4.2 Remote HUD Sync:** Verify Alarm manifest ONLY appears on Viewer.
 *   **4.3 State Sync:** Confirm Tracker and Viewer HUD transition between states simultaneously.
-*   **4.4 Dual HUD Status Lines Audit:** Verify the Monitor displays two distinct status lines: Line 1 (Local Device) with a local GPS LED in **Cyan (`#06B6D4`)**, and Line 2 (Sensor / Tracker) with a sensor GPS LED in **Green (`#10B981`)** when connected.
-*   **4.5 Dual Centering Buttons Audit:** Verify map controls feature two distinct centering buttons: **`SENSOR`** (Green icon) and **`LOCAL`** (Cyan icon).
+*   **4.4 Dual HUD Status Lines Audit:** Verify the Monitor displays two distinct status lines: Line 1 (Local Device) with a local GPS LED in **orange-brown (`#D2691E`, cyan up to Nov19.1)**, and Line 2 (Sensor / Tracker) with a sensor GPS LED in **Green (`#10B981`)** when connected.
+*   **4.5 Dual Centering Buttons Audit:** Verify map controls feature two distinct centering buttons: **`SENSOR`** (Green icon) and **`LOCAL`** (orange-brown icon since Nov19.2).
 *   **4.6 Connection-Aware Auto-Centering Audit:** 
     *   *Disconnected State:* Confirm that when devices are not connected, the local line reflects local GPS status and the map automatically centers around the monitor device.
     *   *Connected State:* Confirm that when connected, each GPS LED reflects its device correctly and the map auto-centers around the known device (Sensor if both known).
@@ -701,7 +701,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 148 - Local Trail Storage & Pruning (Nov7.38)
 **Status: A** - `LocalTrailTest`: local trail ingestion, dual-trail separation, and 48-hour TTL pruning (ISSUE-NOV6.2-O29, ISSUE-NOV6.0-O23)
 *   **148.1 Local Trail Entity Ingestion:** Verify that the Monitor persists its own movement path (`isLocalUser = true`) in `TrailDao` via `MonitorRepository.insertLocalTrail` when receiving location fixes from `MonitorLocationSource`, storing local trail points with `isLocalUser = true`. Automated by `LocalTrailTest` and `MonitorViewModel` local fix collection (ISSUE-NOV6.2-O29).
-*   **148.2 Dual Trail Map Rendering:** Verify that `MonitorActivity` renders independent polylines for remote tracker trail (Blue) and local viewer trail (Cyan) on the osmdroid map canvas. Automated by UI implementation and `LocalTrailTest`.
+*   **148.2 Dual Trail Map Rendering:** Verify that `MonitorActivity` renders independent polylines for remote tracker trail (green, blue up to Nov19.1) and local viewer trail (orange-brown, cyan up to Nov19.1) on the osmdroid map canvas. Automated by UI implementation and `LocalTrailTest`.
 *   **148.3 Local Trail TTL Pruning:** Verify that `TrailDao.pruneLocalTrail` successfully prunes local user trail entries older than 48 hours without affecting remote tracker trail storage. Automated by `TrailStorageBoundTest.localRowsExpireAfter48Hours`.
 
 ## Chapter 149 - Unpaired Tracker Trail Retention (Nov8.0)
@@ -1035,8 +1035,8 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ## Chapter 206 - Icons That Tell The Apps And The Devices Apart (Nov17.6)
 **Status: L** - verified by the user on the A15 (ISSUE-NOV17.6-O103, SOT 1.445)
-*   **206.1 Launcher (device):** the launcher shows GPS Monitor as a white eye on cyan and GPS Sensor as a white pin on green.
-*   **206.2 Map (device):** in the Monitor's map the Monitor's own position is a cyan dot and the Sensor's a green dot, each in a white ring; Home Points stay green squares, OUT points red dots.
+*   **206.1 Launcher (device):** the launcher shows GPS Monitor as a white eye on orange-brown (cyan up to Nov19.1) and GPS Sensor as a white pin on green.
+*   **206.2 Map (device):** in the Monitor's map the Monitor's own position is an orange-brown dot (cyan up to Nov19.1) and the Sensor's a green dot, each in a white ring; Home Points stay green squares, OUT points red dots.
 
 ## Chapter 207 - Backfill Keeps Battery And Temperature (Nov17.7)
 **Status: A / L** - `ForensicEntryIntegrityTest`, `LocationRowWireTest` pass; 207.3 verified on the A15; 207.4 verified in the Nov17.15 Two-phone test (S21FE offline about 21:45:00 to 21:46:37, no gap in the 1 h graphs) (ISSUE-NOV17.3-O102, SOT 1.446)
@@ -1154,8 +1154,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **228.1 Instrumented:** `SetupNavigationTest.alertsHeaderAndBackClose`, `sirenHeaderAndBackClose`, `cleanSetupHeaderAndBackClose`: opened from the Setup dialog, the header's `Close` X is displayed and returns to the map; opened again, Back returns to the map with the activity not finishing; `backFromEventsReturnsToTheMap`.
 *   **228.2 Device:** on each overlay of both apps (Alerts, Siren, Phone Setup, Clean Setup, Info, Graphs, Events; Sensor: Configuration, Detection Settings, Sensor Phone Setup) the X is on screen beside the whole title, also on the narrow S21FE; Back closes the overlay one level (Detection Settings to Configuration to Sensor Admin).
 
+## Chapter 229 - The Monitor Is Orange-Brown (Nov19.2)
+**Status: L** - `DeviceColorsTest` 4/4 (964 unit tests); 229.2 not run: the A15 has no paired Monitor and the S21FE was disconnected (ISSUE-NOV19.2-O123, SIMP-NOV17.6-S1, SOT 1.468)
+*   **229.1 Unit:** `DeviceColorsTest`: the Monitor and Sensor colors are at least 90 degrees of hue apart, the Monitor's hue is orange (15 to 40 degrees) and not light, the Event log marks `MONITOR` and `SENSOR` in the device colors, and the graph tones (main, second, limit) are at least 30 degrees apart.
+*   **229.2 Device:** on the Monitor, the HUD's own LEDs, the map's own dot and trail, the `LOCAL` button, the Setup icon and the `MONITOR:` label are orange-brown, the Sensor's dot, trail and `TRK` LED green; the launcher shows a white eye on orange-brown; on the Sensor, `SENSOR: <id>` is green and its `VWR` LED orange-brown; Satellites in Graphs shows Used and In view in different colors.
+
 ---
-**Active Testing Chapters: 217 of 228**
+**Active Testing Chapters: 218 of 229**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
