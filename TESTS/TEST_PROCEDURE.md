@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov19.3 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov19.4 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1165,8 +1165,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **230.2 Device:** the Monitor's menu bar shows the Sensor's STATIONARY or »MOVING« (gray when the Sensor is not heard) and no `MONITOR: ... -> TRK:` text; the Sensor's bar shows its own state, no `SENSOR:`; no HUD line shows `This phone:` or `Sensor:` or the motion word, the speed stays; the Monitor launcher shows the tractor, the Sensor the green pin.
 *   **230.3 Device (Android 10+):** the settings EXPORT of both apps and the Monitor map's SAVE write to `Download/GPS-Tracker` with no picker, the message names the path; IMPORT and LOAD open the picker in that folder.
 
+## Chapter 231 - Test Runs Ignore Pushes, One Folder Saver (Nov19.4)
+**Status: A / D** - `MessagingServiceOffDuringRunsTest` OK in a full Monitor `am instrument` on the A15 with airplane mode off and the Sensor running (76 tests; `SensorSetupNoticeDeviceTest` needed the notification permission of the fresh install, then OK); 231.2 and 231.3 passed on the A15; no push arrived during the run (the A15 Monitor is unpaired) (ISSUE-NOV12.3-O90, SIMP-NOV19.3-S1, SOT 1.470)
+*   **231.1 Instrumented:** `MessagingServiceOffDuringRunsTest`: during a run `MonitorMessagingService` is `COMPONENT_ENABLED_STATE_DISABLED`.
+*   **231.2 Device:** after a Monitor `am instrument` run, `adb shell dumpsys package com.jd.app.monitor` lists no `disabledComponents` (the service is on again).
+*   **231.3 Device (Android 10+):** the Sensor's EXPORT writes `Download/GPS-Tracker/GPS-Sensor-settings-<time>.json` with no picker through `rememberGpsTrackerSaver`; the Monitor's EXPORT and trail SAVE are checked in 230.3.
+
 ---
-**Active Testing Chapters: 219 of 230**
+**Active Testing Chapters: 220 of 231**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

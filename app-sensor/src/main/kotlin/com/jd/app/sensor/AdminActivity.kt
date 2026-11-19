@@ -97,20 +97,13 @@ class AdminActivity : ComponentActivity() {
                 val context = LocalContext.current
                 var initialAutoStartTriggered by rememberSaveable { mutableStateOf(false) }
 
-                // The settings file (ISSUE-NOV10.8-O80) is saved straight to Download/GPS-Tracker (Nov19.3);
-                // the save picker is only the fallback (before Android 10).
-                val exportLauncher = rememberLauncherForActivityResult(
-                    com.jd.core.ui.CreateInGpsTrackerFolder(SETTINGS_FILE_MIME_TYPE)
-                ) { uri -> uri?.let { viewModel.exportSettings(it) } }
+                // The settings file (ISSUE-NOV10.8-O80) is saved straight to Download/GPS-Tracker (Nov19.3)
+                // by the one core-ui saver (SIMP-NOV19.3-S1).
+                val saveSettingsFile = com.jd.core.ui.rememberGpsTrackerSaver(SETTINGS_FILE_MIME_TYPE, viewModel::exportSettings)
                 val importLauncher = rememberLauncherForActivityResult(
                     com.jd.core.ui.OpenInGpsTrackerFolder()
                 ) { uri -> uri?.let(viewModel::importSettings) }
-                val exportSettings: () -> Unit = {
-                    val name = viewModel.exportFileName()
-                    com.jd.core.ui.GpsTrackerFolder.createFile(context, name, SETTINGS_FILE_MIME_TYPE)
-                        ?.let { viewModel.exportSettings(it, com.jd.core.ui.GpsTrackerFolder.shownPath(name)) }
-                        ?: exportLauncher.launch(name)
-                }
+                val exportSettings: () -> Unit = { saveSettingsFile(viewModel.exportFileName()) }
                 LaunchedEffect(Unit) {
                     viewModel.transferMessages.collect { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
                 }
