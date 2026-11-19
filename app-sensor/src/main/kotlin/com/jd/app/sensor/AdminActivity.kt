@@ -97,13 +97,20 @@ class AdminActivity : ComponentActivity() {
                 val context = LocalContext.current
                 var initialAutoStartTriggered by rememberSaveable { mutableStateOf(false) }
 
-                // The settings file (ISSUE-NOV10.8-O80): the system picker needs no storage permission.
+                // The settings file (ISSUE-NOV10.8-O80) is saved straight to Download/GPS-Tracker (Nov19.3);
+                // the save picker is only the fallback (before Android 10).
                 val exportLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.CreateDocument(SETTINGS_FILE_MIME_TYPE)
-                ) { uri -> uri?.let(viewModel::exportSettings) }
+                    com.jd.core.ui.CreateInGpsTrackerFolder(SETTINGS_FILE_MIME_TYPE)
+                ) { uri -> uri?.let { viewModel.exportSettings(it) } }
                 val importLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.OpenDocument()
+                    com.jd.core.ui.OpenInGpsTrackerFolder()
                 ) { uri -> uri?.let(viewModel::importSettings) }
+                val exportSettings: () -> Unit = {
+                    val name = viewModel.exportFileName()
+                    com.jd.core.ui.GpsTrackerFolder.createFile(context, name, SETTINGS_FILE_MIME_TYPE)
+                        ?.let { viewModel.exportSettings(it, com.jd.core.ui.GpsTrackerFolder.shownPath(name)) }
+                        ?: exportLauncher.launch(name)
+                }
                 LaunchedEffect(Unit) {
                     viewModel.transferMessages.collect { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
                 }
@@ -216,7 +223,7 @@ class AdminActivity : ComponentActivity() {
                                 com.jd.core.ui.CleanSetupOverlay(
                                     onResetStats = { viewModel.resetOperationalStatistics() },
                                     onFullInit = { viewModel.triggerFullSystemReinitialization() },
-                                    onExportSettings = { exportLauncher.launch(viewModel.exportFileName()) },
+                                    onExportSettings = exportSettings,
                                     onImportSettings = { importLauncher.launch(arrayOf("*/*")) }, // The content is checked on reading.
                                     onClose = { showCleanSetupOverlay = false }
                                 )
@@ -588,25 +595,19 @@ fun SensorAdminConsole(
                     }
                     // One setup icon (ISSUE-NOV17.7-O109): the Settings screen opens from the Setup dialog's SETTINGS button.
                     IconButton(onClick = onEventsClick, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events", tint = com.jd.core.ui.BrandGold, modifier = Modifier.size(15.dp))
                     }
                     IconButton(onClick = onInfoClick, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
+                        Icon(Icons.Default.Info, contentDescription = "Info", tint = com.jd.core.ui.InfoBlue, modifier = Modifier.size(15.dp))
                     }
                     IconButton(onClick = onGraphsClick, modifier = Modifier.size(28.dp)) {
-                        Icon(com.jd.core.ui.GraphsIcon, contentDescription = "Graphs", tint = Color(0xFFA78BFA), modifier = Modifier.size(15.dp))
+                        Icon(com.jd.core.ui.GraphsIcon, contentDescription = "Graphs", tint = com.jd.core.ui.GraphsViolet, modifier = Modifier.size(15.dp))
                     }
                 }
-                Text(
-                    text = "SENSOR: ${trackerId.take(6).uppercase()}",
-                    color = com.jd.core.ui.SensorGreen, // the Sensor's own color (ISSUE-NOV19.2-O123)
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
+                // This Sensor's STATIONARY / MOVING replaces the `SENSOR: T` header (Nov19.3); the ID is on the HUD line.
+                com.jd.core.ui.SensorMotionLabel(trackerState = hudState.trackerState, active = true)
                 IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFF43F5E), modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = com.jd.core.ui.Rose500, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -631,7 +632,7 @@ fun SensorAdminConsole(
                 onClick = onOpenPhoneSetup,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (setupMissing == 0) Color(0xFF10B981) else Color(0xFFF59E0B)
+                    containerColor = if (setupMissing == 0) com.jd.core.ui.SensorGreen else com.jd.core.ui.BrandGold
                 )
             ) {
                 Text(phoneSetupLineText(setupMissing))
@@ -640,17 +641,17 @@ fun SensorAdminConsole(
             Text(
                 text = microphoneStatusText(microphoneState),
                 fontSize = 12.sp,
-                color = if (microphoneState == MicrophoneState.LISTENING) Color(0xFF10B981) else Color(0xFFF59E0B)
+                color = if (microphoneState == MicrophoneState.LISTENING) com.jd.core.ui.SensorGreen else com.jd.core.ui.BrandGold
             )
             Text(
                 text = backgroundLocationStatusText(isAllowedAllTheTime),
                 fontSize = 12.sp,
-                color = if (isAllowedAllTheTime) Color(0xFF10B981) else Color(0xFFF59E0B)
+                color = if (isAllowedAllTheTime) com.jd.core.ui.SensorGreen else com.jd.core.ui.BrandGold
             )
             Text(
                 text = motionStatusText(motionState, sensorBehaviour),
                 fontSize = 12.sp,
-                color = if (motionState.isArmed) Color(0xFF10B981) else Color(0xFFF59E0B)
+                color = if (motionState.isArmed) com.jd.core.ui.SensorGreen else com.jd.core.ui.BrandGold
             )
 
             Card(
@@ -668,7 +669,7 @@ fun SensorAdminConsole(
                         Text(
                             text = if (isServiceRunning) "SERVICE: RUNNING" else "SERVICE: STOPPED",
                             fontWeight = FontWeight.Bold,
-                            color = if (isServiceRunning) Color(0xFF10B981) else StatusRed,
+                            color = if (isServiceRunning) com.jd.core.ui.SensorGreen else StatusRed,
                             fontSize = 14.sp
                         )
                         Text(
@@ -687,7 +688,7 @@ fun SensorAdminConsole(
                     } else {
                         Button(
                             onClick = { startSensorService(context) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                            colors = ButtonDefaults.buttonColors(containerColor = com.jd.core.ui.SensorGreen)
                         ) {
                             Text("START SERVICE")
                         }

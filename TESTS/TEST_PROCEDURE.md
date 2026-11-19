@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov19.2 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov19.3 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1159,8 +1159,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **229.1 Unit:** `DeviceColorsTest`: the Monitor and Sensor colors are at least 90 degrees of hue apart, the Monitor's hue is orange (15 to 40 degrees) and not light, the Event log marks `MONITOR` and `SENSOR` in the device colors, and the graph tones (main, second, limit) are at least 30 degrees apart.
 *   **229.2 Device:** on the Monitor, the HUD's own LEDs, the map's own dot and trail, the `LOCAL` button, the Setup icon and the `MONITOR:` label are orange-brown, the Sensor's dot, trail and `TRK` LED green; the launcher shows a white eye on orange-brown; on the Sensor, `SENSOR: <id>` is green and its `VWR` LED orange-brown; Satellites in Graphs shows Used and In view in different colors.
 
+## Chapter 230 - Tractor Icon, GPS-Tracker Folder, Motion In The Menu Bar (Nov19.3)
+**Status: L / D** - `HudStateTest` (bare ID) in 964 unit tests; 230.2 passed on the A15 for the Sensor (bar `STATIONARY`, HUD ID `T`); 230.3 and the Monitor part of 230.2 not run: the A15 Monitor is unpaired and the S21FE was disconnected (ISSUE-NOV19.3-O124 to O126, SIMP-NOV19.2-S1, SIMP-NOV18.11-S1, SOT 1.469)
+*   **230.1 Unit / instrumented:** `HudStateTest`: `idText` is the ID alone (`VIEWER`, `T`); `HudLayoutAuditTest.menuBarKeepsEveryActionVisibleWithLongIds` with `MOVING` in the bar.
+*   **230.2 Device:** the Monitor's menu bar shows the Sensor's STATIONARY or »MOVING« (gray when the Sensor is not heard) and no `MONITOR: ... -> TRK:` text; the Sensor's bar shows its own state, no `SENSOR:`; no HUD line shows `This phone:` or `Sensor:` or the motion word, the speed stays; the Monitor launcher shows the tractor, the Sensor the green pin.
+*   **230.3 Device (Android 10+):** the settings EXPORT of both apps and the Monitor map's SAVE write to `Download/GPS-Tracker` with no picker, the message names the path; IMPORT and LOAD open the picker in that folder.
+
 ---
-**Active Testing Chapters: 218 of 229**
+**Active Testing Chapters: 219 of 230**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

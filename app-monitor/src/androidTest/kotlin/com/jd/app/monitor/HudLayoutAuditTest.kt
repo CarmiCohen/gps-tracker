@@ -64,10 +64,11 @@ class HudLayoutAuditTest {
 
     @Test
     fun menuBarKeepsEveryActionVisibleWithLongIds() {
+        // Since Nov19.3 the bar's text is the Sensor's motion state; MOVING (between guillemets) is the longest.
         composeRule.setContent {
             RevolutionTheme {
                 Box(Modifier.width(320.dp)) {
-                    MonitorMenuBar("MONITOR-LONG-ID", "TRACKER-LONG-ID", {}, {}, {}, {}, {}, {})
+                    MonitorMenuBar("MOVING", true, {}, {}, {}, {}, {}, {})
                 }
             }
         }

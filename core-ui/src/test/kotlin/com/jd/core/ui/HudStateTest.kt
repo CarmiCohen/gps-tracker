@@ -79,8 +79,8 @@ class HudStateTest {
             telemetryAgeSec = 0
         )
 
-        assertEquals("This phone: VIEWER", state.idText)
-        assertEquals("Sensor: T", HudState(appMode = "sensor", selfId = "T").idText)
+        assertEquals("VIEWER", state.idText)
+        assertEquals("T", HudState(appMode = "sensor", selfId = "t").idText)
         assertEquals("${B}100%|${T}30°|A:±5.0m|AGE:0s", state.telemetryText)
     }
 

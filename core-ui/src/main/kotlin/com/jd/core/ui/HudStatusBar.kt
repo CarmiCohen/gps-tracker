@@ -64,17 +64,6 @@ private fun HudStatusBarContent(
     val localColor = if (isMonitor) MonitorBrown else SensorGreen
     val peerColor = if (isMonitor) SensorGreen else MonitorBrown
 
-    val infiniteTransition = rememberInfiniteTransition(label = "HudPulse")
-    val movingAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "MovingAlpha"
-    )
-
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = Color.Black.copy(alpha = 0.90f),
@@ -85,7 +74,7 @@ private fun HudStatusBarContent(
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp, vertical = verticalGap)
         ) {
-            // Row 1: Status LEDs & Speed/Movement
+            // Row 1: Status LEDs & Speed (the Sensor's STATIONARY/MOVING is in the menu bar since Nov19.3: SensorMotionLabel)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -103,31 +92,14 @@ private fun HudStatusBarContent(
                     StatusBadge(label = "WDG", active = hudState.watchdogOk, activeColor = localColor)
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    val isMoving = hudState.trackerState == "MOVING"
-                    Text(
-                        text = if (isMoving) "»${hudState.trackerState}«" else hudState.trackerState,
-                        color = if (hudState.isPeerActive || !isMonitor) {
-                            if (isMoving) SensorGreen.copy(alpha = movingAlpha) else SensorGreen
-                        } else Color.Gray,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 1
-                    )
-
-                    Text(
-                        text = hudState.speedText,
-                        color = if (hudState.isPeerActive || !isMonitor) Color.White else Color.Gray,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 1
-                    )
-                }
+                Text(
+                    text = hudState.speedText,
+                    color = if (hudState.isPeerActive || !isMonitor) Color.White else Color.Gray,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1
+                )
             }
 
             Spacer(modifier = Modifier.height(verticalGap))
@@ -141,7 +113,7 @@ private fun HudStatusBarContent(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 // The ID is a few characters and always shown whole; a long telemetry line wraps instead
-                // (ISSUE-NOV18.9-O117: `This phone:…` beside `38%⚡|29°|A:±96.0m|AGE:465s`).
+                // (ISSUE-NOV18.9-O117: the ID beside `38%⚡|29°|A:±96.0m|AGE:465s`).
                 Text(
                     text = idDisplay,
                     color = Color.Gray,
@@ -164,6 +136,32 @@ private fun HudStatusBarContent(
             }
         }
     }
+}
+
+/**
+ * The Sensor's STATIONARY / MOVING in the menu bar of both apps, where the `MONITOR: V -> TRK: T` and `SENSOR: T`
+ * headers were (Nov19.3). MOVING pulses between guillemets; gray when the Sensor is not heard ([active] false).
+ */
+@Composable
+fun SensorMotionLabel(trackerState: String, active: Boolean, modifier: Modifier = Modifier) {
+    val isMoving = trackerState == "MOVING"
+    val pulse = rememberInfiniteTransition(label = "MotionPulse")
+    val movingAlpha by pulse.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(animation = tween(800), repeatMode = RepeatMode.Reverse),
+        label = "MovingAlpha"
+    )
+    Text(
+        text = if (isMoving) "»$trackerState«" else trackerState,
+        color = if (!active) Color.Gray else if (isMoving) SensorGreen.copy(alpha = movingAlpha) else SensorGreen,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Monospace,
+        maxLines = 1,
+        softWrap = false,
+        modifier = modifier
+    )
 }
 
 @Composable

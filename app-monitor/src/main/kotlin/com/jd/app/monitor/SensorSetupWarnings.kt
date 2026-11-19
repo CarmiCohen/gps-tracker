@@ -99,4 +99,4 @@ fun SensorSetupWarningDialog(warnings: List<String>, onClose: () -> Unit) {
     )
 }
 
-private val SETUP_WARNING_COLOR = Color(0xFFF59E0B)
+private val SETUP_WARNING_COLOR = com.jd.core.ui.BrandGold

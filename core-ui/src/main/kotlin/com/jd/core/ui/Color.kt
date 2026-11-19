@@ -30,3 +30,8 @@ val Rose500 = Color(0xFFF43F5E)
 val MonitorBrown = Color(0xFFD2691E)
 val SensorGreen = Color(0xFF10B981)
 
+// Toolbar and map button colors (SIMP-NOV19.2-S1): named here so no screen writes a literal hex.
+val InfoBlue = Color(0xFF3B82F6)
+val GraphsViolet = Color(0xFFA78BFA)
+val MapZoomPurple = Color(0xFF800080)
+

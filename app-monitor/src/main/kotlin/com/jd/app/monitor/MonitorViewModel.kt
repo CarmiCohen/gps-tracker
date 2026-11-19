@@ -70,11 +70,12 @@ class MonitorViewModel @Inject constructor(
     /** The name the file picker suggests for an export. */
     fun exportFileName(): String = settingsFileName("Monitor", System.currentTimeMillis())
 
-    fun exportSettings(uri: Uri) {
+    /** [savedTo] is the shown path when the file went straight to the GPS-Tracker folder (Nov19.3). */
+    fun exportSettings(uri: Uri, savedTo: String? = null) {
         viewModelScope.launch {
             val message = try {
                 val file = settingsTransfer.export(uri)
-                "Settings exported: ${file.geofence.points.size} home points, ${file.trails.size} trail points"
+                ("Settings exported: ${file.geofence.points.size} home points, ${file.trails.size} trail points" + savedTo.asSuffix())
                     .also { eventLog.record(EventLevel.INFO, it) }
             } catch (e: Exception) {
                 "Export failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
@@ -102,16 +103,18 @@ class MonitorViewModel @Inject constructor(
     /** The name the file picker suggests for the map's SAVE (ISSUE-NOV17.7-O107). */
     fun suggestedTrailFileName(): String = trailFileName(System.currentTimeMillis())
 
-    fun saveTrails(uri: Uri) {
+    fun saveTrails(uri: Uri, savedTo: String? = null) {
         viewModelScope.launch {
             val message = try {
-                "Trails saved: ${trailTransfer.save(uri).trails.size} points".also { eventLog.record(EventLevel.INFO, it) }
+                ("Trails saved: ${trailTransfer.save(uri).trails.size} points" + savedTo.asSuffix()).also { eventLog.record(EventLevel.INFO, it) }
             } catch (e: Exception) {
                 "Trail save failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
             }
             _transferMessages.emit(message)
         }
     }
+
+    private fun String?.asSuffix(): String = if (this == null) "" else " to $this"
 
     fun loadTrails(uri: Uri) {
         viewModelScope.launch {

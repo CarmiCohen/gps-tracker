@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov19.2)
+# SOT Master Requirements & Hardening Status (Nov19.3)
 
-## 🏗️ Architectural Master Rules (541 Rules)
+## 🏗️ Architectural Master Rules (542 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -169,6 +169,7 @@
 *   **1.466 The Sensor Phone Warnings By Push**: the Sensor MUST send its setup report on every change while connected to the relay, also with no Monitor online, and stamp it with its send time; the relay MUST push it to the room's Monitors, at normal priority, only when the missing items or faults change. The Monitor MUST keep the paired tracker's newest report from either road, show a new warning once as a plain notification without siren, and remove it when the setup is fixed or the tracker unpaired (ISSUE-NOV10.8-O86, user decision 2026-11-18, chapter 227).
 *   **1.467 Every Overlay Closes The Same Way**: every full-screen overlay of both apps MUST use the shared `OverlayHeader`, whose title wraps so its close X stays on screen beside any title, and Back MUST close the overlay exactly like the X, one level at a time (ISSUE-NOV10.7-O74, SIMP-NOV10.8-S1, chapter 228).
 *   **1.468 The Monitor Is Orange-Brown**: each device MUST have one color across both apps, the Monitor orange-brown (`MonitorBrown` `#D2691E`) and the Sensor green (`SensorGreen` `#10B981`), in the HUD LEDs, the map dots and trails, the event sources, the toolbar labels and the launcher icons; no cyan remains, and the lines of one graph MUST stay apart in hue (ISSUE-NOV19.2-O123, SIMP-NOV17.6-S1, chapter 229).
+*   **1.469 Saved Files In One Folder, The Motion State In The Menu Bar**: every file the user saves (settings exports, map trails) MUST go to `Download/GPS-Tracker`, directly from Android 10 (picker only as the fallback), and the open pickers MUST start there. The menu bar of both apps MUST show the Sensor's STATIONARY / MOVING in place of an ID header; the HUD MUST show each phone's ID without a `This phone:` or `Sensor:` label and no motion word. The Monitor's launcher icon is the John Deere tractor photo, the Sensor's the green pin; screens use named core-ui colors only (ISSUE-NOV19.3-O124 to O126, SIMP-NOV19.2-S1, chapter 230).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

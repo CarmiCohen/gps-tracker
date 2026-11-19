@@ -108,21 +108,32 @@ class MonitorActivity : ComponentActivity() {
                 }
                 val context = LocalContext.current
 
-                // The settings file (ISSUE-NOV10.8-O80): the system picker needs no storage permission.
+                // The settings file (ISSUE-NOV10.8-O80) and the map's trail file (ISSUE-NOV17.7-O107) are saved straight
+                // to Download/GPS-Tracker (Nov19.3); the save picker is only the fallback (before Android 10).
                 val exportLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.CreateDocument(SETTINGS_FILE_MIME_TYPE)
-                ) { uri -> uri?.let(viewModel::exportSettings) }
+                    com.jd.core.ui.CreateInGpsTrackerFolder(SETTINGS_FILE_MIME_TYPE)
+                ) { uri -> uri?.let { viewModel.exportSettings(it) } }
                 val importLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.OpenDocument()
+                    com.jd.core.ui.OpenInGpsTrackerFolder()
                 ) { uri -> uri?.let(viewModel::importSettings) }
-                val exportSettings = { exportLauncher.launch(viewModel.exportFileName()) }
-                // The map's trail file (ISSUE-NOV17.7-O107), through the same system picker.
+                val exportSettings: () -> Unit = {
+                    val name = viewModel.exportFileName()
+                    com.jd.core.ui.GpsTrackerFolder.createFile(context, name, SETTINGS_FILE_MIME_TYPE)
+                        ?.let { viewModel.exportSettings(it, com.jd.core.ui.GpsTrackerFolder.shownPath(name)) }
+                        ?: exportLauncher.launch(name)
+                }
                 val saveTrailsLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.CreateDocument(SETTINGS_FILE_MIME_TYPE)
-                ) { uri -> uri?.let(viewModel::saveTrails) }
+                    com.jd.core.ui.CreateInGpsTrackerFolder(SETTINGS_FILE_MIME_TYPE)
+                ) { uri -> uri?.let { viewModel.saveTrails(it) } }
                 val loadTrailsLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.OpenDocument()
+                    com.jd.core.ui.OpenInGpsTrackerFolder()
                 ) { uri -> uri?.let(viewModel::loadTrails) }
+                val saveTrails: () -> Unit = {
+                    val name = viewModel.suggestedTrailFileName()
+                    com.jd.core.ui.GpsTrackerFolder.createFile(context, name, SETTINGS_FILE_MIME_TYPE)
+                        ?.let { viewModel.saveTrails(it, com.jd.core.ui.GpsTrackerFolder.shownPath(name)) }
+                        ?: saveTrailsLauncher.launch(name)
+                }
                 val importSettings = { importLauncher.launch(arrayOf("*/*")) } // The content is checked on reading.
                 LaunchedEffect(Unit) {
                     viewModel.transferMessages.collect { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
@@ -201,7 +212,7 @@ class MonitorActivity : ComponentActivity() {
                         },
                         onExportSettings = exportSettings,
                         onImportSettings = importSettings,
-                        onSaveTrails = { saveTrailsLauncher.launch(viewModel.suggestedTrailFileName()) },
+                        onSaveTrails = saveTrails,
                         onLoadTrails = { loadTrailsLauncher.launch(arrayOf("*/*")) }, // The content is checked on reading.
                         onClearTrails = viewModel::clearTrails,
                         onClose = { moveTaskToBack(true) }
@@ -633,8 +644,8 @@ fun MonitorScreen(
             if (isFenceVisible || isEditingHome) mapView.overlays.add(Polygon(mapView).apply {
                 points = Polygon.pointsAsCircle(center, geofence.radiusMeters)
                 // More transparent, so the map under the fence stays readable (ISSUE-NOV17.7-O108).
-                fillPaint.color = android.graphics.Color.argb(FENCE_FILL_ALPHA, 16, 185, 129)
-                outlinePaint.color = android.graphics.Color.argb(FENCE_OUTLINE_ALPHA, 16, 185, 129)
+                fillPaint.color = com.jd.core.ui.SensorGreen.copy(alpha = FENCE_FILL_ALPHA / 255f).toArgb()
+                outlinePaint.color = com.jd.core.ui.SensorGreen.copy(alpha = FENCE_OUTLINE_ALPHA / 255f).toArgb()
                 outlinePaint.strokeWidth = 3f
                 setOnClickListener { _, _, _ -> false } // Taps inside the circle still reach the map.
             })
@@ -715,8 +726,8 @@ fun MonitorScreen(
             Column(modifier = Modifier.fillMaxWidth()) {
                 // Menu Upper Line (Header Bar with Setup, Settings, and Actions)
                 MonitorMenuBar(
-                    monitorId = monitorId,
-                    trackerId = trackerId,
+                    sensorState = remoteHudState.trackerState,
+                    isSensorHeard = remoteHudState.isPeerActive,
                     onSetup = { showSetupDialog = true },
                     onMap = { followMode = MapFollowMode.AUTO },
                     onEvents = { showEventsOverlay = true },
@@ -786,14 +797,14 @@ fun MonitorScreen(
                     // Two buttons a row, so the trail buttons (ISSUE-NOV17.7-O107) also fit a landscape map.
                     Column(verticalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
-                            MapToolButton(label = "IN", symbol = "+", onClick = { mapView.controller.zoomIn() }, iconColor = Color(0xFF800080))
-                            MapToolButton(label = "OUT", symbol = "-", onClick = { mapView.controller.zoomOut() }, iconColor = Color(0xFF800080))
+                            MapToolButton(label = "IN", symbol = "+", onClick = { mapView.controller.zoomIn() }, iconColor = com.jd.core.ui.MapZoomPurple)
+                            MapToolButton(label = "OUT", symbol = "-", onClick = { mapView.controller.zoomOut() }, iconColor = com.jd.core.ui.MapZoomPurple)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
                             MapToolButton(icon = Icons.Default.Place, label = "SENSOR", onClick = {
                                 followMode = MapFollowMode.TRACKER
                                 sensorPosition?.let { mapView.controller.setCenter(GeoPoint(it.lat, it.lng)) }
-                            }, iconColor = Color(0xFF10B981))
+                            }, iconColor = com.jd.core.ui.SensorGreen)
                             MapToolButton(icon = Icons.Default.Person, label = "LOCAL", onClick = {
                                 followMode = MapFollowMode.VIEWER
                                 localPosition?.let { mapView.controller.setCenter(GeoPoint(it.lat, it.lng)) }
@@ -804,13 +815,13 @@ fun MonitorScreen(
                                 icon = Icons.Default.Home,
                                 label = "HOME",
                                 onClick = { isEditingHome = !isEditingHome },
-                                iconColor = if (isEditingHome) Color.White else Color(0xFF10B981),
-                                containerColor = if (isEditingHome) Color(0xFF10B981) else Color.White
+                                iconColor = if (isEditingHome) Color.White else com.jd.core.ui.SensorGreen,
+                                containerColor = if (isEditingHome) com.jd.core.ui.SensorGreen else Color.White
                             )
-                            MapToolButton(icon = Icons.Default.Delete, label = "CLEAR", onClick = { isClearTrailsPending = true }, iconColor = Color(0xFFF43F5E))
+                            MapToolButton(icon = Icons.Default.Delete, label = "CLEAR", onClick = { isClearTrailsPending = true }, iconColor = com.jd.core.ui.Rose500)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
-                            MapToolButton(icon = TrailLoadIcon, label = "LOAD", onClick = onLoadTrails, iconColor = Color(0xFF10B981))
+                            MapToolButton(icon = TrailLoadIcon, label = "LOAD", onClick = onLoadTrails, iconColor = com.jd.core.ui.SensorGreen)
                             MapToolButton(icon = TrailSaveIcon, label = "SAVE", onClick = onSaveTrails, iconColor = Color(0xFF6366F1))
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
@@ -818,8 +829,8 @@ fun MonitorScreen(
                                 label = "FENCE",
                                 symbol = "◯",
                                 onClick = { isFenceVisible = !isFenceVisible },
-                                iconColor = if (isFenceVisible) Color.White else Color(0xFF10B981),
-                                containerColor = if (isFenceVisible) Color(0xFF10B981) else Color.White
+                                iconColor = if (isFenceVisible) Color.White else com.jd.core.ui.SensorGreen,
+                                containerColor = if (isFenceVisible) com.jd.core.ui.SensorGreen else Color.White
                             )
                         }
                     }
@@ -962,8 +973,8 @@ fun MonitorScreen(
 
 @Composable
 fun MonitorMenuBar(
-    monitorId: String,
-    trackerId: String,
+    sensorState: String,
+    isSensorHeard: Boolean,
     onSetup: () -> Unit,
     onMap: () -> Unit,
     onEvents: () -> Unit,
@@ -991,29 +1002,24 @@ fun MonitorMenuBar(
                     Icon(Icons.Default.Build, contentDescription = "Setup", tint = com.jd.core.ui.MonitorBrown, modifier = Modifier.size(15.dp))
                 }
                 IconButton(onClick = onMap, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Place, contentDescription = "Map", tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
+                    Icon(Icons.Default.Place, contentDescription = "Map", tint = com.jd.core.ui.SensorGreen, modifier = Modifier.size(15.dp))
                 }
                 IconButton(onClick = onEvents, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events", tint = Color(0xFFF59E0B), modifier = Modifier.size(15.dp))
+                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events", tint = com.jd.core.ui.BrandGold, modifier = Modifier.size(15.dp))
                 }
                 IconButton(onClick = onInfo, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
+                    Icon(Icons.Default.Info, contentDescription = "Info", tint = com.jd.core.ui.InfoBlue, modifier = Modifier.size(15.dp))
                 }
                 IconButton(onClick = onGraphs, modifier = Modifier.size(28.dp)) {
-                    Icon(com.jd.core.ui.GraphsIcon, contentDescription = "Graphs", tint = Color(0xFFA78BFA), modifier = Modifier.size(15.dp))
+                    Icon(com.jd.core.ui.GraphsIcon, contentDescription = "Graphs", tint = com.jd.core.ui.GraphsViolet, modifier = Modifier.size(15.dp))
                 }
             }
-            Text(
-                text = "MONITOR: ${monitorId.take(6).uppercase()} -> TRK:${trackerId.take(6).uppercase()}",
-                color = com.jd.core.ui.MonitorBrown,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
+            // The Sensor's STATIONARY / MOVING replaces the `MONITOR: V -> TRK: T` header (Nov19.3).
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                com.jd.core.ui.SensorMotionLabel(trackerState = sensorState, active = isSensorHeard)
+            }
             IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFF43F5E), modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = com.jd.core.ui.Rose500, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -1021,7 +1027,7 @@ fun MonitorMenuBar(
 
 @Composable
 fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
-    val purple = Color(0xFF800080)
+    val purple = com.jd.core.ui.MapZoomPurple
     val backgroundColor = if (isMapButtonsVisible) purple else Color.White
     val contentColor = if (isMapButtonsVisible) Color.White else purple
 
@@ -1044,7 +1050,7 @@ fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifi
 
 @Composable
 fun MapToolButton(icon: ImageVector? = null, symbol: String? = null, label: String, onClick: () -> Unit, iconColor: Color, containerColor: Color = Color.White) {
-    val prp = Color(0xFF800080)
+    val prp = com.jd.core.ui.MapZoomPurple
     CappedFontScale {
         Box(
             modifier = Modifier
@@ -1089,7 +1095,7 @@ fun HomePointEditor(
                 Text(
                     "HOME: ${geofence.points.size} | ${radius.toInt()} m",
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF10B981),
+                    color = com.jd.core.ui.SensorGreen,
                     fontSize = 13.sp,
                     modifier = Modifier.weight(1f)
                 )
@@ -1177,7 +1183,7 @@ internal const val HOME_MARKER_SIZE_DP = 10
 internal fun homeMarkerIcon(context: android.content.Context): android.graphics.drawable.Drawable =
     android.graphics.drawable.ShapeDrawable(android.graphics.drawable.shapes.RectShape()).apply {
         val sizePx = (HOME_MARKER_SIZE_DP * context.resources.displayMetrics.density).toInt()
-        paint.color = android.graphics.Color.rgb(16, 185, 129)
+        paint.color = com.jd.core.ui.SensorGreen.toArgb()
         intrinsicWidth = sizePx
         intrinsicHeight = sizePx
     }

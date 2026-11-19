@@ -42,11 +42,11 @@ data class HudState(
         get() = "${speedKmh?.let { String.format(Locale.US, "%.1f", it) } ?: NO_VALUE} km/h"
 
     /**
-     * Names the phone this HUD describes: the Monitor's own HUD says `This phone`, a Sensor HUD (on the Sensor, or the
-     * Monitor's HUD of the paired Sensor) says `Sensor` (ISSUE-NOV17.7-O105; was `TRK:LOCAL | SELF:T`).
+     * The ID of the phone this HUD describes, alone (Nov19.3; was `This phone: V` / `Sensor: T`, ISSUE-NOV17.7-O105):
+     * the line's color already tells which phone it is.
      */
     val idText: String
-        get() = "${if (appMode == "monitor") "This phone" else "Sensor"}: ${selfId.take(6).uppercase()}"
+        get() = selfId.take(6).uppercase()
 
     /** Uses the same state as the SRV LED, so the two can never disagree. */
     val relayStatusText: String

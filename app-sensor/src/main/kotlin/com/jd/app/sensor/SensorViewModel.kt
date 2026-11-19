@@ -58,11 +58,13 @@ class SensorViewModel @Inject constructor(
     /** The name the file picker suggests for an export. */
     fun exportFileName(): String = settingsFileName("Sensor", System.currentTimeMillis())
 
-    fun exportSettings(uri: Uri) {
+    /** [savedTo] is the shown path when the file went straight to the GPS-Tracker folder (Nov19.3). */
+    fun exportSettings(uri: Uri, savedTo: String? = null) {
         viewModelScope.launch {
             val message = try {
                 val file = settingsTransfer.export(uri)
-                "Settings exported: ID ${file.sensorId}, next sequence ${file.nextSequenceId ?: "unknown"}"
+                ("Settings exported: ID ${file.sensorId}, next sequence ${file.nextSequenceId ?: "unknown"}" +
+                    (savedTo?.let { " to $it" } ?: ""))
                     .also { eventLog.record(EventLevel.INFO, it) }
             } catch (e: Exception) {
                 "Export failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
