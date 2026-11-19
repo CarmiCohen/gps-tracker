@@ -32,6 +32,7 @@ import androidx.core.location.LocationManagerCompat
 import com.google.android.gms.location.*
 import com.jd.core.network.SignalingClient
 import com.jd.core.network.peerDeliveries
+import com.jd.core.network.relayDeliveries
 import com.jd.core.shared.*
 import com.jd.core.ui.getAppVersionName
 import com.jd.core.ui.readPhoneState
@@ -502,9 +503,10 @@ class SensorService : Service(), SensorEventListener {
 
     /**
      * Tells the Monitor what this phone's setup lacks and which detection settings are applied (ISSUE-NOV10.8-O83
-     * part 2, ISSUE-NOV15.2-O97): the report is sent each time a Monitor comes online, and each time it changes while one
-     * is online. Android announces no change of a permission or an exemption, so the setup is read again every
-     * [SETUP_STATUS_CHECK_MS].
+     * part 2, ISSUE-NOV15.2-O97): the report is sent each time a Monitor comes online, and each time it changes while
+     * this phone is connected to the relay, also with no Monitor online: the relay pushes a changed report to a Monitor
+     * frozen in the background (ISSUE-NOV10.8-O86). Android announces no change of a permission or an exemption, so the
+     * setup is read again every [SETUP_STATUS_CHECK_MS].
      */
     private fun setupSetupReporting() {
         val items = sensorSetupItems()
@@ -520,7 +522,7 @@ class SensorService : Service(), SensorEventListener {
             .distinctUntilChanged()
             .onEach { setupReport.value = it }
             .launchIn(serviceScope)
-        peerDeliveries(setupReport.filterNotNull(), signalingClient.viewerStatusFlow)
+        relayDeliveries(setupReport.filterNotNull(), signalingClient.isConnected, signalingClient.viewerStatusFlow)
             .onEach(::sendSetupReport)
             .launchIn(serviceScope)
         var previousReport: SensorSetupReport? = null
@@ -691,7 +693,10 @@ class SensorService : Service(), SensorEventListener {
 
     private suspend fun sendSetupReport(report: SensorSetupReport) {
         val sent = signalingClient.sendSensorSetup(report)
-        SystemLogger.i("SensorSetup", "Report sent: $sent (missing ${report.missing}, faults ${report.faults}, behaviour rev ${report.behaviourRevision})")
+        SystemLogger.i(
+            "SensorSetup",
+            "Report sent: $sent (Monitor online: $isMonitorOnline, missing ${report.missing}, faults ${report.faults}, behaviour rev ${report.behaviourRevision})"
+        )
     }
 
     /**

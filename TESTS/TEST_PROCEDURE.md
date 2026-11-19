@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov18.11 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov18.12 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1142,8 +1142,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **226.2 Device:** restart the Sensor (install over it, then open it); its Events (or the paired Monitor's) show `Sensor service started` and no `Detection settings applied` line; changing a detection setting on the Monitor adds one line with the new revision.
 *   **226.3 Live (two phones):** on the paired Monitor, a relay drop shorter than 30 s raises no `Alarm: Relay disconnected`; one of 30 s or more does (for example airplane mode on the Monitor for 10 s, then for 40 s; Local internet lost alarms too).
 
+## Chapter 227 - The Sensor Phone Warnings By Push (Nov18.12)
+**Status: L / A** - 227.1 passed (relay `npm test` 18; 956 unit tests); 227.2 passed on the A15; 227.3 passed on the A15 with both apps (session connected); 227.4 not run (needs a Monitor frozen in the background) (ISSUE-NOV10.8-O86, SOT 1.466)
+*   **227.1 Units:** relay `registry.test.js` (a setup report is news only when its missing items or faults change, per Sensor, in any order), `relay.test.js` (every report reaches the room, only changed ones log `[SETUP]`); `RelayDeliveriesTest` (a change is sent while connected with no Monitor online; a Monitor coming online gets the report again; nothing without the relay link); `SensorSetupWireTest` (the send time travels and is stamped by the client, a report without it has time 0, the pushed text decodes); `SensorSetupNoticesTest` (the later sent report wins, another tracker's starts over; a warning not notified before shows the notification, the same or fewer keep it, none removes it).
+*   **227.2 Instrumented:** `SensorSetupNoticeDeviceTest` (grant the Monitor `POST_NOTIFICATIONS` first): the `monitor_sensor_setup` channel is default importance; a new warning posts notification 2002 and stores it, the same report by the other road does not post again, a new warning lists it, an older copy is ignored, a fixed setup removes the notification; another tracker's report is ignored.
+*   **227.3 Live:** with the Monitor paired and in the background, `adb shell "dumpsys deviceidle whitelist -com.jd.app.sensor"` on the Sensor phone: within 30 s `REV_SensorSetup` on the Monitor shows the report `by relay` and `by push` and one `Sensor phone needs attention` notification appears; `+com.jd.app.sensor` brings the fixed report and removes it. Debug `STATE` shows `sentAt=` and `notified=`.
+*   **227.4 Live (two phones):** with the Monitor frozen in the background long enough for the relay to drop its socket (the Sensor logs `Monitor online: false`), the same change still shows the notification, by push only.
+
 ---
-**Active Testing Chapters: 215 of 226**
+**Active Testing Chapters: 216 of 227**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

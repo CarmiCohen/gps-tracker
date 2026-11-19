@@ -23,6 +23,7 @@ import org.junit.Test
 /**
  * Chapter 189 (ISSUE-NOV10.8-O83 part 2): the Sensor's setup report travels to the Monitor inside the relay's existing
  * settings_update / settings_relay event, so the relay needs no change, and the client keeps the newest report.
+ * Chapter 227 (ISSUE-NOV10.8-O86): the report carries the time it was sent, and the pushed JSON text decodes the same.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SensorSetupWireTest {
@@ -45,6 +46,22 @@ class SensorSetupWireTest {
         assertEquals("The relay routes by id to the Sensor's own room", "T", wire.getString("id"))
         assertEquals("sensor_setup", wire.getString("type"))
         assertEquals(report.copy(trackerId = "T"), SensorSetupWire.decode(JSONObject(wire.toString())))
+    }
+
+    @Test
+    fun `the send time travels, and a report of a Sensor before Nov18_12 has time 0`() {
+        val wire = JSONObject(SensorSetupWire.encode("T", report, sentAtMs = 1_795_000_000_123L).toString())
+        assertEquals(1_795_000_000_123L, SensorSetupWire.decode(wire)!!.sentAtMs)
+        wire.remove("sentAt")
+        assertEquals(report.copy(trackerId = "T"), SensorSetupWire.decode(wire))
+    }
+
+    @Test
+    fun `the pushed text decodes as the relayed event, and other text is ignored`() {
+        val text = SensorSetupWire.encode("T", report, sentAtMs = 42L).toString()
+        assertEquals(report.copy(trackerId = "T", sentAtMs = 42L), SensorSetupWire.decodeText(text))
+        assertNull(SensorSetupWire.decodeText("not json"))
+        assertNull(SensorSetupWire.decodeText("""{"type":"sensor_silent","id":"T","lastTs":1}"""))
     }
 
     @Test
@@ -87,10 +104,13 @@ class SensorSetupWireTest {
 
             socket.simulateConnect()
             runCurrent()
+            val before = System.currentTimeMillis()
             assertTrue(client.sendSensorSetup(report))
 
             val sent = socket.emittedEvents.single { it.first == "settings_update" }.second as JSONObject
-            assertEquals("The client fills in the Sensor's own ID", report.copy(trackerId = "T"), SensorSetupWire.decode(JSONObject(sent.toString())))
+            val decoded = SensorSetupWire.decode(JSONObject(sent.toString()))!!
+            assertEquals("The client fills in the Sensor's own ID", report.copy(trackerId = "T"), decoded.copy(sentAtMs = 0L))
+            assertTrue("The client stamps the send time", decoded.sentAtMs in before..System.currentTimeMillis())
         } finally {
             client.disconnect()
         }

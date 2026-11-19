@@ -6,6 +6,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.LocationRowWire
+import com.jd.core.network.SensorSetupWire
 import com.jd.core.network.SensorSilenceWire
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.SystemLogger
@@ -19,6 +20,8 @@ import javax.inject.Inject
  * silent: the fast second road beside the relay connection, which a phone may delay in the background, and the only
  * road for what the relay notices by itself (ISSUE-NOV10.8-O86). Each goes to [PushedRows] for [MonitorAlarmEngine],
  * the only place that raises alarms; a push that finds the session dead starts it.
+ * The Sensor's changed phone setup report comes at normal priority and goes to [SensorSetupReports], which notifies
+ * a new warning without the session (ISSUE-NOV10.8-O86, the O83 warnings).
  */
 @AndroidEntryPoint
 class MonitorMessagingService : FirebaseMessagingService() {
@@ -26,6 +29,7 @@ class MonitorMessagingService : FirebaseMessagingService() {
     @Inject lateinit var signalingClient: SignalingClient
     @Inject lateinit var identityManager: ForensicIdentityManager
     @Inject lateinit var pushedRows: PushedRows
+    @Inject lateinit var setupReports: SensorSetupReports
 
     override fun onNewToken(token: String) {
         signalingClient.registerPushToken(token)
@@ -34,13 +38,17 @@ class MonitorMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         val nowMs = System.currentTimeMillis()
         val isHighPriority = remoteMessage.priority == RemoteMessage.PRIORITY_HIGH
+        // Firebase calls this on a worker thread, so reading the stored pairing may block.
+        remoteMessage.data[SETUP_KEY]?.let(SensorSetupWire::decodeText)?.let { report ->
+            runBlocking { setupReports.take(report, "push") }
+            return
+        }
         val row = remoteMessage.data[ROW_KEY]?.let(LocationRowWire::decodeText)
         val silence = remoteMessage.data[NOTICE_KEY]?.let(SensorSilenceWire::decodeText)
         if (row == null && silence == null) {
-            SystemLogger.w("Push", "A push without a readable row or notice was ignored")
+            SystemLogger.w("Push", "A push without a readable row, notice or setup report was ignored")
             return
         }
-        // Firebase calls this on a worker thread, so reading the stored pairing may block.
         val trackerId = runBlocking { identityManager.targetId.first() }
         if (row != null) {
             if (!pushedRows.offer(row, trackerId, nowMs)) {
@@ -71,5 +79,8 @@ class MonitorMessagingService : FirebaseMessagingService() {
 
         /** The relay sends what it noticed by itself as JSON text under this data key. */
         const val NOTICE_KEY = "notice"
+
+        /** The relay sends the Sensor's changed setup report, its own JSON text, under this data key (relay v6.047). */
+        const val SETUP_KEY = "setup"
     }
 }

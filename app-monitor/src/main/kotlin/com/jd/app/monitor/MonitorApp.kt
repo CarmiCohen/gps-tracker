@@ -29,6 +29,8 @@ class MonitorApp : Application(), Configuration.Provider {
         const val ALARM_CHANNEL_ID = "monitor_alarm"
         /** Low importance, for the ongoing tracking session notification. */
         const val SESSION_CHANNEL_ID = "monitor_session"
+        /** Default importance: what the Sensor phone lacks, never with the siren (ISSUE-NOV10.8-O86, user decision 2026-11-18). */
+        const val SETUP_CHANNEL_ID = "monitor_sensor_setup"
         /** Shared by both until Nov7.2; the session service had lowered it to low importance. */
         const val LEGACY_CHANNEL_ID = "critical_violation_channel"
     }
@@ -77,6 +79,11 @@ fun createMonitorNotificationChannels(context: Context) {
     manager.createNotificationChannel(
         NotificationChannel(MonitorApp.SESSION_CHANNEL_ID, "Tracking Session", NotificationManager.IMPORTANCE_LOW).apply {
             description = "Shown while the Monitor receives a paired tracker."
+        }
+    )
+    manager.createNotificationChannel(
+        NotificationChannel(MonitorApp.SETUP_CHANNEL_ID, "Sensor Phone Warnings", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = "What the Sensor phone lacks, such as a permission taken back. No siren."
         }
     )
 }

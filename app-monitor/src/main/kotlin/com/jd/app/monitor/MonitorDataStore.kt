@@ -28,6 +28,17 @@ class MonitorDataStore(private val context: Context) {
     private val geofenceKey = stringPreferencesKey("geofence_json")
     private val trailClearTrackerKey = stringPreferencesKey("trail_clear_tracker")
     private val trailClearAtKey = longPreferencesKey("trail_clear_at_ms")
+    private val notifiedSetupWarningsKey = stringSetPreferencesKey("notified_setup_warnings")
+
+    /**
+     * The Sensor phone warnings the last setup notification covered, so each one is notified once, also across
+     * restarts of the Monitor (ISSUE-NOV10.8-O86, user decision 2026-11-18).
+     */
+    val notifiedSetupWarnings: Flow<Set<String>> = context.monitorDataStore.data.map { it[notifiedSetupWarningsKey] ?: emptySet() }
+
+    suspend fun saveNotifiedSetupWarnings(warnings: Set<String>) {
+        context.monitorDataStore.edit { it[notifiedSetupWarningsKey] = warnings }
+    }
 
     /** The user's last trail clear, or null (ISSUE-NOV17.7-O107). */
     val trailClear: Flow<TrailClear?> = context.monitorDataStore.data.map { prefs ->

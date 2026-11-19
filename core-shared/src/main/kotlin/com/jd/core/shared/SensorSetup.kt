@@ -33,11 +33,14 @@ enum class SensorFault(val text: String, val isMicrophone: Boolean = false) {
  * What the Sensor [trackerId] tells its Monitors about its phone (ISSUE-NOV10.8-O83 part 2): the required Phone Setup
  * items known to be [missing] (an optional item, or one Android does not let the app read, is never listed), the
  * [faults] of the running service, and [behaviourRevision], the revision of the detection settings it applies
- * (ISSUE-NOV15.2-O97). The Sensor leaves [trackerId] empty; the signaling client fills it.
+ * (ISSUE-NOV15.2-O97). The Sensor leaves [trackerId] empty; the signaling client fills it. [sentAtMs] is the Sensor's
+ * clock when the signaling client sent the report (0 from a Sensor before Nov18.12): the same report reaches the Monitor
+ * by the relay connection and by push, and the later sent one wins (ISSUE-NOV10.8-O86).
  */
 data class SensorSetupReport(
     val trackerId: String = "",
     val missing: List<SensorSetupItem> = emptyList(),
     val faults: List<SensorFault> = emptyList(),
-    val behaviourRevision: Long = 0L
+    val behaviourRevision: Long = 0L,
+    val sentAtMs: Long = 0L
 )

@@ -39,6 +39,7 @@ class MonitorSessionService : Service() {
     @Inject lateinit var alarmEngine: MonitorAlarmEngine
     @Inject lateinit var eventLog: EventLog
     @Inject lateinit var graphs: MonitorGraphs
+    @Inject lateinit var setupReports: SensorSetupReports
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var signalingJob: Job? = null
@@ -91,11 +92,10 @@ class MonitorSessionService : Service() {
                     SystemLogger.i("MonitorService", "Sensor behaviour rev ${behaviour.revision} sent to $targetId: $sent ($behaviour)")
                 }
             }
-            // The Sensor answers with what its phone setup lacks; the screen warns from the client's copy (ISSUE-NOV10.8-O83 part 2).
+            // The Sensor answers with what its phone setup lacks (ISSUE-NOV10.8-O83 part 2); the same report may also come
+            // by push, so both roads meet in SensorSetupReports, which the screen reads (ISSUE-NOV10.8-O86).
             launch {
-                signalingClient.sensorSetupFlow.filterNotNull().collect { report ->
-                    SystemLogger.i("MonitorService", "Sensor setup report from ${report.trackerId}: missing ${report.missing}, faults ${report.faults}, behaviour rev ${report.behaviourRevision}")
-                }
+                signalingClient.sensorSetupFlow.filterNotNull().collect { setupReports.take(it, "relay") }
             }
 
             // The Monitor's events list also holds the paired Sensor's events (ISSUE-NOV10.8-O84); those it missed while

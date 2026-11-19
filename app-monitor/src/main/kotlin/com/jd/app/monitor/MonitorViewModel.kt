@@ -58,6 +58,7 @@ class MonitorViewModel @Inject constructor(
     private val graphs: MonitorGraphs,
     private val settingsTransfer: MonitorSettingsTransfer,
     private val trailTransfer: MonitorTrailTransfer,
+    private val setupReports: SensorSetupReports,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -166,9 +167,9 @@ class MonitorViewModel @Inject constructor(
 
     /**
      * The paired Sensor's newest setup report, or null while none has arrived; a report of another tracker is never
-     * shown (ISSUE-NOV10.8-O83 part 2).
+     * shown (ISSUE-NOV10.8-O83 part 2). It came by the relay connection or by push (ISSUE-NOV10.8-O86).
      */
-    val sensorSetup: StateFlow<SensorSetupReport?> = combine(signalingClient.sensorSetupFlow, identityManager.targetId) { report, target ->
+    val sensorSetup: StateFlow<SensorSetupReport?> = combine(setupReports.latest, identityManager.targetId) { report, target ->
         report?.takeIf { it.trackerId == target }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
@@ -246,6 +247,7 @@ class MonitorViewModel @Inject constructor(
     fun triggerFullSystemReinitialization() {
         viewModelScope.launch {
             identityManager.clearTargetId()
+            setupReports.forget()
             dataStore.saveAlertSettings(AlertSettings())
             dataStore.saveSirenType("Siren")
             dataStore.saveRelayUrl(RelayConfig.DEFAULT_URL)
@@ -498,6 +500,7 @@ class MonitorViewModel @Inject constructor(
         graphs.sensor.clear() // The next Sensor's samples must not mix with this one's (ISSUE-NOV10.8-O84 part 3).
         viewModelScope.launch {
             identityManager.clearTargetId()
+            setupReports.forget() // The Sensor phone warnings were about the unpaired tracker.
         }
     }
 

@@ -474,7 +474,7 @@ class SocketioSignalingClient @Inject constructor(
     override suspend fun sendSensorSetup(report: SensorSetupReport): Boolean {
         val deviceId = currentDeviceId ?: return false
         if (!_isConnected.value) return false
-        val payload = SensorSetupWire.encode(report.trackerId.ifEmpty { deviceId }, report)
+        val payload = SensorSetupWire.encode(report.trackerId.ifEmpty { deviceId }, report, sentAtMs = System.currentTimeMillis())
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true
