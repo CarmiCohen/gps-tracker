@@ -8,6 +8,8 @@ import android.location.Location
 import android.location.LocationManager
 import android.os.Looper
 import androidx.core.content.ContextCompat
+import androidx.core.location.GnssStatusCompat
+import androidx.core.location.LocationManagerCompat
 import androidx.core.location.LocationListenerCompat
 import com.jd.core.ui.toFixReading
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -56,6 +58,31 @@ class MonitorLocationSource @Inject constructor(
             )
         }
         awaitClose { locationManager.removeUpdates(listener) }
+    }
+
+    /**
+     * How many satellites the GNSS chip's fix uses, at each of its status reports (about once a second while GPS runs
+     * for [fixes]), 0 when it stops. For the GPS LED (Nov19.5): unlike the fixes, which wait for 10 m of movement, the
+     * reports keep coming on a Monitor standing still. Emits nothing without fine location (GNSS status needs it).
+     */
+    fun satellitesUsed(): Flow<Int> = callbackFlow {
+        val locationManager = context.getSystemService(LocationManager::class.java)
+        val callback = object : GnssStatusCompat.Callback() {
+            override fun onSatelliteStatusChanged(status: GnssStatusCompat) {
+                trySend((0 until status.satelliteCount).count { status.usedInFix(it) })
+            }
+
+            override fun onStopped() {
+                trySend(0)
+            }
+        }
+        val isRegistered = try {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
+                LocationManagerCompat.registerGnssStatusCallback(locationManager, ContextCompat.getMainExecutor(context), callback)
+        } catch (e: SecurityException) {
+            false
+        }
+        awaitClose { if (isRegistered) LocationManagerCompat.unregisterGnssStatusCallback(locationManager, callback) }
     }
 
     private fun Location.toLocalFix() = LocalFix(MapPosition(latitude, longitude), toFixReading())

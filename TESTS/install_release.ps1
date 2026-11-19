@@ -11,7 +11,8 @@
 param([string]$Serial = "R58X40GV2AR", [string[]]$Apps = @("sensor", "monitor"), [switch]$NoBuild)
 $root = Split-Path -Parent $PSScriptRoot
 if (-not $NoBuild) {
-    $tasks = $Apps | ForEach-Object { ":app-${_}:assembleRelease" }
+    # Always an array: with one app a bare string is splatted wrongly and Gradle gets task ':' (Nov19.5, -Apps sensor).
+    $tasks = @($Apps | ForEach-Object { ":app-${_}:assembleRelease" })
     & (Join-Path $root "gradlew.bat") -p $root @tasks -q
     if ($LASTEXITCODE -ne 0) { "RELEASE BUILD FAILED ($($tasks -join ' '))"; exit 1 }
 }

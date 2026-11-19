@@ -24,6 +24,10 @@ import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.atUiRate
 import com.jd.core.ui.HudState
+import com.jd.core.ui.gpsLed
+import com.jd.core.ui.ownLeds
+import com.jd.core.ui.peerLed
+import com.jd.core.ui.relayLinkUp
 import com.jd.core.ui.readBattery
 import com.jd.core.ui.withLocalReadings
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -213,21 +217,26 @@ class SensorViewModel @Inject constructor(
         selfId,
         signalingClient.isConnected,
         signalingClient.viewerStatusFlow,
-        uiFix,
+        combine(uiFix, fixStore.satelliteFixTimeMs) { fix, satelliteFixMs -> fix to satelliteFixMs },
         _ticker
-    ) { id, isConnected, isViewerConnected, fix, now ->
+    ) { id, isConnected, isViewerConnected, (fix, satelliteFixMs), now ->
+        val satelliteFixAgeMs = satelliteFixMs?.let { (now - it).coerceAtLeast(0L) }
         val isInternet = isNetworkAvailable(context)
-        val isGpsActive = isLocationProviderEnabled(context)
+        val isLinkUp = relayLinkUp(isInternet, isConnected)
 
         HudState(
             appMode = "sensor",
             selfId = id,
-            isInternet = isInternet,
             isRelayConnected = isConnected,
-            isLocalGpsActive = isGpsActive,
             isPeerActive = isViewerConnected,
-            isDataHealthy = isInternet,
-            watchdogOk = true
+            // INT, SRV, GPS and VWR in green, red or gray (Nov19.5); DAT (a copy of INT) and WDG are gone.
+            leds = ownLeds(
+                isInternet = isInternet,
+                isRelayConnected = isLinkUp,
+                gps = gpsLed(isLocationProviderEnabled(context), satelliteFixAgeMs),
+                peerLabel = "VWR",
+                peer = peerLed(isPaired = true, isRelayConnected = isLinkUp, isPeerHeard = isViewerConnected)
+            )
         ).withLocalReadings(fix, readBattery(context), now)
     }
         .atUiRate()

@@ -27,7 +27,14 @@ import com.jd.core.shared.SensorSetupReport
 import com.jd.core.shared.SettingsFileException
 import com.jd.core.shared.settingsFileName
 import com.jd.core.shared.atUiRate
+import com.jd.core.ui.HudLed
 import com.jd.core.ui.HudState
+import com.jd.core.ui.gpsLed
+import com.jd.core.ui.isSatelliteFix
+import com.jd.core.ui.ownLeds
+import com.jd.core.ui.peerLed
+import com.jd.core.ui.relayLinkUp
+import com.jd.core.ui.remoteGpsLed
 import com.jd.core.ui.getAppVersionName
 import com.jd.core.ui.metersPerSecondToKmh
 import com.jd.core.ui.motionState
@@ -294,6 +301,14 @@ class MonitorViewModel @Inject constructor(
         .map { it?.position }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    /** When this Monitor's GNSS chip last reported a satellite fix (`isSatelliteFix`), for its GPS LED (Nov19.5). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val lastSatelliteFixMs: StateFlow<Long?> = hasLocationPermission
+        .flatMapLatest { granted -> if (granted) locationSource.satellitesUsed() else emptyFlow() }
+        .filter(::isSatelliteFix)
+        .map { System.currentTimeMillis() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     fun refreshLocationPermission() {
         hasLocationPermission.value = locationSource.hasPermission()
     }
@@ -302,10 +317,17 @@ class MonitorViewModel @Inject constructor(
     private val pairedTelemetry = combine(_latestTelemetry, identityManager.targetId) { latest, target -> latest.ifFrom(target) }
     private val uiTelemetry = pairedTelemetry.atUiRate()
 
+    /** The Sensor and time (its clock) of its newest row with a satellite fix, for the gray of its GPS LED (Nov19.5). */
+    private val lastSensorFix = MutableStateFlow<Pair<String, Long>?>(null)
+
     init {
         signalingClient.telemetryFlow
             .onEach { update ->
                 _latestTelemetry.value = update
+                // The newest time only: a late backfilled row must not move it back.
+                if (isSatelliteFix(update.satsUsed)) lastSensorFix.update { last ->
+                    if (last == null || last.first != update.deviceId || update.timestamp > last.second) update.deviceId to update.timestamp else last
+                }
             }
             .launchIn(viewModelScope)
 
@@ -330,26 +352,31 @@ class MonitorViewModel @Inject constructor(
     }
 
     val localHudState: StateFlow<HudState> = combine(
-        selfId,
+        combine(selfId, identityManager.targetId) { self, target -> self to target },
         signalingClient.isConnected,
         uiTelemetry,
-        localFix,
+        combine(localFix, lastSatelliteFixMs) { fix, satelliteFixMs -> fix to satelliteFixMs },
         _ticker
-    ) { self, isConnected, latest, fix, now ->
-        val isInternet = isNetworkAvailable(context)
-        val isLocalGps = isLocationProviderEnabled(context)
+    ) { (self, target), isConnected, latest, (fix, satelliteFixMs), now ->
         val lastTs = latest?.timestamp ?: 0L
         val isTrackerPresent = lastTs > 0 && (now - lastTs) < TRACKER_PRESENT_MS
+        val satelliteFixAgeMs = satelliteFixMs?.let { (now - it).coerceAtLeast(0L) }
+        val isInternet = isNetworkAvailable(context)
+        val isLinkUp = relayLinkUp(isInternet, isConnected)
 
         HudState(
-            appMode = "monitor", // MonitorBrown local LEDs (ISSUE-NOV19.2-O123)
+            appMode = "monitor",
             selfId = self,
-            isInternet = isInternet,
-            isRelayConnected = isConnected,       // SRV: Green ONLY if connected to Relay
-            isLocalGpsActive = isLocalGps,
-            isPeerActive = isTrackerPresent,       // TRK: Green ONLY if Tracker T is connected & active
-            isDataHealthy = isInternet && isConnected,
-            watchdogOk = true
+            isRelayConnected = isConnected,
+            isPeerActive = isTrackerPresent,
+            // INT, SRV, GPS and TRK in green, red or gray (Nov19.5); DAT (INT and SRV again) and WDG are gone.
+            leds = ownLeds(
+                isInternet = isInternet,
+                isRelayConnected = isLinkUp,
+                gps = gpsLed(isLocationProviderEnabled(context), satelliteFixAgeMs),
+                peerLabel = "TRK",
+                peer = peerLed(isPaired = !target.isNullOrBlank(), isRelayConnected = isLinkUp, isPeerHeard = isTrackerPresent)
+            )
         ).withLocalReadings(fix?.reading, readBattery(context), now)
     }
         .atUiRate()
@@ -359,25 +386,26 @@ class MonitorViewModel @Inject constructor(
         identityManager.targetId.filterNotNull(),
         signalingClient.isConnected,
         uiTelemetry,
+        lastSensorFix,
         _ticker
-    ) { target, isConnected, latest, now ->
+    ) { target, isConnected, latest, lastFix, now ->
         val lastTs = latest?.timestamp ?: 0L
         val ageSec = if (lastTs > 0) (now - lastTs) / 1000 else -1L
         val isTrackerPresent = lastTs > 0 && (now - lastTs) < TRACKER_PRESENT_MS
-        val isInternet = isNetworkAvailable(context)
         val isGpsActive = latest != null && (latest.lat != 0.0 || latest.lng != 0.0)
         val speedMps = latest?.takeIf { isGpsActive && it.speed >= 0f }?.speed
         val speedKmh = speedMps?.let(::metersPerSecondToKmh)
+        val lastFixAgeMs = lastFix?.takeIf { it.first == target }?.let { (now - it.second).coerceAtLeast(0L) }
 
         HudState(
-            appMode = "sensor", // Green remote sensor GPS LED
+            appMode = "sensor",
             selfId = target, // this HUD describes the paired Sensor (ISSUE-NOV17.7-O105)
-            isInternet = isInternet,
-            isRelayConnected = isConnected,          // SRV: Green ONLY if connected to Relay
-            isLocalGpsActive = isGpsActive,
-            isPeerActive = isTrackerPresent,          // Green ONLY if remote Tracker T is present and active
-            isDataHealthy = isInternet && isTrackerPresent,
-            watchdogOk = true,
+            isRelayConnected = isConnected,
+            isPeerActive = isTrackerPresent,
+            // GPS alone (Nov19.5): the Monitor cannot see the Sensor's internet or relay link, and TRK already tells it is heard.
+            leds = listOf(
+                HudLed("GPS", remoteGpsLed(isTrackerPresent, latest?.satsUsed ?: -1, lastFixAgeMs))
+            ),
             trackerState = motionState(speedKmh),
             speedKmh = speedKmh,
             batteryLevel = latest?.takeIf { it.batteryLevel >= 0 }?.batteryLevel,

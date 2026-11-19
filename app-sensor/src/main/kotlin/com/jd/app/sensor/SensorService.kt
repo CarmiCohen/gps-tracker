@@ -147,6 +147,8 @@ class SensorService : Service(), SensorEventListener {
             satellites = (0 until status.satelliteCount).map { i ->
                 SatelliteReading(status.getSvid(i), status.getConstellationType(i), status.getCn0DbHz(i), status.usedInFix(i))
             }
+            // The GPS LED means satellites (Nov19.5): the same count the rows carry as `sats`.
+            if (com.jd.core.ui.isSatelliteFix(satellites.count { it.usedInFix })) fixStore.markSatelliteFix(System.currentTimeMillis())
         }
 
         override fun onStopped() {

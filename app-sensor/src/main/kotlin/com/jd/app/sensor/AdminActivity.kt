@@ -575,33 +575,18 @@ fun SensorAdminConsole(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically, 
-                    horizontalArrangement = Arrangement.spacedBy(0.dp),
-                    modifier = Modifier.weight(1f, fill = false)
-                ) {
-                    IconButton(onClick = { showSetupDialog = true }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Build, contentDescription = "Setup", tint = com.jd.core.ui.MonitorBrown, modifier = Modifier.size(15.dp))
-                    }
-                    // One setup icon (ISSUE-NOV17.7-O109): the Settings screen opens from the Setup dialog's SETTINGS button.
-                    IconButton(onClick = onEventsClick, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events", tint = com.jd.core.ui.BrandGold, modifier = Modifier.size(15.dp))
-                    }
-                    IconButton(onClick = onInfoClick, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Info, contentDescription = "Info", tint = com.jd.core.ui.InfoBlue, modifier = Modifier.size(15.dp))
-                    }
-                    IconButton(onClick = onGraphsClick, modifier = Modifier.size(28.dp)) {
-                        Icon(com.jd.core.ui.GraphsIcon, contentDescription = "Graphs", tint = com.jd.core.ui.GraphsViolet, modifier = Modifier.size(15.dp))
-                    }
-                }
-                // This Sensor's STATIONARY / MOVING replaces the `SENSOR: T` header (Nov19.3); the ID is on the HUD line.
+                // Every icon gets an equal share of the width beside the label, all of it tappable (Nov19.5, user request).
+                val share = Modifier.weight(1f)
+                com.jd.core.ui.MenuBarIcon(Icons.Default.Build, "Setup", com.jd.core.ui.MonitorBrown, { showSetupDialog = true }, share)
+                // One setup icon (ISSUE-NOV17.7-O109): the Settings screen opens from the Setup dialog's SETTINGS button.
+                com.jd.core.ui.MenuBarIcon(Icons.AutoMirrored.Filled.List, "Events", com.jd.core.ui.BrandGold, onEventsClick, share)
+                com.jd.core.ui.MenuBarIcon(Icons.Default.Info, "Info", com.jd.core.ui.InfoBlue, onInfoClick, share)
+                com.jd.core.ui.MenuBarIcon(com.jd.core.ui.GraphsIcon, "Graphs", com.jd.core.ui.GraphsViolet, onGraphsClick, share)
+                // This Sensor's STATIONARY / MOVING replaces the `SENSOR: T` header (Nov19.3); always whole (Nov19.5).
                 com.jd.core.ui.SensorMotionLabel(trackerState = hudState.trackerState, active = true)
-                IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = com.jd.core.ui.Rose500, modifier = Modifier.size(18.dp))
-                }
+                com.jd.core.ui.MenuBarIcon(Icons.Default.Close, "Close", com.jd.core.ui.Rose500, onClose, share)
             }
         }
 

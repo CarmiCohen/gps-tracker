@@ -21,12 +21,9 @@ const val HUD_TEMPERATURE_ICON = "🌡️" // 🌡️ (with the emoji presentati
 data class HudState(
     val appMode: String = "monitor", // "monitor" (Viewer) or "sensor" (Tracker)
     val selfId: String = "--", // the ID of the phone this HUD describes (ISSUE-NOV17.7-O105)
-    val isInternet: Boolean = false,        // INT LED
-    val isRelayConnected: Boolean = false,  // SRV LED
-    val isLocalGpsActive: Boolean = false,  // GPS LED
-    val isPeerActive: Boolean = false,      // TRK LED (Viewer) or VWR LED (Tracker)
-    val isDataHealthy: Boolean = false,    // DAT LED (true if internet, relay, and peer active)
-    val watchdogOk: Boolean = true,         // WDG LED
+    val isRelayConnected: Boolean = false,  // this phone's relay connection (relayStatusText)
+    val isPeerActive: Boolean = false,      // the other app is heard (the Monitor's map center and speed color)
+    val leds: List<HudLed> = emptyList(),   // the LEDs this line shows, green, red or gray (Nov19.5, HudLeds.kt)
     val trackerState: String = NO_VALUE,    // "MOVING", "STATIONARY", "PARKING", or NO_VALUE
     val speedKmh: Float? = null,
     val batteryLevel: Int? = null,

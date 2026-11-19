@@ -60,9 +60,6 @@ private fun HudStatusBarContent(
     verticalGap: Dp,
 ) {
     val isMonitor = hudState.appMode == "monitor"
-    val peerBadgeLabel = if (isMonitor) "TRK" else "VWR"
-    val localColor = if (isMonitor) MonitorBrown else SensorGreen
-    val peerColor = if (isMonitor) SensorGreen else MonitorBrown
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -84,12 +81,7 @@ private fun HudStatusBarContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    StatusBadge(label = "INT", active = hudState.isInternet, activeColor = localColor)
-                    StatusBadge(label = "SRV", active = hudState.isRelayConnected, activeColor = localColor)
-                    StatusBadge(label = "GPS", active = hudState.isLocalGpsActive, activeColor = localColor)
-                    StatusBadge(label = peerBadgeLabel, active = hudState.isPeerActive, activeColor = peerColor)
-                    StatusBadge(label = "DAT", active = hudState.isDataHealthy, activeColor = localColor)
-                    StatusBadge(label = "WDG", active = hudState.watchdogOk, activeColor = localColor)
+                    hudState.leds.forEach { led -> StatusBadge(label = led.label, state = led.state) }
                 }
 
                 Text(
@@ -153,7 +145,7 @@ fun SensorMotionLabel(trackerState: String, active: Boolean, modifier: Modifier 
         label = "MovingAlpha"
     )
     Text(
-        text = if (isMoving) "»$trackerState«" else trackerState,
+        text = motionLabelText(trackerState),
         color = if (!active) Color.Gray else if (isMoving) SensorGreen.copy(alpha = movingAlpha) else SensorGreen,
         fontSize = 10.sp,
         fontWeight = FontWeight.Bold,
@@ -164,16 +156,35 @@ fun SensorMotionLabel(trackerState: String, active: Boolean, modifier: Modifier 
     )
 }
 
+/** The longest motion label, `STATIONARY`; every label is padded to it. */
+const val MOTION_LABEL_CHARS = 10
+
+/**
+ * The label's text, MOVING between guillemets, centered in [MOTION_LABEL_CHARS] monospace characters: the menu bar
+ * gives it its whole width (on the narrow S21FE it was cut to `STATION`, Nov19.5) and the icons beside it do not move
+ * when the state changes.
+ */
+fun motionLabelText(trackerState: String): String {
+    val text = if (trackerState == "MOVING") "»$trackerState«" else trackerState
+    val pad = (MOTION_LABEL_CHARS - text.length).coerceAtLeast(0)
+    return " ".repeat(pad / 2) + text + " ".repeat(pad - pad / 2)
+}
+
+/** The color of a HUD LED in both apps: green OK, red not OK, gray no information (Nov19.5). */
+fun ledColor(state: LedState): Color = when (state) {
+    LedState.OK -> StatusGreen
+    LedState.NOT_OK -> StatusRed
+    LedState.UNKNOWN -> StatusGrey
+}
+
 @Composable
 fun StatusBadge(
     label: String,
-    active: Boolean,
-    modifier: Modifier = Modifier,
-    activeColor: Color = SensorGreen,
-    inactiveColor: Color = Rose500
+    state: LedState,
+    modifier: Modifier = Modifier
 ) {
-    val bgColor = if (active) activeColor.copy(alpha = 0.2f) else inactiveColor.copy(alpha = 0.2f)
-    val textColor = if (active) activeColor else inactiveColor
+    val textColor = ledColor(state)
+    val bgColor = textColor.copy(alpha = 0.2f)
 
     Box(
         modifier = modifier

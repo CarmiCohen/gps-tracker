@@ -980,33 +980,16 @@ fun MonitorMenuBar(
                 .padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                IconButton(onClick = onSetup, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Build, contentDescription = "Setup", tint = com.jd.core.ui.MonitorBrown, modifier = Modifier.size(15.dp))
-                }
-                IconButton(onClick = onMap, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Place, contentDescription = "Map", tint = com.jd.core.ui.SensorGreen, modifier = Modifier.size(15.dp))
-                }
-                IconButton(onClick = onEvents, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events", tint = com.jd.core.ui.BrandGold, modifier = Modifier.size(15.dp))
-                }
-                IconButton(onClick = onInfo, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Info, contentDescription = "Info", tint = com.jd.core.ui.InfoBlue, modifier = Modifier.size(15.dp))
-                }
-                IconButton(onClick = onGraphs, modifier = Modifier.size(28.dp)) {
-                    Icon(com.jd.core.ui.GraphsIcon, contentDescription = "Graphs", tint = com.jd.core.ui.GraphsViolet, modifier = Modifier.size(15.dp))
-                }
-            }
-            // The Sensor's STATIONARY / MOVING replaces the `MONITOR: V -> TRK: T` header (Nov19.3).
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                com.jd.core.ui.SensorMotionLabel(trackerState = sensorState, active = isSensorHeard)
-            }
-            IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = com.jd.core.ui.Rose500, modifier = Modifier.size(18.dp))
-            }
+            // Every icon gets an equal share of the width beside the label, all of it tappable (Nov19.5, user request).
+            val share = Modifier.weight(1f)
+            com.jd.core.ui.MenuBarIcon(Icons.Default.Build, "Setup", com.jd.core.ui.MonitorBrown, onSetup, share)
+            com.jd.core.ui.MenuBarIcon(Icons.Default.Place, "Map", com.jd.core.ui.SensorGreen, onMap, share)
+            com.jd.core.ui.MenuBarIcon(Icons.AutoMirrored.Filled.List, "Events", com.jd.core.ui.BrandGold, onEvents, share)
+            com.jd.core.ui.MenuBarIcon(Icons.Default.Info, "Info", com.jd.core.ui.InfoBlue, onInfo, share)
+            com.jd.core.ui.MenuBarIcon(com.jd.core.ui.GraphsIcon, "Graphs", com.jd.core.ui.GraphsViolet, onGraphs, share)
+            // The Sensor's STATIONARY / MOVING replaces the `MONITOR: V -> TRK: T` header (Nov19.3); always whole (Nov19.5).
+            com.jd.core.ui.SensorMotionLabel(trackerState = sensorState, active = isSensorHeard)
+            com.jd.core.ui.MenuBarIcon(Icons.Default.Close, "Close", com.jd.core.ui.Rose500, onClose, share)
         }
     }
 }

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov19.4 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov19.5 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1155,7 +1155,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **228.2 Device:** on each overlay of both apps (Alerts, Siren, Phone Setup, Clean Setup, Info, Graphs, Events; Sensor: Configuration, Detection Settings, Sensor Phone Setup) the X is on screen beside the whole title, also on the narrow S21FE; Back closes the overlay one level (Detection Settings to Configuration to Sensor Admin).
 
 ## Chapter 229 - The Monitor Is Orange-Brown (Nov19.2)
-**Status: L** - `DeviceColorsTest` 4/4 (964 unit tests); 229.2 not run: the A15 has no paired Monitor and the S21FE was disconnected (ISSUE-NOV19.2-O123, SIMP-NOV17.6-S1, SOT 1.468)
+**Status: L** - `DeviceColorsTest` 4/4 (964 unit tests); 229.2 not run: the A15 has no paired Monitor and the S21FE was disconnected; since Nov19.5 the LEDs are green, red or gray in both apps (chapter 232), so 229.2's LED colors no longer apply (ISSUE-NOV19.2-O123, SIMP-NOV17.6-S1, SOT 1.468)
 *   **229.1 Unit:** `DeviceColorsTest`: the Monitor and Sensor colors are at least 90 degrees of hue apart, the Monitor's hue is orange (15 to 40 degrees) and not light, the Event log marks `MONITOR` and `SENSOR` in the device colors, and the graph tones (main, second, limit) are at least 30 degrees apart.
 *   **229.2 Device:** on the Monitor, the HUD's own LEDs, the map's own dot and trail, the `LOCAL` button, the Setup icon and the `MONITOR:` label are orange-brown, the Sensor's dot, trail and `TRK` LED green; the launcher shows a white eye on orange-brown; on the Sensor, `SENSOR: <id>` is green and its `VWR` LED orange-brown; Satellites in Graphs shows Used and In view in different colors.
 
@@ -1171,8 +1171,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **231.2 Device:** after a Monitor `am instrument` run, `adb shell dumpsys package com.jd.app.monitor` lists no `disabledComponents` (the service is on again).
 *   **231.3 Device (Android 10+):** the Sensor's EXPORT writes `Download/GPS-Tracker/GPS-Sensor-settings-<time>.json` with no picker through `rememberGpsTrackerSaver`; the Monitor's EXPORT and trail SAVE are checked in 230.3.
 
+## Chapter 232 - Three-Color LEDs, GPS Means Satellites, Spread Menu Icons (Nov19.5)
+**Status: L / A / D** - `HudLedsTest` 9/9, `SensorFixStoreTest` 1/1 (982 unit tests); `HudLayoutAuditTest` and `TextFitTest` 8/8 on the A15; 232.2 passed on the A15 Sensor and the S21FE Monitor except TRK red and gray (not cut live: the S21FE's siren); 232.3 passed on the S21FE (ISSUE-NOV19.5-O127, O128, SOT 1.471)
+*   **232.1 Unit:** `HudLedsTest`: the colors green, red, gray; `isSatelliteFix` from 4 satellites; `gpsLed` green under 15 s, red to 2 min and with location off, gray from 2 min or never; `remoteGpsLed` gray when not heard or `sats` unknown; `peerLed` gray unpaired or with the relay down; `relayLinkUp` needs internet; `ownLeds` is INT, SRV, GPS and the peer; `motionLabelText` is 10 characters for every state. `SensorFixStoreTest`: the satellite fix time is kept and cleared on stop.
+*   **232.2 Device:** the Sensor line shows INT, SRV, GPS, VWR; the Monitor's own line INT, SRV, GPS, TRK; its Sensor line GPS only; no DAT or WDG. Cutting the Sensor's network (Operational Notes) turns its INT and SRV red and VWR gray; location off turns GPS red; a still Monitor's GPS stays green with an old fix; with the Sensor silent for 35 s the Monitor's TRK is red and the Sensor line's GPS gray.
+*   **232.3 Instrumented / device:** `TextFitTest.theMotionLabelStaysWholeInANarrowMenuBar` (320 dp, font scale 1.3), `HudLayoutAuditTest.menuBarKeepsEveryActionVisibleWithLongIds`; on the S21FE the bar shows `STATIONARY` whole with the icons spread over the bar.
+
 ---
-**Active Testing Chapters: 220 of 231**
+**Active Testing Chapters: 221 of 232**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

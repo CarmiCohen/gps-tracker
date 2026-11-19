@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov19.4)
+# SOT Master Requirements & Hardening Status (Nov19.5)
 
-## 🏗️ Architectural Master Rules (543 Rules)
+## 🏗️ Architectural Master Rules (544 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -171,6 +171,7 @@
 *   **1.468 The Monitor Is Orange-Brown**: each device MUST have one color across both apps, the Monitor orange-brown (`MonitorBrown` `#D2691E`) and the Sensor green (`SensorGreen` `#10B981`), in the HUD LEDs, the map dots and trails, the event sources, the toolbar labels and the launcher icons; no cyan remains, and the lines of one graph MUST stay apart in hue (ISSUE-NOV19.2-O123, SIMP-NOV17.6-S1, chapter 229).
 *   **1.469 Saved Files In One Folder, The Motion State In The Menu Bar**: every file the user saves (settings exports, map trails) MUST go to `Download/GPS-Tracker`, directly from Android 10 (picker only as the fallback), and the open pickers MUST start there. The menu bar of both apps MUST show the Sensor's STATIONARY / MOVING in place of an ID header; the HUD MUST show each phone's ID without a `This phone:` or `Sensor:` label and no motion word. The Monitor's launcher icon is the John Deere tractor photo, the Sensor's the green pin; screens use named core-ui colors only (ISSUE-NOV19.3-O124 to O126, SIMP-NOV19.2-S1, chapter 230).
 *   **1.470 Test Runs Ignore Pushes, One Save Rule**: while the Monitor's instrumented tests run, its push service MUST be off, so a push from a running Sensor cannot crash the run, and it MUST be on again when the run ends. Every user file save MUST go through the one core-ui `rememberGpsTrackerSaver` (ISSUE-NOV12.3-O90, SIMP-NOV19.3-S1, chapter 231).
+*   **1.471 Three-Color LEDs, GPS Means Satellites, A Tappable Menu Bar**: every HUD LED MUST be green (OK), red (not OK) or gray (no information), never an app color, and a line MUST show only LEDs its phone can know: each phone's own line INT, SRV, GPS and TRK or VWR, the Monitor's line for the Sensor GPS only. SRV MUST need internet; TRK and VWR MUST be gray while unpaired or SRV is down. GPS MUST mean a GNSS fix from at least 4 satellites: green within 15 s, red with location off or older, gray after 2 min or before any. The menu bar icons MUST share the bar's width as tap areas at least 40 dp high, and the motion label MUST stay whole (ISSUE-NOV19.5-O127, O128, chapter 232).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

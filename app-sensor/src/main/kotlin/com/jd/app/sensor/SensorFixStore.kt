@@ -16,11 +16,24 @@ class SensorFixStore @Inject constructor() {
     private val latest = MutableStateFlow<FixReading?>(null)
     val fix: StateFlow<FixReading?> = latest.asStateFlow()
 
+    private val satelliteFix = MutableStateFlow<Long?>(null)
+
+    /**
+     * When (wall clock) the GNSS chip last reported a fix from enough satellites (`isSatelliteFix`), for the GPS LED
+     * (Nov19.5); null before the first one, while the service is not running, or without GNSS status.
+     */
+    val satelliteFixTimeMs: StateFlow<Long?> = satelliteFix.asStateFlow()
+
     fun publish(fix: FixReading) {
         latest.value = fix
     }
 
+    fun markSatelliteFix(timeMs: Long) {
+        satelliteFix.value = timeMs
+    }
+
     fun clear() {
         latest.value = null
+        satelliteFix.value = null
     }
 }

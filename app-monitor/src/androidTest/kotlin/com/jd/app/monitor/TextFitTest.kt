@@ -21,6 +21,8 @@ import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
 import com.jd.core.ui.HudState
 import com.jd.core.ui.HudStatusBar
+import com.jd.core.ui.LedState
+import com.jd.core.ui.ownLeds
 import com.jd.core.ui.RevolutionTheme
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -57,10 +59,30 @@ class TextFitTest {
         }
     }
 
+    /** Chapter 232.3: the S21FE (about 333 dp at its display zoom) cut the motion label to `STATION` in Nov19.5. */
+    @Test
+    fun theMotionLabelStaysWholeInANarrowMenuBar() {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 1.3f)) {
+                RevolutionTheme {
+                    androidx.compose.foundation.layout.Box(Modifier.width(320.dp)) {
+                        MonitorMenuBar("STATIONARY", true, {}, {}, {}, {}, {}, {})
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithText(com.jd.core.ui.motionLabelText("STATIONARY")).assertTextFits()
+        listOf("Setup", "Map", "Events", "Info", "Graphs", "Close").forEach {
+            composeRule.onNodeWithContentDescription(it).assertIsDisplayed()
+        }
+    }
+
     @Test
     fun theMonitorIdStaysWholeBesideLongTelemetry() {
         val state = HudState(appMode = "monitor", selfId = "VIEWER", batteryLevel = 38, isCharging = true, tempCelsius = 29f,
-            accuracyMeters = 96f, telemetryAgeSec = 465L)
+            accuracyMeters = 96f, telemetryAgeSec = 465L,
+            leds = ownLeds(isInternet = true, isRelayConnected = true, gps = LedState.OK, peerLabel = "TRK", peer = LedState.OK))
         composeRule.setContent {
             // A narrow phone; the S21FE (about 384 dp) cut the ID in Nov18.9.
             RevolutionTheme { HudStatusBar(hudState = state, modifier = Modifier.width(360.dp)) }

@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jd.core.ui.HudState
+import com.jd.core.ui.LedState
+import com.jd.core.ui.ownLeds
 import com.jd.core.ui.HudStatusBar
 import com.jd.core.ui.RevolutionTheme
 import org.junit.Assert.assertTrue
@@ -35,13 +37,14 @@ class HudLayoutAuditTest {
     fun hudStaysLeftToRightUnderRtlLayout() {
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                HudStatusBar(hudState = HudState(appMode = "monitor"))
+                HudStatusBar(hudState = monitorLine)
             }
         }
 
+        // TRK is the last LED since Nov19.5 (WDG and DAT are gone).
         val intLeft = composeRule.onNodeWithText("INT").getUnclippedBoundsInRoot().left
-        val wdgLeft = composeRule.onNodeWithText("WDG").getUnclippedBoundsInRoot().left
-        assertTrue("INT must stay left of WDG under RTL", intLeft < wdgLeft)
+        val trkLeft = composeRule.onNodeWithText("TRK").getUnclippedBoundsInRoot().left
+        assertTrue("INT must stay left of TRK under RTL", intLeft < trkLeft)
     }
 
     @Test
@@ -51,7 +54,7 @@ class HudLayoutAuditTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
                 RevolutionTheme {
                     Box(Modifier.width(360.dp)) {
-                        HudStatusBar(HudState(appMode = "monitor", speedKmh = 0f), compact = true)
+                        HudStatusBar(monitorLine.copy(speedKmh = 0f), compact = true)
                     }
                 }
             }
@@ -83,8 +86,8 @@ class HudLayoutAuditTest {
     fun compactHudIsShorterThanStandardHud() {
         composeRule.setContent {
             RevolutionTheme {
-                HudStatusBar(HudState(appMode = "monitor"), Modifier.testTag("standard"))
-                HudStatusBar(HudState(appMode = "monitor"), Modifier.testTag("compact"), compact = true)
+                HudStatusBar(monitorLine, Modifier.testTag("standard"))
+                HudStatusBar(monitorLine, Modifier.testTag("compact"), compact = true)
             }
         }
 
@@ -95,4 +98,9 @@ class HudLayoutAuditTest {
             (compact.bottom - compact.top).value < (standard.bottom - standard.top).value * 0.6f
         )
     }
+
+    private val monitorLine = HudState(
+        appMode = "monitor",
+        leds = ownLeds(isInternet = true, isRelayConnected = true, gps = LedState.OK, peerLabel = "TRK", peer = LedState.NOT_OK)
+    )
 }
