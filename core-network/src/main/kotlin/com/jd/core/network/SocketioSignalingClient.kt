@@ -306,8 +306,7 @@ class SocketioSignalingClient @Inject constructor(
                 val id = currentDeviceId
                 if (room != null && id != null && _isConnected.value) {
                     val payload = LatencyPingWire.encode(room, id, monotonicMs())
-                    socket?.emit("ping_cmd", payload)
-                    bytesSent += payload.toString().length.toLong()
+                    emitCounted("ping_cmd", payload)
                 }
                 delay(LATENCY_PING_INTERVAL_MS)
             }
@@ -412,8 +411,7 @@ class SocketioSignalingClient @Inject constructor(
             batchArray.put(LocationRowWire.encode(update, deviceId, live = true))
         }
 
-        socket?.emit("location_batch", batchArray)
-        bytesSent += batchArray.toString().length.toLong()
+        emitCounted("location_batch", batchArray)
         return true
     }
 
@@ -429,8 +427,7 @@ class SocketioSignalingClient @Inject constructor(
             put("ts", event.timestamp)
         }
         
-        socket?.emit("violation_event", payload)
-        bytesSent += payload.toString().length.toLong()
+        emitCounted("violation_event", payload)
         return true
     }
 
@@ -442,8 +439,7 @@ class SocketioSignalingClient @Inject constructor(
             put("end", request.endSequenceId)
             put("reqId", request.requestId)
         }
-        socket?.emit("backfill_request", payload)
-        bytesSent += payload.toString().length.toLong()
+        emitCounted("backfill_request", payload)
         return true
     }
 
@@ -460,8 +456,7 @@ class SocketioSignalingClient @Inject constructor(
             }
             put("updates", updatesArr)
         }
-        socket?.emit("backfill_response", payload)
-        bytesSent += payload.toString().length.toLong()
+        emitCounted("backfill_response", payload)
         return true
     }
 
@@ -495,14 +490,21 @@ class SocketioSignalingClient @Inject constructor(
         emitFromSensor { deviceId -> GraphSamplesWire.encode(deviceId, samples, compressed) }
 
     /**
+     * The one sender of every data event (SIMP-NOV22.9-S1): the payload leaves and its size counts towards
+     * [bytesSent], so no event can be sent uncounted. Only the push-token control messages bypass it.
+     */
+    private fun emitCounted(event: String, payload: Any) {
+        socket?.emit(event, payload)
+        bytesSent += payload.toString().length.toLong()
+    }
+
+    /**
      * The one sender of the relay's settings_update event (SIMP-NOV22.3-S1): nothing is encoded or sent while
-     * disconnected; a sent payload counts towards [bytesSent].
+     * disconnected; a sent payload is counted by [emitCounted].
      */
     private inline fun emitSettings(encode: () -> JSONObject): Boolean {
         if (!_isConnected.value) return false
-        val payload = encode()
-        socket?.emit("settings_update", payload)
-        bytesSent += payload.toString().length.toLong()
+        emitCounted("settings_update", encode())
         return true
     }
 

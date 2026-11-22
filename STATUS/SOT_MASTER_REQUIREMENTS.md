@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov22.11)
+# SOT Master Requirements & Hardening Status (Nov22.12)
 
-## 🏗️ Architectural Master Rules (557 Rules)
+## 🏗️ Architectural Master Rules (558 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -185,6 +185,7 @@
 *   **1.482 One Settings Sender**: every `settings_update` message MUST leave `SocketioSignalingClient` through its one `emitSettings` (sent only while connected, encoded only when sent, counted in the data use), a Monitor's stamped with its own ID by `emitFromMonitor` and a Sensor's carrying the Sensor's ID by `emitFromSensor` (SIMP-NOV22.3-S1, chapter 242).
 *   **1.483 One Rise Confirmation**: the noise and the light detection MUST debounce through the one `RiseConfirmer` (core-shared), fed spans (a value held for a duration up to a time, with the background then): a rise alerts once its rising spans add up to the confirmation time within the window from the first one's start, against the background at that first span, and after an alert a new rise counts only after a span below the limit; each detector keeps its own background and warm-up (SIMP-NOV22.4-S2, chapter 243).
 *   **1.484 Light On The Rows**: every telemetry row MUST carry the Sensor's newest light reading (`LocationUpdate.lightLux`, `lux` on the wire, live and backfilled, left out and read as null while not known), the forensic buffer (version 6) MUST keep it, an older buffer is upgraded in place keeping every field it had, and the Monitor's `SENSOR'S NEWEST ROW` MUST show it (SIMP-NOV22.4-S1, chapter 244).
+*   **1.485 One Counted Emit**: every data event the signaling client sends (`ping_cmd`, `location_batch`, `violation_event`, `backfill_request`, `backfill_response`, `settings_update`) MUST leave through the one sender `emitCounted`, which counts its payload in the monthly data use; only the `join` and push-token control messages bypass it (SIMP-NOV22.9-S1, chapter 245).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*
