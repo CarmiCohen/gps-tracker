@@ -15,14 +15,14 @@ class ThermalThrottlingTest {
 
     @Test
     fun testThrottlingPriority() {
-        // 1. Nominal: Moving fast, good battery, cool temp -> 10Hz
+        // 1. Nominal: Moving fast, good battery, cool temp -> 1Hz, the fastest row clock (ISSUE-NOV22.5-O133)
         val nominal = SensingEngine.getOptimalIntervalMs(
             currentTemp = 30f,
             isCharging = false,
             batteryLevel = 80,
             velocityMps = 10f
         )
-        assertEquals(100L, nominal)
+        assertEquals(1000L, nominal)
 
         // 2. Battery Warning: Moving fast, low battery (18%), cool temp -> 1Hz (Throttled)
         val lowBattery = SensingEngine.getOptimalIntervalMs(

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov22.7 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov22.8 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1220,8 +1220,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **240.2 Instrumented:** `MonitorIdTrailTest`: a new Monitor ID takes the Monitor's own trail, the Sensor's rows stay, a row at the same time is replaced.
 *   **240.3 Device (relay up):** on the Monitor's Setup dialog, EDIT the Monitor ID to `M1` and save (the Tracker ID itself is refused): the Monitor reconnects, its own trail stays on the map, its Events show `Monitor ID changed from V to M1`; within a minute the Sensor's Setup dialog and Info show `Last Monitor ID: M1` and its Events `Heard from Monitor M1`. Set it back to `V`.
 
+## Chapter 241 - One Row A Second, The Alarm Window (Nov22.8)
+**Status: A / L** - 241.1 passed (relay 20/20, 1054 unit tests); 241.2 passed on the A15 (11/11; on USB 97 rows per 10 s before, 10 after; on simulated battery 10 s); 241.3 waits for the relay (O133); 241.4 postponed by the user (ISSUE-NOV22.5-O133, ISSUE-NOV22.8-O136, SOT 1.480, 1.481)
+*   **241.1 Unit:** `RowClockTest`: no condition gives a row faster than 1 s; plugged in or moving 1 s, stationary 10 s; critical battery or heat 10 s even on power, moving or alarmed; an alarm gives a stationary Sensor on battery 1 s; the alarm window lasts 5 min after the last alarm and restarts with each one. `relay.test.js`: a batch reaches the Monitor as one message and never the Sensor, with no viewer status per row; the viewer status goes out when a Monitor comes and goes, and to each joining phone.
+*   **241.2 Instrumented and device:** `AdaptiveSamplingTest`, `ThermalHysteresisTest`, `ThermalThrottlingTest`, `UnifiedPowerPolicyProfileTest`, `SensingEngineStressTest`, `ProductionReadinessAuditTest` on the A15; with the Sensor on USB, `Telemetry sent` lines show `Interval: 1000ms` and about 10 sequence numbers per 10 s; after `dumpsys battery unplug` and `set status 3`, `Sampling Updated: 10000ms ... Alarm window: false` (then `dumpsys battery reset`).
+*   **241.3 Device (relay v6.048 deployed):** a paired Monitor gets the Sensor's rows (about one a second on USB) and its HUD shows the Sensor online; the Sensor's logcat shows no `location_relay` handling of its own rows; after a few days the Render bandwidth graph grows by tens of MB a day, not GB.
+*   **241.4 Device (a person at the A15):** with the battery simulated as in 241.2 and `Interval: 10000ms`, knock on the phone or lift it: `Sampling Updated: 1000ms ... Alarm window: true` at the alarm; with no new alarm, `10000ms` again 5 minutes later; restore with `dumpsys battery reset`.
+
 ---
-**Active Testing Chapters: 229 of 240**
+**Active Testing Chapters: 230 of 241**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

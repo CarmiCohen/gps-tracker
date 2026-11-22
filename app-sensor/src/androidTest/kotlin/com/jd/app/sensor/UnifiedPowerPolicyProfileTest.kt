@@ -24,7 +24,7 @@ class UnifiedPowerPolicyProfileTest {
             batteryLevel = 90,
             velocityMps = 10f
         )
-        assertEquals("Nominal state should request high frequency (100ms)", 100L, nominal)
+        assertEquals("Nominal state should request the fastest row clock (1 s, ISSUE-NOV22.5-O133)", 1000L, nominal)
 
         // 2. Low Battery State: Throttling engaged (R497)
         val lowBattery = SensingEngine.getOptimalIntervalMs(

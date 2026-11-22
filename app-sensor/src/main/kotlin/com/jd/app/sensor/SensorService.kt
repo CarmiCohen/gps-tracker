@@ -100,6 +100,7 @@ class SensorService : Service(), SensorEventListener {
     
     // Adaptive Sampling & Throttling State
     private var currentIntervalMs = 1000L
+    @Volatile private var lastAlarmElapsedMs: Long? = null // Monotonic; starts the alarm window (ISSUE-NOV22.8-O136).
     @Volatile private var lastLocation: Location? = null // Written on the main looper, read by the sensing loop.
     private val sequenceIdCounter = java.util.concurrent.atomic.AtomicLong(0L)
     private var initJob: Job? = null
@@ -779,19 +780,25 @@ class SensorService : Service(), SensorEventListener {
         if (!isGnssRegistered) SystemLogger.w("Location", "No GNSS status: the Info shows no satellites")
     }
 
-    private fun refreshSamplingRate() {
+    /**
+     * Sets the row clock. [preempt] starts the next tick now; the sensing loop itself passes false, since it reads the
+     * new interval right after its tick anyway.
+     */
+    private fun refreshSamplingRate(preempt: Boolean = true) {
         val speed = if (lastLocation != null && lastLocation!!.hasSpeed()) lastLocation!!.speed else 0f
+        val isAlarmed = SensingEngine.isInAlarmWindow(lastAlarmElapsedMs, SystemClock.elapsedRealtime())
         val newInterval = SensingEngine.getOptimalIntervalMs(
             currentTemp = lastTempCelsius,
             isCharging = lastIsPluggedIn, // On outside power the fast rate costs no battery (ISSUE-NOV17.15-O114).
             batteryLevel = lastBatteryLevel,
-            velocityMps = speed
+            velocityMps = speed,
+            isAlarmed = isAlarmed
         )
         
         if (newInterval != currentIntervalMs) {
-            SystemLogger.i("SensorService", "Sampling Updated: ${newInterval}ms (Speed: ${speed}m/s, Bat: ${lastBatteryLevel}%, Temp: ${lastTempCelsius}C)")
+            SystemLogger.i("SensorService", "Sampling Updated: ${newInterval}ms (Speed: ${speed}m/s, Bat: ${lastBatteryLevel}%, Temp: ${lastTempCelsius}C, Alarm window: $isAlarmed)")
             currentIntervalMs = newInterval
-            orchestrator.preemptLoop("sensing_loop")
+            if (preempt) orchestrator.preemptLoop("sensing_loop")
         }
     }
 
@@ -929,6 +936,7 @@ class SensorService : Service(), SensorEventListener {
                 
                 forensicBuffer.writeTrace(update, isCritical = update.isCritical)
                 signalingClient.sendTelemetry(update)
+                refreshSamplingRate(preempt = false) // An alarm starts the window at once; its end is seen within a second.
 
                 if (System.currentTimeMillis() % 10000 < currentIntervalMs) {
                     SystemLogger.i("SensorService", "Telemetry sent. Seq: ${update.sequenceId} | Interval: ${currentIntervalMs}ms")
@@ -945,6 +953,7 @@ class SensorService : Service(), SensorEventListener {
     private fun reportViolation(update: LocationUpdate, status: String, logLine: String) {
         update.status = status
         update.isCritical = true
+        lastAlarmElapsedMs = SystemClock.elapsedRealtime() // Every alarm restarts the alarm window (ISSUE-NOV22.8-O136).
         eventLog.record(EventLevel.ALARM, logLine)
         // Built before launching: the pooled update is zeroed on release, before the launched send runs.
         val violation = ViolationEvent(type = status, location = update.snapshot(), nonce = java.util.UUID.randomUUID().toString())

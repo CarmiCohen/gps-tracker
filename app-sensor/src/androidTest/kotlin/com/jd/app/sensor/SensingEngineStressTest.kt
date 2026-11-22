@@ -20,7 +20,7 @@ class SensingEngineStressTest {
      */
     @Test
     fun verifyLoadSheddingPriority() {
-        // High Speed (10m/s) normally requests 100ms (10Hz)
+        // High Speed (10m/s) normally requests 1000ms (1Hz, the fastest row clock since Nov22.8)
         // But Critical Thermal (46C) must force 10,000ms (0.1Hz)
         val interval = SensingEngine.getOptimalIntervalMs(
             currentTemp = 46f,

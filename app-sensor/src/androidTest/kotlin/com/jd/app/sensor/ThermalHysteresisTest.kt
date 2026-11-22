@@ -31,26 +31,16 @@ class ThermalHysteresisTest {
         val interval2 = SensingEngine.getOptimalIntervalMs(44f, false, 100, 10f)
         assertEquals("Hysteresis failed to hold Critical status at 44C", 10000L, interval2)
 
-        // 3. Drop to 42.5C (Below Hysteresis for Critical, but Warning is 40C)
-        // Should drop to 1000L (Warning level)
+        // 3. Drop to 42.5C (Below Hysteresis for Critical): back to the moving rate of one row a second
         val interval3 = SensingEngine.getOptimalIntervalMs(42.5f, false, 100, 10f)
         assertEquals(1000L, interval3)
     }
 
+    /** The 40C warning stage capped the row clock at 1 s; since Nov22.8 that is the fastest rate anyway (ISSUE-NOV22.5-O133). */
     @Test
     fun testThermalWarningHysteresis() {
-        // 1. Nominal -> Warning (41C)
-        val interval1 = SensingEngine.getOptimalIntervalMs(41f, false, 100, 10f)
-        assertEquals(1000L, interval1) // 1Hz
-
-        // 2. Drop to 39C (Inside Hysteresis: 40C - 2C = 38C)
-        // Should stay at 1000L
-        val interval2 = SensingEngine.getOptimalIntervalMs(39f, false, 100, 10f)
-        assertEquals("Hysteresis failed to hold Warning status at 39C", 1000L, interval2)
-
-        // 3. Drop to 37.5C (Below Hysteresis for Warning)
-        // Should drop to 100L (Nominal)
-        val interval3 = SensingEngine.getOptimalIntervalMs(37.5f, false, 100, 10f)
-        assertEquals(100L, interval3)
+        for (temp in listOf(41f, 39f, 37.5f)) {
+            assertEquals("A warm moving Sensor at $temp C", 1000L, SensingEngine.getOptimalIntervalMs(temp, false, 100, 10f))
+        }
     }
 }

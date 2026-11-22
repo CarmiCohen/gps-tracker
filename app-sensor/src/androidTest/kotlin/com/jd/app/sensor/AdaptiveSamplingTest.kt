@@ -43,9 +43,9 @@ class AdaptiveSamplingTest {
         assertEquals(1000L, currentInterval.get())
         orchestrator.preemptLoop("test_loop")
 
-        // 3. Fast Movement (10Hz / 0.1s)
+        // 3. Fast Movement: still one row a second, the fastest row clock (ISSUE-NOV22.5-O133)
         currentInterval.set(SensingEngine.getOptimalIntervalMs(30f, false, 80, 10.0f))
-        assertEquals(100L, currentInterval.get())
+        assertEquals(1000L, currentInterval.get())
         orchestrator.preemptLoop("test_loop")
 
         // 4. Survival Mode (Battery < 15%)

@@ -12,9 +12,20 @@ import kotlin.math.*
  */
 object SensingEngine {
 
-    const val THERMAL_WARNING_CELSIUS = 40.0
     const val THERMAL_CRITICAL_CELSIUS = 45.0
     const val THERMAL_HYSTERESIS_CELSIUS = 2.0
+    /** The fastest row clock: one telemetry row a second (ISSUE-NOV22.5-O133). */
+    const val ROW_INTERVAL_MS = 1_000L
+    /** The slow row clock: stationary, critical battery or critical heat. */
+    const val SURVIVAL_INTERVAL_MS = 10_000L
+    private const val SURVIVAL_BATTERY_PERCENT = 15
+    private const val MOVING_MPS = 0.5f
+    /** How long after its last alarm a Sensor keeps one row a second (ISSUE-NOV22.8-O136, user decision 2026-11-22). */
+    const val ALARM_WINDOW_MS = 5 * 60_000L
+
+    /** Whether the last alarm, at monotonic [lastAlarmMs] (null: none yet), is less than [ALARM_WINDOW_MS] before [nowMs]. */
+    fun isInAlarmWindow(lastAlarmMs: Long?, nowMs: Long): Boolean =
+        lastAlarmMs != null && nowMs - lastAlarmMs < ALARM_WINDOW_MS
     
     private const val GRAVITY_EARTH = 9.80665
     
@@ -53,50 +64,29 @@ object SensingEngine {
     }
 
     /**
-     * Determines the optimal sensing interval based on movement, heat, and power source.
-     * Aligned with Revol35.0: Multi-stage throttling (10Hz moving, 1Hz slow/warn, 0.1Hz stationary/crit).
-     * Updated Nov2.25: Implemented Hysteresis for boundary stability (R133).
+     * The interval of the Sensor's sensing loop, which is also its row clock: every tick makes one telemetry row.
+     * The fastest rate is one row a second (ISSUE-NOV22.5-O133): a location fix comes at most once a second, so faster
+     * rows repeated the same position and used up the relay's bandwidth. Motion, noise and light are detected on the
+     * sensors' own events, and a queued alarm preempts the loop, so a slower row clock delays no alarm.
+     * Moving, on outside power, or within the alarm window ([isAlarmed], ISSUE-NOV22.8-O136): [ROW_INTERVAL_MS].
+     * Stationary, critical battery (< 15 %) or critical heat (with hysteresis, R133): [SURVIVAL_INTERVAL_MS]; heat and
+     * battery override movement, outside power and an alarm (R-ID 83, user decision 2026-11-22).
      */
     @Synchronized
     fun getOptimalIntervalMs(
-        currentTemp: Float, 
-        isCharging: Boolean, 
+        currentTemp: Float,
+        isCharging: Boolean,
         batteryLevel: Int,
-        velocityMps: Float = 0f
+        velocityMps: Float = 0f,
+        isAlarmed: Boolean = false
     ): Long {
-        // 1. Thermal Throttling with Hysteresis (Highest Priority)
-        val thermalCap = when {
-            currentTemp >= THERMAL_CRITICAL_CELSIUS -> 10000L
-            activeThermalThrottlingMs == 10000L && currentTemp >= (THERMAL_CRITICAL_CELSIUS - THERMAL_HYSTERESIS_CELSIUS) -> 10000L
-            currentTemp >= THERMAL_WARNING_CELSIUS -> 1000L
-            activeThermalThrottlingMs == 1000L && currentTemp >= (THERMAL_WARNING_CELSIUS - THERMAL_HYSTERESIS_CELSIUS) -> 1000L
-            else -> 100L
-        }
-        activeThermalThrottlingMs = thermalCap
-        
-        // 2. Battery Throttling
-        val batteryCap = when {
-            batteryLevel < 15 -> 10000L // 0.1Hz: Survival Mode
-            batteryLevel < 20 -> 1000L  // 1Hz: Low Battery
-            else -> 100L                // 10Hz: Nominal
-        }
-
-        // 3. Velocity-Based Base Interval
-        val baseInterval = when {
-            velocityMps > 5.0f -> 100L   // 10Hz: Moving
-            velocityMps > 0.5f -> 1000L  // 1Hz: Slow
-            else -> 10000L               // 0.1Hz: Stationary
-        }
-
-        // Combine constraints: The longest interval wins (throttling)
-        val combinedInterval = max(baseInterval, max(thermalCap, batteryCap))
-
-        // Special case for charging: allows performance mode if thermal is safe
-        // Charging respects thermal caps and hysteresis
-        return if (isCharging && thermalCap == 100L) {
-            min(100L, combinedInterval)
-        } else {
-            combinedInterval
+        val isCriticalHeat = currentTemp >= THERMAL_CRITICAL_CELSIUS ||
+            (activeThermalThrottlingMs == SURVIVAL_INTERVAL_MS && currentTemp >= THERMAL_CRITICAL_CELSIUS - THERMAL_HYSTERESIS_CELSIUS)
+        activeThermalThrottlingMs = if (isCriticalHeat) SURVIVAL_INTERVAL_MS else ROW_INTERVAL_MS
+        return when {
+            isCriticalHeat || batteryLevel < SURVIVAL_BATTERY_PERCENT -> SURVIVAL_INTERVAL_MS
+            isAlarmed || isCharging || velocityMps > MOVING_MPS -> ROW_INTERVAL_MS
+            else -> SURVIVAL_INTERVAL_MS
         }
     }
 
