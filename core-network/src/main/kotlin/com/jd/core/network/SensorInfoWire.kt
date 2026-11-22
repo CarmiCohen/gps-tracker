@@ -52,6 +52,9 @@ internal object InfoRequestWire {
 
     fun isRequest(data: JSONObject): Boolean = data.optString("type") == TYPE
 
+    /** Whether the request asks for the satellite list, or null for another settings type (SIMP-NOV15.3-S1). */
+    fun decode(data: JSONObject): Boolean? = if (isRequest(data)) wantsSatellites(data) else null
+
     fun wantsSatellites(data: JSONObject): Boolean = data.optBoolean(SATELLITES, true)
 }
 

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov22.1 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov22.3 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1192,8 +1192,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **235.1 Unit:** `PushWireTest`: each relay key (`row`, `notice`, `setup`, as relay `index.js` writes them) reads as its `PushMessage` with the Sensor's ID; no data, an unknown key or unreadable text is no message; an unreadable setup report falls back to the row.
 *   **235.2 Unit:** `PushWireTest.testOnlyThePairedTrackerIsTaken` and `PushedRowsTest`'s pairing tests: `isPairedTracker` takes the paired tracker only, and nothing on an unpaired Monitor.
 
+## Chapter 236 - One Settings Decoder (Nov22.3)
+**Status: A** - `SettingsWireTest` 3/3 and the existing settings wire tests passed (1002 unit tests) (SIMP-NOV15.3-S1, SOT 1.475)
+*   **236.1 Unit:** `SettingsWireTest`: each of the nine settings kinds, encoded by its wire object and read back as relayed JSON text, reads as its own `SettingsMessage`; an unknown or missing type and a malformed geofence or Info read as nothing; the nine type names are distinct.
+*   **236.2 Unit:** the existing wire tests (`GeofenceWireTest`, `SensorBehaviourWireTest`, `SensorSetupWireTest`, `SensorEventsWireTest`, `SensorInfoWireTest`, `GraphWireTest`) still pass through the client's `settings_relay` listener on the fake socket, so every flow still receives its message.
+
 ---
-**Active Testing Chapters: 224 of 235**
+**Active Testing Chapters: 225 of 236**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

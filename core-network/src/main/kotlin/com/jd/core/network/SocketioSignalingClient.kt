@@ -232,15 +232,19 @@ class SocketioSignalingClient @Inject constructor(
             // The relay forwards settings_update to the room as settings_relay; the sender's echo is harmless.
             on("settings_relay") { args ->
                 val data = args.getOrNull(0) as? JSONObject ?: return@on
-                GeofenceWire.decode(data)?.let { _geofenceFlow.tryEmit(it) }
-                SensorBehaviourWire.decode(data)?.let { _sensorBehaviourFlow.tryEmit(it) }
-                SensorSetupWire.decode(data)?.let { _sensorSetupFlow.value = it }
-                SensorEventsWire.decode(data)?.let { _sensorEventsFlow.tryEmit(it) }
-                SensorInfoWire.decode(data)?.let { _sensorInfoFlow.value = ReceivedSensorInfo(it, System.currentTimeMillis()) }
-                if (InfoRequestWire.isRequest(data)) _infoRequestFlow.tryEmit(InfoRequestWire.wantsSatellites(data))
-                GraphRequestWire.decode(data)?.let { _graphRequestFlow.tryEmit(it) }
-                EventsRequestWire.decode(data)?.let { _eventsRequestFlow.tryEmit(it) }
-                GraphSamplesWire.decode(data)?.let { _graphSamplesFlow.tryEmit(it) }
+                // One decoder reads the type once (SIMP-NOV15.3-S1).
+                when (val message = SettingsWire.decode(data)) {
+                    is SettingsMessage.Geofence -> _geofenceFlow.tryEmit(message.config)
+                    is SettingsMessage.Behaviour -> _sensorBehaviourFlow.tryEmit(message.behaviour)
+                    is SettingsMessage.Setup -> _sensorSetupFlow.value = message.report
+                    is SettingsMessage.Events -> _sensorEventsFlow.tryEmit(message.batch)
+                    is SettingsMessage.EventsRequest -> _eventsRequestFlow.tryEmit(message.afterMs)
+                    is SettingsMessage.Info -> _sensorInfoFlow.value = ReceivedSensorInfo(message.info, System.currentTimeMillis())
+                    is SettingsMessage.InfoRequest -> _infoRequestFlow.tryEmit(message.withSatellites)
+                    is SettingsMessage.GraphRequest -> _graphRequestFlow.tryEmit(message.request)
+                    is SettingsMessage.GraphSamples -> _graphSamplesFlow.tryEmit(message.batch)
+                    null -> Unit
+                }
             }
 
             // Every ping of the room comes here; only this device's own echo is its latency (ISSUE-NOV10.8-O84 part 2).
