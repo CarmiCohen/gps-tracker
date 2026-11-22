@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.jd.core.network.ForensicIdentityManager
+import com.jd.core.network.isPairedTracker
 import com.jd.core.shared.SensorSetupReport
 import com.jd.core.shared.SystemLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -65,7 +66,7 @@ class SensorSetupReports @Inject constructor(
 
     /** Takes [report], received by [road], when it is the paired tracker's and not older than the one held. */
     suspend fun take(report: SensorSetupReport, road: String) = mutex.withLock {
-        if (report.trackerId != identityManager.targetId.first()) {
+        if (!isPairedTracker(report.trackerId, identityManager.targetId.first())) {
             SystemLogger.w("SensorSetup", "A setup report of '${report.trackerId}' by $road was ignored: it is not the paired tracker")
             return@withLock
         }

@@ -29,20 +29,16 @@ class PushedRows @Inject constructor() {
     private val waitingSilences = Channel<Pushed<SensorSilence>>(CAPACITY, BufferOverflow.DROP_OLDEST)
 
     /**
-     * Takes [row], received at [receivedAtMs], when it comes from the paired tracker [trackerId].
-     * Returns false for another tracker's row and for an unpaired Monitor, which must stay asleep.
+     * Takes the paired tracker's [row], received at [receivedAtMs]. The caller has checked the pairing
+     * ([com.jd.core.network.isPairedTracker], SIMP-NOV18.12-S1).
      */
-    fun offer(row: LocationUpdate, trackerId: String?, receivedAtMs: Long): Boolean {
-        if (trackerId == null || row.deviceId != trackerId) return false
+    fun offer(row: LocationUpdate, receivedAtMs: Long) {
         waitingRows.trySend(Pushed(row, receivedAtMs))
-        return true
     }
 
-    /** Takes the relay's [silence] notice under the same rule as [offer]. */
-    fun offerSilence(silence: SensorSilence, trackerId: String?, receivedAtMs: Long): Boolean {
-        if (trackerId == null || silence.trackerId != trackerId) return false
+    /** Takes the relay's [silence] notice about the paired tracker, as [offer] takes a row. */
+    fun offerSilence(silence: SensorSilence, receivedAtMs: Long) {
         waitingSilences.trySend(Pushed(silence, receivedAtMs))
-        return true
     }
 
     /** The waiting rows and every later one, for a single collector; a row that waited too long at [clock] time is dropped. */

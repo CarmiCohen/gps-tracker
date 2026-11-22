@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov22.0 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov22.1 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1187,8 +1187,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: A** - `OneHudModelTest` passed (986 unit tests) (SIMP-NOV6.3-S1, SOT 1.473)
 *   **234.1 Unit:** `OneHudModelTest.hudStateIsTheOnlyHudModel`: `com.jd.core.ui.HudState` loads and `com.jd.core.ui.HudViewState` does not (`ClassNotFoundException`), so the HUD has one model only.
 
+## Chapter 235 - One Push Decoder (Nov22.1)
+**Status: A** - `PushWireTest` 5/5, `PushedRowsTest` and `PushedAlarmTest` passed (996 unit tests) (SIMP-NOV18.12-S1, SOT 1.474)
+*   **235.1 Unit:** `PushWireTest`: each relay key (`row`, `notice`, `setup`, as relay `index.js` writes them) reads as its `PushMessage` with the Sensor's ID; no data, an unknown key or unreadable text is no message; an unreadable setup report falls back to the row.
+*   **235.2 Unit:** `PushWireTest.testOnlyThePairedTrackerIsTaken` and `PushedRowsTest`'s pairing tests: `isPairedTracker` takes the paired tracker only, and nothing on an unpaired Monitor.
+
 ---
-**Active Testing Chapters: 223 of 234**
+**Active Testing Chapters: 224 of 235**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

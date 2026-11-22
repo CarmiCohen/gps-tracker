@@ -1,6 +1,8 @@
 package com.jd.app.monitor
 
+import com.jd.core.network.PushMessage
 import com.jd.core.network.SensorSilence
+import com.jd.core.network.isPairedTracker
 import com.jd.core.shared.ACOUSTIC_ALERT_STATUS
 import com.jd.core.shared.LocationUpdate
 import kotlinx.coroutines.flow.first
@@ -26,7 +28,7 @@ class PushedRowsTest {
     @Test
     fun `a row pushed before the engine started waits for it`() = runBlocking {
         val rows = PushedRows()
-        assertTrue(rows.offer(row(1), "T", receivedAtMs = 1_000L))
+        rows.offer(row(1), receivedAtMs = 1_000L)
 
         val engineStartsAt = 1_000L + PUSHED_ROW_FRESH_MS
         val taken = withTimeout(5.seconds) { rows.fresh { engineStartsAt }.first() }
@@ -38,8 +40,8 @@ class PushedRowsTest {
     fun `a row that waited too long is dropped`() = runBlocking {
         val rows = PushedRows()
         val engineStartsAt = 1_000L + PUSHED_ROW_FRESH_MS + 1
-        rows.offer(row(1), "T", receivedAtMs = 1_000L)
-        rows.offer(row(2), "T", receivedAtMs = engineStartsAt)
+        rows.offer(row(1), receivedAtMs = 1_000L)
+        rows.offer(row(2), receivedAtMs = engineStartsAt)
 
         val taken = withTimeout(5.seconds) { rows.fresh { engineStartsAt }.first() }
 
@@ -48,11 +50,17 @@ class PushedRowsTest {
 
     @Test
     fun `only the paired tracker's rows are taken`() = runBlocking {
+        // Since SIMP-NOV18.12-S1 the push service checks the pairing once, with isPairedTracker, before PushedRows.
         val rows = PushedRows()
+        fun pushed(row: LocationUpdate, trackerId: String?) {
+            if (isPairedTracker(PushMessage.Row(row).trackerId, trackerId)) rows.offer(row, 1_000L)
+        }
 
-        assertFalse("Another tracker's row", rows.offer(row(1, tracker = "X"), "T", 1_000L))
-        assertFalse("An unpaired Monitor must stay asleep", rows.offer(row(2), null, 1_000L))
-        assertTrue(rows.offer(row(3), "T", 1_000L))
+        assertFalse("Another tracker's row", isPairedTracker(PushMessage.Row(row(1, tracker = "X")).trackerId, "T"))
+        assertFalse("An unpaired Monitor must stay asleep", isPairedTracker(PushMessage.Row(row(2)).trackerId, null))
+        pushed(row(1, tracker = "X"), "T")
+        pushed(row(2), null)
+        pushed(row(3), "T")
 
         assertEquals(3L, withTimeout(5.seconds) { rows.fresh { 1_000L }.first() }.sequenceId)
     }
@@ -60,7 +68,7 @@ class PushedRowsTest {
     @Test
     fun `a flood keeps the newest rows`() = runBlocking {
         val rows = PushedRows()
-        (1L..20L).forEach { rows.offer(row(it), "T", 1_000L) }
+        (1L..20L).forEach { rows.offer(row(it), 1_000L) }
 
         val taken = withTimeout(5.seconds) { rows.fresh { 1_000L }.take(16).toList() }
 
@@ -74,10 +82,11 @@ class PushedRowsTest {
         val rows = PushedRows()
         val engineStartsAt = 1_000L + PUSHED_ROW_FRESH_MS + 1
 
-        assertFalse("Another tracker's notice", rows.offerSilence(silence(1, tracker = "X"), "T", engineStartsAt))
-        assertFalse("An unpaired Monitor must stay asleep", rows.offerSilence(silence(2), null, engineStartsAt))
-        assertTrue(rows.offerSilence(silence(3), "T", receivedAtMs = 1_000L))
-        assertTrue(rows.offerSilence(silence(4), "T", receivedAtMs = engineStartsAt))
+        assertFalse("Another tracker's notice", isPairedTracker(PushMessage.Silence(silence(1, tracker = "X")).trackerId, "T"))
+        assertFalse("An unpaired Monitor must stay asleep", isPairedTracker(PushMessage.Silence(silence(2)).trackerId, null))
+        assertTrue(isPairedTracker(PushMessage.Silence(silence(3)).trackerId, "T"))
+        rows.offerSilence(silence(3), receivedAtMs = 1_000L)
+        rows.offerSilence(silence(4), receivedAtMs = engineStartsAt)
 
         val taken = withTimeout(5.seconds) { rows.freshSilences { engineStartsAt }.first() }
 

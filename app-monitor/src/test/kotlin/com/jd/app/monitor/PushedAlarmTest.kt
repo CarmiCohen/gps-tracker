@@ -58,10 +58,10 @@ class PushedAlarmTest {
             listOf(relay, acks).forEach { flow -> flow.subscriptionCount.first { it > 0 } }
         }
 
-        fun push(row: LocationUpdate) = pushed.offer(row, "T", now)
+        fun push(row: LocationUpdate) = pushed.offer(row, now)
 
         /** The relay's notice that the tracker sent nothing after its row sent at [lastSentAtMs]. */
-        fun pushSilence(lastSentAtMs: Long) = pushed.offerSilence(SensorSilence("T", lastSentAtMs, 1L, 35_000L), "T", now)
+        fun pushSilence(lastSentAtMs: Long) = pushed.offerSilence(SensorSilence("T", lastSentAtMs, 1L, 35_000L), now)
 
         suspend fun awaitBook(predicate: (AlarmBook) -> Boolean): AlarmBook =
             withTimeout(5.seconds) { latest.filterNotNull().first(predicate) }
@@ -125,7 +125,7 @@ class PushedAlarmTest {
     @Test
     fun `a push that found the session dead is raised once the engine starts`() = runBlocking {
         val pushed = PushedRows()
-        pushed.offer(alarm, "T", receivedAtMs = 1_000_000L)
+        pushed.offer(alarm, receivedAtMs = 1_000_000L)
 
         val watch = Watch(this, pushed)
         watch.now = 1_003_000L // The service and the engine took three seconds to start.
@@ -192,7 +192,7 @@ class PushedAlarmTest {
     @Test
     fun `a push that waited too long for the engine is not raised`() = runBlocking {
         val pushed = PushedRows()
-        pushed.offer(alarm, "T", receivedAtMs = 1_000_000L)
+        pushed.offer(alarm, receivedAtMs = 1_000_000L)
 
         val watch = Watch(this, pushed)
         watch.now = 1_000_000L + PUSHED_ROW_FRESH_MS + 1
