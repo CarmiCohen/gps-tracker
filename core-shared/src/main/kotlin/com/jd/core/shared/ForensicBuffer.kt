@@ -26,14 +26,16 @@ import java.util.zip.CRC32
  *
  * Version 4 (Nov17.3) also keeps the satellites used and in view, the mean signal and the noise level, so
  * backfilled rows carry them like live rows (ISSUE-NOV15.5-O99 part 2). Version 5 (Nov17.7) also keeps the
- * battery level, charging and temperature (ISSUE-NOV17.3-O102). Older files are upgraded in place.
+ * battery level, charging and temperature (ISSUE-NOV17.3-O102). Version 6 (Nov22.11) also keeps the light level
+ * (SIMP-NOV22.4-S1). Older files are upgraded in place.
  */
 class ForensicBuffer(
     private val storageDir: File,
     val capacity: Int = 10000
 ) {
     private val magic = 0x5245564F 
-    private val version = 5
+    private val version = 6
+    private val versionWithBattery = 5
     private val versionWithSatellites = 4
     private val versionWithoutChecksums = 2
     private val entrySize = 128
@@ -64,11 +66,15 @@ class ForensicBuffer(
     private val offBattery = offNoise + 4 // -1 when not known
     private val offCharging = offBattery + 4 // 1 when charging
     private val offTemp = offCharging + 4 // -1 when not known, as in LocationUpdate
-    private val entryDataSize = offTemp + 4
+    private val offLux = offTemp + 4 // NaN when not known
+    private val entryDataSize = offLux + 4
 
     /** The stored fields of an older version; its checksum, from version 3 on, follows them. */
-    private fun legacyDataSize(storedVersion: Int) =
-        if (storedVersion == versionWithSatellites) offBattery else offSatsUsed
+    private fun legacyDataSize(storedVersion: Int) = when (storedVersion) {
+        versionWithBattery -> offLux
+        versionWithSatellites -> offBattery
+        else -> offSatsUsed
+    }
 
     /** Sequence numbers reserved per header sync; a restart can skip at most this many. */
     private val sequenceReserve = 100L
@@ -157,7 +163,7 @@ class ForensicBuffer(
     }
 
     /**
-     * Upgrades a version 2, 3 or 4 file to version 5, keeping its entries: a reset would restart sequence
+     * Upgrades a version 2, 3, 4 or 5 file to version 6, keeping its entries: a reset would restart sequence
      * numbers at 0. The fields the old version lacks are stored as not known. An entry that failed its
      * checksum stays failed. Entries are rewritten whole from their legacy bytes, and the version changes last,
      * so an interrupted upgrade simply repeats.
@@ -190,9 +196,12 @@ class ForensicBuffer(
             entryView.putFloat(offMeanCn0, Float.NaN)
             entryView.putFloat(offNoise, Float.NaN)
         }
-        entryView.putInt(offBattery, -1)
-        entryView.putInt(offCharging, 0)
-        entryView.putFloat(offTemp, -1f)
+        if (from <= offBattery) {
+            entryView.putInt(offBattery, -1)
+            entryView.putInt(offCharging, 0)
+            entryView.putFloat(offTemp, -1f)
+        }
+        entryView.putFloat(offLux, Float.NaN)
     }
 
     private fun isHeaderConsistent(): Boolean {
@@ -350,6 +359,7 @@ class ForensicBuffer(
                             this.batteryLevel = entryView.getInt(offBattery)
                             this.isCharging = entryView.getInt(offCharging) == 1
                             this.tempCelsius = entryView.getFloat(offTemp)
+                            this.lightLux = entryView.getFloat(offLux).takeUnless { it.isNaN() }
                         }
                         result.add(update)
                     }
@@ -414,6 +424,7 @@ class ForensicBuffer(
                 entryView.putInt(offBattery, update.batteryLevel)
                 entryView.putInt(offCharging, if (update.isCharging) 1 else 0)
                 entryView.putFloat(offTemp, update.tempCelsius)
+                entryView.putFloat(offLux, update.lightLux ?: Float.NaN)
                 storeSlot(buffer, currentWrite)
 
                 // Prepare next indices

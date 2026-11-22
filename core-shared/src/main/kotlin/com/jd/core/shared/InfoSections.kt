@@ -216,6 +216,7 @@ fun newestRowSection(row: LocationUpdate, nowMs: Long, isStale: Boolean): InfoSe
             row.satsUsed.takeIf { it >= 0 }?.let { InfoLine("Satellites", "$it used / ${row.satsInView} in view") },
             InfoLine("Signal (mean)", signalText(row.meanCn0DbHz), signalTone(row.meanCn0DbHz)),
             InfoLine("Noise", row.noiseDbfs?.let { "${it.roundToInt()} dBFS" } ?: NO_VALUE),
+            InfoLine("Light", row.lightLux?.let { "${it.roundToInt()} lx" } ?: NO_VALUE), // SIMP-NOV22.4-S1
             batteryLine(row.batteryLevel.takeIf { it >= 0 }, row.isCharging),
             temperatureLine(row.tempCelsius.takeIf { it > 0f })
         ),

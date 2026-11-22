@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov22.10 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov22.11 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1237,8 +1237,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **243.1 Unit:** `RiseConfirmerTest`: rising spans adding up to 2 s within 3 s of the first one's start alert once, against the background at the first span, not the risen one; spans that do not fit in the window start a new rise; after an alert a new rise counts only after a span below the limit; an empty span changes nothing. `AcousticDetectorTest` and `LightDetectorTest` pass unchanged on the shared confirmer.
 *   **243.2 Device:** `ProductionReadinessAuditTest` on the A15, and the release apps installed there cold start with `davey_over_500ms=0 stacklog=0 fatal=0`. The live noise and light alerts stay in 220 and 237.3.
 
+## Chapter 244 - Light On The Rows (Nov22.11)
+**Status: A / L** - 244.1 passed (`ForensicEntryIntegrityTest` +2, `LocationRowWireTest`, `SensorInfoWireTest`, `InfoSectionsTest`, 1064 unit tests); 244.2 passed on the A15 (`ProductionReadinessAuditTest` 3/3, the version 5 buffer upgraded to 6 with its 10000 entries, release Sensor cold start clean); 244.3 waits for the relay (O133) and a paired Monitor (SIMP-NOV22.4-S1, SOT 1.484)
+*   **244.1 Unit:** a row's `lightLux` travels as `lux` on live and backfilled rows and through the socket; a row without it (unknown, or an older Sensor) leaves `lux` out and reads back as null. The forensic buffer keeps the light (NaN stored for not known); a version 5 file is upgraded to 6 keeping its satellites, battery, charging and temperature, with the light not known and a torn entry still skipped; a version 4 file gets battery and light not known. The Monitor's `SENSOR'S NEWEST ROW` shows `Light: 413 lx` for 412.6 lx and `--` when not known.
+*   **244.2 Device:** `ProductionReadinessAuditTest` on the A15; the installed Sensor's `forensic_trace.bin` header reads version 6 with its entries kept (`run-as com.jd.app.sensor od -A d -t d4 -N 16 /data/user_de/0/com.jd.app.sensor/files/forensic_trace.bin`); the release Sensor cold starts with `davey_over_500ms=0 stacklog=0 fatal=0`.
+*   **244.3 Live:** with the relay up and a paired Monitor, the Monitor's Info of the Sensor, before the Sensor's Info answers, shows a Light line that follows a torch held over the Sensor's light sensor, and a backfilled row carries it too.
+
 ---
-**Active Testing Chapters: 232 of 243**
+**Active Testing Chapters: 233 of 244**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

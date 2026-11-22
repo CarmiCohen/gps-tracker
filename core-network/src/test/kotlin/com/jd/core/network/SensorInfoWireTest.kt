@@ -218,7 +218,7 @@ class SensorInfoWireTest {
             runCurrent()
 
             val update = LocationUpdate(lat = 32.0, lng = 34.0, timestamp = 5_000L, sequenceId = 3L).apply {
-                satsUsed = 9; satsInView = 21; meanCn0DbHz = 33.5f; noiseDbfs = -58f; isCritical = true
+                satsUsed = 9; satsInView = 21; meanCn0DbHz = 33.5f; noiseDbfs = -58f; lightLux = 250f; isCritical = true
             }
             client.sendTelemetry(update)
             update.reset() // The pool zeroes it at once.
@@ -232,9 +232,10 @@ class SensorInfoWireTest {
                 assertEquals(21, satsInView)
                 assertEquals(33.5f, meanCn0DbHz!!, 0.01f)
                 assertEquals(-58f, noiseDbfs!!, 0.01f)
+                assertEquals(250f, lightLux!!, 0.01f) // SIMP-NOV22.4-S1
             }
 
-            listOf("sats", "satsView", "snr", "noise").forEach { sent.remove(it) }
+            listOf("sats", "satsView", "snr", "noise", "lux").forEach { sent.remove(it) }
             val older = async(start = CoroutineStart.UNDISPATCHED) { client.telemetryFlow.first() }
             socket.relay("location_relay", sent)
             with(older.await()) {
@@ -242,6 +243,7 @@ class SensorInfoWireTest {
                 assertEquals(-1, satsInView)
                 assertNull(meanCn0DbHz)
                 assertNull(noiseDbfs)
+                assertNull(lightLux)
             }
         } finally {
             client.disconnect()

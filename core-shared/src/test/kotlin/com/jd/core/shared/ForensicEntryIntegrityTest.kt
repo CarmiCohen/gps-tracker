@@ -31,7 +31,8 @@ class ForensicEntryIntegrityTest {
     private val legacyChecksumOffset = 84
     /** Where version 4 ends its stored fields and puts its checksum. */
     private val versionFourChecksumOffset = 100
-    private val currentVersion = 5
+    private val versionFiveChecksumOffset = 112
+    private val currentVersion = 6
 
     private val offVersion = 4
     private val offWriteIdx = 8
@@ -190,6 +191,33 @@ class ForensicEntryIntegrityTest {
         assertEquals(-1f, unknown.tempCelsius)
     }
 
+    /** Chapter 244 (SIMP-NOV22.4-S1): the light level is kept, so backfilled rows carry it like live rows. */
+    @Test
+    fun lightLevelIsKeptAndUnknownStaysUnknown() {
+        val buffer = openBuffer()
+        buffer.writeTrace(update(0).apply { lightLux = 412.5f })
+        buffer.writeTrace(update(1))
+
+        val (known, unknown) = openBuffer().readTraces()
+        assertEquals(412.5f, known.lightLux)
+        assertNull(unknown.lightLux)
+    }
+
+    @Test
+    fun versionFiveFileKeepsItsBatteryWithUnknownLightAfterUpgrade() {
+        val buffer = openBuffer()
+        (0L..14L).forEach { buffer.writeTrace(update(it).apply { satsUsed = 9; batteryLevel = 80; isCharging = true; tempCelsius = 30f; lightLux = 500f }) }
+        downgrade(5, versionFiveChecksumOffset, tornSlot = 7) // Slot 7 holds sequence 7.
+
+        val traces = openBuffer().readTraces()
+
+        assertEquals((5L..14L).toList() - 7L, traces.map { it.sequenceId })
+        assertTrue(traces.all { it.satsUsed == 9 && it.batteryLevel == 80 && it.isCharging && it.tempCelsius == 30f })
+        assertTrue(traces.all { it.lightLux == null })
+        assertEquals(currentVersion, withFile { it.getInt(offVersion) })
+        assertEquals((5L..14L).toList() - 7L, sequences(openBuffer()))
+    }
+
     /** Rewrites the file as an older version left it: its fields, their checksum at [dataSize], nothing after. */
     private fun downgrade(toVersion: Int, dataSize: Int, tornSlot: Int? = null) = withFile { file ->
         val legacy = ByteArray(dataSize)
@@ -216,7 +244,7 @@ class ForensicEntryIntegrityTest {
 
         assertEquals((5L..14L).toList() - 7L, traces.map { it.sequenceId })
         assertTrue(traces.all { it.satsUsed == 9 })
-        assertTrue(traces.all { it.batteryLevel == -1 && !it.isCharging && it.tempCelsius == -1f })
+        assertTrue(traces.all { it.batteryLevel == -1 && !it.isCharging && it.tempCelsius == -1f && it.lightLux == null })
         assertEquals(currentVersion, withFile { it.getInt(offVersion) })
         assertEquals((5L..14L).toList() - 7L, sequences(openBuffer()))
     }

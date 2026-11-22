@@ -177,13 +177,15 @@ class InfoSectionsTest {
     @Test
     fun `the newest row stands in while no Info has come`() {
         val row = LocationUpdate(lat = 32.0, lng = 34.0, accuracy = 7f, timestamp = now - 12_000L, batteryLevel = 60).apply {
-            satsUsed = 9; satsInView = 20; meanCn0DbHz = 31f; noiseDbfs = -55f
+            satsUsed = 9; satsInView = 20; meanCn0DbHz = 31f; noiseDbfs = -55f; lightLux = 412.6f
         }
         val section = newestRowSection(row, now, isStale = false)
         assertEquals("12 s ago", section.lines.single { it.label == "Sent" }.value)
         assertEquals("9 used / 20 in view", section.lines.single { it.label == "Satellites" }.value)
         assertEquals("-55 dBFS", section.lines.single { it.label == "Noise" }.value)
+        assertEquals("413 lx", section.lines.single { it.label == "Light" }.value) // SIMP-NOV22.4-S1
         val older = newestRowSection(LocationUpdate(timestamp = now - 1_000L), now, isStale = true)
+        assertEquals("--", older.lines.single { it.label == "Light" }.value)
         assertTrue("A row of an older Sensor has no satellite line", older.lines.none { it.label == "Satellites" })
         assertEquals(InfoTone.BAD, older.lines.single { it.label == "Fix" }.tone)
         assertTrue(older.isStale)

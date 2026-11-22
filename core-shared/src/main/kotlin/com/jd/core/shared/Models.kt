@@ -49,6 +49,8 @@ data class LocationUpdate(
     var meanCn0DbHz: Float? = null,
     /** The microphone's newest sound level, null while it is not listening (ISSUE-NOV10.8-O84 part 2). */
     var noiseDbfs: Float? = null,
+    /** The light sensor's newest reading in lux, null while light detection is off or the phone has none (SIMP-NOV22.4-S1). */
+    var lightLux: Float? = null,
     var sensorSnapshot: SensorSnapshot = SensorSnapshot()
 ) {
     /** Deep copy for holders that outlive a pooled instance, which is zeroed on release. */
@@ -60,7 +62,7 @@ data class LocationUpdate(
         isCharging = false; isPluggedIn = null; batteryLevel = -1; gsmSignalDbm = 0; networkType = "--"
         isBuffered = false; isHistoricalLkg = false; tempCelsius = -1f
         isThermalThrottled = false; cumulativeBytesSent = 0L; status = "VALID"; isNoiseDetectionOff = false; isCritical = false
-        satsUsed = -1; satsInView = -1; meanCn0DbHz = null; noiseDbfs = null
+        satsUsed = -1; satsInView = -1; meanCn0DbHz = null; noiseDbfs = null; lightLux = null
         sensorSnapshot.reset()
     }
 }
@@ -69,13 +71,12 @@ data class LocationUpdate(
 data class SensorSnapshot(
     var vibration: Float = 0f,
     var vibrationFloor: Float = 0.12f,
-    var lux: Float = 0f,
     var pressure: Float = 0f,
     var tiltDegrees: Float = 0f,
     var temperature: Float = 0f
 ) {
     fun reset() {
-        vibration = 0f; vibrationFloor = 0.12f; lux = 0f
+        vibration = 0f; vibrationFloor = 0.12f
         pressure = 0f; tiltDegrees = 0f; temperature = 0f
     }
 }

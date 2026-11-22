@@ -10,13 +10,14 @@ import org.junit.Test
 /**
  * Chapter 203: live and backfilled rows share one encoder, and both carry satellites, signal and noise
  * (ISSUE-NOV15.5-O99 part 2). Only live rows carry `noiseOff` and `crit`. Chapter 207: battery, charging and
- * temperature travel on both, now that the forensic buffer keeps them (ISSUE-NOV17.3-O102).
+ * temperature travel on both, now that the forensic buffer keeps them (ISSUE-NOV17.3-O102). Chapter 244: the light
+ * level travels on both as `lux` (SIMP-NOV22.4-S1).
  */
 class LocationRowWireTest {
 
     private fun row() = LocationUpdate(
         sequenceId = 42L, timestamp = 1_000L, lat = 32.1, lng = 34.8, status = "VALID",
-        satsUsed = 8, satsInView = 20, meanCn0DbHz = 33.5f, noiseDbfs = -60f,
+        satsUsed = 8, satsInView = 20, meanCn0DbHz = 33.5f, noiseDbfs = -60f, lightLux = 412.5f,
         batteryLevel = 57, isCharging = true, tempCelsius = 31.4f,
         isNoiseDetectionOff = true, isCritical = true
     )
@@ -34,6 +35,7 @@ class LocationRowWireTest {
         assertEquals(57, decoded.batteryLevel)
         assertTrue(decoded.isCharging)
         assertEquals(31.4f, decoded.tempCelsius, 0.001f)
+        assertEquals(412.5f, decoded.lightLux!!, 0.001f)
     }
 
     @Test
@@ -50,13 +52,14 @@ class LocationRowWireTest {
     @Test
     fun unknownValuesAreLeftOutAndReadBackAsUnknown() {
         val encoded = LocationRowWire.encode(LocationUpdate(sequenceId = 1L), "S1", live = false)
-        listOf("sats", "satsView", "snr", "noise").forEach { assertFalse(it, encoded.has(it)) }
+        listOf("sats", "satsView", "snr", "noise", "lux").forEach { assertFalse(it, encoded.has(it)) }
 
         val decoded = LocationRowWire.decode(encoded)
         assertEquals(-1, decoded.satsUsed)
         assertEquals(-1, decoded.satsInView)
         assertNull(decoded.meanCn0DbHz)
         assertNull(decoded.noiseDbfs)
+        assertNull(decoded.lightLux)
     }
 
     /** Chapter 214 (ISSUE-NOV17.15-O114): plugged in travels as `plg`; a row without it reads back as not known. */

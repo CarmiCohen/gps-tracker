@@ -533,6 +533,7 @@ object LocationRowWire {
      * `noiseOff`, and `crit`, which tells the relay to push the row to the Monitors as well (ISSUE-NOV10.8-O86).
      * Satellites, signal and noise travel on both since Nov17.3 (ISSUE-NOV15.5-O99 part 2); a value not known is left out.
      * Backfilled battery, charging and temperature are real since Nov17.7 (ISSUE-NOV17.3-O102), -1 when not known.
+     * The light level travels on both since Nov22.11 as `lux` (SIMP-NOV22.4-S1), left out while not known.
      */
     fun encode(update: LocationUpdate, deviceId: String, live: Boolean): JSONObject = JSONObject().apply {
         put("id", update.deviceId.ifEmpty { deviceId })
@@ -552,6 +553,7 @@ object LocationRowWire {
         if (update.satsInView >= 0) put("satsView", update.satsInView)
         update.meanCn0DbHz?.let { put("snr", it.toDouble()) }
         update.noiseDbfs?.let { put("noise", it.toDouble()) }
+        update.lightLux?.let { put("lux", it.toDouble()) }
         if (live) {
             put("noiseOff", update.isNoiseDetectionOff)
             if (update.isCritical) put("crit", true)
@@ -578,7 +580,9 @@ object LocationRowWire {
             satsUsed = data.optInt("sats", -1),
             satsInView = data.optInt("satsView", -1),
             meanCn0DbHz = if (data.has("snr")) data.optDouble("snr").toFloat() else null,
-            noiseDbfs = if (data.has("noise")) data.optDouble("noise").toFloat() else null
+            noiseDbfs = if (data.has("noise")) data.optDouble("noise").toFloat() else null,
+            // Absent from Sensors before Nov22.11 and while not known (SIMP-NOV22.4-S1).
+            lightLux = if (data.has("lux")) data.optDouble("lux").toFloat() else null
         ).apply {
             sensorSnapshot.vibration = data.optDouble("vib", 0.0).toFloat()
         }

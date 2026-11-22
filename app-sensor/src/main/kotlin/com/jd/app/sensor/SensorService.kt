@@ -883,6 +883,7 @@ class SensorService : Service(), SensorEventListener {
                     update.meanCn0DbHz = gnss.meanCn0DbHz
                 }
                 update.noiseDbfs = acousticMonitor.levelDbfs?.toFloat()
+                update.lightLux = lightMonitor.lux?.toFloat() // SIMP-NOV22.4-S1
                 
                 val hasPhysicalMotion = update.sensorSnapshot.vibration > 0.12f
                 // A fix older than FIX_STALE_AFTER_MS is no longer the current position: send NO_FIX without one.
