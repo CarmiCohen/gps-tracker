@@ -383,7 +383,7 @@ fun MonitorScreen(
     var isFenceVisible by rememberSaveable { mutableStateOf(true) }
     var showSetupDialog by rememberSaveable { mutableStateOf(false) }
     // What the Sensor phone lacks, as the Sensor reports it (ISSUE-NOV10.8-O83 part 2).
-    val setupWarnings = remember(sensorSetup, alertSettings.acousticAlert) { sensorSetupWarnings(sensorSetup, alertSettings) }
+    val setupWarnings = remember(sensorSetup, alertSettings.acousticAlert, alertSettings.lightAlert) { sensorSetupWarnings(sensorSetup, alertSettings) }
     var showSetupWarnings by rememberSaveable { mutableStateOf(false) }
     var showAlertsOverlay by rememberSaveable { mutableStateOf(false) }
     var showEventsOverlay by rememberSaveable { mutableStateOf(false) }

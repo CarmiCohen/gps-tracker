@@ -56,6 +56,15 @@ class SensorSetupWarningsTest {
         }
     }
 
+    /** Chapter 237 (ISSUE-NOV22.4-O130). */
+    @Test
+    fun `a missing light sensor is a warning only while light detection is switched on`() {
+        val report = SensorSetupReport(trackerId = "T", faults = listOf(SensorFault.NO_LIGHT_SENSOR))
+        assertEquals(listOf("The Sensor phone has no light sensor"), sensorSetupWarnings(report, settings))
+        assertTrue(sensorSetupWarnings(report, settings.copy(lightAlert = false)).isEmpty())
+        assertEquals("Noise off does not hide it", 1, sensorSetupWarnings(report, settings.copy(acousticAlert = false)).size)
+    }
+
     @Test
     fun `the warning line counts the items`() {
         assertEquals("SENSOR PHONE: 1 ITEM NEEDS ATTENTION", sensorSetupLineText(1))

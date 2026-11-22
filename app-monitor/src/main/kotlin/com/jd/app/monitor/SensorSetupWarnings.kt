@@ -30,13 +30,14 @@ import com.jd.core.shared.SensorSetupReport
 /**
  * What the Monitor user must fix on the Sensor phone, one line each, from the Sensor's setup [report]
  * (ISSUE-NOV10.8-O83 part 2); empty while no report has arrived. A microphone problem is no warning while noise
- * detection is switched off here: the Sensor keeps its microphone closed then.
+ * detection is switched off here: the Sensor keeps its microphone closed then. Likewise a missing light sensor while
+ * light detection is (ISSUE-NOV22.4-O130).
  */
 fun sensorSetupWarnings(report: SensorSetupReport?, settings: AlertSettings): List<String> {
     report ?: return emptyList()
     val isNoiseOn = settings.acousticAlert
     return report.missing.filter { isNoiseOn || it != SensorSetupItem.MICROPHONE }.map { "${it.label}: missing" } +
-        report.faults.filter { isNoiseOn || !it.isMicrophone }.map { it.text }
+        report.faults.filter { (isNoiseOn || !it.isMicrophone) && (settings.lightAlert || !it.isLight) }.map { it.text }
 }
 
 /** The warning line under the Monitor's status lines. */

@@ -145,6 +145,9 @@ const val LIFT_ALERT_STATUS = "LIFT_ALERT"
 /** Telemetry status and violation type the Sensor sends when the resting tracker is knocked or shaken (ISSUE-NOV5.2-O11 Group 7). */
 const val VIBRATION_ALERT_STATUS = "VIBRATION_ALERT"
 
+/** Telemetry status and violation type the Sensor sends when the light at it rises suddenly (ISSUE-NOV22.4-O130). */
+const val LIGHT_ALERT_STATUS = "LIGHT_ALERT"
+
 /** A user-defined Home Point; the tracker is home while it is within the geofence radius of any one of them. */
 @Serializable
 data class HomePoint(val lat: Double, val lng: Double)
@@ -213,6 +216,9 @@ data class AlertSettings(
     val vibrationSensitivity: Float = DEFAULT_VIBRATION_SENSITIVITY,
     val tiltSensitivity: Float = DEFAULT_TILT_SENSITIVITY,
     val noiseSensitivity: Float = DEFAULT_NOISE_SENSITIVITY,
+    /** The Sensor's light detection and its limit (ISSUE-NOV22.4-O130); absent from files before Nov22.4: on, the default limit. */
+    val lightAlert: Boolean = true,
+    val lightSensitivity: Float = DEFAULT_LIGHT_SENSITIVITY,
     /** The revision of the Sensor's part ([sensorBehaviour]), stamped by the Monitor's store on each change (ISSUE-NOV10.8-O83). */
     val sensorRevision: Long = 0L,
     val sirenType: String = "Siren"
@@ -226,6 +232,8 @@ data class AlertSettings(
         tiltSensitivity = tiltSensitivity,
         vibrationSensitivity = vibrationSensitivity,
         noiseSensitivity = noiseSensitivity,
+        lightAlert = lightAlert,
+        lightSensitivity = lightSensitivity,
         revision = sensorRevision
     )
 
@@ -238,8 +246,8 @@ data class AlertSettings(
 
 /**
  * The Sensor's detection settings, set on the Monitor and sent by relay like the geofence (ISSUE-NOV10.8-O83, user
- * decisions 2026-11-15): a switched-off kind is not detected at all (noise off closes the microphone), and the three
- * sliders set the limits. [revision] is the Monitor's edit time: the Sensor keeps only the newest.
+ * decisions 2026-11-15): a switched-off kind is not detected at all (noise off closes the microphone, light off the
+ * light sensor), and the sliders set the limits. Light came with ISSUE-NOV22.4-O130. [revision] is the Monitor's edit time: the Sensor keeps only the newest.
  */
 @Serializable
 data class SensorBehaviour(
@@ -250,6 +258,8 @@ data class SensorBehaviour(
     val tiltSensitivity: Float = DEFAULT_TILT_SENSITIVITY,
     val vibrationSensitivity: Float = DEFAULT_VIBRATION_SENSITIVITY,
     val noiseSensitivity: Float = DEFAULT_NOISE_SENSITIVITY,
+    val lightAlert: Boolean = true,
+    val lightSensitivity: Float = DEFAULT_LIGHT_SENSITIVITY,
     val revision: Long = 0L
 ) {
     /** False for an alert [status] whose kind is switched off. */
@@ -258,6 +268,7 @@ data class SensorBehaviour(
         VIBRATION_ALERT_STATUS -> vibrationAlert
         ACOUSTIC_ALERT_STATUS -> noiseAlert
         LIFT_ALERT_STATUS -> liftAlert
+        LIGHT_ALERT_STATUS -> lightAlert
         else -> true
     }
 }

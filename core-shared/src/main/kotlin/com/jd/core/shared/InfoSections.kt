@@ -126,7 +126,14 @@ private fun sensorLines(info: SensorInfo) = listOf(
         "Noise",
         info.noiseDbfs?.let { "${it.roundToInt()} dBFS (background ${info.noiseFloorDbfs?.roundToInt() ?: NO_VALUE})" } ?: "Not listening"
     ),
-    InfoLine("Light", info.lux?.let { "${it.roundToInt()} lx" } ?: "No light sensor")
+    InfoLine(
+        "Light",
+        when {
+            info.lux != null -> "${info.lux.roundToInt()} lx (background ${info.lightFloorLux?.roundToInt() ?: NO_VALUE} lx)"
+            info.isLightSensorMissing -> "No light sensor"
+            else -> "Not measuring"
+        }
+    )
 )
 
 /** The phone lines of both apps. */

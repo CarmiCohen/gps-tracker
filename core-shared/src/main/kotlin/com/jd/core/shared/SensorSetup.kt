@@ -17,16 +17,18 @@ enum class SensorSetupItem(val label: String, val optional: Boolean = false) {
 
 /**
  * What the running Sensor cannot do now although its Phone Setup allows it (ISSUE-NOV10.8-O83 part 2). [text] is the
- * Monitor's warning; [isMicrophone] faults matter only while noise detection is switched on.
+ * Monitor's warning; [isMicrophone] faults matter only while noise detection is switched on, [isLight] ones only while
+ * light detection is (ISSUE-NOV22.4-O130). A Monitor before Nov22.4 ignores a fault it does not know.
  */
-enum class SensorFault(val text: String, val isMicrophone: Boolean = false) {
+enum class SensorFault(val text: String, val isMicrophone: Boolean = false, val isLight: Boolean = false) {
     LOCATION_NEEDS_TAP("Location is off since the Sensor phone restarted: tap its notification or open the Sensor app"),
     MICROPHONE_NEEDS_TAP(
         "The microphone is off since the Sensor phone restarted: tap its notification or open the Sensor app",
         isMicrophone = true
     ),
     MICROPHONE_SILENCED("The microphone is silenced by the Sensor phone", isMicrophone = true),
-    MICROPHONE_UNAVAILABLE("The Sensor phone's microphone is not available", isMicrophone = true)
+    MICROPHONE_UNAVAILABLE("The Sensor phone's microphone is not available", isMicrophone = true),
+    NO_LIGHT_SENSOR("The Sensor phone has no light sensor", isLight = true)
 }
 
 /**

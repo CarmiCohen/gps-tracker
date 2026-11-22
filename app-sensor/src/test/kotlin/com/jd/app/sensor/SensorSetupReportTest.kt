@@ -88,6 +88,16 @@ class SensorSetupReportTest {
         assertEquals(listOf(SensorFault.LOCATION_NEEDS_TAP), report(refused = RefusedAccess(location = true)).faults)
     }
 
+    /** Chapter 237 (ISSUE-NOV22.4-O130): the Monitor shows it only while its light detection is on. */
+    @Test
+    fun `a phone without a light sensor reports it last`() {
+        assertEquals(
+            listOf(SensorFault.MICROPHONE_SILENCED, SensorFault.NO_LIGHT_SENSOR),
+            sensorSetupReport(emptyList(), MicrophoneState.SILENCED, RefusedAccess(), 5L, hasLightSensor = false).faults
+        )
+        assertTrue(report().faults.isEmpty())
+    }
+
     @Test
     fun `a new detection revision is a new report, so the Monitor learns it was applied`() {
         assertTrue(report(revision = 5L) != report(revision = 6L))

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov22.3 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov22.4 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1197,8 +1197,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **236.1 Unit:** `SettingsWireTest`: each of the nine settings kinds, encoded by its wire object and read back as relayed JSON text, reads as its own `SettingsMessage`; an unknown or missing type and a malformed geofence or Info read as nothing; the nine type names are distinct.
 *   **236.2 Unit:** the existing wire tests (`GeofenceWireTest`, `SensorBehaviourWireTest`, `SensorSetupWireTest`, `SensorEventsWireTest`, `SensorInfoWireTest`, `GraphWireTest`) still pass through the client's `settings_relay` listener on the fake socket, so every flow still receives its message.
 
+## Chapter 237 - Light Detection (Nov22.4)
+**Status: A** - `LightDetectorTest` 15/15, `LightAlarmTest` 4/4 and the light cases passed (1031 unit tests); A15 `REV_Light: Measuring`; 237.3 live alert postponed by the user (away from the A15), 237.4 waits for the S21FE (ISSUE-NOV22.4-O130, SOT 1.476)
+*   **237.1 Unit:** `LightDetectorTest`: in a 2 lx room a 300 lx light alerts once, 2 s after it came on, against the dark background, and then becomes background; a rise under 20 lx or under 4 times the background, a 1.5 s flash, a darkening, a slow dawn and the 3 s warm-up do not alert; a new alert needs the light to fall below the limit first; a reading held between sparse sensor events still confirms; the slider gives 8x, 4x and 2x (`4×`, `3.2×`, `6×`), the alert line names light, background and factor; the light switch and slider are in `SensorBehaviour` and its revision.
+*   **237.2 Unit:** `LightAlarmTest`: a `LIGHT_ALERT` row or violation raises `Tracker light detected` (an event alarm kept until acknowledged), switched by `lightAlert`; `SensorBehaviourWireTest`: light settings travel, and a Monitor before Nov22.4 leaves light on at the default; `SensorSetupReportTest` and `SensorSetupWarningsTest`: a phone without a light sensor is reported, and warned about only while light detection is on; `SensorGraphsTest` and `GraphsTest`: the `LIGHT_LUX` peak and the `Light` panel.
+*   **237.3 Device:** on the A15 in a dark room, a torch or a lamp at the phone's top front edge for 3 s writes `Light alert: <lx> lx, background <lx> lx, <factor>×` in the Sensor's Events; the Info shows `Light: <lx> lx (background <lx> lx)`; with light switched off on the Monitor the Info shows `Not measuring` and no alert comes.
+*   **237.4 Device (two phones):** the Monitor sounds `Tracker light detected` for that alert, the Alerts page has `Ambient Light Sensor` with its slider, and the Graphs show the `Light` panel.
+
 ---
-**Active Testing Chapters: 225 of 236**
+**Active Testing Chapters: 226 of 237**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

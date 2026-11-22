@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jd.core.shared.SensorBehaviour
+import com.jd.core.shared.lightLimitLabel
 import com.jd.core.shared.noiseLimitLabel
 import com.jd.core.shared.tiltLimitLabel
 import com.jd.core.shared.vibrationLimitLabel
@@ -31,6 +32,7 @@ fun sensorBehaviourLines(behaviour: SensorBehaviour): List<String> = listOf(
     behaviourLine("Vibration", behaviour.vibrationAlert, vibrationLimitLabel(behaviour.vibrationSensitivity)),
     behaviourLine("Tilt", behaviour.tiltAlert, tiltLimitLabel(behaviour.tiltSensitivity)),
     behaviourLine("Noise", behaviour.noiseAlert, noiseLimitLabel(behaviour.noiseSensitivity) + " over the background"),
+    behaviourLine("Light", behaviour.lightAlert, lightLimitLabel(behaviour.lightSensitivity) + " the background"),
     "Lift: " + if (behaviour.liftAlert) "On" else "Off"
 )
 

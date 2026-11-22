@@ -20,6 +20,8 @@ class SensorBehaviourWireTest {
         tiltSensitivity = 0.3f,
         vibrationSensitivity = 0.9f,
         noiseSensitivity = 0.7f,
+        lightAlert = false,
+        lightSensitivity = 0.8f,
         revision = 1_794_000_000_000L
     )
 
@@ -37,6 +39,15 @@ class SensorBehaviourWireTest {
         assertNull("A Sensor before Nov15.2 ignores the new type", GeofenceWire.decode(behaviourWire))
         val geofenceWire = JSONObject(GeofenceWire.encode("TRK-1", com.jd.core.shared.GeofenceConfig()).toString())
         assertNull(SensorBehaviourWire.decode(geofenceWire))
+    }
+
+    @Test
+    fun `a Monitor before Nov22 4 sends no light setting, and the Sensor keeps light detection on at the default`() {
+        val wire = JSONObject(SensorBehaviourWire.encode("TRK-1", behaviour).toString())
+        wire.remove("light")
+        wire.remove("lightSens")
+        val read = SensorBehaviourWire.decode(wire)
+        assertEquals(behaviour.copy(lightAlert = true, lightSensitivity = com.jd.core.shared.DEFAULT_LIGHT_SENSITIVITY), read)
     }
 
     @Test

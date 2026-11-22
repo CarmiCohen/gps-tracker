@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.lightLimitLabel
 import com.jd.core.shared.noiseLimitLabel
 import com.jd.core.shared.tiltLimitLabel
 import com.jd.core.shared.vibrationLimitLabel
@@ -61,7 +62,7 @@ fun AlertManagementOverlay(
                                     jammerDetection = true, signalLoss = true, gpsStalling = true,
                                     distance = true, power = true, lowBattery = true, batteryHealth = true,
                                     highTemperature = true, longTimeGap = true, tamperAlert = true,
-                                    tiltAlert = true, acousticAlert = true, liftAlert = true,
+                                    tiltAlert = true, acousticAlert = true, liftAlert = true, lightAlert = true,
                                     systemStorageLow = true
                                 )
                             )
@@ -78,7 +79,7 @@ fun AlertManagementOverlay(
                                     jammerDetection = false, signalLoss = false, gpsStalling = false,
                                     distance = false, power = false, lowBattery = false, batteryHealth = false,
                                     highTemperature = false, longTimeGap = false, tamperAlert = false,
-                                    tiltAlert = false, acousticAlert = false, liftAlert = false,
+                                    tiltAlert = false, acousticAlert = false, liftAlert = false, lightAlert = false,
                                     systemStorageLow = false
                                 )
                             )
@@ -202,6 +203,18 @@ fun AlertManagementOverlay(
                     value = draftAlertSettings.noiseSensitivity,
                     limitLabel = ::noiseLimitLabel,
                     onValueCommitted = { onUpdateAlertSettings(draftAlertSettings.copy(noiseSensitivity = it)) }
+                )
+            }
+
+            AlarmToggle("Ambient Light Sensor", draftAlertSettings.lightAlert) {
+                onUpdateAlertSettings(draftAlertSettings.copy(lightAlert = it))
+            }
+            if (draftAlertSettings.lightAlert) {
+                SensitivitySlider(
+                    label = "Light Sensitivity Threshold",
+                    value = draftAlertSettings.lightSensitivity,
+                    limitLabel = ::lightLimitLabel,
+                    onValueCommitted = { onUpdateAlertSettings(draftAlertSettings.copy(lightSensitivity = it)) }
                 )
             }
 

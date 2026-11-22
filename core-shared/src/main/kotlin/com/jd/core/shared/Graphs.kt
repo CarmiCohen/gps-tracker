@@ -4,7 +4,7 @@ import java.util.Locale
 
 /**
  * What the menu's Graphs screen shows (ISSUE-NOV10.8-O84 part 3, user decisions 2026-11-15): Sensor motion (vibration
- * and tilt with their limits, noise), GNSS (accuracy, satellites, mean signal), Connection (relay link, latency, rows
+ * and tilt with their limits, noise, light since ISSUE-NOV22.4-O130), GNSS (accuracy, satellites, mean signal), Connection (relay link, latency, rows
  * held offline) and Phone health (battery with charging, temperature), each over the chosen [ViewPeriod]; a Monitor
  * adds its own connection (relay link, latency, the Sensor's rows live, backfilled and missing). Built here, drawn by
  * core-ui's `GraphsOverlay`.
@@ -170,7 +170,8 @@ fun sensorGraphSections(titlePrefix: String = ""): List<GraphSectionSpec> = list
         listOf(
             GraphPanelSpec("Vibration", "g", listOf(GraphLineSpec(GraphField.VIBRATION_G, "Peak"), GraphLineSpec(GraphField.VIBRATION_LIMIT_G, "Limit", GraphTone.LIMIT)), floor = 0f),
             GraphPanelSpec("Tilt", "°", listOf(GraphLineSpec(GraphField.TILT_DEG, "Peak"), GraphLineSpec(GraphField.TILT_LIMIT_DEG, "Limit", GraphTone.LIMIT)), floor = 0f),
-            GraphPanelSpec("Noise", "dBFS", listOf(GraphLineSpec(GraphField.NOISE_DBFS, "Peak")))
+            GraphPanelSpec("Noise", "dBFS", listOf(GraphLineSpec(GraphField.NOISE_DBFS, "Peak"))),
+            GraphPanelSpec("Light", "lx", listOf(GraphLineSpec(GraphField.LIGHT_LUX, "Peak")), floor = 0f)
         )
     ),
     GraphSectionSpec(

@@ -57,6 +57,7 @@ enum class AlarmType(val title: String, val isEvent: Boolean = false) {
     GPS_JUMP("Tracker GPS jump", isEvent = true),
     GEOFENCE_BREACH("Geofence boundary breach", isEvent = true),
     ACOUSTIC_ALERT("Tracker noise detected", isEvent = true),
+    LIGHT_ALERT("Tracker light detected", isEvent = true),
     TILT_ALERT("Tracker tilted", isEvent = true),
     LIFT_ALERT("Tracker lifted", isEvent = true),
     VIBRATION_ALERT("Tracker vibration detected", isEvent = true),
@@ -73,9 +74,10 @@ fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) 
     AlarmType.GPS_SIGNAL_LOSS -> signalLoss
     AlarmType.GPS_JUMP -> jammerDetection
     AlarmType.GEOFENCE_BREACH -> distance
-    // The four Sensor switches also stop the Sensor's detection once it has them (ISSUE-NOV10.8-O83); the alarm stays
+    // The five Sensor switches also stop the Sensor's detection once it has them (ISSUE-NOV10.8-O83); the alarm stays
     // gated here for rows sent before the Sensor received the change.
     AlarmType.ACOUSTIC_ALERT -> acousticAlert // "Acoustic / Microphone Noise Sensor"
+    AlarmType.LIGHT_ALERT -> lightAlert // "Ambient Light Sensor" (ISSUE-NOV22.4-O130)
     AlarmType.TILT_ALERT -> tiltAlert // "Tilt Angle Detection Sensor"
     AlarmType.LIFT_ALERT -> liftAlert // "Lift / Height Change Sensor"
     AlarmType.VIBRATION_ALERT -> tamperAlert // "Tamper / Vibration Sensor"
@@ -179,6 +181,7 @@ fun alarmConditions(
 private val SENSOR_VIOLATION_ALARMS = mapOf(
     com.jd.core.shared.GEOFENCE_BREACH_STATUS to AlarmType.GEOFENCE_BREACH,
     com.jd.core.shared.ACOUSTIC_ALERT_STATUS to AlarmType.ACOUSTIC_ALERT,
+    com.jd.core.shared.LIGHT_ALERT_STATUS to AlarmType.LIGHT_ALERT,
     com.jd.core.shared.TILT_ALERT_STATUS to AlarmType.TILT_ALERT,
     com.jd.core.shared.LIFT_ALERT_STATUS to AlarmType.LIFT_ALERT,
     com.jd.core.shared.VIBRATION_ALERT_STATUS to AlarmType.VIBRATION_ALERT

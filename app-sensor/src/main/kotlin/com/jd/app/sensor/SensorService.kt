@@ -112,7 +112,7 @@ class SensorService : Service(), SensorEventListener {
     @Volatile private var geofence = GeofenceConfig() // Written by the geofence collector, read by the sensing loop.
     private var geofenceState = SentinelLogic.GeofenceState.UNKNOWN // Sensing loop only.
     @Volatile private var geofenceChanged = false
-    // Noise, tilt, and lift found on their own threads, each sent by a following sensing tick with the current position.
+    // Noise, light, tilt, and lift found on their own threads, each sent by a following sensing tick with the current position.
     private val pendingAlerts = java.util.concurrent.ConcurrentLinkedQueue<PendingAlert>()
     // One alert per kind a minute, after each detector's own debouncing (ISSUE-NOV17.10-O111).
     private val alertCoolDown = AlertCoolDown()
@@ -134,7 +134,8 @@ class SensorService : Service(), SensorEventListener {
     // For the Info screens and the rows (ISSUE-NOV10.8-O84 part 2); written on their own threads, read anywhere.
     @Volatile private var satellites: List<SatelliteReading> = emptyList()
     private var isGnssRegistered = false // Main thread only.
-    @Volatile private var lux: Float? = null
+    // The light detection (ISSUE-NOV22.4-O130), created with the sensor manager; it runs while light detection is on.
+    private lateinit var lightMonitor: LightMonitor
     @Volatile private var selfId = ""
     @Volatile private var isMonitorOnline = false
 
@@ -221,6 +222,7 @@ class SensorService : Service(), SensorEventListener {
         }
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        lightMonitor = LightMonitor(sensorManager) { lux, referenceLux -> queueAlert(LIGHT_ALERT_STATUS, lightAlertText(lux, referenceLux)) }
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
     }
@@ -494,11 +496,17 @@ class SensorService : Service(), SensorEventListener {
                 motionSentinel.tiltThresholdDegrees = tiltThresholdForSensitivity(behaviour.tiltSensitivity)
                 motionSentinel.vibrationThreshold = vibrationThresholdForSensitivity(behaviour.vibrationSensitivity)
                 acousticMonitor.jumpDb = noiseJumpForSensitivity(behaviour.noiseSensitivity)
+                lightMonitor.riseRatio = lightRatioForSensitivity(behaviour.lightSensitivity)
                 // Logged when the settings change, not on every start with the stored ones (ISSUE-NOV18.9-O121).
                 if (!isFirstRead && behaviour.revision != previous.revision) {
                     eventLog.record(EventLevel.INFO, "Detection settings applied (rev ${behaviour.revision}): ${sensorBehaviourLines(behaviour).joinToString("; ")}")
                 }
                 if (isFirstRead || behaviour.noiseAlert != previous.noiseAlert) withContext(Dispatchers.Main) { applyAccess() }
+                // Light needs no permission: it runs while switched on, from the first read of the stored behaviour.
+                if (isFirstRead || behaviour.lightAlert != previous.lightAlert) {
+                    if (behaviour.lightAlert) lightMonitor.start() else lightMonitor.stop()
+                    if (!lightMonitor.hasSensor) SystemLogger.w("Light", "No light sensor: light detection cannot run")
+                }
             }
             .launchIn(serviceScope)
     }
@@ -519,7 +527,7 @@ class SensorService : Service(), SensorEventListener {
             }
         }
         combine(missingItems, serviceStatus.microphone, serviceStatus.refusedAccess, sensorDataStore.sensorBehaviour) { missing, microphone, refused, behaviour ->
-            sensorSetupReport(missing, microphone, refused, behaviour.revision)
+            sensorSetupReport(missing, microphone, refused, behaviour.revision, hasLightSensor = lightMonitor.hasSensor)
         }
             .distinctUntilChanged()
             .onEach { setupReport.value = it }
@@ -636,7 +644,9 @@ class SensorService : Service(), SensorEventListener {
             pressureHpa = motionSentinel.pressureHpa?.toFloat(),
             noiseDbfs = acousticMonitor.levelDbfs?.toFloat(),
             noiseFloorDbfs = acousticMonitor.floorDbfs?.toFloat(),
-            lux = lux,
+            lux = lightMonitor.lux?.toFloat(),
+            lightFloorLux = lightMonitor.floorLux?.toFloat(),
+            isLightSensorMissing = !lightMonitor.hasSensor,
             phone = readPhoneState(this)
         )
     }
@@ -658,6 +668,7 @@ class SensorService : Service(), SensorEventListener {
                         vibrationPeakMps2 = vibrationPeaks.take(),
                         tiltPeakDeg = tiltPeaks.take(),
                         noisePeakDbfs = acousticMonitor.levelPeaks.take(),
+                        lightPeakLux = lightMonitor.luxPeaks.take(),
                         behaviour = sensorBehaviour,
                         vibrationLimitMps2 = motionSentinel.vibrationThreshold,
                         tiltLimitDeg = motionSentinel.tiltThresholdDegrees,
@@ -709,7 +720,6 @@ class SensorService : Service(), SensorEventListener {
         val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         val gravity = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)
         val pressure = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
-        val light = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT) // Info only (ISSUE-NOV10.8-O84 part 2); reports on change.
         hasGravitySensor = gravity != null
         hasBarometer = pressure != null
         val handler = Handler(HandlerThread("MotionSensors").also { it.start(); motionThread = it }.looper)
@@ -717,11 +727,11 @@ class SensorService : Service(), SensorEventListener {
         accel?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME, handler) }
         gravity?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME, handler) }
         pressure?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler) }
-        light?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler) }
         ownVibrationWatch = OwnVibrationWatch(this) { isOwn ->
             motionSentinel.isOwnVibrationActive = isOwn
             acousticMonitor.isOwnSoundActive = isOwn
-            SystemLogger.i("Motion", if (isOwn) "Phone ringing or notifying: vibration and noise ignored" else "Phone quiet: vibration and noise detected again")
+            lightMonitor.isOwnLightActive = isOwn
+            SystemLogger.i("Motion", if (isOwn) "Phone ringing or notifying: vibration, noise and light ignored" else "Phone quiet: vibration, noise and light detected again")
         }.also { it.start(serviceScope, handler) }
         SystemLogger.i(
             "Motion",
@@ -806,7 +816,6 @@ class SensorService : Service(), SensorEventListener {
                 lastGravity[2] = event.values[2].toDouble()
             }
             Sensor.TYPE_PRESSURE -> motionSentinel.onPressure(event.values[0].toDouble(), eventMs)?.let(::onMotionAlert)
-            Sensor.TYPE_LIGHT -> lux = event.values[0]
         }
     }
 
@@ -1051,6 +1060,7 @@ class SensorService : Service(), SensorEventListener {
         else SystemLogger.i("SensorService", "onDestroy before initialization")
         infoSource.unregister()
         acousticMonitor.stop()
+        lightMonitor.stop()
         getSystemService(NotificationManager::class.java).cancel(RESTART_NOTIFICATION_ID)
         serviceScope.cancel()
         orchestrator.cancelAll()

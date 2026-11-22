@@ -32,7 +32,7 @@ import kotlin.math.roundToLong
 /**
  * The history behind the Graphs (ISSUE-NOV10.8-O84 part 3, user decisions 2026-11-15 and 2026-11-16): each phone takes
  * one [GraphSample] a minute, kept [GraphHistory.RETENTION_MS]. The Sensor samples its sensors, GNSS, relay link and
- * battery, with the peaks of the minute for vibration, tilt and noise; a Monitor keeps a copy of the Sensor's samples,
+ * battery, with the peaks of the minute for vibration, tilt, noise and light; a Monitor keeps a copy of the Sensor's samples,
  * which it asks for while its Graphs screen is open, and samples its own relay link and the rows it receives.
  */
 
@@ -71,7 +71,9 @@ enum class GraphField(val decimals: Int, val aggregate: GraphAggregate) {
     /** Monitor: the Sensor's rows received by backfill in the minute. */
     ROWS_BACKFILLED(0, GraphAggregate.MAX),
     /** Monitor: the Sensor's rows known to be missing at the minute's end. */
-    ROWS_MISSING(0, GraphAggregate.MAX)
+    ROWS_MISSING(0, GraphAggregate.MAX),
+    /** The brightest light of the minute, in lux; unknown while light detection is off (ISSUE-NOV22.4-O130). */
+    LIGHT_LUX(0, GraphAggregate.MAX)
 }
 
 /** One minute of a phone's history; [timeMs] is the minute's end on that phone's clock. Unknown values are absent. */

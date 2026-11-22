@@ -78,13 +78,15 @@ internal data class SensorSetupStatus(
 /**
  * What the Sensor tells the Monitor about its phone (ISSUE-NOV10.8-O83 part 2): the [missing] setup items, and what
  * the running service lacks although the setup allows it. A microphone without permission is the missing Microphone
- * item, and one switched off on the Monitor is the Monitor user's own choice: neither is a fault here.
+ * item, and one switched off on the Monitor is the Monitor user's own choice: neither is a fault here. A phone without
+ * a light sensor is one whatever the switch: the Monitor shows it only while its light detection is on (ISSUE-NOV22.4-O130).
  */
 internal fun sensorSetupReport(
     missing: List<SensorSetupItem>,
     microphone: MicrophoneState,
     refused: RefusedAccess,
-    behaviourRevision: Long
+    behaviourRevision: Long,
+    hasLightSensor: Boolean = true
 ): SensorSetupReport = SensorSetupReport(
     missing = missing,
     faults = listOfNotNull(
@@ -94,7 +96,8 @@ internal fun sensorSetupReport(
             MicrophoneState.SILENCED -> SensorFault.MICROPHONE_SILENCED
             MicrophoneState.UNAVAILABLE -> SensorFault.MICROPHONE_UNAVAILABLE
             MicrophoneState.OFF, MicrophoneState.NO_PERMISSION, MicrophoneState.LISTENING, MicrophoneState.TURNED_OFF -> null
-        }
+        },
+        SensorFault.NO_LIGHT_SENSOR.takeUnless { hasLightSensor }
     ),
     behaviourRevision = behaviourRevision
 )

@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov22.3)
+# SOT Master Requirements & Hardening Status (Nov22.4)
 
-## 🏗️ Architectural Master Rules (548 Rules)
+## 🏗️ Architectural Master Rules (549 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -176,6 +176,7 @@
 *   **1.473 One HUD Model**: `HudState` MUST be the only HUD model; no second, parallel HUD state class may exist (SIMP-NOV6.3-S1, chapter 234).
 *   **1.474 One Push Decoder**: the Monitor MUST read every relay push through `PushWire.decode`, which alone holds the push data keys, and MUST check the pairing once, with `isPairedTracker`, before dispatching it; the setup reports of the relay connection use the same rule (SIMP-NOV18.12-S1, chapter 235).
 *   **1.475 One Settings Decoder**: both apps MUST read every message of the relay's `settings_relay` event through `SettingsWire.decode`, which reads its `type` once and returns one `SettingsMessage`; a new settings kind is added there, and an unknown type is ignored (SIMP-NOV15.3-S1, chapter 236).
+*   **1.476 Light Detection**: the Sensor MUST alert on a sudden rise of the ambient light like on a sudden noise: at least 4 times the learned background (the Monitor's `Light Sensitivity Threshold`, 8x to 2x) and 20 lx more, bright for 2 s within 3 s, never on a darkening, through the per-kind cool-down; light switched off on the Monitor closes the light sensor; the Monitor raises `Tracker light detected` and both apps graph the minute's brightest light (ISSUE-NOV22.4-O130, chapter 237).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

@@ -2,6 +2,7 @@ package com.jd.core.network
 
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
+import com.jd.core.shared.DEFAULT_LIGHT_SENSITIVITY
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.GraphRequest
 import com.jd.core.shared.GraphSample
@@ -663,6 +664,8 @@ internal object SensorBehaviourWire {
         put("tiltSens", behaviour.tiltSensitivity.toDouble())
         put("vibSens", behaviour.vibrationSensitivity.toDouble())
         put("noiseSens", behaviour.noiseSensitivity.toDouble())
+        put("light", behaviour.lightAlert)
+        put("lightSens", behaviour.lightSensitivity.toDouble())
     }
 
     /** Returns null for another settings type or a malformed payload. */
@@ -677,6 +680,9 @@ internal object SensorBehaviourWire {
                 tiltSensitivity = data.getDouble("tiltSens").toFloat(),
                 vibrationSensitivity = data.getDouble("vibSens").toFloat(),
                 noiseSensitivity = data.getDouble("noiseSens").toFloat(),
+                // Absent from Monitors before Nov22.4 (ISSUE-NOV22.4-O130): light detection on, at the default limit.
+                lightAlert = data.optBoolean("light", true),
+                lightSensitivity = data.optDouble("lightSens", DEFAULT_LIGHT_SENSITIVITY.toDouble()).toFloat(),
                 revision = data.getLong("rev")
             )
         } catch (e: Exception) {

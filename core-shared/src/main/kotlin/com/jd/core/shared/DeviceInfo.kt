@@ -131,7 +131,11 @@ data class SensorInfo(
     val pressureHpa: Float? = null,
     val noiseDbfs: Float? = null,
     val noiseFloorDbfs: Float? = null,
+    /** The light and its learned background, null while light detection is off or the phone has no light sensor. */
     val lux: Float? = null,
+    val lightFloorLux: Float? = null,
+    /** The phone has no light sensor (ISSUE-NOV22.4-O130). */
+    val isLightSensorMissing: Boolean = false,
     // Phone
     val phone: PhoneState = PhoneState()
 )

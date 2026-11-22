@@ -75,7 +75,8 @@ class GraphsTest {
     @Test
     fun `vibration and tilt are drawn with their limits`() {
         val motion = sensorGraphSections().single { it.title == "MOTION" }
-        assertEquals(listOf("Vibration", "Tilt", "Noise"), motion.panels.map { it.title })
+        assertEquals(listOf("Vibration", "Tilt", "Noise", "Light"), motion.panels.map { it.title }) // Light: ISSUE-NOV22.4-O130
+        assertEquals(GraphField.LIGHT_LUX, motion.panels[3].lines.single().field)
         assertEquals(GraphField.VIBRATION_LIMIT_G, motion.panels[0].lines.single { it.tone == GraphTone.LIMIT }.field)
         assertEquals(GraphField.TILT_LIMIT_DEG, motion.panels[1].lines.single { it.tone == GraphTone.LIMIT }.field)
     }

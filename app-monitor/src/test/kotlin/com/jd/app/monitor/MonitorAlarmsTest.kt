@@ -145,7 +145,7 @@ class MonitorAlarmsTest {
     @Test
     fun onlyTheEventAlarmsLatch() {
         val events = setOf(
-            AlarmType.GPS_JUMP, AlarmType.GEOFENCE_BREACH, AlarmType.ACOUSTIC_ALERT,
+            AlarmType.GPS_JUMP, AlarmType.GEOFENCE_BREACH, AlarmType.ACOUSTIC_ALERT, AlarmType.LIGHT_ALERT,
             AlarmType.TILT_ALERT, AlarmType.LIFT_ALERT, AlarmType.VIBRATION_ALERT
         )
         assertEquals(events, AlarmType.entries.filter { it.isEvent }.toSet())

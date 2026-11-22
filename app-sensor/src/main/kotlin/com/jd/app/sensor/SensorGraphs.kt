@@ -16,6 +16,7 @@ fun sensorGraphSample(
     vibrationPeakMps2: Double?,
     tiltPeakDeg: Double?,
     noisePeakDbfs: Double?,
+    lightPeakLux: Double?,
     behaviour: SensorBehaviour,
     vibrationLimitMps2: Double,
     tiltLimitDeg: Double,
@@ -44,6 +45,7 @@ fun sensorGraphSample(
         GraphField.QUEUED_ROWS to queuedRows,
         GraphField.BATTERY_PERCENT to batteryPercent.takeIf { it >= 0 },
         GraphField.CHARGING to (if (batteryPercent >= 0) (if (isCharging) 1 else 0) else null),
-        GraphField.TEMPERATURE_C to temperatureC.takeIf { it > 0f }
+        GraphField.TEMPERATURE_C to temperatureC.takeIf { it > 0f },
+        GraphField.LIGHT_LUX to lightPeakLux
     )
 )

@@ -63,6 +63,7 @@ class SensorBehaviourStoreTest {
                 "Vibration: On, alert above 0.13 g",
                 "Tilt: Off",
                 "Noise: On, alert above 15 dB over the background",
+                "Light: On, alert above 4× the background", // ISSUE-NOV22.4-O130
                 "Lift: On"
             ),
             lines

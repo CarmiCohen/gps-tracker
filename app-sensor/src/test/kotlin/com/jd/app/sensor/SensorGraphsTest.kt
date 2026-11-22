@@ -16,12 +16,14 @@ class SensorGraphsTest {
         vibrationPeak: Double? = 0.5 * STANDARD_GRAVITY,
         gnss: GnssSummary? = GnssSummary(26, 55, 23.94f),
         battery: Int = 87,
-        temperature: Float = 31.5f
+        temperature: Float = 31.5f,
+        lightPeak: Double? = 312.4
     ) = sensorGraphSample(
         timeMs = 1_800_000_000_000L,
         vibrationPeakMps2 = vibrationPeak,
         tiltPeakDeg = 4.0,
         noisePeakDbfs = -61.0,
+        lightPeakLux = lightPeak,
         behaviour = behaviour,
         vibrationLimitMps2 = 0.8 * STANDARD_GRAVITY,
         tiltLimitDeg = 15.0,
@@ -53,6 +55,7 @@ class SensorGraphsTest {
         assertEquals(87f, sample[GraphField.BATTERY_PERCENT])
         assertEquals(1f, sample[GraphField.CHARGING])
         assertEquals(31.5f, sample[GraphField.TEMPERATURE_C])
+        assertEquals("Light in whole lux (ISSUE-NOV22.4-O130)", 312f, sample[GraphField.LIGHT_LUX])
         assertNull("The Monitor's own fields", sample[GraphField.ROWS_LIVE])
     }
 
@@ -63,7 +66,8 @@ class SensorGraphsTest {
             vibrationPeak = null,
             gnss = null,
             battery = -1,
-            temperature = -1f
+            temperature = -1f,
+            lightPeak = null
         )
         assertNull(sample[GraphField.VIBRATION_LIMIT_G])
         assertNull(sample[GraphField.TILT_LIMIT_DEG])
@@ -73,5 +77,6 @@ class SensorGraphsTest {
         assertNull(sample[GraphField.BATTERY_PERCENT])
         assertNull(sample[GraphField.CHARGING])
         assertNull(sample[GraphField.TEMPERATURE_C])
+        assertNull("Light detection off or no light sensor", sample[GraphField.LIGHT_LUX])
     }
 }
