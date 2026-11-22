@@ -10,7 +10,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -66,68 +72,94 @@ private fun HudStatusBarContent(
         color = Color.Black.copy(alpha = 0.90f),
         contentColor = Color.White
     ) {
-        Column(
+        // One line per phone since Nov19.6: ID, LEDs, telemetry, speed (the Sensor's STATIONARY/MOVING is in the
+        // menu bar since Nov19.3: SensorMotionLabel).
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = verticalGap)
+                .padding(horizontal = 4.dp, vertical = verticalGap),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Row 1: Status LEDs & Speed (the Sensor's STATIONARY/MOVING is in the menu bar since Nov19.3: SensorMotionLabel)
+            // The ID is a few characters and always shown whole; a long telemetry text wraps instead
+            // (ISSUE-NOV18.9-O117).
+            Text(
+                text = hudState.idText,
+                color = Color.Gray,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                softWrap = false
+            )
+            Spacer(modifier = Modifier.width(4.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    hudState.leds.forEach { led -> StatusBadge(label = led.label, state = led.state) }
-                }
-
-                Text(
-                    text = hudState.speedText,
-                    color = if (hudState.isPeerActive || !isMonitor) Color.White else Color.Gray,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1
-                )
+                hudState.leds.forEach { led -> StatusBadge(label = led.label, state = led.state) }
             }
-
-            Spacer(modifier = Modifier.height(verticalGap))
-
-            // Row 2: Metadata / Telemetry
-            val idDisplay = hudState.idText
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // The ID is a few characters and always shown whole; a long telemetry line wraps instead
-                // (ISSUE-NOV18.9-O117: the ID beside `38%⚡|29°|A:±96.0m|AGE:465s`).
-                Text(
-                    text = idDisplay,
-                    color = Color.Gray,
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    softWrap = false
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = hudState.telemetryText,
-                    color = Color.LightGray,
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace,
-                    textAlign = TextAlign.End,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            Spacer(modifier = Modifier.width(4.dp))
+            OneLineFitText(
+                text = hudState.telemetryText,
+                color = Color.LightGray,
+                maxFontSize = 9.sp,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = speedAnnotated(hudState.speedNumberText),
+                color = if (hudState.isPeerActive || !isMonitor) Color.White else Color.Gray,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                softWrap = false
+            )
         }
     }
+}
+
+/**
+ * Monospace text kept on one line (Nov19.6): the font shrinks in half-sp steps from [maxFontSize] down to
+ * [MIN_HUD_FONT_SP] until the text fits the width it is given; only below that is it cut with an ellipsis.
+ * (Compose's own `autoSize` needs a newer BOM than this project's 2023.10.01.)
+ */
+@Composable
+private fun OneLineFitText(
+    text: String,
+    color: Color,
+    maxFontSize: TextUnit,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.CenterEnd) {
+        val measurer = rememberTextMeasurer()
+        val baseStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace)
+        val maxWidthPx = constraints.maxWidth
+        val fontSize = remember(text, maxWidthPx, baseStyle) {
+            var size = maxFontSize.value
+            while (size > MIN_HUD_FONT_SP &&
+                measurer.measure(text, baseStyle.copy(fontSize = size.sp), maxLines = 1, softWrap = false).size.width > maxWidthPx
+            ) size -= 0.5f
+            size.sp
+        }
+        Text(
+            text = text,
+            color = color,
+            fontSize = fontSize,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+private const val MIN_HUD_FONT_SP = 6f
+
+/** The speed with its unit in a tiny font (Nov19.6); the text stays `12.3 km/h` for tests and accessibility. */
+private fun speedAnnotated(number: String): AnnotatedString = buildAnnotatedString {
+    append(number)
+    withStyle(SpanStyle(fontSize = 6.sp, fontWeight = FontWeight.Normal)) { append(" $SPEED_UNIT") }
 }
 
 /**

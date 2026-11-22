@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov19.5 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov19.6-HUD - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1177,8 +1177,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **232.2 Device:** the Sensor line shows INT, SRV, GPS, VWR; the Monitor's own line INT, SRV, GPS, TRK; its Sensor line GPS only; no DAT or WDG. Cutting the Sensor's network (Operational Notes) turns its INT and SRV red and VWR gray; location off turns GPS red; a still Monitor's GPS stays green with an old fix; with the Sensor silent for 35 s the Monitor's TRK is red and the Sensor line's GPS gray.
 *   **232.3 Instrumented / device:** `TextFitTest.theMotionLabelStaysWholeInANarrowMenuBar` (320 dp, font scale 1.3), `HudLayoutAuditTest.menuBarKeepsEveryActionVisibleWithLongIds`; on the S21FE the bar shows `STATIONARY` whole with the icons spread over the bar.
 
+## Chapter 233 - One HUD Line Per Phone (Nov19.6-HUD)
+**Status: L / A / D** - `HudStateTest`, `FixReadingTest` (984 unit tests); `HudLayoutAuditTest` + `TextFitTest` 8/8 and `SensorHudValuesTest` 5/5 on the A15; 233.3 passed on the A15 (Sensor and Monitor); not seen on the S21FE (not connected) (ISSUE-NOV19.6-O129, SOT 1.472)
+*   **233.1 Unit:** `HudStateTest`: the data is `100%|30°|±5.0m|0s`, with no icon and no `B:`, `T:`, `A:`, `AGE:` or `C` (`valuesCarryOnlyTheirUnitSigns`); accuracy 9.94 m is `±9.9m`, 9.95 m `±10m`, 12.5 m `±13m` (`largeAccuracyDropsItsDecimal`); `speedNumberText` is the number alone.
+*   **233.2 Instrumented:** `TextFitTest.theMonitorIdStaysWholeBesideLongTelemetry` (ID and data fit at 360 dp), `HudLayoutAuditTest` (speed on screen at font scale 2, INT left of TRK under RTL, compact shorter); `SensorHudValuesTest`: the data ends with `|±13m|<age>s`.
+*   **233.3 Device:** each phone's HUD is one line: ID first, then the LEDs, the data and the speed with a tiny `km/h`; the data never wraps to a second line (it shrinks instead), on the Sensor and on both Monitor lines.
+
 ---
-**Active Testing Chapters: 221 of 232**
+**Active Testing Chapters: 222 of 233**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
