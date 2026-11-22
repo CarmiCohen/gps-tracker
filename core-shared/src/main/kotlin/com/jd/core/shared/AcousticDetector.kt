@@ -17,7 +17,8 @@ import kotlin.math.sqrt
  * the background at its first loud frame (ISSUE-NOV17.10-O111: a door slam or a dropped spoon is no intruder;
  * ISSUE-NOV17.12-O112: nor is a coughing fit). After
  * an alert the level must fall below the limit before a new noise counts, so one noise raises one alert; the time
- * between alerts is the Sensor's per-kind cool-down ([AlertCoolDown]), which replaced a lockout here.
+ * between alerts is the Sensor's per-kind cool-down ([AlertCoolDown]), which replaced a lockout here. The
+ * debouncing is the [RiseConfirmer] the light detection shares (SIMP-NOV22.4-S2), fed one frame as one span.
  *
  * Feed one level per audio frame of about [ACOUSTIC_FRAME_MS], timed by a monotonic clock. Not thread-safe: one
  * audio thread owns it.
@@ -35,14 +36,12 @@ class AcousticDetector(
      * The background the last alert was compared against: the one at its noise's first loud frame, not [floorDbfs],
      * which rises during the noise (ISSUE-NOV18.9-O120). Null before the first alert.
      */
-    var alertReferenceDbfs: Double? = null
-        private set
+    val alertReferenceDbfs: Double? get() = confirmer.alertReference
 
     private var startMs = 0L
-    private var loudSinceMs: Long? = null // The first loud frame of the noise being confirmed.
-    private var loudReference = 0.0 // The background at that frame.
-    private var loudFrames = 0
-    private var needsQuiet = false // After an alert, until the level falls below the limit.
+    private val confirmer = RiseConfirmer(ACOUSTIC_CONFIRM_MS, ACOUSTIC_CONFIRM_WINDOW_MS) { level, reference ->
+        level - reference >= jumpDb && level >= minAlertDbfs
+    }
 
     /** Returns true when [levelDbfs] at [nowMs] is an alert. */
     fun onLevel(levelDbfs: Double, nowMs: Long): Boolean {
@@ -53,7 +52,7 @@ class AcousticDetector(
             return false
         }
         val isWarmingUp = nowMs - startMs < warmUpMs
-        val isAlert = !isWarmingUp && confirm(levelDbfs, floor, nowMs)
+        val isAlert = !isWarmingUp && confirmer.onSpan(levelDbfs, nowMs, ACOUSTIC_FRAME_MS, floor)
         val alpha = when {
             isWarmingUp -> WARM_UP_ALPHA
             levelDbfs < floor -> FALL_ALPHA
@@ -61,29 +60,6 @@ class AcousticDetector(
         }
         floorDbfs = floor + alpha * (levelDbfs - floor)
         return isAlert
-    }
-
-    private fun isLoud(levelDbfs: Double, reference: Double) = levelDbfs - reference >= jumpDb && levelDbfs >= minAlertDbfs
-
-    /** True when this frame completes [ACOUSTIC_CONFIRM_MS] of loud frames within [ACOUSTIC_CONFIRM_WINDOW_MS]. */
-    private fun confirm(levelDbfs: Double, floor: Double, nowMs: Long): Boolean {
-        if (needsQuiet) {
-            if (!isLoud(levelDbfs, floor)) needsQuiet = false
-            return false
-        }
-        if (loudSinceMs?.let { nowMs - it >= ACOUSTIC_CONFIRM_WINDOW_MS } == true) loudSinceMs = null // Too short: a new start.
-        if (loudSinceMs == null) {
-            if (!isLoud(levelDbfs, floor)) return false
-            loudSinceMs = nowMs
-            loudReference = floor
-            loudFrames = 0
-        }
-        if (isLoud(levelDbfs, loudReference)) loudFrames++
-        if (loudFrames * ACOUSTIC_FRAME_MS < ACOUSTIC_CONFIRM_MS) return false
-        loudSinceMs = null
-        needsQuiet = true
-        alertReferenceDbfs = loudReference
-        return true
     }
 
     private companion object {

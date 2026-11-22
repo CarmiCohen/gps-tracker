@@ -7,14 +7,16 @@ import kotlin.math.round
  * Detects a sudden rise of the ambient light at the Sensor (ISSUE-NOV22.4-O130, user request 2026-11-22): a lamp or a
  * torch switched on in a dark room, or the hidden phone uncovered. It works like the noise detection ([AcousticDetector]):
  * the light alerts when it reaches [riseRatio] times the learned background ([floorLux]) and at least [minRiseLux] more,
- * and stays there for [LIGHT_CONFIRM_MS] within [LIGHT_CONFIRM_WINDOW_MS], measured against the background at its first
- * bright reading, so a car's headlights sweeping past do not alert. A darkening never alerts (user decision 2026-11-22:
+ * and stays there for [LIGHT_CONFIRM_MS] within [LIGHT_CONFIRM_WINDOW_MS], measured against the background just before
+ * it, so a car's headlights sweeping past do not alert. A darkening never alerts (user decision 2026-11-22:
  * a hand or a pocket over the sensor would). The background follows a darker light within about a second and a brighter
  * one only over about ten seconds, so a light that stays on becomes background; after an alert the light must fall below
  * the limit before a new rise counts. The time between alerts is the Sensor's per-kind cool-down ([AlertCoolDown]).
  *
  * The light sensor reports only on a change, so a reading holds until the next one: feed each reading, and the held one
- * again at least every [LIGHT_TICK_MS], timed by a monotonic clock. Not thread-safe: one sensor thread owns it.
+ * again at least every [LIGHT_TICK_MS], timed by a monotonic clock. Each call hands the reading that held since the
+ * last one, as one span, to the [RiseConfirmer] the noise detection shares (SIMP-NOV22.4-S2). Not thread-safe: one
+ * sensor thread owns it.
  */
 class LightDetector(
     @Volatile var riseRatio: Double = LIGHT_RISE_RATIO,
@@ -25,19 +27,17 @@ class LightDetector(
     var floorLux: Double? = null
         private set
 
-    /** The background the last alert was compared against: the one at its first bright reading. Null before the first alert. */
-    var alertReferenceLux: Double? = null
-        private set
+    /** The background the last alert was compared against: the one just before its rise. Null before the first alert. */
+    val alertReferenceLux: Double? get() = confirmer.alertReference
 
     private var startMs = 0L
     private var lastMs = 0L
     private var lastLux = 0.0 // The reading that held from lastMs until now.
-    private var brightSinceMs: Long? = null // The first bright reading of the rise being confirmed.
-    private var brightReference = 0.0 // The background at that reading.
-    private var brightMs = 0L // How long the light has been bright since then.
-    private var needsDark = false // After an alert, until the light falls below the limit.
+    private val confirmer = RiseConfirmer(LIGHT_CONFIRM_MS, LIGHT_CONFIRM_WINDOW_MS) { lux, reference ->
+        lux - reference >= minRiseLux && lux >= reference * riseRatio
+    }
 
-    /** Returns true when [lux] at [nowMs] completes an alert. */
+    /** Feeds [lux], which holds from [nowMs]; returns true when the reading held until [nowMs] completes an alert. */
     fun onLux(lux: Double, nowMs: Long): Boolean {
         val floor = floorLux
         if (floor == null) {
@@ -49,7 +49,7 @@ class LightDetector(
         }
         val elapsedMs = (nowMs - lastMs).coerceAtLeast(0L)
         val isWarmingUp = nowMs - startMs < warmUpMs
-        val isAlert = !isWarmingUp && confirm(lux, floor, nowMs, elapsedMs)
+        val isAlert = !isWarmingUp && confirmer.onSpan(lastLux, nowMs, elapsedMs, floor)
         // The background follows the reading that held during the elapsed time.
         val tauMs = when {
             isWarmingUp -> WARM_UP_TAU_MS
@@ -60,32 +60,6 @@ class LightDetector(
         lastMs = nowMs
         lastLux = lux
         return isAlert
-    }
-
-    private fun isBright(lux: Double, reference: Double) = lux - reference >= minRiseLux && lux >= reference * riseRatio
-
-    /** True when the light has now been bright for [LIGHT_CONFIRM_MS] within [LIGHT_CONFIRM_WINDOW_MS] of its first bright reading. */
-    private fun confirm(lux: Double, floor: Double, nowMs: Long, elapsedMs: Long): Boolean {
-        if (needsDark) {
-            if (!isBright(lux, floor)) needsDark = false
-            return false
-        }
-        brightSinceMs?.let { since ->
-            if (isBright(lastLux, brightReference)) brightMs += elapsedMs
-            if (brightMs >= LIGHT_CONFIRM_MS) {
-                brightSinceMs = null
-                needsDark = true
-                alertReferenceLux = brightReference
-                return true
-            }
-            if (nowMs - since >= LIGHT_CONFIRM_WINDOW_MS) brightSinceMs = null // Too short: a new start.
-        }
-        if (brightSinceMs == null && isBright(lux, floor)) {
-            brightSinceMs = nowMs
-            brightReference = floor
-            brightMs = 0L
-        }
-        return false
     }
 
     private companion object {

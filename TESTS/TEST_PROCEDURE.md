@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov22.9 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov22.10 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1232,8 +1232,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **242.1 Unit:** `SettingsSenderTest`: none of the nine settings messages is sent or counted before `connect()` or while disconnected; once connected each is exactly one `settings_update` of its wire type, counted once in `getMonthlyDataUsageBytes`; the five Monitor messages carry `from` = the Monitor's ID and `id` = the Sensor, the four Sensor messages the Sensor's own `id` and no `from`. `MonitorIdWireTest` and the wire tests pass unchanged.
 *   **242.2 Device:** `ProductionReadinessAuditTest` on the A15, and both release apps cold start with `davey_over_500ms=0 stacklog=0 fatal=0`.
 
+## Chapter 243 - One Rise Confirmation (Nov22.10)
+**Status: A** - 243.1 passed (`RiseConfirmerTest` 4/4, `AcousticDetectorTest` 17/17, `LightDetectorTest` 15/15, 1062 unit tests); 243.2 passed on the A15 (`ProductionReadinessAuditTest` 3/3, release Sensor cold start clean; the Monitor not installed there) (SIMP-NOV22.4-S2, SOT 1.483)
+*   **243.1 Unit:** `RiseConfirmerTest`: rising spans adding up to 2 s within 3 s of the first one's start alert once, against the background at the first span, not the risen one; spans that do not fit in the window start a new rise; after an alert a new rise counts only after a span below the limit; an empty span changes nothing. `AcousticDetectorTest` and `LightDetectorTest` pass unchanged on the shared confirmer.
+*   **243.2 Device:** `ProductionReadinessAuditTest` on the A15, and the release apps installed there cold start with `davey_over_500ms=0 stacklog=0 fatal=0`. The live noise and light alerts stay in 220 and 237.3.
+
 ---
-**Active Testing Chapters: 231 of 242**
+**Active Testing Chapters: 232 of 243**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
