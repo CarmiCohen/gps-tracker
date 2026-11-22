@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov22.8)
+# SOT Master Requirements & Hardening Status (Nov22.9)
 
-## 🏗️ Architectural Master Rules (554 Rules)
+## 🏗️ Architectural Master Rules (555 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -182,6 +182,7 @@
 *   **1.479 The Monitor's Own ID**: the Monitor's own ID MUST be settable in its Setup dialog, never blank and never equal to the Tracker ID (also checked at pairing and settings import); a new ID MUST rejoin the relay at once and take the Monitor's own trail with it; every Monitor message to the Sensor MUST carry the ID as `from`, and the Sensor MUST show the Monitor it heard last (Setup dialog, Info, one event per Monitor per run) without obeying only that Monitor (ISSUE-NOV22.7-O135, chapter 240).
 *   **1.480 One Row A Second At Most**: the Sensor's row clock (`SensingEngine.getOptimalIntervalMs`) MUST give one telemetry row a second at most (`ROW_INTERVAL_MS`) when moving or on outside power, and one per 10 s when stationary or at critical battery or heat; motion, noise and light MUST stay detected on the sensors' own events and an alarm MUST still be sent at once. The relay MUST forward a Sensor's batch as one message to the rest of its room, never back to the sender, send the viewer status only when it changes (and to each joining phone), and write its cache at most every 5 s (ISSUE-NOV22.5-O133, chapter 241).
 *   **1.481 The Alarm Window**: for 5 minutes after its last alarm of any kind (`ALARM_WINDOW_MS`, restarted by each alarm), the Sensor MUST send one row a second even when stationary on battery, so an alarmed user can follow the thief; critical Sensor battery (< 15 %) or heat MUST keep one row per 10 s even then (ISSUE-NOV22.8-O136, user decisions 2026-11-22, chapter 241).
+*   **1.482 One Settings Sender**: every `settings_update` message MUST leave `SocketioSignalingClient` through its one `emitSettings` (sent only while connected, encoded only when sent, counted in the data use), a Monitor's stamped with its own ID by `emitFromMonitor` and a Sensor's carrying the Sensor's ID by `emitFromSensor` (SIMP-NOV22.3-S1, chapter 242).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

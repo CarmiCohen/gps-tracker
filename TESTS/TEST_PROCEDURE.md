@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov22.8 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov22.9 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1227,8 +1227,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **241.3 Device (relay v6.048 deployed):** a paired Monitor gets the Sensor's rows (about one a second on USB) and its HUD shows the Sensor online; the Sensor's logcat shows no `location_relay` handling of its own rows; after a few days the Render bandwidth graph grows by tens of MB a day, not GB.
 *   **241.4 Device (a person at the A15):** with the battery simulated as in 241.2 and `Interval: 10000ms`, knock on the phone or lift it: `Sampling Updated: 1000ms ... Alarm window: true` at the alarm; with no new alarm, `10000ms` again 5 minutes later; restore with `dumpsys battery reset`.
 
+## Chapter 242 - One Settings Sender (Nov22.9)
+**Status: A** - 242.1 passed (`SettingsSenderTest` 2/2, 1058 unit tests); 242.2 passed on the A15 (`ProductionReadinessAuditTest` 3/3, release cold starts clean) (SIMP-NOV22.3-S1, SOT 1.482)
+*   **242.1 Unit:** `SettingsSenderTest`: none of the nine settings messages is sent or counted before `connect()` or while disconnected; once connected each is exactly one `settings_update` of its wire type, counted once in `getMonthlyDataUsageBytes`; the five Monitor messages carry `from` = the Monitor's ID and `id` = the Sensor, the four Sensor messages the Sensor's own `id` and no `from`. `MonitorIdWireTest` and the wire tests pass unchanged.
+*   **242.2 Device:** `ProductionReadinessAuditTest` on the A15, and both release apps cold start with `davey_over_500ms=0 stacklog=0 fatal=0`.
+
 ---
-**Active Testing Chapters: 230 of 241**
+**Active Testing Chapters: 231 of 242**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

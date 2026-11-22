@@ -465,80 +465,55 @@ class SocketioSignalingClient @Inject constructor(
         return true
     }
 
-    override suspend fun sendGeofence(targetId: String, config: GeofenceConfig): Boolean {
+    override suspend fun sendGeofence(targetId: String, config: GeofenceConfig): Boolean =
+        emitFromMonitor { GeofenceWire.encode(targetId, config) }
+
+    override suspend fun sendSensorBehaviour(targetId: String, behaviour: SensorBehaviour): Boolean =
+        emitFromMonitor { SensorBehaviourWire.encode(targetId, behaviour) }
+
+    override suspend fun sendSensorSetup(report: SensorSetupReport): Boolean =
+        emitFromSensor { deviceId ->
+            SensorSetupWire.encode(report.trackerId.ifEmpty { deviceId }, report, sentAtMs = System.currentTimeMillis())
+        }
+
+    override suspend fun sendSensorEvents(events: List<EventEntry>, completeAfterMs: Long?): Boolean =
+        emitFromSensor { deviceId -> SensorEventsWire.encode(deviceId, events, completeAfterMs) }
+
+    override suspend fun requestSensorEvents(targetId: String, afterMs: Long): Boolean =
+        emitFromMonitor { EventsRequestWire.encode(targetId, afterMs) }
+
+    override suspend fun requestSensorInfo(targetId: String, withSatellites: Boolean): Boolean =
+        emitFromMonitor { InfoRequestWire.encode(targetId, withSatellites) }
+
+    override suspend fun sendSensorInfo(info: SensorInfo): Boolean =
+        emitFromSensor { deviceId -> SensorInfoWire.encode(info.sensorId.ifEmpty { deviceId }, info) }
+
+    override suspend fun requestGraphSamples(targetId: String, afterMs: Long): Boolean =
+        emitFromMonitor { GraphRequestWire.encode(targetId, afterMs) }
+
+    override suspend fun sendGraphSamples(samples: List<GraphSample>, compressed: Boolean): Boolean =
+        emitFromSensor { deviceId -> GraphSamplesWire.encode(deviceId, samples, compressed) }
+
+    /**
+     * The one sender of the relay's settings_update event (SIMP-NOV22.3-S1): nothing is encoded or sent while
+     * disconnected; a sent payload counts towards [bytesSent].
+     */
+    private inline fun emitSettings(encode: () -> JSONObject): Boolean {
         if (!_isConnected.value) return false
-        val payload = SettingsWire.fromMonitor(GeofenceWire.encode(targetId, config), currentDeviceId)
+        val payload = encode()
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true
     }
 
-    override suspend fun sendSensorBehaviour(targetId: String, behaviour: SensorBehaviour): Boolean {
-        if (!_isConnected.value) return false
-        val payload = SettingsWire.fromMonitor(SensorBehaviourWire.encode(targetId, behaviour), currentDeviceId)
-        socket?.emit("settings_update", payload)
-        bytesSent += payload.toString().length.toLong()
-        return true
-    }
+    /** A Monitor -> Sensor message, stamped with this Monitor's ID by [SettingsWire.fromMonitor]. */
+    private inline fun emitFromMonitor(body: () -> JSONObject): Boolean =
+        emitSettings { SettingsWire.fromMonitor(body(), currentDeviceId) }
 
-    override suspend fun sendSensorSetup(report: SensorSetupReport): Boolean {
+    /** A Sensor -> Monitor message, which needs this Sensor's own ID; false before [connect]. */
+    private inline fun emitFromSensor(encode: (deviceId: String) -> JSONObject): Boolean {
         val deviceId = currentDeviceId ?: return false
-        if (!_isConnected.value) return false
-        val payload = SensorSetupWire.encode(report.trackerId.ifEmpty { deviceId }, report, sentAtMs = System.currentTimeMillis())
-        socket?.emit("settings_update", payload)
-        bytesSent += payload.toString().length.toLong()
-        return true
-    }
-
-    override suspend fun sendSensorEvents(events: List<EventEntry>, completeAfterMs: Long?): Boolean {
-        val deviceId = currentDeviceId ?: return false
-        if (!_isConnected.value) return false
-        val payload = SensorEventsWire.encode(deviceId, events, completeAfterMs)
-        socket?.emit("settings_update", payload)
-        bytesSent += payload.toString().length.toLong()
-        return true
-    }
-
-    override suspend fun requestSensorEvents(targetId: String, afterMs: Long): Boolean {
-        if (!_isConnected.value) return false
-        val payload = SettingsWire.fromMonitor(EventsRequestWire.encode(targetId, afterMs), currentDeviceId)
-        socket?.emit("settings_update", payload)
-        bytesSent += payload.toString().length.toLong()
-        return true
-    }
-
-    override suspend fun requestSensorInfo(targetId: String, withSatellites: Boolean): Boolean {
-        if (!_isConnected.value) return false
-        val payload = SettingsWire.fromMonitor(InfoRequestWire.encode(targetId, withSatellites), currentDeviceId)
-        socket?.emit("settings_update", payload)
-        bytesSent += payload.toString().length.toLong()
-        return true
-    }
-
-    override suspend fun sendSensorInfo(info: SensorInfo): Boolean {
-        val deviceId = currentDeviceId ?: return false
-        if (!_isConnected.value) return false
-        val payload = SensorInfoWire.encode(info.sensorId.ifEmpty { deviceId }, info)
-        socket?.emit("settings_update", payload)
-        bytesSent += payload.toString().length.toLong()
-        return true
-    }
-
-    override suspend fun requestGraphSamples(targetId: String, afterMs: Long): Boolean {
-        if (!_isConnected.value) return false
-        val payload = SettingsWire.fromMonitor(GraphRequestWire.encode(targetId, afterMs), currentDeviceId)
-        socket?.emit("settings_update", payload)
-        bytesSent += payload.toString().length.toLong()
-        return true
-    }
-
-    override suspend fun sendGraphSamples(samples: List<GraphSample>, compressed: Boolean): Boolean {
-        val deviceId = currentDeviceId ?: return false
-        if (!_isConnected.value) return false
-        val payload = GraphSamplesWire.encode(deviceId, samples, compressed)
-        socket?.emit("settings_update", payload)
-        bytesSent += payload.toString().length.toLong()
-        return true
+        return emitSettings { encode(deviceId) }
     }
 
     private companion object {
