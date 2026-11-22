@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov19.6-HUD - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov22.0 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1183,8 +1183,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **233.2 Instrumented:** `TextFitTest.theMonitorIdStaysWholeBesideLongTelemetry` (ID and data fit at 360 dp), `HudLayoutAuditTest` (speed on screen at font scale 2, INT left of TRK under RTL, compact shorter); `SensorHudValuesTest`: the data ends with `|±13m|<age>s`.
 *   **233.3 Device:** each phone's HUD is one line: ID first, then the LEDs, the data and the speed with a tiny `km/h`; the data never wraps to a second line (it shrinks instead), on the Sensor and on both Monitor lines.
 
+## Chapter 234 - One HUD Model (Nov22.0)
+**Status: A** - `OneHudModelTest` passed (986 unit tests) (SIMP-NOV6.3-S1, SOT 1.473)
+*   **234.1 Unit:** `OneHudModelTest.hudStateIsTheOnlyHudModel`: `com.jd.core.ui.HudState` loads and `com.jd.core.ui.HudViewState` does not (`ClassNotFoundException`), so the HUD has one model only.
+
 ---
-**Active Testing Chapters: 222 of 233**
+**Active Testing Chapters: 223 of 234**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

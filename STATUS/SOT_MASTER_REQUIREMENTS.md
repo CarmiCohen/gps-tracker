@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov19.6-HUD)
+# SOT Master Requirements & Hardening Status (Nov22.0)
 
-## 🏗️ Architectural Master Rules (545 Rules)
+## 🏗️ Architectural Master Rules (546 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -173,6 +173,7 @@
 *   **1.470 Test Runs Ignore Pushes, One Save Rule**: while the Monitor's instrumented tests run, its push service MUST be off, so a push from a running Sensor cannot crash the run, and it MUST be on again when the run ends. Every user file save MUST go through the one core-ui `rememberGpsTrackerSaver` (ISSUE-NOV12.3-O90, SIMP-NOV19.3-S1, chapter 231).
 *   **1.471 Three-Color LEDs, GPS Means Satellites, A Tappable Menu Bar**: every HUD LED MUST be green (OK), red (not OK) or gray (no information), never an app color, and a line MUST show only LEDs its phone can know: each phone's own line INT, SRV, GPS and TRK or VWR, the Monitor's line for the Sensor GPS only. SRV MUST need internet; TRK and VWR MUST be gray while unpaired or SRV is down. GPS MUST mean a GNSS fix from at least 4 satellites: green within 15 s, red with location off or older, gray after 2 min or before any. The menu bar icons MUST share the bar's width as tap areas at least 40 dp high, and the motion label MUST stay whole (ISSUE-NOV19.5-O127, O128, chapter 232).
 *   **1.472 One HUD Line Per Phone**: each phone's HUD MUST be one line: ID, LEDs, data, speed. The data MUST carry no icons and no labels, only the unit signs (`100%⚡|27°|±39m|1s`); an accuracy of 9.95 m or more MUST drop its decimal; `km/h` MUST be drawn in a tiny font after the speed; the data MUST shrink rather than wrap (ISSUE-NOV19.6-O129, chapter 233).
+*   **1.473 One HUD Model**: `HudState` MUST be the only HUD model; no second, parallel HUD state class may exist (SIMP-NOV6.3-S1, chapter 234).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*
