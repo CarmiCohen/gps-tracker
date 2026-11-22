@@ -74,7 +74,7 @@ class LightDetectorTest {
     fun noAlertWhileTheBackgroundIsFirstLearned() {
         val detector = LightDetector()
         detector.onLux(2.0, 0)
-        assertTrue(detector.feed(300.0, LIGHT_TICK_MS, LIGHT_WARM_UP_MS - LIGHT_TICK_MS).isEmpty())
+        assertTrue(detector.feed(300.0, LIGHT_TICK_MS, BACKGROUND_WARM_UP_MS - LIGHT_TICK_MS).isEmpty())
     }
 
     @Test

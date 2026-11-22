@@ -37,7 +37,7 @@ class AcousticDetectorTest {
     fun noAlertWhileTheBackgroundIsFirstLearned() {
         val detector = AcousticDetector()
         detector.onLevel(-70.0, 0)
-        assertTrue(detector.feed(-20.0, 100, ACOUSTIC_WARM_UP_MS - 200).isEmpty())
+        assertTrue(detector.feed(-20.0, 100, BACKGROUND_WARM_UP_MS - 200).isEmpty())
     }
 
     @Test

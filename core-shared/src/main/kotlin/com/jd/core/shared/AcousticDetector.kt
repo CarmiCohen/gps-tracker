@@ -10,8 +10,9 @@ import kotlin.math.sqrt
  * A phone microphone measures relative to full scale (dBFS), not true sound pressure, so the trigger is a jump of
  * [jumpDb] above the learned background level ([floorDbfs]), not an absolute loudness (user decision, 2026-11-08: 30 dB;
  * since ISSUE-NOV10.8-O83 set by the Monitor's `Noise Sensitivity Threshold` slider, [noiseJumpForSensitivity]).
- * The background follows quiet frames within about a second and loud frames only over about ten seconds, so a
- * noise that goes on (a TV, rain) becomes background instead of raising alerts again and again.
+ * The background is the [LearnedBackground] the light detection shares (SIMP-NOV22.10-S1): it follows quiet frames
+ * within about a second and loud frames only over about ten seconds, so a noise that goes on (a TV, rain) becomes
+ * background instead of raising alerts again and again.
  *
  * A noise alerts only when it is loud for [ACOUSTIC_CONFIRM_MS] within [ACOUSTIC_CONFIRM_WINDOW_MS], measured against
  * the background at its first loud frame (ISSUE-NOV17.10-O111: a door slam or a dropped spoon is no intruder;
@@ -26,11 +27,12 @@ import kotlin.math.sqrt
 class AcousticDetector(
     @Volatile var jumpDb: Double = ACOUSTIC_JUMP_DB,
     private val minAlertDbfs: Double = ACOUSTIC_MIN_ALERT_DBFS,
-    private val warmUpMs: Long = ACOUSTIC_WARM_UP_MS
+    warmUpMs: Long = BACKGROUND_WARM_UP_MS
 ) {
+    private val background = LearnedBackground(warmUpMs)
+
     /** The learned background level, or null before the first frame. */
-    var floorDbfs: Double? = null
-        private set
+    val floorDbfs: Double? get() = background.level
 
     /**
      * The background the last alert was compared against: the one at its noise's first loud frame, not [floorDbfs],
@@ -38,34 +40,20 @@ class AcousticDetector(
      */
     val alertReferenceDbfs: Double? get() = confirmer.alertReference
 
-    private var startMs = 0L
     private val confirmer = RiseConfirmer(ACOUSTIC_CONFIRM_MS, ACOUSTIC_CONFIRM_WINDOW_MS) { level, reference ->
         level - reference >= jumpDb && level >= minAlertDbfs
     }
 
     /** Returns true when [levelDbfs] at [nowMs] is an alert. */
     fun onLevel(levelDbfs: Double, nowMs: Long): Boolean {
-        val floor = floorDbfs
+        val floor = background.level
         if (floor == null) {
-            floorDbfs = levelDbfs
-            startMs = nowMs
+            background.start(levelDbfs, nowMs)
             return false
         }
-        val isWarmingUp = nowMs - startMs < warmUpMs
-        val isAlert = !isWarmingUp && confirmer.onSpan(levelDbfs, nowMs, ACOUSTIC_FRAME_MS, floor)
-        val alpha = when {
-            isWarmingUp -> WARM_UP_ALPHA
-            levelDbfs < floor -> FALL_ALPHA
-            else -> RISE_ALPHA
-        }
-        floorDbfs = floor + alpha * (levelDbfs - floor)
+        val isAlert = !background.isWarmingUp(nowMs) && confirmer.onSpan(levelDbfs, nowMs, ACOUSTIC_FRAME_MS, floor)
+        background.follow(levelDbfs, nowMs, ACOUSTIC_FRAME_MS)
         return isAlert
-    }
-
-    private companion object {
-        const val WARM_UP_ALPHA = 0.2
-        const val FALL_ALPHA = 0.1 // About 1 s at 100 ms frames.
-        const val RISE_ALPHA = 0.01 // About 10 s at 100 ms frames.
     }
 }
 
@@ -97,9 +85,6 @@ fun acousticAlertText(levelDbfs: Double, referenceDbfs: Double): String =
 
 /** A jump that stays quieter than this is ignored, so a microphone near digital silence cannot alert on a whisper. */
 const val ACOUSTIC_MIN_ALERT_DBFS = -50.0
-
-/** No alerts while the background is first learned. */
-const val ACOUSTIC_WARM_UP_MS = 3_000L
 
 /**
  * How long a noise must be loud to alert (ISSUE-NOV17.10-O111); its loud frames may have gaps, like speech. 2 s since

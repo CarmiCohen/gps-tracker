@@ -1,6 +1,5 @@
 package com.jd.core.shared
 
-import kotlin.math.exp
 import kotlin.math.round
 
 /**
@@ -9,28 +8,29 @@ import kotlin.math.round
  * the light alerts when it reaches [riseRatio] times the learned background ([floorLux]) and at least [minRiseLux] more,
  * and stays there for [LIGHT_CONFIRM_MS] within [LIGHT_CONFIRM_WINDOW_MS], measured against the background just before
  * it, so a car's headlights sweeping past do not alert. A darkening never alerts (user decision 2026-11-22:
- * a hand or a pocket over the sensor would). The background follows a darker light within about a second and a brighter
- * one only over about ten seconds, so a light that stays on becomes background; after an alert the light must fall below
- * the limit before a new rise counts. The time between alerts is the Sensor's per-kind cool-down ([AlertCoolDown]).
+ * a hand or a pocket over the sensor would). The background is the [LearnedBackground] the noise detection shares
+ * (SIMP-NOV22.10-S1): it follows a darker light within about a second and a brighter one only over about ten seconds,
+ * so a light that stays on becomes background; after an alert the light must fall below the limit before a new rise
+ * counts. The time between alerts is the Sensor's per-kind cool-down ([AlertCoolDown]).
  *
  * The light sensor reports only on a change, so a reading holds until the next one: feed each reading, and the held one
  * again at least every [LIGHT_TICK_MS], timed by a monotonic clock. Each call hands the reading that held since the
- * last one, as one span, to the [RiseConfirmer] the noise detection shares (SIMP-NOV22.4-S2). Not thread-safe: one
+ * last one, as one span, to the [RiseConfirmer] and the background (SIMP-NOV22.4-S2). Not thread-safe: one
  * sensor thread owns it.
  */
 class LightDetector(
     @Volatile var riseRatio: Double = LIGHT_RISE_RATIO,
     private val minRiseLux: Double = LIGHT_MIN_RISE_LUX,
-    private val warmUpMs: Long = LIGHT_WARM_UP_MS
+    warmUpMs: Long = BACKGROUND_WARM_UP_MS
 ) {
+    private val background = LearnedBackground(warmUpMs)
+
     /** The learned background light, or null before the first reading. */
-    var floorLux: Double? = null
-        private set
+    val floorLux: Double? get() = background.level
 
     /** The background the last alert was compared against: the one just before its rise. Null before the first alert. */
     val alertReferenceLux: Double? get() = confirmer.alertReference
 
-    private var startMs = 0L
     private var lastMs = 0L
     private var lastLux = 0.0 // The reading that held from lastMs until now.
     private val confirmer = RiseConfirmer(LIGHT_CONFIRM_MS, LIGHT_CONFIRM_WINDOW_MS) { lux, reference ->
@@ -39,33 +39,19 @@ class LightDetector(
 
     /** Feeds [lux], which holds from [nowMs]; returns true when the reading held until [nowMs] completes an alert. */
     fun onLux(lux: Double, nowMs: Long): Boolean {
-        val floor = floorLux
+        val floor = background.level
         if (floor == null) {
-            floorLux = lux
-            startMs = nowMs
+            background.start(lux, nowMs)
             lastMs = nowMs
             lastLux = lux
             return false
         }
         val elapsedMs = (nowMs - lastMs).coerceAtLeast(0L)
-        val isWarmingUp = nowMs - startMs < warmUpMs
-        val isAlert = !isWarmingUp && confirmer.onSpan(lastLux, nowMs, elapsedMs, floor)
-        // The background follows the reading that held during the elapsed time.
-        val tauMs = when {
-            isWarmingUp -> WARM_UP_TAU_MS
-            lastLux < floor -> FALL_TAU_MS
-            else -> RISE_TAU_MS
-        }
-        floorLux = floor + (1.0 - exp(-elapsedMs.toDouble() / tauMs)) * (lastLux - floor)
+        val isAlert = !background.isWarmingUp(nowMs) && confirmer.onSpan(lastLux, nowMs, elapsedMs, floor)
+        background.follow(lastLux, nowMs, elapsedMs) // The reading that held during the elapsed time.
         lastMs = nowMs
         lastLux = lux
         return isAlert
-    }
-
-    private companion object {
-        const val WARM_UP_TAU_MS = 500.0
-        const val FALL_TAU_MS = 1_000.0
-        const val RISE_TAU_MS = 10_000.0
     }
 }
 
@@ -76,9 +62,6 @@ const val DEFAULT_LIGHT_SENSITIVITY = 0.5f
 
 /** A rise smaller than this never alerts, so a dark room's sensor flicker of a few lux is no light switched on. */
 const val LIGHT_MIN_RISE_LUX = 20.0
-
-/** No alerts while the background is first learned. */
-const val LIGHT_WARM_UP_MS = 3_000L
 
 /** How long a rise must stay bright to alert: the 2 s of the noise detection (user decision 2026-11-22). */
 const val LIGHT_CONFIRM_MS = 2_000L
