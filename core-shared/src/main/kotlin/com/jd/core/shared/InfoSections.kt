@@ -54,6 +54,7 @@ private fun serviceLines(info: SensorInfo, now: Long) = listOf(
 
 private fun connectionLines(info: SensorInfo, now: Long) = linkLines(info.link, now) + listOf(
     InfoLine("Monitor online", if (info.isMonitorOnline) "Yes" else "No", if (info.isMonitorOnline) InfoTone.GOOD else InfoTone.WARN),
+    InfoLine("Last Monitor ID", info.lastMonitorId ?: NO_VALUE), // ISSUE-NOV22.7-O135
     InfoLine("Rows held offline", info.queuedRows.toString(), if (info.queuedRows > 0) InfoTone.WARN else InfoTone.NORMAL)
 )
 

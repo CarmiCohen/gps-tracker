@@ -28,6 +28,9 @@ fun relayLinkEvent(isConnected: Boolean): LoggedEvent =
 fun monitorLinkEvent(isOnline: Boolean): LoggedEvent =
     if (isOnline) LoggedEvent(EventLevel.INFO, "A Monitor is connected") else LoggedEvent(EventLevel.INFO, "No Monitor connected")
 
+/** The first message of the Monitor [monitorId] since the service started (ISSUE-NOV22.7-O135). */
+fun monitorHeardEvent(monitorId: String): LoggedEvent = LoggedEvent(EventLevel.INFO, "Heard from Monitor $monitorId")
+
 fun serviceStartedMessage(versionName: String): String = "$SERVICE_STARTED (version $versionName)"
 
 /** How the previous Sensor process ended, as Android recorded it (`ApplicationExitInfo`, API 30+). */

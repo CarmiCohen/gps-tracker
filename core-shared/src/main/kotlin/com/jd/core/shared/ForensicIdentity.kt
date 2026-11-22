@@ -42,4 +42,15 @@ object ForensicIdentity {
     fun isValid(id: String): Boolean {
         return id.isNotBlank()
     }
+
+    /**
+     * Why [monitorId] cannot be the Monitor's own ID while it is paired with [trackerId] (null: not paired), or null
+     * when it can (ISSUE-NOV22.7-O135). The two must differ: the Monitor stores its own trail under its ID beside the
+     * Sensor's rows, and the relay names a room after each ID. The pairing screen asks the same of a new Tracker ID.
+     */
+    fun monitorIdProblem(monitorId: String, trackerId: String?): String? = when {
+        monitorId.isBlank() -> "The Monitor ID cannot be blank"
+        trackerId != null && monitorId.trim() == trackerId.trim() -> "The Monitor ID and the Tracker ID must differ"
+        else -> null
+    }
 }

@@ -552,6 +552,11 @@ class SensorService : Service(), SensorEventListener {
         signalingClient.isConnected.linkChanges().onEach { record(relayLinkEvent(it)) }.launchIn(serviceScope)
         signalingClient.viewerStatusFlow.linkChanges().onEach { record(monitorLinkEvent(it)) }.launchIn(serviceScope)
         signalingClient.viewerStatusFlow.onEach { isMonitorOnline = it }.launchIn(serviceScope)
+        // Each Monitor once per run: two Monitors with open screens take turns as the one heard last (ISSUE-NOV22.7-O135).
+        val heardMonitors = mutableSetOf<String>()
+        signalingClient.monitorIdFlow.filterNotNull()
+            .onEach { if (heardMonitors.add(it)) record(monitorHeardEvent(it)) }
+            .launchIn(serviceScope)
         peerDeliveries(eventLog.events.map { it.newestForPeer() }.filter { it.events.isNotEmpty() }, signalingClient.viewerStatusFlow)
             .onEach(::sendEvents)
             .launchIn(serviceScope)
@@ -621,6 +626,7 @@ class SensorService : Service(), SensorEventListener {
             behaviourRevision = sensorBehaviour.revision,
             link = signalingClient.linkStats.value,
             isMonitorOnline = isMonitorOnline,
+            lastMonitorId = signalingClient.monitorIdFlow.value,
             queuedRows = signalingClient.queuedRowCount(),
             // The fix's age from the monotonic clock, as the GPS time may differ from the phone's clock.
             fixTimeMs = fix?.let { nowMs - (SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos) / 1_000_000L } ?: 0L,

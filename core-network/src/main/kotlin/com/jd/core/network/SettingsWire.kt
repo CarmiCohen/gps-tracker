@@ -57,4 +57,20 @@ object SettingsWire {
         GraphSamplesWire.TYPE -> GraphSamplesWire.decode(data)?.let(SettingsMessage::GraphSamples)
         else -> null
     }
+
+    /** The key of the sending Monitor's own ID in each message a Monitor sends to its Sensor (ISSUE-NOV22.7-O135). */
+    const val FROM = "from"
+
+    /** [payload], a Monitor's message to its Sensor, with the Monitor's own [monitorId] (ISSUE-NOV22.7-O135). */
+    fun fromMonitor(payload: JSONObject, monitorId: String?): JSONObject = payload.apply { monitorId?.let { put(FROM, it) } }
+
+    /**
+     * The ID of the Monitor that sent [message], read from its payload [data] (ISSUE-NOV22.7-O135); null for a Sensor's
+     * message, and for one from a Monitor before Nov22.7, which sends no ID.
+     */
+    fun monitorIdOf(data: JSONObject, message: SettingsMessage?): String? = when (message) {
+        is SettingsMessage.Geofence, is SettingsMessage.Behaviour, is SettingsMessage.EventsRequest,
+        is SettingsMessage.InfoRequest, is SettingsMessage.GraphRequest -> data.optString(FROM).takeIf { it.isNotBlank() }
+        else -> null
+    }
 }

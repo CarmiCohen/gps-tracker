@@ -104,6 +104,9 @@ class SocketioSignalingClient @Inject constructor(
     private val _graphSamplesFlow = MutableSharedFlow<SensorGraphBatch>(extraBufferCapacity = 32)
     override val graphSamplesFlow: SharedFlow<SensorGraphBatch> = _graphSamplesFlow.asSharedFlow()
 
+    private val _monitorIdFlow = MutableStateFlow<String?>(null) // ISSUE-NOV22.7-O135; disconnect keeps it.
+    override val monitorIdFlow: StateFlow<String?> = _monitorIdFlow.asStateFlow()
+
     private var currentRoom: String? = null // The room joined as `secret`, where the latency pings go.
     private var pingJob: Job? = null
 
@@ -234,7 +237,9 @@ class SocketioSignalingClient @Inject constructor(
             on("settings_relay") { args ->
                 val data = args.getOrNull(0) as? JSONObject ?: return@on
                 // One decoder reads the type once (SIMP-NOV15.3-S1).
-                when (val message = SettingsWire.decode(data)) {
+                val message = SettingsWire.decode(data)
+                SettingsWire.monitorIdOf(data, message)?.takeIf { it != currentDeviceId }?.let { _monitorIdFlow.value = it }
+                when (message) {
                     is SettingsMessage.Geofence -> _geofenceFlow.tryEmit(message.config)
                     is SettingsMessage.Behaviour -> _sensorBehaviourFlow.tryEmit(message.behaviour)
                     is SettingsMessage.Setup -> _sensorSetupFlow.value = message.report
@@ -462,7 +467,7 @@ class SocketioSignalingClient @Inject constructor(
 
     override suspend fun sendGeofence(targetId: String, config: GeofenceConfig): Boolean {
         if (!_isConnected.value) return false
-        val payload = GeofenceWire.encode(targetId, config)
+        val payload = SettingsWire.fromMonitor(GeofenceWire.encode(targetId, config), currentDeviceId)
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true
@@ -470,7 +475,7 @@ class SocketioSignalingClient @Inject constructor(
 
     override suspend fun sendSensorBehaviour(targetId: String, behaviour: SensorBehaviour): Boolean {
         if (!_isConnected.value) return false
-        val payload = SensorBehaviourWire.encode(targetId, behaviour)
+        val payload = SettingsWire.fromMonitor(SensorBehaviourWire.encode(targetId, behaviour), currentDeviceId)
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true
@@ -496,7 +501,7 @@ class SocketioSignalingClient @Inject constructor(
 
     override suspend fun requestSensorEvents(targetId: String, afterMs: Long): Boolean {
         if (!_isConnected.value) return false
-        val payload = EventsRequestWire.encode(targetId, afterMs)
+        val payload = SettingsWire.fromMonitor(EventsRequestWire.encode(targetId, afterMs), currentDeviceId)
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true
@@ -504,7 +509,7 @@ class SocketioSignalingClient @Inject constructor(
 
     override suspend fun requestSensorInfo(targetId: String, withSatellites: Boolean): Boolean {
         if (!_isConnected.value) return false
-        val payload = InfoRequestWire.encode(targetId, withSatellites)
+        val payload = SettingsWire.fromMonitor(InfoRequestWire.encode(targetId, withSatellites), currentDeviceId)
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true
@@ -521,7 +526,7 @@ class SocketioSignalingClient @Inject constructor(
 
     override suspend fun requestGraphSamples(targetId: String, afterMs: Long): Boolean {
         if (!_isConnected.value) return false
-        val payload = GraphRequestWire.encode(targetId, afterMs)
+        val payload = SettingsWire.fromMonitor(GraphRequestWire.encode(targetId, afterMs), currentDeviceId)
         socket?.emit("settings_update", payload)
         bytesSent += payload.toString().length.toLong()
         return true

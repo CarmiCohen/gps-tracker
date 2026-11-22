@@ -12,6 +12,7 @@ import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
 import com.jd.core.shared.EventLog
+import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.ViewPeriod
 import com.jd.core.shared.GRAPH_REQUEST_INTERVAL_MS
 import com.jd.core.shared.GraphScreenState
@@ -213,6 +214,21 @@ class MonitorViewModel @Inject constructor(
     fun updateRelayUrl(url: String) {
         viewModelScope.launch {
             dataStore.saveRelayUrl(url.trim())
+        }
+    }
+
+    /**
+     * Sets this Monitor's own ID, set in its Setup dialog (ISSUE-NOV22.7-O135): the session rejoins the relay under it
+     * and the Sensor shows it. The ID is set before the trail moves, so no new fix is left under the old one.
+     */
+    fun updateMonitorId(id: String) {
+        val newId = id.trim()
+        viewModelScope.launch {
+            val oldId = identityManager.selfId.first()
+            if (newId == oldId || ForensicIdentity.monitorIdProblem(newId, identityManager.targetId.first()) != null) return@launch
+            identityManager.setSelfId(newId)
+            repository.moveLocalTrail(oldId, newId)
+            eventLog.record(EventLevel.INFO, "Monitor ID changed from $oldId to $newId")
         }
     }
 

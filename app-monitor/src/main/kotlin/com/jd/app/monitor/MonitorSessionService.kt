@@ -18,6 +18,8 @@ import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.SystemLogger
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -71,7 +73,6 @@ class MonitorSessionService : Service() {
         signalingJob = serviceScope.launch {
             val targetId = identityManager.targetId.first() ?: return@launch
             identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_MONITOR) // ISSUE-NOV8.101-O59
-            val selfId = identityManager.selfId.first()
 
             // The relay also pushes the tracker's alarm rows to this phone (ISSUE-NOV10.8-O86).
             FirebaseMessaging.getInstance().token
@@ -135,16 +136,18 @@ class MonitorSessionService : Service() {
             // Get last sequence ID for initial backfill handshake (R-ID 768)
             val lastSeq = trailDao.getLastSequenceId(targetId) ?: 0L
 
-            dataStore.relayUrl.collect { rawUrl ->
-                val url = RelayConfig.resolve(rawUrl)
-                SystemLogger.i("MonitorService", "Connecting to relay $url for target $targetId (Last Seq: $lastSeq)")
-                signalingClient.connect(
-                    url = url,
-                    deviceId = selfId,
-                    secret = targetId, // Monitor joins the target's forensic room
-                    lastSequenceId = lastSeq
-                )
-            }
+            // A new Monitor ID, set in the Setup dialog, rejoins the relay under it like a new relay (ISSUE-NOV22.7-O135).
+            combine(identityManager.selfId, dataStore.relayUrl) { selfId, rawUrl -> selfId to RelayConfig.resolve(rawUrl) }
+                .distinctUntilChanged()
+                .collect { (selfId, url) ->
+                    SystemLogger.i("MonitorService", "Connecting to relay $url as $selfId for target $targetId (Last Seq: $lastSeq)")
+                    signalingClient.connect(
+                        url = url,
+                        deviceId = selfId,
+                        secret = targetId, // Monitor joins the target's forensic room
+                        lastSequenceId = lastSeq
+                    )
+                }
         }
     }
 

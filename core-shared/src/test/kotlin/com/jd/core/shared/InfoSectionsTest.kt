@@ -66,6 +66,13 @@ class InfoSectionsTest {
     }
 
     @Test
+    fun `chapter 240 - the connection names the Monitor heard last`() {
+        // ISSUE-NOV22.7-O135: also from the Sensor's Info JSON, which a Sensor before Nov22.7 sends without the field.
+        assertEquals("M1", sensorInfoSections(info.copy(lastMonitorId = "M1")).line("CONNECTION", "Last Monitor ID").value)
+        assertEquals("--", sensorInfoSections(info).line("CONNECTION", "Last Monitor ID").value)
+    }
+
+    @Test
     fun `the link lines say since when the dropouts are counted`() {
         // Chapter 204 (ISSUE-NOV15.5-O99 part 3): counts start with the app process, so Info shows that start.
         val since = now - 60_000L // A minute, so no time zone puts it on another day.

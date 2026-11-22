@@ -186,6 +186,12 @@ interface SignalingClient {
     val graphSamplesFlow: Flow<SensorGraphBatch>
 
     /**
+     * Sensor: the ID of the Monitor heard last, from the `from` of its messages, or null while none was heard since the
+     * app started (ISSUE-NOV22.7-O135). Kept across reconnections; this phone's own echoes do not count.
+     */
+    val monitorIdFlow: StateFlow<String?>
+
+    /**
      * Sensor: sends [samples] to the Monitors of its room, at most [com.jd.core.shared.GRAPH_SAMPLES_PER_MESSAGE] a call
      * (ISSUE-NOV10.8-O84 part 3), [compressed] when the asking Monitor reads that form (ISSUE-NOV15.6-O100 part 1).
      * Returns false when not connected.

@@ -93,4 +93,9 @@ class SensorEventsTest {
         assertEquals(EventLevel.INFO, relayLinkEvent(true).level)
         assertEquals(EventLevel.INFO, monitorLinkEvent(false).level)
     }
+
+    @Test
+    fun `chapter 240 - the first message of a Monitor names it`() {
+        assertEquals(LoggedEvent(EventLevel.INFO, "Heard from Monitor M1"), monitorHeardEvent("M1"))
+    }
 }

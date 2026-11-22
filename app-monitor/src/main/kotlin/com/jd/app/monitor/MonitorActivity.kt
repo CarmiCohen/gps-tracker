@@ -157,6 +157,7 @@ class MonitorActivity : ComponentActivity() {
                 } else if (trackerId == null) {
                     PairingWizard(
                         relayUrl = relayUrl,
+                        monitorId = monitorId,
                         onPair = { id -> viewModel.setTargetId(id) },
                         onUpdateRelayUrl = { url -> viewModel.updateRelayUrl(url) },
                         onImportSettings = importSettings
@@ -189,6 +190,7 @@ class MonitorActivity : ComponentActivity() {
                             context.stopService(Intent(context, MonitorSessionService::class.java))
                         },
                         onUpdateRelayUrl = { url -> viewModel.updateRelayUrl(url) },
+                        onUpdateMonitorId = viewModel::updateMonitorId,
                         onClearHomePoints = viewModel::clearHomePoints,
                         geofence = geofence,
                         onAddHomePoint = viewModel::addHomePoint,
@@ -231,6 +233,8 @@ private const val DEVICE_ZOOM = 18.0
 @Composable
 fun PairingWizard(
     relayUrl: String,
+    /** This Monitor's own ID, which the Tracker ID must differ from (ISSUE-NOV22.7-O135). */
+    monitorId: String,
     onPair: (String) -> Unit,
     onUpdateRelayUrl: (String) -> Unit,
     /** A reinstalled Monitor opens here, so the settings file is imported from here too (ISSUE-NOV10.8-O80). */
@@ -247,7 +251,12 @@ fun PairingWizard(
             onDismiss = { confirmImport = false }
         )
     }
-    var isError by rememberSaveable { mutableStateOf(false) }
+    val pairingProblem = when {
+        text.isEmpty() -> null
+        !ForensicIdentity.isValid(text) -> "Device ID cannot be blank"
+        ForensicIdentity.monitorIdProblem(monitorId, text) != null -> "This Monitor's own ID is $monitorId: the Tracker ID must differ"
+        else -> null
+    }
     var relayUrlInput by rememberSaveable(relayUrl) { mutableStateOf(relayUrl) }
     var showRelayConfig by rememberSaveable { mutableStateOf(false) }
     val isRelayUrlValid = RelayConfig.isValid(relayUrlInput)
@@ -262,23 +271,16 @@ fun PairingWizard(
         
         TextField(
             value = text,
-            onValueChange = { 
-                text = it 
-                isError = it.isNotEmpty() && !ForensicIdentity.isValid(it)
-            },
+            onValueChange = { text = it },
             label = { Text("Enter Tracker ID") },
-            isError = isError,
-            supportingText = {
-                if (isError) {
-                    Text("Device ID cannot be blank")
-                }
-            },
+            isError = pairingProblem != null,
+            supportingText = { pairingProblem?.let { Text(it) } },
             modifier = Modifier.fillMaxWidth()
         )
         
         Button(
-            onClick = { if (!isError && text.isNotEmpty()) onPair(text) },
-            enabled = !isError && text.isNotEmpty(),
+            onClick = { if (pairingProblem == null && text.isNotEmpty()) onPair(text) },
+            enabled = pairingProblem == null && text.isNotEmpty(),
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
         ) {
             Text("Pair Device")
@@ -355,6 +357,8 @@ fun MonitorScreen(
     onTestSiren: () -> Unit,
     onReset: () -> Unit,
     onUpdateRelayUrl: (String) -> Unit,
+    /** Sets this Monitor's own ID from the Setup dialog (ISSUE-NOV22.7-O135). */
+    onUpdateMonitorId: (String) -> Unit = {},
     onClearHomePoints: () -> Unit = {},
     geofence: GeofenceConfig = GeofenceConfig(),
     onAddHomePoint: (lat: Double, lng: Double) -> Unit = { _, _ -> },
@@ -404,6 +408,8 @@ fun MonitorScreen(
     var showCleanSetupOverlay by rememberSaveable { mutableStateOf(false) }
     var isEditingRelayUrl by rememberSaveable { mutableStateOf(false) }
     var relayUrlInput by rememberSaveable(relayUrl) { mutableStateOf(relayUrl) }
+    var isEditingMonitorId by rememberSaveable { mutableStateOf(false) }
+    var monitorIdInput by rememberSaveable(monitorId) { mutableStateOf(monitorId) }
     var followMode by rememberSaveable { mutableStateOf(MapFollowMode.AUTO) }
     // Every control that unpairs asks first; only the dialog's confirm button runs the pending action
     // (Chapter 127; full re-initialization also unpairs, ISSUE-NOV8.2-O46).
@@ -859,6 +865,7 @@ fun MonitorScreen(
             onDismissRequest = { 
                 showSetupDialog = false 
                 isEditingRelayUrl = false
+                isEditingMonitorId = false
             },
             title = { Text("Monitor Setup") }, // The detailed Info has its own screen (ISSUE-NOV10.8-O84 part 2).
             text = {
@@ -869,7 +876,46 @@ fun MonitorScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text("Tracker ID: $trackerId")
-                    Text("Monitor ID: $monitorId")
+                    // The Monitor's own ID is set here; the Sensor shows the one it heard last (ISSUE-NOV22.7-O135).
+                    if (isEditingMonitorId) {
+                        val problem = ForensicIdentity.monitorIdProblem(monitorIdInput, trackerId)
+                        TextField(
+                            value = monitorIdInput,
+                            onValueChange = { monitorIdInput = it },
+                            label = { Text("Edit Monitor ID") },
+                            isError = problem != null,
+                            supportingText = { problem?.let { Text(it) } },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {
+                                monitorIdInput = monitorId
+                                isEditingMonitorId = false
+                            }) {
+                                Text("Cancel")
+                            }
+                            Button(
+                                onClick = {
+                                    onUpdateMonitorId(monitorIdInput.trim())
+                                    isEditingMonitorId = false
+                                },
+                                enabled = problem == null
+                            ) {
+                                Text("Save ID")
+                            }
+                        }
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Monitor ID: $monitorId", modifier = Modifier.weight(1f))
+                            TextButton(onClick = {
+                                monitorIdInput = monitorId
+                                isEditingMonitorId = true
+                            }) {
+                                Text("EDIT", fontSize = 10.sp)
+                            }
+                        }
+                    }
                     Text("Relay URL: $relayUrl")
                     Text("App Version: ${getAppVersionName(LocalContext.current)}")
                     Text(localHudState.relayStatusText)

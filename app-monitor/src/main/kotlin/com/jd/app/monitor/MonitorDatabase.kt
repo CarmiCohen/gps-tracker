@@ -89,6 +89,13 @@ interface TrailDao {
     suspend fun pruneLocalTrail(threshold: Long)
 
     /**
+     * Files this Monitor's own rows of ID [from] under its new ID [to] (ISSUE-NOV22.7-O135); a row [to] already holds at
+     * the same time is replaced. The Sensor's rows stay where they are.
+     */
+    @Query("UPDATE OR REPLACE trails SET trackerId = :to WHERE trackerId = :from AND isLocalUser = 1")
+    suspend fun moveLocalTrail(from: String, to: String)
+
+    /**
      * Deletes all trail records across all trackers. Used during clean setup maintenance.
      */
     @Query("DELETE FROM trails")

@@ -54,6 +54,9 @@ class SensorViewModel @Inject constructor(
 
     val selfId = identityManager.selfId
 
+    /** The ID of the Monitor heard last, null while none was (ISSUE-NOV22.7-O135). */
+    val lastMonitorId: StateFlow<String?> = signalingClient.monitorIdFlow
+
     private val _transferMessages = MutableSharedFlow<String>(extraBufferCapacity = 1)
 
     /** The outcome of each settings file export or import, shown once (ISSUE-NOV10.8-O80). */

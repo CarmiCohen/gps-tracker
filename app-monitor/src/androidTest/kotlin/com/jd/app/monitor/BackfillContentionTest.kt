@@ -271,6 +271,7 @@ class FakeSignalingClient : SignalingClient {
     override suspend fun requestGraphSamples(targetId: String, afterMs: Long): Boolean = true
     override val graphSamplesFlow: Flow<com.jd.core.shared.SensorGraphBatch> = MutableSharedFlow()
     override suspend fun sendGraphSamples(samples: List<com.jd.core.shared.GraphSample>, compressed: Boolean): Boolean = true
+    override val monitorIdFlow: StateFlow<String?> = MutableStateFlow(null)
 
     fun emitTelemetry(update: LocationUpdate) = deliver(_telemetryFlow, update)
 

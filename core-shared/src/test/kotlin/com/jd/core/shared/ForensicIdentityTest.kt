@@ -56,4 +56,15 @@ class ForensicIdentityTest {
         assertFalse("Blank ID must be rejected", ForensicIdentity.isValid(blankId))
         assertFalse("Empty ID must be rejected", ForensicIdentity.isValid(emptyId))
     }
+
+    /** Chapter 240 (ISSUE-NOV22.7-O135): the Monitor's own ID, set in its Setup dialog. */
+    @Test
+    fun monitorIdMustNotBeBlankOrTheTrackerId() {
+        assertNull(ForensicIdentity.monitorIdProblem("M1", "T"))
+        assertNull("Unpaired: any ID", ForensicIdentity.monitorIdProblem("T", null))
+        assertEquals("The Monitor ID cannot be blank", ForensicIdentity.monitorIdProblem(" ", "T"))
+        assertEquals("The Monitor ID and the Tracker ID must differ", ForensicIdentity.monitorIdProblem("T", "T"))
+        assertNotNull("Spaces around an ID do not make it another", ForensicIdentity.monitorIdProblem(" T ", "T"))
+        assertNull("IDs differ by case", ForensicIdentity.monitorIdProblem("t", "T"))
+    }
 }

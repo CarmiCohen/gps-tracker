@@ -86,6 +86,7 @@ class AdminActivity : ComponentActivity() {
                 BackHandler { moveTaskToBack(true) }
                 val trackerId by identityManager.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
                 val relayUrl by viewModel.relayUrl.collectAsStateWithLifecycle()
+                val lastMonitorId by viewModel.lastMonitorId.collectAsStateWithLifecycle()
                 val hudState by viewModel.hudState.collectAsStateWithLifecycle()
                 val isServiceRunning by viewModel.isServiceRunning.collectAsStateWithLifecycle()
                 val serviceUptimeText by viewModel.serviceUptimeText.collectAsStateWithLifecycle()
@@ -250,6 +251,7 @@ class AdminActivity : ComponentActivity() {
                                     motionState = motionState,
                                     sensorBehaviour = sensorBehaviour,
                                     trackerId = trackerId,
+                                    lastMonitorId = lastMonitorId,
                                     relayUrl = relayUrl,
                                     logs = logs,
                                     onSettingsClick = { showSettings = true },
@@ -546,6 +548,8 @@ fun SensorAdminConsole(
     motionState: MotionState,
     sensorBehaviour: SensorBehaviour,
     trackerId: String,
+    /** The ID of the Monitor heard last, null while none was (ISSUE-NOV22.7-O135). */
+    lastMonitorId: String?,
     relayUrl: String,
     logs: List<SystemLogger.LogEntry>, 
     onSettingsClick: () -> Unit,
@@ -733,6 +737,7 @@ fun SensorAdminConsole(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Sensor Device ID: $trackerId")
+                    Text("Last Monitor ID: ${lastMonitorId ?: "none heard yet"}") // ISSUE-NOV22.7-O135
                     Text("Relay URL: $relayUrl")
                     Text("App Version: ${getAppVersionName(context)}")
                     Text(serviceStatusText(isServiceRunning, serviceUptimeText))

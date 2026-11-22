@@ -76,6 +76,9 @@ class MonitorRepository @Inject constructor(
         trailDao.insert(entity)
     }
 
+    /** This Monitor's own trail follows its new ID (ISSUE-NOV22.7-O135). */
+    suspend fun moveLocalTrail(fromId: String, toId: String) = trailDao.moveLocalTrail(fromId, toId)
+
     /** Inserts local user movement fix into trail database (ISSUE-NOV6.2-O29). */
     suspend fun insertLocalTrail(selfId: String, fix: LocalFix) {
         val ts = if (fix.reading.timeMs > 0) fix.reading.timeMs else System.currentTimeMillis()

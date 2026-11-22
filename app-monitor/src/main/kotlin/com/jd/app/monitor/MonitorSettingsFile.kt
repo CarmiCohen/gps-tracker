@@ -102,7 +102,13 @@ class MonitorSettingsTransfer @Inject constructor(
         if (file.trails.isNotEmpty()) {
             database.withTransaction { file.trails.chunked(TRAIL_IMPORT_CHUNK).forEach { database.trailDao().insertAll(it) } }
         }
-        file.monitorId?.takeIf { ForensicIdentity.isValid(it) }?.let { identityManager.setSelfId(it) }
+        // A Monitor ID equal to the file's Tracker ID is refused, as in the Setup dialog; the own trail follows a new ID
+        // (ISSUE-NOV22.7-O135).
+        val oldMonitorId = identityManager.selfId.first()
+        file.monitorId?.trim()?.takeIf { it != oldMonitorId && ForensicIdentity.monitorIdProblem(it, file.trackerId) == null }?.let {
+            identityManager.setSelfId(it)
+            database.trailDao().moveLocalTrail(oldMonitorId, it)
+        }
         val trackerId = file.trackerId
         if (trackerId != null && ForensicIdentity.isValid(trackerId)) identityManager.setTargetId(trackerId) else identityManager.clearTargetId()
         file

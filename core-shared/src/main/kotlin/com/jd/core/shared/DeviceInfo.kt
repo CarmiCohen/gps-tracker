@@ -105,6 +105,8 @@ data class SensorInfo(
     // Connection
     val link: LinkStats = LinkStats(),
     val isMonitorOnline: Boolean = false,
+    /** The ID of the Monitor heard last, null while none was (ISSUE-NOV22.7-O135); absent from Sensors before Nov22.7. */
+    val lastMonitorId: String? = null,
     val queuedRows: Int = 0,
     // Position: no fix while [fixTimeMs] is 0
     val fixTimeMs: Long = 0L,

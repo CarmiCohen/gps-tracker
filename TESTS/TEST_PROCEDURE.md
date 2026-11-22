@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov22.6 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov22.7 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1214,8 +1214,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: A** - `MapCenterResolverTest` 13/13 (1039 unit tests); A15 `ProductionReadinessAuditTest` 3/3; release cold starts clean (SIMP-NOV22.5-S1, SOT 1.478)
 *   **239.1 Unit:** `MapCenterResolverTest`: TRACKER locks to the sensor, VIEWER to the local device, AUTO prefers the sensor while it is connected; with no known position every one of the three modes leaves the map uncentered; `MapFollowMode` has no NONE.
 
+## Chapter 240 - The Monitor's Own ID (Nov22.7)
+**Status: A / L** - 240.1 passed (1047 unit tests); 240.2 passed on the A15 (`MonitorIdTrailTest` 2/2); 240.3 not run, the relay suspended (O133) (ISSUE-NOV22.7-O135, SOT 1.479)
+*   **240.1 Unit:** `MonitorIdWireTest`: the five Monitor-to-Sensor messages carry `from`, a Sensor's message and an older Monitor's name no Monitor, the relay still routes by the Sensor's ID; the Sensor keeps the ID heard last across reconnections and ignores its own echoes. `ForensicIdentityTest`: a blank Monitor ID or one equal to the Tracker ID is refused. `InfoSectionsTest`: the Sensor's Info shows `Last Monitor ID`. `SensorEventsTest`: `Heard from Monitor X`.
+*   **240.2 Instrumented:** `MonitorIdTrailTest`: a new Monitor ID takes the Monitor's own trail, the Sensor's rows stay, a row at the same time is replaced.
+*   **240.3 Device (relay up):** on the Monitor's Setup dialog, EDIT the Monitor ID to `M1` and save (the Tracker ID itself is refused): the Monitor reconnects, its own trail stays on the map, its Events show `Monitor ID changed from V to M1`; within a minute the Sensor's Setup dialog and Info show `Last Monitor ID: M1` and its Events `Heard from Monitor M1`. Set it back to `V`.
+
 ---
-**Active Testing Chapters: 228 of 239**
+**Active Testing Chapters: 229 of 240**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
