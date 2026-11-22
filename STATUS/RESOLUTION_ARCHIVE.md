@@ -2,6 +2,9 @@
 
 *The single home of every resolved issue's full description (Documentation Rule D1); other documents point here by issue ID. The Dashboard History is the last section.*
 
+## ✅ Resolved Issues (Nov22.6)
+- **No unused follow mode (SIMP-NOV22.5-S1, Low)**: since the Map icon went (ISSUE-NOV22.5-O132), `MapFollowMode.NONE` was never set anywhere and `resolveMapCenter` treated it as AUTO. `NONE` is removed from the enum in `MapCenterResolver.kt`, leaving TRACKER, VIEWER and AUTO (the start state), the three modes the Monitor can reach; the `when` branch reads `MapFollowMode.AUTO` alone. `MapCenterResolverTest` (its `values()` loop now covers three modes) passes unchanged; no test removed. `DOCS/MAP_FUNCTIONALITY_SPEC.md` now names the modes `TRACKER` and `VIEWER` (it said `SENSOR` and `LOCAL`). Chapter 239, SOT 1.478.
+
 ## ✅ Resolved Issues (Nov22.5)
 - **The map centers once; the Home panel can be dragged (ISSUE-NOV22.5-O131, Low, user request 2026-11-22)**: the Monitor's map re-centered on every new position, so a pan was pulled back within seconds. Cause: the overlay `LaunchedEffect` in `MonitorScreen` (`MonitorActivity.kt`) called `setCenter` each time the trail, the local position or the follow mode changed. The centering now has its own `LaunchedEffect(needsCenter, mapCenter != null)`: it centers on `resolveMapCenter(...)` only while `needsCenter` is true and then clears it; `needsCenter` starts true and is set again by a `LifecycleEventObserver` on `ON_START` (the app starts or returns to the foreground). The zoom to `DEVICE_ZOOM` still happens on the first centering only (`hasZoomed`, was `hasCentered`). `followMode` left the overlay effect's keys. SENSOR and LOCAL still center on a tap. `HomePointEditor` takes a drag on its header line (`HOME: n | r m` and DONE; `detectDragGestures` into a `dragOffset` applied by `Modifier.offset`), so the panel can be moved off the part of the map being edited; the list and the slider keep their own gestures. Chapter 238, SOT 1.477.
 - **The menu's Map icon removed (ISSUE-NOV22.5-O132, Low, user request 2026-11-22)**: the green pin `Map` icon of `MonitorMenuBar` (set the follow mode back to AUTO) is removed with its `onMap` parameter. Since then the follow mode is AUTO at each start and changes only by SENSOR or LOCAL. `TextFitTest` and `HudLayoutAuditTest` call the bar without the parameter and no longer expect a `Map` label (no test removed, Rule 17). Chapter 238.
@@ -590,6 +593,7 @@
 
 ## 📊 Dashboard History
 *Audit lines of versions older than the newest rows kept in `DOCS/issues.md` (Documentation Rule D2), moved unchanged in Nov8.100-Documentation; newest first.*
+- **Nov19.6-HUD: [SOT Count: 1045 (Rules: 545), Open: H:0, M:2, L:10, Ideas: H:0, M:0, L:25, Testing: PASSED (Sub-items: 487), QA: 167]**
 - **Nov19.5: [SOT Count: 1044 (Rules: 544), Open: H:0, M:2, L:10, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 484), QA: 166]**
 - **Nov19.4: [SOT Count: 1043 (Rules: 543), Open: H:0, M:2, L:10, Ideas: H:0, M:0, L:23, Testing: PASSED (Sub-items: 481), QA: 165]**
 - **Nov19.3: [SOT Count: 1042 (Rules: 542), Open: H:0, M:2, L:11, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 478), QA: 164]**

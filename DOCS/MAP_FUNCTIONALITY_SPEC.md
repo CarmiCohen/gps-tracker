@@ -39,7 +39,7 @@ This document provides the definitive specification of all map capabilities, ren
 - **Connection-Aware Auto-Centering**: 
   - When there is **no connection** between devices, the map automatically centers around the monitor (local device).
   - When connected, the map automatically centers around the device whose GPS location is known (prioritizing the Sensor if both are known), unless overridden by the user via `SENSOR` or `LOCAL` buttons.
-- **Follow Mode**: `MapFollowMode` (`MapCenterResolver.kt`): `SENSOR` and `LOCAL` lock the center to that device; `AUTO` applies the connection-aware rule above.
+- **Follow Mode**: `MapFollowMode` (`MapCenterResolver.kt`): `TRACKER` (sensor) and `VIEWER` (local) lock the center to that device; `AUTO` (the start state) applies the connection-aware rule above. There is no fourth, no-follow mode (SIMP-NOV22.5-S1).
 - **Zoom Controls (`IN` / `OUT`)**: Dedicated **Zoom In ("+")** and **Zoom Out ("-")** buttons for fast, single-tap zoom adjustments.
 
 ---

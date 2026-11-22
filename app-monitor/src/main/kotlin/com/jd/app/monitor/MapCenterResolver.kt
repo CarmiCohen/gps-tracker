@@ -2,7 +2,8 @@ package com.jd.app.monitor
 
 data class MapPosition(val lat: Double, val lng: Double)
 
-enum class MapFollowMode { TRACKER, VIEWER, AUTO, NONE }
+/** The three centering modes the Monitor can reach: AUTO at start, TRACKER or VIEWER from the HUD (SIMP-NOV22.5-S1). */
+enum class MapFollowMode { TRACKER, VIEWER, AUTO }
 
 /** Trail positions in stored order, without the (0,0) rows sent before the sensor had a fix. */
 fun knownPositions(trail: List<TrailEntity>): List<MapPosition> =
@@ -25,7 +26,7 @@ fun resolveMapCenter(
 ): MapPosition? = when (followMode) {
     MapFollowMode.TRACKER -> sensorPosition
     MapFollowMode.VIEWER -> localPosition
-    MapFollowMode.AUTO, MapFollowMode.NONE ->
+    MapFollowMode.AUTO ->
         if (isPeerActive) sensorPosition ?: localPosition else localPosition ?: sensorPosition
 }
 

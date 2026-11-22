@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov22.5 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov22.6 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1210,8 +1210,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **238.2 Device:** on the Monitor, pan the map away from the dots and wait 30 s with the Sensor sending: the map stays; send the app to the background and reopen it: the map centers again; SENSOR and LOCAL still center on a tap.
 *   **238.3 Device:** HOME opens the panel; dragging its header line moves it over the map, and the point list still scrolls and the radius slider still slides; the menu bar shows Setup, Events, Info, Graphs, the motion label and Close, with no Map icon (`TextFitTest`, `HudLayoutAuditTest` check the labels).
 
+## Chapter 239 - Three Follow Modes (Nov22.6)
+**Status: A** - `MapCenterResolverTest` 13/13 (1039 unit tests); A15 `ProductionReadinessAuditTest` 3/3; release cold starts clean (SIMP-NOV22.5-S1, SOT 1.478)
+*   **239.1 Unit:** `MapCenterResolverTest`: TRACKER locks to the sensor, VIEWER to the local device, AUTO prefers the sensor while it is connected; with no known position every one of the three modes leaves the map uncentered; `MapFollowMode` has no NONE.
+
 ---
-**Active Testing Chapters: 227 of 238**
+**Active Testing Chapters: 228 of 239**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

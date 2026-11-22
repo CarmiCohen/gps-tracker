@@ -65,7 +65,6 @@ of S21FE Events; O95 (a test update lost before the repository listened) done in
 ---
 
 ## 🚀 Strategic Simplification Ideas
-*   **SIMP-NOV22.5-S1**: No Unused Follow Mode. Since the Map icon is gone (ISSUE-NOV22.5-O132), `MapFollowMode.AUTO` is only the start state and `MapFollowMode.NONE` is never set anywhere; `resolveMapCenter` still handles it with AUTO. Removing `NONE` would leave the three modes the Monitor can reach.
 *   **SIMP-NOV22.4-S1**: Light On The Rows. Since Nov22.4 the light reaches the Monitor only by the Graphs and the Info screen; the telemetry rows carry the noise level but not the light, so the Monitor's `SENSOR'S NEWEST ROW` section has no Light line. A `lightLux` on `LocationUpdate`, the row wire (`lux`) and a ForensicBuffer version 6 (upgraded in place like version 5) would carry it on live and backfilled rows alike.
 *   **SIMP-NOV22.4-S2**: One Rise Confirmation. `AcousticDetector` (frames) and `LightDetector` (held readings) each hold the same rise logic: a slow-rising background, a jump measured against the background at its first frame, a confirmation time within a window, and a wait for quiet after an alert. One core-shared confirmer fed with durations would keep the debouncing in one place for both kinds.
 *   **SIMP-NOV22.3-S1**: One Settings Sender. Since Nov22.3 the settings event is read by one `SettingsWire.decode`, but `SocketioSignalingClient` still sends it from nine `send...`/`request...` methods that each repeat the connected check, `emit("settings_update", payload)` and the `bytesSent` count (five also check `currentDeviceId`). One private `emitSettings(payload): Boolean` would keep the sending side in one place too.
@@ -96,9 +95,9 @@ of S21FE Events; O95 (a test update lost before the repository listened) done in
 
 ## 📊 Hardening Progress Dashboard
 *The newest rows only (at most 6); older rows are in the Dashboard History of `STATUS/RESOLUTION_ARCHIVE.md`. From Nov8.100-Documentation, Open and Ideas are counted from the lists in this file; earlier figures used a count that cannot be traced.*
+- **Nov22.6: [SOT Count: 1051 (Rules: 551), Open: H:1, M:2, L:10, Ideas: H:0, M:0, L:25, Testing: PASSED (Sub-items: 500), QA: 173]**
 - **Nov22.5: [SOT Count: 1050 (Rules: 550), Open: H:1, M:2, L:10, Ideas: H:0, M:0, L:26, Testing: PASSED (Sub-items: 499), QA: 172]**
 - **Nov22.4: [SOT Count: 1049 (Rules: 549), Open: H:0, M:2, L:10, Ideas: H:0, M:0, L:25, Testing: PASSED (Sub-items: 496), QA: 171]**
 - **Nov22.3: [SOT Count: 1048 (Rules: 548), Open: H:0, M:2, L:10, Ideas: H:0, M:0, L:23, Testing: PASSED (Sub-items: 492), QA: 170]**
 - **Nov22.1: [SOT Count: 1047 (Rules: 547), Open: H:0, M:2, L:10, Ideas: H:0, M:0, L:23, Testing: PASSED (Sub-items: 490), QA: 169]**
 - **Nov22.0: [SOT Count: 1046 (Rules: 546), Open: H:0, M:2, L:10, Ideas: H:0, M:0, L:24, Testing: PASSED (Sub-items: 488), QA: 168]**
-- **Nov19.6-HUD: [SOT Count: 1045 (Rules: 545), Open: H:0, M:2, L:10, Ideas: H:0, M:0, L:25, Testing: PASSED (Sub-items: 487), QA: 167]**
