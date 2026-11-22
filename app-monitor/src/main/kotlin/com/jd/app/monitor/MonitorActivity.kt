@@ -9,6 +9,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.roundToInt
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -603,14 +606,36 @@ fun MonitorScreen(
             setScaleBarOffset(SCALE_BAR_OFFSET_PX, SCALE_BAR_OFFSET_PX)
         }
     }
-    var hasCentered by remember(mapView) { mutableStateOf(false) }
+    var hasZoomed by remember(mapView) { mutableStateOf(false) }
+    // The map centers once per start or return to the foreground, not on every new position, so the user can pan
+    // freely (Nov22.5). SENSOR and LOCAL still center on demand; the menu's Map icon is gone (Nov22.5, user request).
+    var needsCenter by remember(mapView) { mutableStateOf(true) }
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) needsCenter = true
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val sensorTrail = remember(trail) { knownPositions(trail) }
     val sensorPosition = sensorTrail.firstOrNull()
     val localPath = remember(localTrail) { knownPositions(localTrail) }
     val breaches = remember(trail) { geofenceBreaches(trail) }
+    val mapCenter = resolveMapCenter(followMode, remoteHudState.isPeerActive, sensorPosition, localPosition)
 
-    // Automatic Centering & Connection Logic
-    LaunchedEffect(remoteHudState.isPeerActive, trail, localTrail, followMode, localPosition, geofence, isEditingHome, isFenceVisible) {
+    LaunchedEffect(needsCenter, mapCenter != null) {
+        val step = pendingCentering(needsCenter, hasZoomed, mapCenter) ?: return@LaunchedEffect
+        if (step.zoomIn) {
+            mapView.controller.setZoom(DEVICE_ZOOM)
+            hasZoomed = true
+        }
+        mapView.controller.setCenter(GeoPoint(step.center.lat, step.center.lng))
+        needsCenter = false
+    }
+
+    // Overlays
+    LaunchedEffect(remoteHudState.isPeerActive, trail, localTrail, localPosition, geofence, isEditingHome, isFenceVisible) {
         mapView.overlays.clear()
         mapView.overlays.add(scaleBar)
 
@@ -697,13 +722,6 @@ fun MonitorScreen(
             mapView.overlays.add(marker)
         }
 
-        resolveMapCenter(followMode, remoteHudState.isPeerActive, sensorPosition, localPosition)?.let {
-            if (!hasCentered) {
-                mapView.controller.setZoom(DEVICE_ZOOM)
-                hasCentered = true
-            }
-            mapView.controller.setCenter(GeoPoint(it.lat, it.lng))
-        }
         mapView.invalidate()
     }
 
@@ -715,7 +733,6 @@ fun MonitorScreen(
                     sensorState = remoteHudState.trackerState,
                     isSensorHeard = remoteHudState.isPeerActive,
                     onSetup = { showSetupDialog = true },
-                    onMap = { followMode = MapFollowMode.AUTO },
                     onEvents = { showEventsOverlay = true },
                     onInfo = { showInfoOverlay = true },
                     onGraphs = {
@@ -962,7 +979,6 @@ fun MonitorMenuBar(
     sensorState: String,
     isSensorHeard: Boolean,
     onSetup: () -> Unit,
-    onMap: () -> Unit,
     onEvents: () -> Unit,
     onInfo: () -> Unit,
     onGraphs: () -> Unit,
@@ -983,7 +999,6 @@ fun MonitorMenuBar(
             // Every icon gets an equal share of the width beside the label, all of it tappable (Nov19.5, user request).
             val share = Modifier.weight(1f)
             com.jd.core.ui.MenuBarIcon(Icons.Default.Build, "Setup", com.jd.core.ui.MonitorBrown, onSetup, share)
-            com.jd.core.ui.MenuBarIcon(Icons.Default.Place, "Map", com.jd.core.ui.SensorGreen, onMap, share)
             com.jd.core.ui.MenuBarIcon(Icons.AutoMirrored.Filled.List, "Events", com.jd.core.ui.BrandGold, onEvents, share)
             com.jd.core.ui.MenuBarIcon(Icons.Default.Info, "Info", com.jd.core.ui.InfoBlue, onInfo, share)
             com.jd.core.ui.MenuBarIcon(com.jd.core.ui.GraphsIcon, "Graphs", com.jd.core.ui.GraphsViolet, onGraphs, share)
@@ -1052,15 +1067,27 @@ fun HomePointEditor(
 ) {
     // The slider moves locally and stores once released, so dragging does not send a geofence per step.
     var radius by remember(geofence.radiusMeters) { mutableFloatStateOf(geofence.radiusMeters.toFloat()) }
+    // Dragged by its header line, so it can be moved off the part of the map being edited (Nov22.5).
+    var dragOffset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     // Compact, so the map stays usable for tapping points and the map controls stay uncovered.
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .offset { androidx.compose.ui.unit.IntOffset(dragOffset.x.roundToInt(), dragOffset.y.roundToInt()) }
+            .fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = Color.Black.copy(alpha = 0.85f),
         contentColor = Color.White
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.pointerInput(Unit) {
+                    detectDragGestures { change, amount ->
+                        change.consume()
+                        dragOffset += amount
+                    }
+                }
+            ) {
                 Text(
                     "HOME: ${geofence.points.size} | ${radius.toInt()} m",
                     fontWeight = FontWeight.Bold,

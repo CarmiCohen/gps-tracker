@@ -28,3 +28,14 @@ fun resolveMapCenter(
     MapFollowMode.AUTO, MapFollowMode.NONE ->
         if (isPeerActive) sensorPosition ?: localPosition else localPosition ?: sensorPosition
 }
+
+/** One automatic centering of the map: where, and whether to zoom in first. */
+data class MapCentering(val center: MapPosition, val zoomIn: Boolean)
+
+/**
+ * The automatic centering due now, or null (ISSUE-NOV22.5-O131): the map centers only while a centering is pending
+ * (set at each start or return to the foreground) and a position is known, so new positions do not pull a panned
+ * map back; only the first centering zooms in, so a later one keeps the user's zoom.
+ */
+fun pendingCentering(isCenterPending: Boolean, hasZoomed: Boolean, center: MapPosition?): MapCentering? =
+    if (isCenterPending && center != null) MapCentering(center, zoomIn = !hasZoomed) else null

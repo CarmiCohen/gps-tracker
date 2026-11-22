@@ -70,4 +70,26 @@ class MapCenterResolverTest {
             assertNull(resolveMapCenter(mode, true, null, null))
         }
     }
+
+    // Chapter 238.1 (ISSUE-NOV22.5-O131): one automatic centering per start or return to the foreground.
+    @Test
+    fun theFirstCenteringZoomsIn() {
+        assertEquals(MapCentering(sensor, zoomIn = true), pendingCentering(true, false, sensor))
+    }
+
+    @Test
+    fun aLaterCenteringKeepsTheUsersZoom() {
+        assertEquals(MapCentering(local, zoomIn = false), pendingCentering(true, true, local))
+    }
+
+    @Test
+    fun newPositionsDoNotMoveTheMapOnceCentered() {
+        assertNull(pendingCentering(false, true, sensor))
+        assertNull(pendingCentering(false, false, sensor))
+    }
+
+    @Test
+    fun aPendingCenteringWaitsForAPosition() {
+        assertNull(pendingCentering(true, false, null))
+    }
 }

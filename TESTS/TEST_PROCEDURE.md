@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov22.4 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov22.5 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1204,8 +1204,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **237.3 Device:** on the A15 in a dark room, a torch or a lamp at the phone's top front edge for 3 s writes `Light alert: <lx> lx, background <lx> lx, <factor>×` in the Sensor's Events; the Info shows `Light: <lx> lx (background <lx> lx)`; with light switched off on the Monitor the Info shows `Not measuring` and no alert comes.
 *   **237.4 Device (two phones):** the Monitor sounds `Tracker light detected` for that alert, the Alerts page has `Ambient Light Sensor` with its slider, and the Graphs show the `Light` panel.
 
+## Chapter 238 - Map Centers Once, Draggable Home Panel, No Map Icon (Nov22.5)
+**Status: A / L / H** - `MapCenterResolverTest` 13/13 with the four centering tests (1039 unit tests); 238.3 passed live on the A15; 238.2 not judged, the relay suspended (O133) (ISSUE-NOV22.5-O131, ISSUE-NOV22.5-O132, SOT 1.477)
+*   **238.1 Unit:** `MapCenterResolverTest` (`pendingCentering`): the map centers on the `resolveMapCenter` position once per start or return to the foreground, and new trail or local positions after that do not move it; the first centering zooms to `DEVICE_ZOOM`, a later one keeps the user's zoom.
+*   **238.2 Device:** on the Monitor, pan the map away from the dots and wait 30 s with the Sensor sending: the map stays; send the app to the background and reopen it: the map centers again; SENSOR and LOCAL still center on a tap.
+*   **238.3 Device:** HOME opens the panel; dragging its header line moves it over the map, and the point list still scrolls and the radius slider still slides; the menu bar shows Setup, Events, Info, Graphs, the motion label and Close, with no Map icon (`TextFitTest`, `HudLayoutAuditTest` check the labels).
+
 ---
-**Active Testing Chapters: 226 of 237**
+**Active Testing Chapters: 227 of 238**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*
