@@ -6,7 +6,6 @@ import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.LocationUpdate
-import com.jd.core.shared.ViolationEvent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
@@ -23,7 +22,7 @@ import org.junit.Test
 class CountedEmitTest {
 
     private val dataEvents = setOf(
-        "ping_cmd", "location_batch", "violation_event", "backfill_request", "backfill_response", "settings_update"
+        "ping_cmd", "location_batch", "backfill_request", "backfill_response", "settings_update"
     )
 
     @Test
@@ -38,7 +37,6 @@ class CountedEmitTest {
 
             val row = LocationUpdate(lat = 32.5, lng = 35.25, timestamp = 5L, sequenceId = 7L)
             assertTrue(client.sendTelemetryBatch(listOf(row)))
-            assertTrue(client.sendViolation(ViolationEvent("MOTION", row, "n", timestamp = 9L)))
             assertTrue(client.requestBackfill(BackfillRequest("T", 1L, 7L, "req")))
             assertTrue(client.sendBackfillResponse(BackfillResponse("req", listOf(row), true)))
             assertTrue(client.sendGeofence("T", GeofenceConfig()))

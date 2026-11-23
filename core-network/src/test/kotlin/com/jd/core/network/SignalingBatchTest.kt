@@ -1,7 +1,6 @@
 package com.jd.core.network
 
 import com.jd.core.shared.LocationUpdate
-import com.jd.core.shared.ViolationEvent
 import io.socket.client.IO
 import io.socket.client.Socket
 import io.socket.emitter.Emitter
@@ -408,8 +407,9 @@ class SignalingBatchTest {
         }
     }
 
+    /** SIMP-NOV8.13-S2: a violation leaves as one critical row, after the pending batch, with no separate violation event. */
     @Test
-    fun testViolationFlushesBatch() = runTest {
+    fun testViolationLeavesAsOneCriticalRow() = runTest {
         val testDispatcher = StandardTestDispatcher(testScheduler)
         val fakeSocket = FakeSocket()
         val client = SocketioSignalingClient(FakeSocketFactory(fakeSocket), testDispatcher)
@@ -421,13 +421,14 @@ class SignalingBatchTest {
 
             client.sendTelemetry(LocationUpdate(sequenceId = 1L))
             
-            client.sendViolation(ViolationEvent("SPEED", LocationUpdate(), "nonce"))
+            client.sendTelemetry(LocationUpdate(sequenceId = 2L, status = "GEOFENCE_BREACH", isCritical = true))
             runCurrent()
 
             val sigEvents = fakeSocket.emittedEvents.filter { it.first != "join" && it.first != "ping_cmd" } // The latency ping is no data (ISSUE-NOV10.8-O84 part 2).
-            assertEquals(2, sigEvents.size)
-            assertEquals("location_batch", sigEvents[0].first)
-            assertEquals("violation_event", sigEvents[1].first)
+            assertEquals(listOf("location_batch", "location_batch"), sigEvents.map { it.first })
+            val violationRow = (sigEvents[1].second as JSONArray).getJSONObject(0)
+            assertEquals(1, (sigEvents[1].second as JSONArray).length())
+            assertEquals("GEOFENCE_BREACH", violationRow.getString("status"))
         } finally {
             client.disconnect()
         }

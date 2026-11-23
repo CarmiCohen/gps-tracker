@@ -70,18 +70,6 @@ data class LocationUpdate(
 }
 
 @Serializable
-data class ViolationEvent(
-    val type: String,
-    val location: LocationUpdate,
-    val nonce: String,
-    val timestamp: Long = System.currentTimeMillis(),
-    val severity: Int = 1,
-    val isBuffered: Boolean = false,
-    val criticalAckRequired: Boolean = true,
-    val requiresBiometricAuth: Boolean = false
-)
-
-@Serializable
 data class HandshakeRequest(
     val deviceId: String,
     val nonce: String,

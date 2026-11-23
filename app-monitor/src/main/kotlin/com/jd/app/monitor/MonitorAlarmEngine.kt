@@ -95,7 +95,6 @@ class MonitorAlarmEngine @Inject constructor(
             alarmBooks(
                 target = identityManager.targetId,
                 telemetry = merge(signalingClient.telemetryFlow, pushedRows.fresh(System::currentTimeMillis)),
-                violations = signalingClient.violationFlow,
                 silences = pushedRows.freshSilences(System::currentTimeMillis),
                 settings = dataStore.alertSettings,
                 ticks = secondTicks(),

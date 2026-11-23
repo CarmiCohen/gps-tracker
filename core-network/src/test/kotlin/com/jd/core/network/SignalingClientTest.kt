@@ -38,7 +38,6 @@ class SignalingClientTest {
             override val isConnected = kotlinx.coroutines.flow.MutableStateFlow(false)
             override val viewerStatusFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
             override val telemetryFlow = kotlinx.coroutines.flow.emptyFlow<LocationUpdate>()
-            override val violationFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.ViolationEvent>()
             override val backfillRequestFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.BackfillRequest>()
             override val backfillResponseFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.BackfillResponse>()
             override suspend fun connect(url: String, deviceId: String, secret: String, lastSequenceId: Long) {
@@ -48,7 +47,6 @@ class SignalingClientTest {
             override fun getMonthlyDataUsageBytes(): Long = 0L
             override suspend fun sendTelemetry(update: LocationUpdate) = true
             override suspend fun sendTelemetryBatch(updates: List<LocationUpdate>) = true
-            override suspend fun sendViolation(event: com.jd.core.shared.ViolationEvent) = true
             override fun sendLastWord(cause: com.jd.core.shared.SilenceCause) = Unit
             override suspend fun requestBackfill(request: com.jd.core.shared.BackfillRequest) = true
             override suspend fun sendBackfillResponse(response: com.jd.core.shared.BackfillResponse) = true

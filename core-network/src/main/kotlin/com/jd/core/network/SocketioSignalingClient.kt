@@ -17,7 +17,6 @@ import com.jd.core.shared.ReceivedSensorInfo
 import com.jd.core.shared.SensorInfo
 import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.SensorSetupReport
-import com.jd.core.shared.ViolationEvent
 import com.jd.core.shared.SystemLogger
 import io.socket.client.IO
 import io.socket.client.Socket
@@ -63,9 +62,6 @@ class SocketioSignalingClient @Inject constructor(
 
     private val _telemetryFlow = MutableSharedFlow<LocationUpdate>(extraBufferCapacity = BURST_CAPACITY)
     override val telemetryFlow: SharedFlow<LocationUpdate> = _telemetryFlow.asSharedFlow()
-
-    private val _violationFlow = MutableSharedFlow<ViolationEvent>(extraBufferCapacity = 16)
-    override val violationFlow: SharedFlow<ViolationEvent> = _violationFlow.asSharedFlow()
 
     private val _backfillRequestFlow = MutableSharedFlow<BackfillRequest>(extraBufferCapacity = BURST_CAPACITY)
     override val backfillRequestFlow: SharedFlow<BackfillRequest> = _backfillRequestFlow.asSharedFlow()
@@ -385,7 +381,8 @@ class SocketioSignalingClient @Inject constructor(
             return false
         }
 
-        // Critical updates (violations, geofence transitions) bypass batching; an ordinary status such as NO_FIX does not
+        // Critical updates (violations, geofence transitions) bypass batching; an ordinary status such as NO_FIX does not.
+        // This row is a violation's only path to the Monitor (SIMP-NOV8.13-S2).
         if (owned.isCritical) {
             flushPendingBatch() // Flush pending first to maintain order
             return sendTelemetryBatch(listOf(owned))
@@ -412,22 +409,6 @@ class SocketioSignalingClient @Inject constructor(
         }
 
         emitCounted("location_batch", batchArray)
-        return true
-    }
-
-    override suspend fun sendViolation(event: ViolationEvent): Boolean {
-        val deviceId = currentDeviceId ?: return false
-        
-        // Critical event: flush pending telemetry to ensure context arrives first
-        flushPendingBatch()
-
-        val payload = JSONObject().apply {
-            put("id", deviceId)
-            put("type", event.type)
-            put("ts", event.timestamp)
-        }
-        
-        emitCounted("violation_event", payload)
         return true
     }
 

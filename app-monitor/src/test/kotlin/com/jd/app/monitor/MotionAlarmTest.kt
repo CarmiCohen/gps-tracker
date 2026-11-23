@@ -5,7 +5,6 @@ import com.jd.core.shared.LIFT_ALERT_STATUS
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.TILT_ALERT_STATUS
 import com.jd.core.shared.VIBRATION_ALERT_STATUS
-import com.jd.core.shared.ViolationEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,18 +28,17 @@ class MotionAlarmTest {
 
     private class Watch(scope: CoroutineScope) {
         val telemetry = MutableSharedFlow<LocationUpdate>(extraBufferCapacity = 16)
-        val violations = MutableSharedFlow<ViolationEvent>(extraBufferCapacity = 16)
         val settings = MutableSharedFlow<AlertSettings>(replay = 1)
         val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
         val acks = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
         val latest = MutableStateFlow<AlarmBook?>(null)
         val job = scope.launch {
-            alarmBooks(MutableStateFlow("T"), telemetry, violations, settings, ticks, acks, MutableStateFlow(true), MutableStateFlow(true)) { 1_000_000L }
+            alarmBooks(MutableStateFlow("T"), telemetry, settings, ticks, acks, MutableStateFlow(true), MutableStateFlow(true)) { 1_000_000L }
                 .collect { latest.value = it }
         }
 
         suspend fun ready() = withTimeout(5.seconds) {
-            listOf(telemetry, violations, ticks, acks).forEach { flow -> flow.subscriptionCount.first { it > 0 } }
+            listOf(telemetry, ticks, acks).forEach { flow -> flow.subscriptionCount.first { it > 0 } }
         }
 
         suspend fun awaitBook(predicate: (AlarmBook) -> Boolean): AlarmBook =
@@ -51,6 +49,12 @@ class MotionAlarmTest {
     private fun unpluggedRow(status: String) = LocationUpdate(
         deviceId = "T", lat = 32.0, lng = 34.0, accuracy = 5f, batteryLevel = 80, isCharging = false,
         tempCelsius = 30f, status = status
+    )
+
+    /** A plugged-in row sent at [timestamp] on the tracker's clock. */
+    private fun row(status: String, timestamp: Long) = LocationUpdate(
+        deviceId = "T", lat = 32.0, lng = 34.0, accuracy = 5f, batteryLevel = 80, isCharging = true,
+        tempCelsius = 30f, status = status, timestamp = timestamp
     )
 
     /**
@@ -83,13 +87,19 @@ class MotionAlarmTest {
         assertTrue(pendingFor(LIFT_ALERT_STATUS, AlertSettings(liftAlert = false)).isEmpty())
     }
 
+    /** SIMP-NOV8.13-S2: the lift row is the alarm's only path, so the alarm must outlast the next normal row. */
     @Test
-    fun `a lift violation event raises the lift alarm`() = runBlocking {
+    fun `a lift alarm stays after the next normal row until acknowledged`() = runBlocking {
         val watch = Watch(this)
         watch.settings.emit(AlertSettings())
         watch.ready()
-        watch.violations.emit(ViolationEvent(type = LIFT_ALERT_STATUS, location = LocationUpdate(deviceId = "T"), nonce = "l1"))
+        watch.telemetry.emit(row(LIFT_ALERT_STATUS, timestamp = 1L))
         assertEquals(listOf(AlarmType.LIFT_ALERT), watch.awaitBook { it.needsSiren }.pending.map { it.type })
+        watch.telemetry.emit(row("VALID", timestamp = 2L))
+        val passed = watch.awaitBook { book -> book.alarms.any { it.type == AlarmType.LIFT_ALERT && !it.isActive } }
+        assertEquals(listOf(AlarmType.LIFT_ALERT), passed.pending.map { it.type })
+        watch.acks.emit(Unit)
+        watch.awaitBook { !it.needsSiren }
         watch.job.cancel()
     }
 
@@ -128,9 +138,9 @@ class MotionAlarmTest {
         val watch = Watch(this)
         watch.settings.emit(AlertSettings())
         watch.ready()
-        watch.violations.emit(ViolationEvent(type = VIBRATION_ALERT_STATUS, location = LocationUpdate(deviceId = "T"), nonce = "v1"))
+        watch.telemetry.emit(row(VIBRATION_ALERT_STATUS, timestamp = 1L))
         watch.awaitBook { book -> book.pending.any { it.type == AlarmType.VIBRATION_ALERT } }
-        watch.violations.emit(ViolationEvent(type = LIFT_ALERT_STATUS, location = LocationUpdate(deviceId = "T"), nonce = "l1"))
+        watch.telemetry.emit(row(LIFT_ALERT_STATUS, timestamp = 2L))
         val book = watch.awaitBook { book -> book.pending.any { it.type == AlarmType.LIFT_ALERT } }
         assertEquals(setOf(AlarmType.VIBRATION_ALERT, AlarmType.LIFT_ALERT), book.pending.map { it.type }.toSet())
         watch.job.cancel()

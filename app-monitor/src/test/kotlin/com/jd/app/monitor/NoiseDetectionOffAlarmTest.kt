@@ -2,7 +2,6 @@ package com.jd.app.monitor
 
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.LocationUpdate
-import com.jd.core.shared.ViolationEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,18 +26,17 @@ class NoiseDetectionOffAlarmTest {
     private class Watch(scope: CoroutineScope) {
         val target = MutableStateFlow<String?>("T")
         val telemetry = MutableSharedFlow<LocationUpdate>(extraBufferCapacity = 16)
-        val violations = MutableSharedFlow<ViolationEvent>(extraBufferCapacity = 16)
         val settings = MutableSharedFlow<AlertSettings>(replay = 1)
         val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
         val acks = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
         val latest = MutableStateFlow<AlarmBook?>(null)
         val job = scope.launch {
-            alarmBooks(target, telemetry, violations, settings, ticks, acks, MutableStateFlow(true), MutableStateFlow(true)) { 1_000_000L }
+            alarmBooks(target, telemetry, settings, ticks, acks, MutableStateFlow(true), MutableStateFlow(true)) { 1_000_000L }
                 .collect { latest.value = it }
         }
 
         suspend fun ready() = withTimeout(5.seconds) {
-            listOf(telemetry, violations, ticks, acks).forEach { flow -> flow.subscriptionCount.first { it > 0 } }
+            listOf(telemetry, ticks, acks).forEach { flow -> flow.subscriptionCount.first { it > 0 } }
         }
 
         suspend fun awaitBook(predicate: (AlarmBook) -> Boolean): AlarmBook =

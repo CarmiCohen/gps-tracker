@@ -382,7 +382,6 @@ class MonitorAlarmsTest {
     private class Watch(scope: CoroutineScope) {
         val target = MutableStateFlow<String?>("T")
         val telemetry = MutableSharedFlow<LocationUpdate>(extraBufferCapacity = 16)
-        val violations = MutableSharedFlow<com.jd.core.shared.ViolationEvent>(extraBufferCapacity = 16)
         val settings = MutableSharedFlow<AlertSettings>(replay = 1)
         val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
         val acks = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
@@ -391,11 +390,11 @@ class MonitorAlarmsTest {
         @Volatile var now = 1_000_000L
         val latest = MutableStateFlow<AlarmBook?>(null)
         val job = scope.launch {
-            alarmBooks(target, telemetry, violations, settings, ticks, acks, isRelayConnected, isLocalInternet) { now }.collect { latest.value = it }
+            alarmBooks(target, telemetry, settings, ticks, acks, isRelayConnected, isLocalInternet) { now }.collect { latest.value = it }
         }
 
         suspend fun ready() = withTimeout(5.seconds) {
-            listOf(telemetry, violations, ticks, acks).forEach { flow -> flow.subscriptionCount.first { it > 0 } }
+            listOf(telemetry, ticks, acks).forEach { flow -> flow.subscriptionCount.first { it > 0 } }
         }
 
         suspend fun awaitBook(predicate: (AlarmBook) -> Boolean): AlarmBook =
@@ -528,19 +527,20 @@ class MonitorAlarmsTest {
         watch.job.cancel()
     }
 
+    /** SIMP-NOV8.13-S2: a GPS jump reaches the Monitor only as the status of its row. */
     @Test
-    fun geofenceBreachViolationEmitsGeofenceBreachAlarm() = runBlocking {
+    fun outlierRowEmitsGpsJumpAlarm() = runBlocking {
         val watch = Watch(this)
-        watch.settings.emit(AlertSettings())
+        watch.settings.emit(AlertSettings(jammerDetection = true))
         watch.ready()
 
-        val violation = com.jd.core.shared.ViolationEvent(
-            type = "GEOFENCE_BREACH",
-            location = LocationUpdate(deviceId = "T", lat = 38.0, lng = -122.0),
-            nonce = "123"
+        watch.telemetry.emit(
+            LocationUpdate(
+                deviceId = "T", lat = 38.0, lng = -122.0, accuracy = 5f, batteryLevel = 80, isCharging = true,
+                tempCelsius = 30f, status = "OUTLIER"
+            )
         )
-        watch.violations.emit(violation)
-        assertEquals(listOf(AlarmType.GEOFENCE_BREACH), watch.awaitBook { it.needsSiren }.pending.map { it.type })
+        assertEquals(listOf(AlarmType.GPS_JUMP), watch.awaitBook { it.needsSiren }.pending.map { it.type })
         watch.job.cancel()
     }
 }

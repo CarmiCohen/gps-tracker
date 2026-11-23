@@ -227,8 +227,6 @@ class FakeSignalingClient : SignalingClient {
 
     override val viewerStatusFlow: Flow<Boolean> = MutableStateFlow(false)
 
-    override val violationFlow: Flow<com.jd.core.shared.ViolationEvent> = MutableSharedFlow()
-    
     private val _backfillRequestFlow = MutableSharedFlow<BackfillRequest>(extraBufferCapacity = 8)
     override val backfillRequestFlow: Flow<BackfillRequest> = _backfillRequestFlow
 
@@ -242,7 +240,6 @@ class FakeSignalingClient : SignalingClient {
     override fun getMonthlyDataUsageBytes(): Long = 0
     override suspend fun sendTelemetry(update: LocationUpdate): Boolean = true
     override suspend fun sendTelemetryBatch(updates: List<LocationUpdate>): Boolean = true
-    override suspend fun sendViolation(event: com.jd.core.shared.ViolationEvent): Boolean = true
     override fun sendLastWord(cause: com.jd.core.shared.SilenceCause) = Unit
 
     override suspend fun requestBackfill(request: BackfillRequest): Boolean {

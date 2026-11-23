@@ -992,15 +992,15 @@ class SensorService : Service(), SensorEventListener {
         }
     }
 
-    /** Marks [update] as violation [status] and sends the violation event. */
+    /**
+     * Marks [update] as violation [status]. The critical row, sent at once and pushed by the relay, is the violation's
+     * only path to the Monitor (SIMP-NOV8.13-S2: the separate violation event reached no listener).
+     */
     private fun reportViolation(update: LocationUpdate, status: String, logLine: String) {
         update.status = status
         update.isCritical = true
         lastAlarmElapsedMs = SystemClock.elapsedRealtime() // Every alarm restarts the alarm window (ISSUE-NOV22.8-O136).
         eventLog.record(EventLevel.ALARM, logLine, kind = status) // The Monitor matches it with its own alarm (ISSUE-NOV23.4-O139).
-        // Built before launching: the pooled update is zeroed on release, before the launched send runs.
-        val violation = ViolationEvent(type = status, location = update.snapshot(), nonce = java.util.UUID.randomUUID().toString())
-        serviceScope.launch { signalingClient.sendViolation(violation) }
     }
 
     private fun startWatchdog() {

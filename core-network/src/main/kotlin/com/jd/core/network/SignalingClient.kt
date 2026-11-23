@@ -14,7 +14,6 @@ import com.jd.core.shared.ReceivedSensorInfo
 import com.jd.core.shared.SensorInfo
 import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.SensorSetupReport
-import com.jd.core.shared.ViolationEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -28,7 +27,6 @@ interface SignalingClient {
     val isConnected: Flow<Boolean>
     val viewerStatusFlow: Flow<Boolean>
     val telemetryFlow: Flow<LocationUpdate>
-    val violationFlow: Flow<ViolationEvent>
     
     /**
      * Flow of incoming backfill requests (used by Sensor).
@@ -64,8 +62,6 @@ interface SignalingClient {
      * Optimized batch transmission for telemetry updates (R-ID 80).
      */
     suspend fun sendTelemetryBatch(updates: List<LocationUpdate>): Boolean
-
-    suspend fun sendViolation(event: ViolationEvent): Boolean
 
     /**
      * Sensor: tells the relay why it is about to go silent, after the rows already taken (ISSUE-NOV22.10-O137).

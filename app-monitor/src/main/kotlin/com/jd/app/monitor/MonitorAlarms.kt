@@ -158,8 +158,6 @@ fun alarmConditions(
     hasRelayConnected: Boolean = true,
     relayLostSinceMs: Long? = null,
     isLocalInternet: Boolean = true,
-    hasViolation: Boolean = false,
-    violationType: String? = null,
     noGpsSignalSinceMs: Long? = null,
     silenceCause: SilenceCause? = null,
     lastSensorAlarmAtMs: Long? = null
@@ -185,12 +183,10 @@ fun alarmConditions(
     ) {
         add(AlarmType.GPS_SIGNAL_LOSS)
     }
-    // The Sensor sends each violation twice: as a violation event and as the status of its telemetry row.
-    val flagged = setOfNotNull(violationType, reading?.status)
-    flagged.mapNotNullTo(this) { SENSOR_VIOLATION_ALARMS[it] }
-    val isOtherViolation = hasViolation && violationType !in SENSOR_VIOLATION_ALARMS
-    if ("JUMP" in flagged || "OUTLIER" in flagged || isOtherViolation) add(AlarmType.GPS_JUMP)
     if (reading == null) return@buildSet
+    // A Sensor violation arrives only as the status of its critical telemetry row (SIMP-NOV8.13-S2).
+    SENSOR_VIOLATION_ALARMS[reading.status]?.let(::add)
+    if (reading.status == "JUMP" || reading.status == "OUTLIER") add(AlarmType.GPS_JUMP)
     // Plugged in, not charging: a held battery is not a cut cable (ISSUE-NOV17.15-O114).
     if (!reading.hasPower) add(AlarmType.POWER_DISCONNECTED)
     if (reading.isNoiseDetectionOff) add(AlarmType.NOISE_DETECTION_OFF)
@@ -278,7 +274,6 @@ fun secondTicks(): Flow<Unit> = flow {
 fun alarmBooks(
     target: Flow<String?>,
     telemetry: Flow<LocationUpdate>,
-    violations: Flow<com.jd.core.shared.ViolationEvent> = flowOf(),
     settings: Flow<AlertSettings>,
     ticks: Flow<Unit>,
     acknowledgements: Flow<Unit>,
@@ -291,7 +286,6 @@ fun alarmBooks(
     val watchingSinceMs = clock()
     merge(
         telemetry.filter { it.deviceId == trackerId }.map { BookEvent.Reading(it.toTrackerReading(clock())) },
-        violations.filter { it.location.deviceId == trackerId || it.location.deviceId.isEmpty() }.map { BookEvent.Violation(it) },
         silences.filter { it.trackerId == trackerId }.map { BookEvent.Silence(it) },
         settings.map { BookEvent.Settings(it) },
         ticks.map { BookEvent.Tick },
@@ -304,26 +298,19 @@ fun alarmBooks(
                 val reading = newerReading(state.reading, event.reading)
                 state.copy(
                     reading = reading,
-                    hasViolation = false,
-                    violationType = null,
                     noGpsSignalSinceMs = if (reading.hasGpsSignal()) null else state.noGpsSignalSinceMs ?: reading.receivedAtMs,
                     silence = state.silence?.takeIf { reading.sensorTimeMs <= it.lastSensorTimeMs },
                     lastSensorAlarmAtMs = if (event.reading.status in SENSOR_VIOLATION_ALARMS) event.reading.receivedAtMs
                     else state.lastSensorAlarmAtMs
                 )
             }
-            is BookEvent.Violation -> state.copy(
-                hasViolation = true,
-                violationType = event.violation.type,
-                lastSensorAlarmAtMs = if (event.violation.type in SENSOR_VIOLATION_ALARMS) clock() else state.lastSensorAlarmAtMs
-            )
             is BookEvent.Silence -> {
                 if (state.reading != null && state.reading.sensorTimeMs > event.silence.lastSensorTimeMs) state
                 else state.copy(silence = event.silence)
             }
             is BookEvent.Settings -> state.copy(settings = event.settings)
             BookEvent.Tick -> state
-            BookEvent.Acknowledge -> state.copy(book = state.book.acknowledge(), hasViolation = false, violationType = null)
+            BookEvent.Acknowledge -> state.copy(book = state.book.acknowledge())
             is BookEvent.RelayConnection -> state.copy(
                 isRelayConnected = event.isConnected,
                 hasRelayConnected = state.hasRelayConnected || event.isConnected,
@@ -342,8 +329,6 @@ fun alarmBooks(
             hasRelayConnected = next.hasRelayConnected,
             relayLostSinceMs = next.relayLostSinceMs,
             isLocalInternet = next.isLocalInternet,
-            hasViolation = next.hasViolation,
-            violationType = next.violationType,
             noGpsSignalSinceMs = next.noGpsSignalSinceMs,
             silenceCause = next.silence?.cause,
             lastSensorAlarmAtMs = next.lastSensorAlarmAtMs
@@ -363,8 +348,6 @@ private data class WatchState(
     /** When the relay connection was lost, or null while it is connected. */
     val relayLostSinceMs: Long? = null,
     val isLocalInternet: Boolean = true,
-    val hasViolation: Boolean = false,
-    val violationType: String? = null,
     val noGpsSignalSinceMs: Long? = null,
     /** The relay's silence notice while it holds; a row newer than its last row, on the tracker's clock, ends it. */
     val silence: SensorSilence? = null,
@@ -374,7 +357,6 @@ private data class WatchState(
 
 private sealed interface BookEvent {
     data class Reading(val reading: TrackerReading) : BookEvent
-    data class Violation(val violation: com.jd.core.shared.ViolationEvent) : BookEvent
     data class Silence(val silence: SensorSilence) : BookEvent
     data class Settings(val settings: AlertSettings) : BookEvent
     data object Tick : BookEvent
