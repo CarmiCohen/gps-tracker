@@ -115,8 +115,9 @@ class SensorService : Service(), SensorEventListener {
     @Volatile private var geofence = GeofenceConfig() // Written by the geofence collector, read by the sensing loop.
     private var geofenceState = SentinelLogic.GeofenceState.UNKNOWN // Sensing loop only.
     @Volatile private var geofenceChanged = false
-    // Noise, light, tilt, and lift found on their own threads, each sent by a following sensing tick with the current position.
-    private val pendingAlerts = java.util.concurrent.ConcurrentLinkedQueue<PendingAlert>()
+    // Noise, light, tilt, lift and vibration found on their own threads, and the loop's geofence and movement findings,
+    // each sent by a sensing tick with the current position, one per tick (SIMP-NOV8.103-S1).
+    private val pendingAlarms = PendingAlarms()
     // One alert per kind a minute, after each detector's own debouncing (ISSUE-NOV17.10-O111).
     private val alertCoolDown = AlertCoolDown()
     // The Monitor's switches and limits (ISSUE-NOV10.8-O83): written by the behaviour collector, read on the sensor threads.
@@ -490,7 +491,7 @@ class SensorService : Service(), SensorEventListener {
             eventLog.record(EventLevel.DETAIL, "$logLine: not sent, the same kind alerted less than ${ALERT_COOL_DOWN_MS / 1000} s ago")
             return
         }
-        pendingAlerts.add(PendingAlert(status, logLine))
+        pendingAlarms.add(PendingAlarms.Alarm(status, logLine))
         orchestrator.preemptLoop("sensing_loop") // Sent now, not after up to 10 s of a slow sampling interval.
     }
 
@@ -940,6 +941,7 @@ class SensorService : Service(), SensorEventListener {
                     }
                 }
                 // Only the tick that carries a new fix is checked; repeated ticks of the same fix stay VALID.
+                var breach: PendingAlarms.Alarm? = null
                 val validation = currentFix?.let { loc ->
                     update.lat = loc.latitude
                     update.lng = loc.longitude
@@ -955,8 +957,8 @@ class SensorService : Service(), SensorEventListener {
                     val zone = SentinelLogic.evaluateHomeZone(loc.latitude, loc.longitude, loc.accuracy, geofence, geofenceState)
                     geofenceState = zone.currentState
                     if (zone.transition == SentinelLogic.GeofenceTransition.EXIT) {
-                        reportViolation(
-                            update, GEOFENCE_BREACH_STATUS,
+                        breach = PendingAlarms.Alarm(
+                            GEOFENCE_BREACH_STATUS,
                             "Geofence breach: ${zone.distanceToCenter.toInt()} m from the nearest home point (radius ${geofence.radiusMeters.toInt()} m, accuracy ${loc.accuracy.toInt()} m)"
                         )
                     }
@@ -967,15 +969,13 @@ class SensorService : Service(), SensorEventListener {
                     )
                 }
 
-                if (validation != null && validation.status != SentinelLogic.SentinelStatus.VALID) {
-                    reportViolation(update, validation.status.name, "Violation detected: ${validation.status} - ${validation.reason}")
+                val movement = validation?.takeIf { it.status != SentinelLogic.SentinelStatus.VALID }?.let {
+                    PendingAlarms.Alarm(it.status.name, "Violation detected: ${it.status} - ${it.reason}")
                 }
 
-                // A tick that already carries a violation keeps it; a queued alert follows on the next tick.
-                if (!update.isCritical) {
-                    pendingAlerts.poll()?.let { reportViolation(update, it.status, it.logLine) }
-                    if (pendingAlerts.isNotEmpty()) orchestrator.preemptLoop("sensing_loop")
-                }
+                // One alarm per row, the oldest waiting; the others follow on the next ticks, run at once (SIMP-NOV8.103-S1).
+                pendingAlarms.takeForTick(breach, movement)?.let { reportViolation(update, it.status, it.logLine) }
+                if (pendingAlarms.isNotEmpty()) orchestrator.preemptLoop("sensing_loop")
                 
                 forensicBuffer.writeTrace(update, isCritical = update.isCritical)
                 signalingClient.sendTelemetry(update)
@@ -1089,8 +1089,6 @@ class SensorService : Service(), SensorEventListener {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    private data class PendingAlert(val status: String, val logLine: String)
 
     /** The while-in-use service types a start command obtained (ISSUE-NOV8.103-O60). */
     private class ForegroundStart(val hasLocation: Boolean, val hasMicrophone: Boolean)
