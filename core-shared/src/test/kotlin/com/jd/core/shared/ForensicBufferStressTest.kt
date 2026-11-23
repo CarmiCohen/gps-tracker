@@ -156,6 +156,6 @@ class ForensicBufferStressTest {
         timestamp = System.currentTimeMillis()
         lat = 45.0
         lng = 9.0
-        sensorSnapshot.vibration = 0.5f
+        vibrationG = 0.5f
     }
 }

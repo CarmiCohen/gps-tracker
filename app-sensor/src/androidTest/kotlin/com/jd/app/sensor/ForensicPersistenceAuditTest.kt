@@ -95,7 +95,7 @@ class ForensicPersistenceAuditTest {
             val update = PoolRegistry.locationUpdatePool.acquire().apply {
                 timestamp = 1000L + i
                 sequenceId = i.toLong()
-                sensorSnapshot.vibration = i.toFloat()
+                vibrationG = i.toFloat()
             }
             buffer.writeTrace(update, isCritical = true)
             PoolRegistry.locationUpdatePool.release(update)

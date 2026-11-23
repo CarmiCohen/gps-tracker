@@ -864,7 +864,7 @@ class SensorService : Service(), SensorEventListener {
                     gravity[0], gravity[1], gravity[2]
                 )
                 
-                update.sensorSnapshot.vibration = worldAccel[0].toFloat()
+                update.vibrationG = worldAccel[0].toFloat()
                 update.timestamp = System.currentTimeMillis()
                 update.monotonicNanos = System.nanoTime()
                 update.sequenceId = sequenceIdCounter.getAndIncrement()
@@ -885,7 +885,7 @@ class SensorService : Service(), SensorEventListener {
                 update.noiseDbfs = acousticMonitor.levelDbfs?.toFloat()
                 update.lightLux = lightMonitor.lux?.toFloat() // SIMP-NOV22.4-S1
                 
-                val hasPhysicalMotion = update.sensorSnapshot.vibration > 0.12f
+                val hasPhysicalMotion = update.vibrationG > 0.12f
                 // A fix older than FIX_STALE_AFTER_MS is no longer the current position: send NO_FIX without one.
                 val currentFix = lastLocation?.takeIf { isFixFresh(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) }
                 if (currentFix == null) update.status = NO_FIX_STATUS

@@ -349,7 +349,7 @@ class ForensicBuffer(
                             this.accuracy = entryView.getFloat(offAccuracy)
                             this.speed = entryView.getFloat(offSpeed)
                             this.sequenceId = seqId
-                            this.sensorSnapshot.vibration = entryView.getFloat(offVibration)
+                            this.vibrationG = entryView.getFloat(offVibration)
                             this.monotonicNanos = entryView.getLong(offMonotonic)
                             this.status = status.ifEmpty { "VALID" }
                             this.satsUsed = entryView.getInt(offSatsUsed)
@@ -411,7 +411,7 @@ class ForensicBuffer(
                 entryView.putFloat(offAccuracy, update.accuracy)
                 entryView.putFloat(offSpeed, update.speed)
                 entryView.putLong(offSeq, update.sequenceId)
-                entryView.putFloat(offVibration, update.sensorSnapshot.vibration)
+                entryView.putFloat(offVibration, update.vibrationG)
                 entryView.putLong(offMonotonic, update.monotonicNanos)
                 
                 val statusBytes = update.status.toByteArray(Charsets.UTF_8)

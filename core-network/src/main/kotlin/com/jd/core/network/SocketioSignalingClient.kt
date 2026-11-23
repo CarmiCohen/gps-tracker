@@ -544,7 +544,7 @@ object LocationRowWire {
         put("ts", update.timestamp)
         put("seq", update.sequenceId)
         put("status", update.status)
-        put("vib", update.sensorSnapshot.vibration)
+        put("vib", update.vibrationG)
         put("acc", update.accuracy)
         put("spd", update.speed)
         put("batt", update.batteryLevel)
@@ -584,10 +584,9 @@ object LocationRowWire {
             meanCn0DbHz = if (data.has("snr")) data.optDouble("snr").toFloat() else null,
             noiseDbfs = if (data.has("noise")) data.optDouble("noise").toFloat() else null,
             // Absent from Sensors before Nov22.11 and while not known (SIMP-NOV22.4-S1).
-            lightLux = if (data.has("lux")) data.optDouble("lux").toFloat() else null
-        ).apply {
-            sensorSnapshot.vibration = data.optDouble("vib", 0.0).toFloat()
-        }
+            lightLux = if (data.has("lux")) data.optDouble("lux").toFloat() else null,
+            vibrationG = data.optDouble("vib", 0.0).toFloat()
+        )
     }
 
     /** Reads a row that the relay pushed as JSON text; null when the text is not a JSON object. */

@@ -11,14 +11,15 @@ import org.junit.Test
  * Chapter 203: live and backfilled rows share one encoder, and both carry satellites, signal and noise
  * (ISSUE-NOV15.5-O99 part 2). Only live rows carry `noiseOff` and `crit`. Chapter 207: battery, charging and
  * temperature travel on both, now that the forensic buffer keeps them (ISSUE-NOV17.3-O102). Chapter 244: the light
- * level travels on both as `lux` (SIMP-NOV22.4-S1).
+ * level travels on both as `lux` (SIMP-NOV22.4-S1). Chapter 247: the vibration travels on both as `vib`
+ * (SIMP-NOV22.11-S1).
  */
 class LocationRowWireTest {
 
     private fun row() = LocationUpdate(
         sequenceId = 42L, timestamp = 1_000L, lat = 32.1, lng = 34.8, status = "VALID",
         satsUsed = 8, satsInView = 20, meanCn0DbHz = 33.5f, noiseDbfs = -60f, lightLux = 412.5f,
-        batteryLevel = 57, isCharging = true, tempCelsius = 31.4f,
+        batteryLevel = 57, isCharging = true, tempCelsius = 31.4f, vibrationG = 0.25f,
         isNoiseDetectionOff = true, isCritical = true
     )
 
@@ -36,6 +37,14 @@ class LocationRowWireTest {
         assertTrue(decoded.isCharging)
         assertEquals(31.4f, decoded.tempCelsius, 0.001f)
         assertEquals(412.5f, decoded.lightLux!!, 0.001f)
+        assertEquals(0.25f, decoded.vibrationG, 0.001f)
+    }
+
+    @Test
+    fun liveRowCarriesTheVibrationAsVib() {
+        val live = LocationRowWire.encode(row(), "S1", live = true)
+        assertEquals(0.25, live.getDouble("vib"), 0.001)
+        assertEquals(0.25f, LocationRowWire.decode(live).vibrationG, 0.001f)
     }
 
     @Test

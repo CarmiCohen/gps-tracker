@@ -51,10 +51,11 @@ data class LocationUpdate(
     var noiseDbfs: Float? = null,
     /** The light sensor's newest reading in lux, null while light detection is off or the phone has none (SIMP-NOV22.4-S1). */
     var lightLux: Float? = null,
-    var sensorSnapshot: SensorSnapshot = SensorSnapshot()
+    /** The world-space X acceleration of the newest sensing tick, in g; `vib` on the wire (SIMP-NOV22.11-S1). */
+    var vibrationG: Float = 0f
 ) {
-    /** Deep copy for holders that outlive a pooled instance, which is zeroed on release. */
-    fun snapshot(): LocationUpdate = copy(sensorSnapshot = sensorSnapshot.copy())
+    /** Copy for holders that outlive a pooled instance, which is zeroed on release; every field is a value. */
+    fun snapshot(): LocationUpdate = copy()
 
     fun reset() {
         deviceId = ""; lat = 0.0; lng = 0.0; accuracy = 0f; speed = -1f; bearing = 0f; altitude = 0.0
@@ -62,22 +63,7 @@ data class LocationUpdate(
         isCharging = false; isPluggedIn = null; batteryLevel = -1; gsmSignalDbm = 0; networkType = "--"
         isBuffered = false; isHistoricalLkg = false; tempCelsius = -1f
         isThermalThrottled = false; cumulativeBytesSent = 0L; status = "VALID"; isNoiseDetectionOff = false; isCritical = false
-        satsUsed = -1; satsInView = -1; meanCn0DbHz = null; noiseDbfs = null; lightLux = null
-        sensorSnapshot.reset()
-    }
-}
-
-@Serializable
-data class SensorSnapshot(
-    var vibration: Float = 0f,
-    var vibrationFloor: Float = 0.12f,
-    var pressure: Float = 0f,
-    var tiltDegrees: Float = 0f,
-    var temperature: Float = 0f
-) {
-    fun reset() {
-        vibration = 0f; vibrationFloor = 0.12f
-        pressure = 0f; tiltDegrees = 0f; temperature = 0f
+        satsUsed = -1; satsInView = -1; meanCn0DbHz = null; noiseDbfs = null; lightLux = null; vibrationG = 0f
     }
 }
 

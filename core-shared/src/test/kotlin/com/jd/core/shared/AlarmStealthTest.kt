@@ -15,7 +15,7 @@ class AlarmStealthTest {
         // SCENARIO: A critical violation occurs while in Tracker Mode.
         val update = LocationUpdate().apply {
             status = "ACOUSTIC_VIOLATION"
-            sensorSnapshot.vibration = 0.5f
+            vibrationG = 0.5f
         }
 
         // Logic check: Any local signaling logic must verify role before acting.
