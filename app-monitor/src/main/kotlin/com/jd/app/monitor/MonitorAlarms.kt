@@ -88,9 +88,10 @@ fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) 
 data class TrackerReading(
     val receivedAtMs: Long,
     val sensorTimeMs: Long,
-    val batteryLevel: Int,
+    /** Null when the Sensor did not know it (SIMP-NOV17.7-S1). */
+    val batteryLevel: Int?,
     val isCharging: Boolean,
-    val tempCelsius: Float,
+    val tempCelsius: Float?,
     val lat: Double = 0.0,
     val lng: Double = 0.0,
     val accuracy: Float = 0f,
@@ -172,9 +173,9 @@ fun alarmConditions(
     if (!reading.hasPower) add(AlarmType.POWER_DISCONNECTED)
     if (reading.isNoiseDetectionOff) add(AlarmType.NOISE_DETECTION_OFF)
     val batteryLimit = if (AlarmType.LOW_BATTERY in active) LOW_BATTERY_CLEARS_AT else LOW_BATTERY_BELOW
-    if (reading.batteryLevel >= 0 && reading.batteryLevel < batteryLimit) add(AlarmType.LOW_BATTERY)
+    if (reading.batteryLevel != null && reading.batteryLevel < batteryLimit) add(AlarmType.LOW_BATTERY)
     val temperatureLimit = if (AlarmType.HIGH_TEMPERATURE in active) HIGH_TEMPERATURE_CLEARS_AT else HIGH_TEMPERATURE_ABOVE
-    if (reading.tempCelsius > 0f && reading.tempCelsius > temperatureLimit) add(AlarmType.HIGH_TEMPERATURE)
+    if (reading.tempCelsius != null && reading.tempCelsius > temperatureLimit) add(AlarmType.HIGH_TEMPERATURE)
 }
 
 /** Violation types with an alarm of their own; any other violation is a GPS jump. */

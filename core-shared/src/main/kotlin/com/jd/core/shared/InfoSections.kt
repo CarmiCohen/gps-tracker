@@ -217,8 +217,8 @@ fun newestRowSection(row: LocationUpdate, nowMs: Long, isStale: Boolean): InfoSe
             InfoLine("Signal (mean)", signalText(row.meanCn0DbHz), signalTone(row.meanCn0DbHz)),
             InfoLine("Noise", row.noiseDbfs?.let { "${it.roundToInt()} dBFS" } ?: NO_VALUE),
             InfoLine("Light", row.lightLux?.let { "${it.roundToInt()} lx" } ?: NO_VALUE), // SIMP-NOV22.4-S1
-            batteryLine(row.batteryLevel.takeIf { it >= 0 }, row.isCharging),
-            temperatureLine(row.tempCelsius.takeIf { it > 0f })
+            batteryLine(row.batteryLevel, row.isCharging),
+            temperatureLine(row.tempCelsius) // Null when not known (SIMP-NOV17.7-S1).
         ),
         isStale
     )

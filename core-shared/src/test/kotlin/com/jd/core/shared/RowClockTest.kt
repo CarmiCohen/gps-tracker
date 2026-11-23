@@ -43,6 +43,14 @@ class RowClockTest {
         assertEquals(1_000L, SensingEngine.getOptimalIntervalMs(42.5f, true, 100, 10f))
     }
 
+    /** Chapter 249 (SIMP-NOV17.7-S1): a battery or temperature not known is not critical; -1 was a critical battery until Nov23.1. */
+    @Test
+    fun unknownBatteryAndTemperatureAreNotCritical() {
+        assertEquals(1_000L, SensingEngine.getOptimalIntervalMs(null, false, null, 10f))
+        assertEquals(1_000L, SensingEngine.getOptimalIntervalMs(-1f, true, 80, 0f))
+        assertEquals(10_000L, SensingEngine.getOptimalIntervalMs(null, false, 10, 10f))
+    }
+
     // ISSUE-NOV22.8-O136: an alarmed user may be chasing the thief; the trail must not wait 10 s between points.
     @Test
     fun anAlarmGivesAStationarySensorOnBatteryOneRowASecond() {

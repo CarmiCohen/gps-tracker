@@ -26,12 +26,14 @@ data class LocationUpdate(
      * Nov17.15 and backfilled rows), and the Monitor then falls back to [isCharging] (ISSUE-NOV17.15-O114).
      */
     var isPluggedIn: Boolean? = null,
-    var batteryLevel: Int = -1,
+    /** Battery percent, null when not known (SIMP-NOV17.7-S1). */
+    var batteryLevel: Int? = null,
     var gsmSignalDbm: Int = 0,
     var networkType: String = "--",
     var isBuffered: Boolean = false,
     var isHistoricalLkg: Boolean = false,
-    var tempCelsius: Float = -1f,
+    /** Battery temperature, null when not known: any number, also -1 or below zero, is a real reading (SIMP-NOV17.7-S1). */
+    var tempCelsius: Float? = null,
     var isThermalThrottled: Boolean = false,
     var cumulativeBytesSent: Long = 0L,
     var status: String = "VALID", // What the reading means (VALID, NO_FIX, JUMP, ...); delivery never depends on it
@@ -60,8 +62,8 @@ data class LocationUpdate(
     fun reset() {
         deviceId = ""; lat = 0.0; lng = 0.0; accuracy = 0f; speed = -1f; bearing = 0f; altitude = 0.0
         timestamp = 0L; monotonicNanos = 0L; serverArrivalTs = 0L; sequenceId = 0L
-        isCharging = false; isPluggedIn = null; batteryLevel = -1; gsmSignalDbm = 0; networkType = "--"
-        isBuffered = false; isHistoricalLkg = false; tempCelsius = -1f
+        isCharging = false; isPluggedIn = null; batteryLevel = null; gsmSignalDbm = 0; networkType = "--"
+        isBuffered = false; isHistoricalLkg = false; tempCelsius = null
         isThermalThrottled = false; cumulativeBytesSent = 0L; status = "VALID"; isNoiseDetectionOff = false; isCritical = false
         satsUsed = -1; satsInView = -1; meanCn0DbHz = null; noiseDbfs = null; lightLux = null; vibrationG = 0f
     }

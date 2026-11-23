@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov23.00 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov23.1 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1253,6 +1253,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **246.1 Unit:** `LearnedBackgroundTest`: no background before the first value; a 3 s warm-up from it; a fall followed with a 1 s and a rise with a 10 s time constant, and 0.5 s in the warm-up; the same course in short or long spans learns the same background; an empty span changes nothing; the noise (100 ms frames) and the light (held readings every 250 ms) fed the same course learn the same background. `AcousticDetectorTest`, `LightDetectorTest`, `RiseConfirmerTest` and `SensorBehaviourTest` pass unchanged (only the warm-up constant's name).
 *   **246.2 Device:** `ProductionReadinessAuditTest` on the A15, and the release Sensor starts there with `davey_over_500ms=0 stacklog=0 fatal=0`. The live noise and light alerts are 241.4 and 237.3.
 
+## Chapter 249 - Unknown Battery And Temperature As Null (Nov23.1)
+**Status: A / L** - 249.1 passed (1089 unit tests); 249.2 passed on the A15 (`ProductionReadinessAuditTest` 3/3, release Sensor start clean, buffer 6 -> 7 with the sequence kept); 249.3 waits for the relay (O133) and a paired Monitor (SIMP-NOV17.7-S1, SOT 1.489)
+*   **249.1 Unit:** `LocationRowWireTest`: an unknown battery and temperature are left out of the row and read back as null; -1 C, 0 C, -12.5 C and an empty battery travel as readings; an older Sensor's `batt` -1 reads as null. `ForensicEntryIntegrityTest`: unknown stays unknown and -1 C is kept; a version 6 file is upgraded to 7 with its -1 temperatures as unknown, its battery, charging and light kept, and a torn entry still skipped; a version 4 file reads battery and temperature as null. `MonitorAlarmsTest`: an unknown battery or temperature raises nothing, and a freezing tracker no high-temperature alarm. `RowClockTest`: an unknown battery or temperature is not critical. `UnknownTelemetryTest`, `SensorGraphsTest`: unknown is null, not -1.
+*   **249.2 Device:** the A15's buffer is upgraded from version 6 to 7 by the new Sensor with its next sequence kept; `ProductionReadinessAuditTest` passes and the release Sensor starts with `davey_over_500ms=0 stacklog=0 fatal=0`.
+*   **249.3 Two phones:** with the relay back, the Monitor's HUD and `SENSOR'S NEWEST ROW` show the Sensor's battery and temperature (no `--` while the A15 reports both), and no low-battery or high-temperature alarm at normal values.
+
 ## Chapter 247 - Vibration On The Row (Nov22.14)
 **Status: A** - 247.1 passed (`LocationUpdateTest` 2/2, `LocationRowWireTest` 5/5, 1077 unit tests); 247.2 passed on the A15 (`ProductionReadinessAuditTest` 3/3, `ForensicPersistenceAuditTest` 3/3, release Sensor start clean; the Monitor not installed there) (SIMP-NOV22.11-S1, SOT 1.487)
 *   **247.1 Unit:** `LocationUpdateTest`: a snapshot keeps its sequence, light and vibration after the pooled row it came from is reset; a reset row equals a new `LocationUpdate()`, with the vibration 0. `LocationRowWireTest`: the vibration travels as `vib` on live and backfilled rows and reads back. `ForensicBufferStressTest` and `AlarmStealthTest` pass with `vibrationG`.
@@ -1263,8 +1269,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **248.1 Unit:** `RiseDetectorTest`: the first value only starts the background, whatever its span; no alert while the background warms up, which follows the value fast; after it, a rise of 2 s within 3 s alerts once against the background before the rise, while the background follows every span. `AcousticDetectorTest`, `LightDetectorTest`, `LearnedBackgroundTest` and `RiseConfirmerTest` pass unchanged.
 *   **248.2 Device:** `ProductionReadinessAuditTest` on the A15, and the release Sensor starts there with `davey_over_500ms=0 stacklog=0 fatal=0`. The live noise and light alerts are 241.4 and 237.3.
 
+## Chapter 249 - Unknown Battery And Temperature As Null (Nov23.1)
+**Status: A / L** - 249.1 passed (1089 unit tests); 249.2 passed on the A15 (`ProductionReadinessAuditTest` 3/3, release Sensor start clean, buffer 6 -> 7 with the sequence kept); 249.3 waits for the relay (O133) and a paired Monitor (SIMP-NOV17.7-S1, SOT 1.489)
+*   **249.1 Unit:** `LocationRowWireTest`: an unknown battery and temperature are left out of the row and read back as null; -1 C, 0 C, -12.5 C and an empty battery travel as readings; an older Sensor's `batt` -1 reads as null. `ForensicEntryIntegrityTest`: unknown stays unknown and -1 C is kept; a version 6 file is upgraded to 7 with its -1 temperatures as unknown, its battery, charging and light kept, and a torn entry still skipped; a version 4 file reads battery and temperature as null. `MonitorAlarmsTest`: an unknown battery or temperature raises nothing, and a freezing tracker no high-temperature alarm. `RowClockTest`: an unknown battery or temperature is not critical. `UnknownTelemetryTest`, `SensorGraphsTest`: unknown is null, not -1.
+*   **249.2 Device:** the A15's buffer is upgraded from version 6 to 7 by the new Sensor with its next sequence kept; `ProductionReadinessAuditTest` passes and the release Sensor starts with `davey_over_500ms=0 stacklog=0 fatal=0`.
+*   **249.3 Two phones:** with the relay back, the Monitor's HUD and `SENSOR'S NEWEST ROW` show the Sensor's battery and temperature (no `--` while the A15 reports both), and no low-battery or high-temperature alarm at normal values.
+
 ---
-**Active Testing Chapters: 237 of 248**
+**Active Testing Chapters: 238 of 249**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

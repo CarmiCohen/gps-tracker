@@ -17,7 +17,8 @@ import kotlin.test.assertTrue
  * Verifies Chapter 121: stored entries survive interrupted writes, power loss, damaged headers,
  * and the upgrade from file version 2 (ISSUE-NOV6.0-O20). Chapter 203: version 4 keeps satellites, signal
  * and noise, and versions 2 and 3 are upgraded to it (ISSUE-NOV15.5-O99 part 2). Chapter 207: version 5 keeps
- * battery, charging and temperature, and version 4 is upgraded to it (ISSUE-NOV17.3-O102).
+ * battery, charging and temperature, and version 4 is upgraded to it (ISSUE-NOV17.3-O102). Chapter 249: version 7
+ * stores an unknown temperature as NaN, and the -1 of versions 5 and 6 is upgraded to not known (SIMP-NOV17.7-S1).
  *
  * Interruptions are simulated by editing the file into the state they leave behind, because a
  * unit test cannot cut power.
@@ -32,7 +33,8 @@ class ForensicEntryIntegrityTest {
     /** Where version 4 ends its stored fields and puts its checksum. */
     private val versionFourChecksumOffset = 100
     private val versionFiveChecksumOffset = 112
-    private val currentVersion = 6
+    private val versionSixChecksumOffset = 116
+    private val currentVersion = 7
 
     private val offVersion = 4
     private val offWriteIdx = 8
@@ -186,9 +188,9 @@ class ForensicEntryIntegrityTest {
         assertEquals(57, known.batteryLevel)
         assertTrue(known.isCharging)
         assertEquals(31.4f, known.tempCelsius)
-        assertEquals(-1, unknown.batteryLevel)
+        assertNull(unknown.batteryLevel)
         assertFalse(unknown.isCharging)
-        assertEquals(-1f, unknown.tempCelsius)
+        assertNull(unknown.tempCelsius)
     }
 
     /** Chapter 244 (SIMP-NOV22.4-S1): the light level is kept, so backfilled rows carry it like live rows. */
@@ -214,6 +216,38 @@ class ForensicEntryIntegrityTest {
         assertEquals((5L..14L).toList() - 7L, traces.map { it.sequenceId })
         assertTrue(traces.all { it.satsUsed == 9 && it.batteryLevel == 80 && it.isCharging && it.tempCelsius == 30f })
         assertTrue(traces.all { it.lightLux == null })
+        assertEquals(currentVersion, withFile { it.getInt(offVersion) })
+        assertEquals((5L..14L).toList() - 7L, sequences(openBuffer()))
+    }
+
+    /** Chapter 249 (SIMP-NOV17.7-S1): unknown stays unknown, and a freezing -1 C or an empty battery is kept. */
+    @Test
+    fun unknownBatteryAndTemperatureStayUnknownAndFreezingIsKept() {
+        val buffer = openBuffer()
+        buffer.writeTrace(update(0).apply { batteryLevel = 0; tempCelsius = -1f })
+        buffer.writeTrace(update(1))
+
+        val (cold, unknown) = openBuffer().readTraces()
+        assertEquals(0, cold.batteryLevel)
+        assertEquals(-1f, cold.tempCelsius)
+        assertNull(unknown.batteryLevel)
+        assertNull(unknown.tempCelsius)
+    }
+
+    /** Chapter 249: a version 6 file keeps its readings, and its -1 temperature, which meant not known, becomes unknown. */
+    @Test
+    fun versionSixFileReadsItsMinusOneTemperatureAsUnknownAfterUpgrade() {
+        val buffer = openBuffer()
+        (0L..14L).forEach { seq ->
+            buffer.writeTrace(update(seq).apply { batteryLevel = 80; isCharging = true; tempCelsius = if (seq % 2 == 0L) 30f else -1f; lightLux = 500f })
+        }
+        downgrade(6, versionSixChecksumOffset, tornSlot = 7) // Slot 7 holds sequence 7.
+
+        val traces = openBuffer().readTraces()
+
+        assertEquals((5L..14L).toList() - 7L, traces.map { it.sequenceId })
+        assertTrue(traces.all { it.batteryLevel == 80 && it.isCharging && it.lightLux == 500f })
+        assertTrue(traces.all { it.tempCelsius == if (it.sequenceId % 2 == 0L) 30f else null })
         assertEquals(currentVersion, withFile { it.getInt(offVersion) })
         assertEquals((5L..14L).toList() - 7L, sequences(openBuffer()))
     }
@@ -244,7 +278,7 @@ class ForensicEntryIntegrityTest {
 
         assertEquals((5L..14L).toList() - 7L, traces.map { it.sequenceId })
         assertTrue(traces.all { it.satsUsed == 9 })
-        assertTrue(traces.all { it.batteryLevel == -1 && !it.isCharging && it.tempCelsius == -1f && it.lightLux == null })
+        assertTrue(traces.all { it.batteryLevel == null && !it.isCharging && it.tempCelsius == null && it.lightLux == null })
         assertEquals(currentVersion, withFile { it.getInt(offVersion) })
         assertEquals((5L..14L).toList() - 7L, sequences(openBuffer()))
     }

@@ -71,20 +71,22 @@ object SensingEngine {
      * Moving, on outside power, or within the alarm window ([isAlarmed], ISSUE-NOV22.8-O136): [ROW_INTERVAL_MS].
      * Stationary, critical battery (< 15 %) or critical heat (with hysteresis, R133): [SURVIVAL_INTERVAL_MS]; heat and
      * battery override movement, outside power and an alarm (R-ID 83, user decision 2026-11-22).
+     * A temperature or battery level not known (null) is neither critical (SIMP-NOV17.7-S1).
      */
     @Synchronized
     fun getOptimalIntervalMs(
-        currentTemp: Float,
+        currentTemp: Float?,
         isCharging: Boolean,
-        batteryLevel: Int,
+        batteryLevel: Int?,
         velocityMps: Float = 0f,
         isAlarmed: Boolean = false
     ): Long {
-        val isCriticalHeat = currentTemp >= THERMAL_CRITICAL_CELSIUS ||
-            (activeThermalThrottlingMs == SURVIVAL_INTERVAL_MS && currentTemp >= THERMAL_CRITICAL_CELSIUS - THERMAL_HYSTERESIS_CELSIUS)
+        val isCriticalHeat = currentTemp != null && (currentTemp >= THERMAL_CRITICAL_CELSIUS ||
+            (activeThermalThrottlingMs == SURVIVAL_INTERVAL_MS && currentTemp >= THERMAL_CRITICAL_CELSIUS - THERMAL_HYSTERESIS_CELSIUS))
         activeThermalThrottlingMs = if (isCriticalHeat) SURVIVAL_INTERVAL_MS else ROW_INTERVAL_MS
+        val isCriticalBattery = batteryLevel != null && batteryLevel < SURVIVAL_BATTERY_PERCENT
         return when {
-            isCriticalHeat || batteryLevel < SURVIVAL_BATTERY_PERCENT -> SURVIVAL_INTERVAL_MS
+            isCriticalHeat || isCriticalBattery -> SURVIVAL_INTERVAL_MS
             isAlarmed || isCharging || velocityMps > MOVING_MPS -> ROW_INTERVAL_MS
             else -> SURVIVAL_INTERVAL_MS
         }

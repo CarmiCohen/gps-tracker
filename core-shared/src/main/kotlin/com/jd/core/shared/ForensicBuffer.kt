@@ -27,14 +27,16 @@ import java.util.zip.CRC32
  * Version 4 (Nov17.3) also keeps the satellites used and in view, the mean signal and the noise level, so
  * backfilled rows carry them like live rows (ISSUE-NOV15.5-O99 part 2). Version 5 (Nov17.7) also keeps the
  * battery level, charging and temperature (ISSUE-NOV17.3-O102). Version 6 (Nov22.11) also keeps the light level
- * (SIMP-NOV22.4-S1). Older files are upgraded in place.
+ * (SIMP-NOV22.4-S1). Version 7 (Nov23.1) stores an unknown temperature as NaN instead of -1, which is also a real
+ * temperature (SIMP-NOV17.7-S1); the -1 of versions 5 and 6 is read as not known. Older files are upgraded in place.
  */
 class ForensicBuffer(
     private val storageDir: File,
     val capacity: Int = 10000
 ) {
     private val magic = 0x5245564F 
-    private val version = 6
+    private val version = 7
+    private val versionWithLux = 6
     private val versionWithBattery = 5
     private val versionWithSatellites = 4
     private val versionWithoutChecksums = 2
@@ -63,14 +65,15 @@ class ForensicBuffer(
     private val offSatsInView = offSatsUsed + 4
     private val offMeanCn0 = offSatsInView + 4 // NaN when not known
     private val offNoise = offMeanCn0 + 4 // NaN when not known
-    private val offBattery = offNoise + 4 // -1 when not known
+    private val offBattery = offNoise + 4 // -1 when not known, never a real level
     private val offCharging = offBattery + 4 // 1 when charging
-    private val offTemp = offCharging + 4 // -1 when not known, as in LocationUpdate
+    private val offTemp = offCharging + 4 // NaN when not known (-1 in versions 5 and 6, SIMP-NOV17.7-S1)
     private val offLux = offTemp + 4 // NaN when not known
     private val entryDataSize = offLux + 4
 
     /** The stored fields of an older version; its checksum, from version 3 on, follows them. */
     private fun legacyDataSize(storedVersion: Int) = when (storedVersion) {
+        versionWithLux -> entryDataSize
         versionWithBattery -> offLux
         versionWithSatellites -> offBattery
         else -> offSatsUsed
@@ -163,8 +166,9 @@ class ForensicBuffer(
     }
 
     /**
-     * Upgrades a version 2, 3, 4 or 5 file to version 6, keeping its entries: a reset would restart sequence
-     * numbers at 0. The fields the old version lacks are stored as not known. An entry that failed its
+     * Upgrades a version 2 to 6 file to version 7, keeping its entries: a reset would restart sequence
+     * numbers at 0. The fields the old version lacks are stored as not known, and so is the -1 temperature of
+     * versions 5 and 6, which meant not known there (SIMP-NOV17.7-S1). An entry that failed its
      * checksum stays failed. Entries are rewritten whole from their legacy bytes, and the version changes last,
      * so an interrupted upgrade simply repeats.
      */
@@ -180,6 +184,7 @@ class ForensicBuffer(
             val valid = !checked || buffer.getInt(offset + legacySize) == crc.value.toInt()
             System.arraycopy(legacy, 0, entryData, 0, legacySize)
             putUnknownExtras(from = legacySize)
+            if (storedVersion >= versionWithBattery && entryView.getFloat(offTemp) == -1f) entryView.putFloat(offTemp, Float.NaN)
             storeSlot(buffer, slot)
             if (!valid) buffer.putInt(offset + entryDataSize, entryChecksum().inv())
         }
@@ -199,9 +204,9 @@ class ForensicBuffer(
         if (from <= offBattery) {
             entryView.putInt(offBattery, -1)
             entryView.putInt(offCharging, 0)
-            entryView.putFloat(offTemp, -1f)
+            entryView.putFloat(offTemp, Float.NaN)
         }
-        entryView.putFloat(offLux, Float.NaN)
+        if (from <= offLux) entryView.putFloat(offLux, Float.NaN)
     }
 
     private fun isHeaderConsistent(): Boolean {
@@ -356,9 +361,9 @@ class ForensicBuffer(
                             this.satsInView = entryView.getInt(offSatsInView)
                             this.meanCn0DbHz = entryView.getFloat(offMeanCn0).takeUnless { it.isNaN() }
                             this.noiseDbfs = entryView.getFloat(offNoise).takeUnless { it.isNaN() }
-                            this.batteryLevel = entryView.getInt(offBattery)
+                            this.batteryLevel = entryView.getInt(offBattery).takeIf { it >= 0 }
                             this.isCharging = entryView.getInt(offCharging) == 1
-                            this.tempCelsius = entryView.getFloat(offTemp)
+                            this.tempCelsius = entryView.getFloat(offTemp).takeUnless { it.isNaN() }
                             this.lightLux = entryView.getFloat(offLux).takeUnless { it.isNaN() }
                         }
                         result.add(update)
@@ -421,9 +426,9 @@ class ForensicBuffer(
                 entryView.putInt(offSatsInView, update.satsInView)
                 entryView.putFloat(offMeanCn0, update.meanCn0DbHz ?: Float.NaN)
                 entryView.putFloat(offNoise, update.noiseDbfs ?: Float.NaN)
-                entryView.putInt(offBattery, update.batteryLevel)
+                entryView.putInt(offBattery, update.batteryLevel ?: -1)
                 entryView.putInt(offCharging, if (update.isCharging) 1 else 0)
-                entryView.putFloat(offTemp, update.tempCelsius)
+                entryView.putFloat(offTemp, update.tempCelsius ?: Float.NaN)
                 entryView.putFloat(offLux, update.lightLux ?: Float.NaN)
                 storeSlot(buffer, currentWrite)
 

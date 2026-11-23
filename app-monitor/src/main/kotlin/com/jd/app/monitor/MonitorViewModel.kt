@@ -424,9 +424,9 @@ class MonitorViewModel @Inject constructor(
             ),
             trackerState = motionState(speedKmh),
             speedKmh = speedKmh,
-            batteryLevel = latest?.takeIf { it.batteryLevel >= 0 }?.batteryLevel,
+            batteryLevel = latest?.batteryLevel,
             isCharging = latest?.isCharging ?: false,
-            tempCelsius = latest?.takeIf { it.tempCelsius > 0f }?.tempCelsius,
+            tempCelsius = latest?.tempCelsius,
             accuracyMeters = latest?.accuracy ?: 0f,
             telemetryAgeSec = ageSec,
             sequenceId = latest?.sequenceId ?: 0L

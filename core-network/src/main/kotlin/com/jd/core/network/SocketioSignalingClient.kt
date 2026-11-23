@@ -534,7 +534,8 @@ object LocationRowWire {
      * One row as the Sensor sends it, live or as backfill. [live] adds what the forensic buffer does not keep:
      * `noiseOff`, and `crit`, which tells the relay to push the row to the Monitors as well (ISSUE-NOV10.8-O86).
      * Satellites, signal and noise travel on both since Nov17.3 (ISSUE-NOV15.5-O99 part 2); a value not known is left out.
-     * Backfilled battery, charging and temperature are real since Nov17.7 (ISSUE-NOV17.3-O102), -1 when not known.
+     * Backfilled battery, charging and temperature are real since Nov17.7 (ISSUE-NOV17.3-O102); since Nov23.1 battery and
+     * temperature are left out while not known, so every number sent is a reading (SIMP-NOV17.7-S1).
      * The light level travels on both since Nov22.11 as `lux` (SIMP-NOV22.4-S1), left out while not known.
      */
     fun encode(update: LocationUpdate, deviceId: String, live: Boolean): JSONObject = JSONObject().apply {
@@ -547,10 +548,10 @@ object LocationRowWire {
         put("vib", update.vibrationG)
         put("acc", update.accuracy)
         put("spd", update.speed)
-        put("batt", update.batteryLevel)
+        update.batteryLevel?.let { put("batt", it) }
         put("chg", update.isCharging)
         update.isPluggedIn?.let { put("plg", it) } // ISSUE-NOV17.15-O114; left out while not known.
-        put("temp", update.tempCelsius)
+        update.tempCelsius?.let { put("temp", it.toDouble()) }
         if (update.satsUsed >= 0) put("sats", update.satsUsed)
         if (update.satsInView >= 0) put("satsView", update.satsInView)
         update.meanCn0DbHz?.let { put("snr", it.toDouble()) }
@@ -572,11 +573,12 @@ object LocationRowWire {
             status = data.optString("status", "VALID"),
             accuracy = data.optDouble("acc", 0.0).toFloat(),
             speed = data.optDouble("spd", 0.0).toFloat(),
-            batteryLevel = data.optInt("batt", 0),
+            // Absent while not known (SIMP-NOV17.7-S1); a Sensor before Nov23.1 sent -1 then, never a real level.
+            batteryLevel = data.optInt("batt", -1).takeIf { it >= 0 },
             isCharging = data.optBoolean("chg", false),
             // Absent from Sensors before Nov17.15 and from backfill: the Monitor then reads `chg` (ISSUE-NOV17.15-O114).
             isPluggedIn = if (data.has("plg")) data.optBoolean("plg") else null,
-            tempCelsius = data.optDouble("temp", 0.0).toFloat(),
+            tempCelsius = if (data.has("temp")) data.optDouble("temp").toFloat() else null, // SIMP-NOV17.7-S1
             isNoiseDetectionOff = data.optBoolean("noiseOff", false), // Absent from Sensors before Nov9.1: no warning.
             // Absent from Sensors before Nov15.5, from backfill before Nov17.3, and while not known (O84 part 2, O99 part 2).
             satsUsed = data.optInt("sats", -1),

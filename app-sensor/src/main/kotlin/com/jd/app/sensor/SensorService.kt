@@ -105,10 +105,10 @@ class SensorService : Service(), SensorEventListener {
     private val sequenceIdCounter = java.util.concurrent.atomic.AtomicLong(0L)
     private var initJob: Job? = null
     
-    private var lastBatteryLevel = -1
+    private var lastBatteryLevel: Int? = null // Null when not known, as in the rows (SIMP-NOV17.7-S1).
     private var lastIsCharging = false
     private var lastIsPluggedIn = false // A charger is connected, even if the battery is held (ISSUE-NOV17.15-O114).
-    private var lastTempCelsius = -1f
+    private var lastTempCelsius: Float? = null
     // The Monitor user's Home Points, enforced here so the Monitor does no per-fix work (ISSUE-NOV8.13-O51).
     @Volatile private var geofence = GeofenceConfig() // Written by the geofence collector, read by the sensing loop.
     private var geofenceState = SentinelLogic.GeofenceState.UNKNOWN // Sensing loop only.
@@ -177,7 +177,7 @@ class SensorService : Service(), SensorEventListener {
     private fun parseBatteryIntent(intent: Intent) {
         val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-        lastBatteryLevel = if (level >= 0 && scale > 0) level * 100 / scale else -1
+        lastBatteryLevel = if (level >= 0 && scale > 0) level * 100 / scale else null
         
         val power = batteryPower(
             status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1),
@@ -187,7 +187,7 @@ class SensorService : Service(), SensorEventListener {
         lastIsPluggedIn = power.isPluggedIn
                          
         val tempTenths = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
-        lastTempCelsius = if (tempTenths != Int.MIN_VALUE) tempTenths / 10.0f else -1f
+        lastTempCelsius = if (tempTenths != Int.MIN_VALUE) tempTenths / 10.0f else null
         
         refreshSamplingRate()
     }
@@ -796,7 +796,7 @@ class SensorService : Service(), SensorEventListener {
         )
         
         if (newInterval != currentIntervalMs) {
-            SystemLogger.i("SensorService", "Sampling Updated: ${newInterval}ms (Speed: ${speed}m/s, Bat: ${lastBatteryLevel}%, Temp: ${lastTempCelsius}C, Alarm window: $isAlarmed)")
+            SystemLogger.i("SensorService", "Sampling Updated: ${newInterval}ms (Speed: ${speed}m/s, Bat: ${lastBatteryLevel?.let { "$it%" } ?: "unknown"}, Temp: ${lastTempCelsius?.let { "${it}C" } ?: "unknown"}, Alarm window: $isAlarmed)")
             currentIntervalMs = newInterval
             if (preempt) orchestrator.preemptLoop("sensing_loop")
         }

@@ -25,9 +25,9 @@ fun sensorGraphSample(
     linkUpPercent: Float,
     latencyMs: Long?,
     queuedRows: Int,
-    batteryPercent: Int,
+    batteryPercent: Int?,
     isCharging: Boolean,
-    temperatureC: Float
+    temperatureC: Float?
 ): GraphSample = GraphSample.of(
     timeMs,
     mapOf(
@@ -43,9 +43,9 @@ fun sensorGraphSample(
         GraphField.LINK_UP_PERCENT to linkUpPercent,
         GraphField.LATENCY_MS to latencyMs,
         GraphField.QUEUED_ROWS to queuedRows,
-        GraphField.BATTERY_PERCENT to batteryPercent.takeIf { it >= 0 },
-        GraphField.CHARGING to (if (batteryPercent >= 0) (if (isCharging) 1 else 0) else null),
-        GraphField.TEMPERATURE_C to temperatureC.takeIf { it > 0f },
+        GraphField.BATTERY_PERCENT to batteryPercent, // Null when not known, as in the rows (SIMP-NOV17.7-S1).
+        GraphField.CHARGING to batteryPercent?.let { if (isCharging) 1 else 0 },
+        GraphField.TEMPERATURE_C to temperatureC,
         GraphField.LIGHT_LUX to lightPeakLux
     )
 )

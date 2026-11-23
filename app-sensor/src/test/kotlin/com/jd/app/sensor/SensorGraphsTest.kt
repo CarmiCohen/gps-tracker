@@ -15,8 +15,8 @@ class SensorGraphsTest {
         behaviour: SensorBehaviour = SensorBehaviour(),
         vibrationPeak: Double? = 0.5 * STANDARD_GRAVITY,
         gnss: GnssSummary? = GnssSummary(26, 55, 23.94f),
-        battery: Int = 87,
-        temperature: Float = 31.5f,
+        battery: Int? = 87,
+        temperature: Float? = 31.5f,
         lightPeak: Double? = 312.4
     ) = sensorGraphSample(
         timeMs = 1_800_000_000_000L,
@@ -65,8 +65,8 @@ class SensorGraphsTest {
             behaviour = SensorBehaviour(vibrationAlert = false, tiltAlert = false),
             vibrationPeak = null,
             gnss = null,
-            battery = -1,
-            temperature = -1f,
+            battery = null,
+            temperature = null,
             lightPeak = null
         )
         assertNull(sample[GraphField.VIBRATION_LIMIT_G])

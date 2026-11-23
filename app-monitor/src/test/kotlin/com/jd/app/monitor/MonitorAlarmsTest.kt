@@ -25,9 +25,9 @@ class MonitorAlarmsTest {
 
     private fun reading(
         at: Long = start,
-        battery: Int = 80,
+        battery: Int? = 80,
         charging: Boolean = true,
-        temp: Float = 30f,
+        temp: Float? = 30f,
         sensorTime: Long = at,
         lat: Double = 37.7749,
         lng: Double = -122.4194,
@@ -81,6 +81,14 @@ class MonitorAlarmsTest {
         assertEquals(emptySet<AlarmType>(), conditions(reading(battery = LOW_BATTERY_BELOW)))
         assertEquals(setOf(AlarmType.HIGH_TEMPERATURE), conditions(reading(temp = 46.1f)))
         assertEquals(emptySet<AlarmType>(), conditions(reading(temp = HIGH_TEMPERATURE_ABOVE)))
+    }
+
+    /** Chapter 249 (SIMP-NOV17.7-S1): a battery or temperature not known raises nothing; a freezing tracker is no alarm. */
+    @Test
+    fun unknownBatteryAndTemperatureRaiseNothing() {
+        assertEquals(emptySet<AlarmType>(), conditions(reading(battery = null, temp = null)))
+        assertEquals(emptySet<AlarmType>(), conditions(reading(temp = -1f)))
+        assertEquals(setOf(AlarmType.LOW_BATTERY), conditions(reading(battery = 0, temp = -10f)))
     }
 
     @Test

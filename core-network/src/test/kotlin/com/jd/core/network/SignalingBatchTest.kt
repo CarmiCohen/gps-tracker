@@ -96,7 +96,7 @@ class SignalingBatchTest {
             assertEquals(35.25, update.lng, 0.0)
             assertEquals(79, update.batteryLevel)
             assertTrue(update.isCharging)
-            assertEquals(31f, update.tempCelsius, 0f)
+            assertEquals(31f, update.tempCelsius!!, 0f)
             assertEquals(5f, update.accuracy, 0f)
             assertEquals(2f, update.speed, 0f)
         } finally {
