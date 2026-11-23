@@ -94,19 +94,6 @@ fun formatUptime(startTimeMs: Long, nowMs: Long): String {
     return String.format(java.util.Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
 }
 
-/** The service line of the Sensor Setup dialog. */
-fun serviceStatusText(isRunning: Boolean, uptimeText: String = ""): String {
-    return if (isRunning) {
-        if (uptimeText.isNotBlank()) "Sensor Service: Running ($uptimeText)" else "Sensor Service: Running"
-    } else {
-        "Sensor Service: Stopped"
-    }
-}
-
-/** The relay line of the Sensor Setup dialog. */
-fun relayStatusText(isConnected: Boolean): String =
-    "Relay Connection: ${if (isConnected) "Connected" else "Disconnected"}"
-
 /** What the Sensor's noise detection is doing (ISSUE-NOV5.2-O11 Group 4). */
 enum class MicrophoneState {
     /** The service is not running. */
@@ -147,7 +134,7 @@ fun restartNotificationTitle(refused: RefusedAccess): String? = when {
     else -> null
 }
 
-/** The background location line of the Sensor screen and Setup dialog ("Allow all the time", ISSUE-NOV8.103-O60). */
+/** The background location line of the Sensor console ("Allow all the time", ISSUE-NOV8.103-O60). */
 fun backgroundLocationStatusText(isAllowedAllTheTime: Boolean): String = "Location after a restart: " +
     if (isAllowedAllTheTime) "Automatic (allowed all the time)" else "Needs a tap on the notification"
 
@@ -169,12 +156,15 @@ fun switchedOffMotionKinds(behaviour: SensorBehaviour): List<String> = listOfNot
     "vibration".takeUnless { behaviour.vibrationAlert }
 )
 
-/** The motion line of the Sensor Setup dialog; it names the kinds switched off on the Monitor (ISSUE-NOV15.2-O97). */
+/**
+ * The Motion value of the Info screens, its one place since SIMP-NOV15.5-S1 (the Info line carries the label); it names
+ * the kinds switched off on the Monitor (ISSUE-NOV15.2-O97).
+ */
 fun motionStatusText(state: MotionState, behaviour: SensorBehaviour = SensorBehaviour()): String {
     val rest = "after the phone rests ${com.jd.core.shared.MOTION_ARM_AFTER_STILL_MS / 1000} s"
     val off = switchedOffMotionKinds(behaviour)
     val switchedOff = if (state.isRunning && off.size in 1..2) "; ${off.joinToString(" and ")} off on the Monitor" else ""
-    return "Tilt, Lift & Vibration: " + when {
+    return when {
         !state.isRunning -> "Off"
         off.size == 3 -> "Off (switched off on the Monitor)"
         state.isArmed && state.isVibrationArmed ->
@@ -185,8 +175,8 @@ fun motionStatusText(state: MotionState, behaviour: SensorBehaviour = SensorBeha
     } + switchedOff
 }
 
-/** The microphone line of the Sensor Setup dialog. */
-fun microphoneStatusText(state: MicrophoneState): String = "Microphone: " + when (state) {
+/** The Microphone value of the Info screens, its one place since SIMP-NOV15.5-S1 (the Info line carries the label). */
+fun microphoneStatusText(state: MicrophoneState): String = when (state) {
     MicrophoneState.OFF -> "Off"
     MicrophoneState.NO_PERMISSION -> "Audio Denied"
     MicrophoneState.NEEDS_APP_OPEN -> "Off after a restart: tap its notification or open the Sensor app"

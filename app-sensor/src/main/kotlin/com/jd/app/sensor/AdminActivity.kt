@@ -46,7 +46,6 @@ import com.jd.core.ui.getAppVersionName
 import com.jd.core.shared.SystemLogger
 import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.RelayConfig
-import com.jd.core.shared.SensorBehaviour
 import com.jd.core.network.ForensicIdentityManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
@@ -90,9 +89,7 @@ class AdminActivity : ComponentActivity() {
                 val hudState by viewModel.hudState.collectAsStateWithLifecycle()
                 val isServiceRunning by viewModel.isServiceRunning.collectAsStateWithLifecycle()
                 val serviceUptimeText by viewModel.serviceUptimeText.collectAsStateWithLifecycle()
-                val microphoneState by viewModel.microphoneState.collectAsStateWithLifecycle()
                 val refusedAccess by viewModel.refusedAccess.collectAsStateWithLifecycle()
-                val motionState by viewModel.motionState.collectAsStateWithLifecycle()
                 val logs by SystemLogger.logs.collectAsStateWithLifecycle()
                 val scope = rememberCoroutineScope()
                 val context = LocalContext.current
@@ -247,9 +244,6 @@ class AdminActivity : ComponentActivity() {
                                     hudState = hudState,
                                     isServiceRunning = isServiceRunning,
                                     serviceUptimeText = serviceUptimeText,
-                                    microphoneState = microphoneState,
-                                    motionState = motionState,
-                                    sensorBehaviour = sensorBehaviour,
                                     trackerId = trackerId,
                                     lastMonitorId = lastMonitorId,
                                     relayUrl = relayUrl,
@@ -289,7 +283,7 @@ fun startSensorService(context: android.content.Context) {
 
 /**
  * Asked together with the required permissions, but not required: without it the Sensor runs without noise
- * detection and shows "Microphone: Audio Denied" (ISSUE-NOV5.2-O11 Group 4).
+ * detection and its Info screen shows Microphone "Audio Denied" (ISSUE-NOV5.2-O11 Group 4).
  */
 internal const val OPTIONAL_MICROPHONE_PERMISSION = Manifest.permission.RECORD_AUDIO
 
@@ -544,9 +538,6 @@ fun SensorAdminConsole(
     hudState: HudState,
     isServiceRunning: Boolean,
     serviceUptimeText: String,
-    microphoneState: MicrophoneState,
-    motionState: MotionState,
-    sensorBehaviour: SensorBehaviour,
     trackerId: String,
     /** The ID of the Monitor heard last, null while none was (ISSUE-NOV22.7-O135). */
     lastMonitorId: String?,
@@ -620,20 +611,12 @@ fun SensorAdminConsole(
                 Text(phoneSetupLineText(setupMissing))
             }
 
-            Text(
-                text = microphoneStatusText(microphoneState),
-                fontSize = 12.sp,
-                color = if (microphoneState == MicrophoneState.LISTENING) com.jd.core.ui.SensorGreen else com.jd.core.ui.BrandGold
-            )
+            // The microphone and motion states are on the Info screen only (SIMP-NOV15.5-S1); this location line stays,
+            // as Info does not show it.
             Text(
                 text = backgroundLocationStatusText(isAllowedAllTheTime),
                 fontSize = 12.sp,
                 color = if (isAllowedAllTheTime) com.jd.core.ui.SensorGreen else com.jd.core.ui.BrandGold
-            )
-            Text(
-                text = motionStatusText(motionState, sensorBehaviour),
-                fontSize = 12.sp,
-                color = if (motionState.isArmed) com.jd.core.ui.SensorGreen else com.jd.core.ui.BrandGold
             )
 
             Card(
@@ -735,16 +718,12 @@ fun SensorAdminConsole(
             onDismissRequest = { showSetupDialog = false },
             title = { Text("Sensor Setup") }, // The detailed Info has its own screen (ISSUE-NOV10.8-O84 part 2).
             text = {
+                // IDs, URL and version only: every state is on the Info screen, its one place (SIMP-NOV15.5-S1).
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Sensor Device ID: $trackerId")
                     Text("Last Monitor ID: ${lastMonitorId ?: "none heard yet"}") // ISSUE-NOV22.7-O135
                     Text("Relay URL: $relayUrl")
                     Text("App Version: ${getAppVersionName(context)}")
-                    Text(serviceStatusText(isServiceRunning, serviceUptimeText))
-                    Text(relayStatusText(hudState.isRelayConnected))
-                    Text(microphoneStatusText(microphoneState))
-                    Text(backgroundLocationStatusText(isAllowedAllTheTime))
-                    Text(motionStatusText(motionState, sensorBehaviour))
                 }
             },
             confirmButton = {
@@ -753,11 +732,19 @@ fun SensorAdminConsole(
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showSetupDialog = false
-                    onSettingsClick()
-                }) {
-                    Text("SETTINGS")
+                Row {
+                    TextButton(onClick = {
+                        showSetupDialog = false
+                        onInfoClick()
+                    }) {
+                        Text("INFO")
+                    }
+                    TextButton(onClick = {
+                        showSetupDialog = false
+                        onSettingsClick()
+                    }) {
+                        Text("SETTINGS")
+                    }
                 }
             }
         )

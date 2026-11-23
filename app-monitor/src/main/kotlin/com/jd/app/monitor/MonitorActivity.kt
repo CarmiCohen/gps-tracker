@@ -919,7 +919,7 @@ fun MonitorScreen(
                     }
                     Text("Relay URL: $relayUrl")
                     Text("App Version: ${getAppVersionName(LocalContext.current)}")
-                    Text(localHudState.relayStatusText)
+                    // The relay state is on the Info screen and the SRV LED only (SIMP-NOV15.5-S1).
                     Text(sensorSetupStatusText(sensorSetup, setupWarnings.size))
                     Text(sensorBehaviourStatusText(sensorSetup, alertSettings.sensorRevision))
 

@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Chapter 138 (ISSUE-NOV6.4-O34, updated Nov7.34 for ISSUE-NOV7.2-O36): the Sensor Setup dialog and console show the service's real state and uptime. */
+/** Chapter 138 (ISSUE-NOV6.4-O34, updated Nov7.34 for ISSUE-NOV7.2-O36): the console and the Info screen show the service's real state and uptime (the Setup dialog no longer does, SIMP-NOV15.5-S1). */
 class SensorServiceStatusTest {
 
     @Test
@@ -50,21 +50,10 @@ class SensorServiceStatusTest {
         assertEquals("01:01:00", formatUptime(1000L, 3661000L))
     }
 
-    @Test
-    fun serviceLineShowsRunningOrStoppedWithUptime() {
-        assertEquals("Sensor Service: Running", serviceStatusText(true))
-        assertEquals("Sensor Service: Running (00:01:04)", serviceStatusText(true, "00:01:04"))
-        assertEquals("Sensor Service: Stopped", serviceStatusText(false))
-        assertEquals("Sensor Service: Stopped", serviceStatusText(false, "00:01:04"))
-    }
+    // The service and relay lines and their three tests went with SIMP-NOV15.5-S1 (user-confirmed, Rule 17): the Info
+    // screen shows both states. The microphone and motion values below carry no label since then; Info adds it.
 
-    @Test
-    fun relayLineShowsConnectedOrDisconnected() {
-        assertEquals("Relay Connection: Connected", relayStatusText(true))
-        assertEquals("Relay Connection: Disconnected", relayStatusText(false))
-    }
-
-    /** Chapter 161 (ISSUE-NOV5.2-O11 Group 4) and chapter 51: the microphone line, with "Audio Denied" without the permission. */
+    /** Chapter 161 (ISSUE-NOV5.2-O11 Group 4) and chapter 51: the microphone value, "Audio Denied" without the permission. */
     @Test
     fun microphoneLineFollowsTheServiceAndIsOffWhenStopped() {
         val status = SensorServiceStatus()
@@ -72,13 +61,13 @@ class SensorServiceStatusTest {
 
         status.markRunning(1000L)
         status.setMicrophone(MicrophoneState.LISTENING)
-        assertEquals("Microphone: Listening", microphoneStatusText(status.microphone.value))
+        assertEquals("Listening", microphoneStatusText(status.microphone.value))
 
         status.markStopped()
         assertEquals(MicrophoneState.OFF, status.microphone.value)
-        assertEquals("Microphone: Audio Denied", microphoneStatusText(MicrophoneState.NO_PERMISSION))
+        assertEquals("Audio Denied", microphoneStatusText(MicrophoneState.NO_PERMISSION))
         assertEquals(
-            "Microphone: Off after a restart: tap its notification or open the Sensor app",
+            "Off after a restart: tap its notification or open the Sensor app",
             microphoneStatusText(MicrophoneState.NEEDS_APP_OPEN)
         )
     }
@@ -124,20 +113,20 @@ class SensorServiceStatusTest {
     @Test
     fun motionLineShowsArmedStateAndSensorsAndIsOffWhenStopped() {
         val status = SensorServiceStatus()
-        assertEquals("Tilt, Lift & Vibration: Off", motionStatusText(status.motion.value))
+        assertEquals("Off", motionStatusText(status.motion.value))
 
         status.setMotion(MotionState(isRunning = true))
-        assertEquals("Tilt, Lift & Vibration: Arms after the phone rests 30 s", motionStatusText(status.motion.value))
+        assertEquals("Arms after the phone rests 30 s", motionStatusText(status.motion.value))
         status.setMotion(MotionState(isRunning = true, isArmed = true, isVibrationArmed = true))
-        assertEquals("Tilt, Lift & Vibration: Armed (accelerometer)", motionStatusText(status.motion.value))
-        assertEquals("Tilt, Lift & Vibration: Armed (accelerometer + barometer)", motionStatusText(MotionState(true, true, true, true)))
+        assertEquals("Armed (accelerometer)", motionStatusText(status.motion.value))
+        assertEquals("Armed (accelerometer + barometer)", motionStatusText(MotionState(true, true, true, true)))
         // Each re-arms on its own: a knock leaves tilt and lift armed, a tilt leaves vibration armed.
         assertEquals(
-            "Tilt, Lift & Vibration: Tilt and lift armed, vibration after the phone rests 30 s",
+            "Tilt and lift armed, vibration after the phone rests 30 s",
             motionStatusText(MotionState(isRunning = true, isArmed = true))
         )
         assertEquals(
-            "Tilt, Lift & Vibration: Vibration armed, tilt and lift after the phone rests 30 s",
+            "Vibration armed, tilt and lift after the phone rests 30 s",
             motionStatusText(MotionState(isRunning = true, isVibrationArmed = true))
         )
 
@@ -150,33 +139,27 @@ class SensorServiceStatusTest {
     fun motionLineNamesTheKindsSwitchedOffOnTheMonitor() {
         val armed = MotionState(isRunning = true, isArmed = true, isVibrationArmed = true)
         val behaviour = com.jd.core.shared.SensorBehaviour()
-        assertEquals("Tilt, Lift & Vibration: Armed (accelerometer)", motionStatusText(armed, behaviour))
+        assertEquals("Armed (accelerometer)", motionStatusText(armed, behaviour))
         assertEquals(
-            "Tilt, Lift & Vibration: Armed (accelerometer); vibration off on the Monitor",
+            "Armed (accelerometer); vibration off on the Monitor",
             motionStatusText(armed, behaviour.copy(vibrationAlert = false))
         )
         assertEquals(
-            "Tilt, Lift & Vibration: Arms after the phone rests 30 s; tilt and lift off on the Monitor",
+            "Arms after the phone rests 30 s; tilt and lift off on the Monitor",
             motionStatusText(MotionState(isRunning = true), behaviour.copy(tiltAlert = false, liftAlert = false))
         )
         val allOff = behaviour.copy(tiltAlert = false, liftAlert = false, vibrationAlert = false)
-        assertEquals("Tilt, Lift & Vibration: Off (switched off on the Monitor)", motionStatusText(armed, allOff))
+        assertEquals("Off (switched off on the Monitor)", motionStatusText(armed, allOff))
         // A stopped service says Off, whatever the switches.
-        assertEquals("Tilt, Lift & Vibration: Off", motionStatusText(MotionState(), allOff))
+        assertEquals("Off", motionStatusText(MotionState(), allOff))
         // Noise is the microphone line's, not this one's.
-        assertEquals("Tilt, Lift & Vibration: Armed (accelerometer)", motionStatusText(armed, behaviour.copy(noiseAlert = false)))
+        assertEquals("Armed (accelerometer)", motionStatusText(armed, behaviour.copy(noiseAlert = false)))
     }
 
     @Test
     fun microphoneIsAskedForButNotRequired() {
         assertEquals(android.Manifest.permission.RECORD_AUDIO, OPTIONAL_MICROPHONE_PERMISSION)
         assertFalse(getRequiredSensorPermissions(android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE).contains(OPTIONAL_MICROPHONE_PERMISSION))
-    }
-
-    @Test
-    fun noLineClaimsAnInventedReadyState() {
-        listOf(serviceStatusText(true), serviceStatusText(false), relayStatusText(true), relayStatusText(false))
-            .forEach { assertFalse(it, it.contains("Ready") || it.contains("Active")) }
     }
 }
 

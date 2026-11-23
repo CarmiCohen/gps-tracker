@@ -19,11 +19,7 @@ class HudStateTest {
         assertFalse("SRV LED must be inactive when relay is disconnected", disconnectedState.isRelayConnected)
     }
 
-    @Test
-    fun relayStatusTextFollowsTheSrvState() {
-        assertEquals("Relay Status: Connected", HudState(isRelayConnected = true).relayStatusText)
-        assertEquals("Relay Status: Disconnected", HudState(isRelayConnected = false).relayStatusText)
-    }
+    // relayStatusTextFollowsTheSrvState went with SIMP-NOV15.5-S1 (user-confirmed, Rule 17): no Setup dialog relay line.
 
     @Test
     fun testGpsLedState() {

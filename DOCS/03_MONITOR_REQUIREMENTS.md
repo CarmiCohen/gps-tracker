@@ -14,7 +14,7 @@ The Monitor is a user-centric application designed for visualization, alert mana
 
 ## 3. Visualization & Interaction (The UI)
 - **Top Header Line & Control Menu**: Upper header in `MonitorActivity` providing Setup, Settings, and Disconnect controls.
-- **Monitor Setup & Relay URL**: Accessible via the Setup button in the header; displays Tracker ID, Monitor ID, Relay URL, Version, and Relay Status, with inline URL editing capability.
+- **Monitor Setup & Relay URL**: Accessible via the Setup button in the header; displays Tracker ID, Monitor ID, Relay URL and Version, with inline URL editing capability; the relay state is on the Info screen and the SRV LED (SIMP-NOV15.5-S1, Nov23.7).
 - **Exhaustive Map Engine & Tools Specification**: For complete documentation of all preserved pre-revolution map features (dual trails, home points ADD/DEL, trail CLEAR/SAVE/LOAD, geofence boundary circles, jump/out-of-range markers, replay cursor, stationary anchor badge, and map controls overlay), see [MAP_FUNCTIONALITY_SPEC.md](MAP_FUNCTIONALITY_SPEC.md).
 - **Hybrid Map**:
     - High-fidelity rendering of the **Sensor's** trail (remote).

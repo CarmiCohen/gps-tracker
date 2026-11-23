@@ -149,19 +149,15 @@ class SensorViewModel @Inject constructor(
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), GraphScreenState())
 
-    /** Reported by [SensorService] itself; shown in the Setup dialog (ISSUE-NOV6.4-O34). */
+    /** Reported by [SensorService] itself; drives the console's service card (ISSUE-NOV6.4-O34). */
     val isServiceRunning: StateFlow<Boolean> = serviceStatus.isRunning
 
     val serviceStartTimeMillis: StateFlow<Long> = serviceStatus.startTimeMillis
 
-    /** What the noise detection is doing, reported by [SensorService] (ISSUE-NOV5.2-O11 Group 4). */
-    val microphoneState: StateFlow<MicrophoneState> = serviceStatus.microphone
-
     /** What a background start was refused; opening the app restores it (ISSUE-NOV8.103-O60). */
     val refusedAccess: StateFlow<RefusedAccess> = serviceStatus.refusedAccess
 
-    /** Whether tilt and lift are armed, reported by [SensorService] (ISSUE-NOV5.2-O11 Group 5). */
-    val motionState: StateFlow<MotionState> = serviceStatus.motion
+    // The microphone and motion states are shown on the Info screen only (SIMP-NOV15.5-S1), from SensorService.buildInfo.
 
     private val _ticker = flow {
         while (true) {

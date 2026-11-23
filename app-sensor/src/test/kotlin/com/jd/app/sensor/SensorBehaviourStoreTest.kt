@@ -74,6 +74,6 @@ class SensorBehaviourStoreTest {
     fun noiseSwitchedOffOnTheMonitorIsNoFaultToWarnAbout() {
         assertFalse(MicrophoneState.TURNED_OFF.isNoiseDetectionOff)
         assertTrue(MicrophoneState.NO_PERMISSION.isNoiseDetectionOff)
-        assertEquals("Microphone: Off (noise detection switched off on the Monitor)", microphoneStatusText(MicrophoneState.TURNED_OFF))
+        assertEquals("Off (noise detection switched off on the Monitor)", microphoneStatusText(MicrophoneState.TURNED_OFF))
     }
 }
