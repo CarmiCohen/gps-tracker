@@ -278,7 +278,7 @@ class SensorService : Service(), SensorEventListener {
         isInitialized = true
         val bootTimeMs = System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()
         eventLog.recordFrom { events -> unrecordedStopEvent(events, bootTimeMs, ::processExits) }
-        eventLog.record(EventLevel.INFO, serviceStartedMessage(getAppVersionName(this)))
+        eventLog.record(EventLevel.INFO, serviceStartedMessage(getAppVersionName(this)), kind = SERVICE_STARTED_KIND)
         val startMs = try { android.os.SystemClock.elapsedRealtime() } catch (_: Throwable) { System.currentTimeMillis() }
         serviceStatus.markRunning(startMs)
     }
@@ -350,7 +350,11 @@ class SensorService : Service(), SensorEventListener {
                 val stored = sensorDataStore.saveGeofence(config)
                 SystemLogger.i("Geofence", "Received ${config.points.size} home points, radius ${config.radiusMeters} m, rev ${config.revision} (stored: $stored)")
                 // A detail, still sent to the Monitors (ISSUE-NOV23.4-O139).
-                if (stored) eventLog.record(EventLevel.DETAIL, "$HOME_POINTS_RECEIVED: ${config.points.size}, radius ${config.radiusMeters.toInt()} m")
+                if (stored) eventLog.record(
+                    EventLevel.DETAIL,
+                    "$HOME_POINTS_RECEIVED: ${config.points.size}, radius ${config.radiusMeters.toInt()} m",
+                    kind = HOME_POINTS_RECEIVED_KIND
+                )
             }
             .launchIn(serviceScope)
         sensorDataStore.geofence
@@ -1111,7 +1115,7 @@ class SensorService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         if (isInitialized) {
-            eventLog.record(EventLevel.WARNING, SERVICE_STOPPED)
+            eventLog.record(EventLevel.WARNING, SERVICE_STOPPED, kind = SERVICE_STOPPED_KIND)
             sayStopWord(SilenceCause.SERVICE_STOPPED) // Without the owner's STOP or a shutdown first, a forced stop.
         } else {
             SystemLogger.i("SensorService", "onDestroy before initialization")

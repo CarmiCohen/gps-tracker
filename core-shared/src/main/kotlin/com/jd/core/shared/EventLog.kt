@@ -33,7 +33,8 @@ enum class EventLevel { ALARM, WARNING, INFO, DETAIL }
  * One event. [trackerId] is the Sensor a Monitor received a Sensor event from (ISSUE-NOV15.6-O100 part 7, Nov17.2), so
  * a re-paired Monitor can tell the Sensors apart; null for a phone's own events and for Sensor events received before.
  * [kind] is the violation type of a Sensor alarm (ISSUE-NOV23.4-O139), so a Monitor can tell which of its own alarms
- * answered it; null for any other event and for a Sensor before Nov23.4.
+ * answered it, or one of the event kinds below (SIMP-NOV23.4-S1, Nov23.9); null for any other event and for a Sensor
+ * before Nov23.4.
  */
 @Serializable
 data class EventEntry(
@@ -53,13 +54,28 @@ data class EventEntry(
 const val SERVICE_STARTED = "Sensor service started"
 const val SERVICE_STOPPED = "Sensor service stopped"
 
-fun EventEntry.isServiceLifecycle(): Boolean = message.startsWith(SERVICE_STARTED) || message.startsWith(SERVICE_STOPPED)
-
 /**
  * The start of the Sensor's event for a Monitor's new Home Points: a DETAIL event (ISSUE-NOV23.4-O139) that is still
  * sent to the Monitors, so theirs lists it under Details too.
  */
 const val HOME_POINTS_RECEIVED = "Home points received"
+
+/**
+ * The [EventEntry.kind] of the Sensor's service start, service stop and Home Points events (SIMP-NOV23.4-S1, Nov23.9),
+ * so the code reads the kind and the wording stays free. An event without a kind (recorded before Nov23.9, kept 7 days,
+ * or from an older Sensor) is still known by the start of its message.
+ */
+const val SERVICE_STARTED_KIND = "SERVICE_STARTED"
+const val SERVICE_STOPPED_KIND = "SERVICE_STOPPED"
+const val HOME_POINTS_RECEIVED_KIND = "HOME_POINTS_RECEIVED"
+
+fun EventEntry.isServiceStart(): Boolean = isOfKind(SERVICE_STARTED_KIND, SERVICE_STARTED)
+fun EventEntry.isServiceStop(): Boolean = isOfKind(SERVICE_STOPPED_KIND, SERVICE_STOPPED)
+fun EventEntry.isServiceLifecycle(): Boolean = isServiceStart() || isServiceStop()
+fun EventEntry.isHomePointsReceived(): Boolean = isOfKind(HOME_POINTS_RECEIVED_KIND, HOME_POINTS_RECEIVED)
+
+private fun EventEntry.isOfKind(eventKind: String, legacyPrefix: String): Boolean =
+    kind == eventKind || (kind == null && message.startsWith(legacyPrefix))
 
 /**
  * The Sensor's service start and stop events a Monitor needs to shade the stops among the samples after [afterMs]
@@ -68,12 +84,12 @@ const val HOME_POINTS_RECEIVED = "Home points received"
  */
 fun List<EventEntry>.serviceLifecycleSince(afterMs: Long): List<EventEntry> {
     val lifecycle = filter { it.isServiceLifecycle() }.sortedBy { it.timestampMs }
-    val runStart = lifecycle.indexOfLast { it.timestampMs <= afterMs && it.message.startsWith(SERVICE_STARTED) }
+    val runStart = lifecycle.indexOfLast { it.timestampMs <= afterMs && it.isServiceStart() }
     return lifecycle.drop(runStart + 1)
 }
 
-/** An event learned after the fact, at the time it happened (ISSUE-NOV15.4-O98). */
-data class PastEvent(val level: EventLevel, val message: String, val timestampMs: Long)
+/** An event learned after the fact, at the time it happened (ISSUE-NOV15.4-O98), of [kind] if given (see [EventEntry.kind]). */
+data class PastEvent(val level: EventLevel, val message: String, val timestampMs: Long, val kind: String? = null)
 
 /**
  * Sensor events as the Monitor receives them (ISSUE-NOV10.8-O84). [completeAfterMs], when set, says the batch holds all
@@ -98,7 +114,7 @@ fun List<EventEntry>.shown(period: ViewPeriod, showDetails: Boolean, nowMs: Long
  * received are sent though DETAIL (ISSUE-NOV23.4-O139), rare and the Monitor's own change.
  */
 fun List<EventEntry>.forPeer(): List<EventEntry> =
-    filter { it.level != EventLevel.DETAIL || it.message.startsWith(HOME_POINTS_RECEIVED) }
+    filter { it.level != EventLevel.DETAIL || it.isHomePointsReceived() }
 
 /**
  * The newest [EventLog.PEER_EVENTS_SENT] peer events, sent each time a Monitor comes online and at each new event while
@@ -211,7 +227,7 @@ class EventLog(
                 .onFailure { SystemLogger.w("Event", "Past event not decided: ${it.message}") }
                 .getOrNull() ?: return@launch
             SystemLogger.log(if (event.level == EventLevel.ALARM || event.level == EventLevel.WARNING) "W" else "I", "Event", event.message)
-            add(listOf(EventEntry(newId(event.timestampMs), event.timestampMs, source, event.level, event.message)))
+            add(listOf(EventEntry(newId(event.timestampMs), event.timestampMs, source, event.level, event.message, kind = event.kind)))
         }
     }
 

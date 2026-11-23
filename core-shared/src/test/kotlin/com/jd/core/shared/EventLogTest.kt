@@ -196,6 +196,26 @@ class EventLogTest {
         assertEquals(listOf("home"), listOf(event("detail", ageMs = 0, level = EventLevel.DETAIL), homePoints).forPeer().map { it.id })
     }
 
+    /** SIMP-NOV23.4-S1 (Nov23.9): the Home Points received are known by their kind, an older one by its wording. */
+    @Test
+    fun `the Home Points received go to the Monitor by their kind, whatever their wording`() {
+        val detail = EventLevel.DETAIL
+        val events = listOf(
+            event("home", ageMs = 0, level = detail).copy(message = "New home: 3 points", kind = HOME_POINTS_RECEIVED_KIND),
+            event("legacy", ageMs = 0, level = detail).copy(message = "$HOME_POINTS_RECEIVED: 2, radius 50 m"),
+            event("other", ageMs = 0, level = detail).copy(message = "$HOME_POINTS_RECEIVED: worded so", kind = "OTHER")
+        )
+        assertEquals(listOf("home", "legacy"), events.forPeer().map { it.id })
+    }
+
+    @Test
+    fun `an event recorded after the fact keeps its kind`() = runTest {
+        val log = log(EventSource.SENSOR)
+        log.recordFrom { PastEvent(EventLevel.WARNING, "$SERVICE_STOPPED: app crashed", nowMs - 5_000, kind = SERVICE_STOPPED_KIND) }
+        runCurrent()
+        assertEquals(listOf(SERVICE_STOPPED_KIND), log.events.value.map { it.kind })
+    }
+
     @Test
     fun `a recorded kind is kept`() = runTest {
         val log = log(EventSource.SENSOR)

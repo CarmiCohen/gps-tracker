@@ -207,4 +207,20 @@ class GraphsTest {
         assertEquals(listOf(120L, 60L), ages(150))
         assertTrue("Nothing while the run that began before the request goes on", ages(50).isEmpty())
     }
+
+    // SIMP-NOV23.4-S1 (Nov23.9): the kind tells a start or stop, whatever its wording.
+
+    @Test
+    fun `a start or stop is known by its kind, one without a kind still by its wording`() {
+        val events = listOf(
+            event(50, "$SERVICE_STOPPED: app crashed"), // Before Nov23.9: no kind.
+            event(40, "Service up again").copy(kind = SERVICE_STARTED_KIND),
+            event(30, "Service down").copy(kind = SERVICE_STOPPED_KIND),
+            event(25, "$SERVICE_STARTED, but of another kind").copy(kind = "TILT_ALERT"), // Its kind decides: no start.
+            event(20, "Service up").copy(kind = SERVICE_STARTED_KIND)
+        )
+        val stops = serviceStops(events, nowMs - 3_600_000L, nowMs, nowMs)
+        assertEquals(listOf(50L to 40L, 30L to 20L), stops.map { (nowMs - it.startMs) / minute to (nowMs - it.endMs) / minute })
+        assertEquals(listOf(50L, 40L, 30L, 20L), events.serviceLifecycleSince(0L).map { (nowMs - it.timestampMs) / minute })
+    }
 }

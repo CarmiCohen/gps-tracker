@@ -5,7 +5,9 @@ import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
 import com.jd.core.shared.EventSource
 import com.jd.core.shared.PastEvent
+import com.jd.core.shared.SERVICE_STARTED_KIND
 import com.jd.core.shared.SERVICE_STOPPED
+import com.jd.core.shared.SERVICE_STOPPED_KIND
 import com.jd.core.shared.SensorFault
 import com.jd.core.shared.SensorSetupItem
 import com.jd.core.shared.SensorSetupReport
@@ -61,7 +63,7 @@ class SensorEventsTest {
             ProcessExit(bootMs + 500, ApplicationExitInfo.REASON_USER_REQUESTED) // Before the start: an older run.
         )
         assertEquals(
-            PastEvent(EventLevel.WARNING, "$SERVICE_STOPPED: killed by Android for memory", bootMs + 7_000),
+            PastEvent(EventLevel.WARNING, "$SERVICE_STOPPED: killed by Android for memory", bootMs + 7_000, kind = SERVICE_STOPPED_KIND),
             unrecordedStopEvent(listOf(started, lastSign), bootMs, { exits })
         )
     }
@@ -69,7 +71,7 @@ class SensorEventsTest {
     @Test
     fun `chapter 196 - without an exit record the stop follows the last event, as a restart when before boot`() {
         assertEquals(
-            PastEvent(EventLevel.WARNING, "$SERVICE_STOPPED: reason unknown (after this, exact time unknown)", bootMs + 5_001),
+            PastEvent(EventLevel.WARNING, "$SERVICE_STOPPED: reason unknown (after this, exact time unknown)", bootMs + 5_001, kind = SERVICE_STOPPED_KIND),
             unrecordedStopEvent(listOf(started, lastSign), bootMs, { emptyList() })
         )
         val laterBoot = bootMs + 3_600_000
@@ -85,6 +87,15 @@ class SensorEventsTest {
         assertNull(unrecordedStopEvent(listOf(started, pastStop), bootMs) { error("asked") })
         assertEquals("app updated", exitReasonText(ApplicationExitInfo.REASON_PACKAGE_UPDATED))
         assertEquals("killed by Android (reason 99)", exitReasonText(99))
+    }
+
+    /** SIMP-NOV23.4-S1 (Nov23.9): a start and a stop are known by their kind, whatever their wording. */
+    @Test
+    fun `a start or stop of a kind counts whatever its wording`() {
+        val keptStart = entry(bootMs + 1_000, "Up").copy(kind = SERVICE_STARTED_KIND)
+        val keptStop = entry(bootMs + 6_000, "Down").copy(kind = SERVICE_STOPPED_KIND)
+        assertNull(unrecordedStopEvent(listOf(keptStart, lastSign, keptStop), bootMs) { error("asked") })
+        assertEquals(bootMs + 5_001, unrecordedStopEvent(listOf(keptStart, lastSign), bootMs) { emptyList() }!!.timestampMs)
     }
 
     @Test

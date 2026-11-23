@@ -6,6 +6,9 @@ import com.jd.core.shared.EventLevel
 import com.jd.core.shared.PastEvent
 import com.jd.core.shared.SERVICE_STARTED
 import com.jd.core.shared.SERVICE_STOPPED
+import com.jd.core.shared.SERVICE_STOPPED_KIND
+import com.jd.core.shared.isServiceLifecycle
+import com.jd.core.shared.isServiceStop
 import com.jd.core.shared.SensorSetupReport
 
 /** An event to record: its level and text (ISSUE-NOV10.8-O84). */
@@ -45,14 +48,17 @@ data class ProcessExit(val timestampMs: Long, val reason: Int)
  * [exits] is asked only when a stop is missing.
  */
 fun unrecordedStopEvent(events: List<EventEntry>, bootTimeMs: Long, exits: () -> List<ProcessExit>): PastEvent? {
-    val lastLifecycle = events.lastOrNull { it.message.startsWith(SERVICE_STARTED) || it.message.startsWith(SERVICE_STOPPED) }
-    if (lastLifecycle == null || lastLifecycle.message.startsWith(SERVICE_STOPPED)) return null
+    val lastLifecycle = events.lastOrNull { it.isServiceLifecycle() }
+    if (lastLifecycle == null || lastLifecycle.isServiceStop()) return null
     val exit = exits().filter { it.timestampMs >= lastLifecycle.timestampMs }.minByOrNull { it.timestampMs }
-    if (exit != null) return PastEvent(EventLevel.WARNING, "$SERVICE_STOPPED: ${exitReasonText(exit.reason)}", exit.timestampMs)
+    if (exit != null) return stopEvent(exitReasonText(exit.reason), exit.timestampMs)
     val lastSeenMs = events.last().timestampMs
     val cause = if (lastSeenMs < bootTimeMs) "phone shut down or restarted" else "reason unknown"
-    return PastEvent(EventLevel.WARNING, "$SERVICE_STOPPED: $cause (after this, exact time unknown)", lastSeenMs + 1)
+    return stopEvent("$cause (after this, exact time unknown)", lastSeenMs + 1)
 }
+
+private fun stopEvent(reason: String, atMs: Long) =
+    PastEvent(EventLevel.WARNING, "$SERVICE_STOPPED: $reason", atMs, kind = SERVICE_STOPPED_KIND)
 
 /** Android's exit reason in words; the constants are compile-time values, so this also runs below API 30. */
 fun exitReasonText(reason: Int): String = when (reason) {

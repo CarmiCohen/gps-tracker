@@ -3,7 +3,7 @@
 *Working file: open work only (Documentation Rule D2). What each version did is in its commit message (`git log`); up to Nov23.4 also in the frozen `STATUS/RESOLUTION_ARCHIVE.md`. The long history paragraph this section held up to Nov23.4 is in tag Nov23.4: `git show Nov23.4:DOCS/issues.md`.*
 
 ## 🎯 Next Resumption Focus
-1. Without phones: the next SIMP idea, SIMP-NOV23.4-S1 (event kinds for the service and Home Points events).
+1. Without phones: the next SIMP idea, SIMP-NOV8.103-S1 (violation priority in the sensing loop).
 2. With the user at the A15: 241.4 (knock, alarm window) with 237.3 (torch); also 211.2 and 213.2's Active apps tap.
 3. O133 (row 73): after Render's reset the user deploys relay v6.049; then the waiting live checks 182.2, 238.2, 240.3, 241.3, 244.3, 249.3, 250.3, 251.3.
 4. With the S21FE: release Monitor, then 215.1, 226.3, 227.4, 228.2, 230.3, 233.3, 237.4; O112 when the user has noted false alarms.
@@ -69,7 +69,7 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 ---
 
 ## 🚀 Strategic Simplification Ideas
-*   **SIMP-NOV23.4-S1**: Event Kinds Instead Of Message Prefixes. Since Nov23.4 a Sensor alarm names its violation type in `EventEntry.kind`, while the Graphs still find the service start and stop by the message's start (`isServiceLifecycle`, `SERVICE_STARTED`, `SERVICE_STOPPED`) and `forPeer` finds the Home Points received the same way (`HOME_POINTS_RECEIVED`). A kind for those events too would let the code read the kind and leave the wording free; events kept from before still need the prefix for 7 days.
+*   **SIMP-NOV23.9-S1**: Drop The Prefix Fallback. Since Nov23.9 the service start, stop and Home Points events carry an `EventEntry.kind`; `isOfKind` in `EventLog.kt` still falls back to the message's start for an event without a kind. Once both phones have run Nov23.9 or later for 7 days, the fallback (and the prefix use in `stopReason`) could go, with the tests of the old wording.
 *   **SIMP-NOV22.8-S1**: Fewer Rows While Nobody Watches. **Very low priority, to be discussed again (user decision 2026-11-22).** Since Nov22.8 the relay no longer sends rows back to the Sensor, so with no Monitor connected the rows reach nobody; one row per 10 s while the viewer status says no Monitor would cut the Sensor's mobile data (about 25 MB a day at one row a second) to a tenth, at the price of a coarser stored trail and a Sensor that depends on the viewer status.
 *   **SIMP-NOV22.8-S2**: The Monitor's Foreground State. **Very low priority, to be discussed again (user decision 2026-11-22).** The Monitor keeps its relay connection in the background too (O122), so "a Monitor is connected" does not mean someone is looking. A Monitor -> Sensor message for foreground and background would let the Sensor send its rows faster or slower by it (two Monitors, lost connections and a killed Monitor to be handled).
 *   **SIMP-NOV19.6-S1**: Compose's Own Text Fitting. Since Nov19.6 the HUD data keeps to one line through a private `OneLineFitText` in `HudStatusBar.kt` that measures the text with `rememberTextMeasurer` and steps the font down. Compose BOM 2023.10.01 has no `autoSize`; once the BOM is raised (with the Kotlin upgrade of ISSUE-NOV10.4-O72), `BasicText(autoSize = TextAutoSize.StepBased(6.sp, 9.sp))` would replace it. **Blocked by O72 (found 2026-11-23): `TextAutoSize` needs Compose foundation 1.8 (BOM 2025.04+), so Kotlin 2.x, the Compose compiler plugin, KSP, AGP and compileSdk come first; the user stopped the session rather than take it on.**

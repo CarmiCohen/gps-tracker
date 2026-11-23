@@ -105,8 +105,8 @@ fun serviceStops(events: List<EventEntry>, startMs: Long, endMs: Long, nowMs: Lo
     }
     sensorEvents.sortedBy { it.timestampMs }.forEach { event ->
         when {
-            event.message.startsWith(SERVICE_STOPPED) -> if (open == null) open = event
-            event.message.startsWith(SERVICE_STARTED) -> open?.let { stop ->
+            event.isServiceStop() -> if (open == null) open = event
+            event.isServiceStart() -> open?.let { stop ->
                 stops += ServiceStop(stop.timestampMs, event.timestampMs, stopReason(stop.message), isOngoing = false)
                 open = null
             }
