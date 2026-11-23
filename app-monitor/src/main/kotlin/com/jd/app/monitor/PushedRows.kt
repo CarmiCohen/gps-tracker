@@ -73,6 +73,6 @@ fun pushArrivalLine(row: LocationUpdate, nowMs: Long, isHighPriority: Boolean): 
 /** The log line of a pushed silence notice. */
 fun silenceArrivalLine(silence: SensorSilence, isHighPriority: Boolean): String =
     "Relay notice by push: tracker '${silence.trackerId}' sent nothing for ${silence.silentMs / 1000} s " +
-        "(last row seq ${silence.lastSequenceId})" + lowPriorityNote(isHighPriority)
+        "(last row seq ${silence.lastSequenceId}, ${silence.cause.wire})" + lowPriorityNote(isHighPriority)
 
 private fun lowPriorityNote(isHighPriority: Boolean) = if (isHighPriority) "" else " (delivered at normal priority)"

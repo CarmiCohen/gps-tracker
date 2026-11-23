@@ -243,6 +243,7 @@ class FakeSignalingClient : SignalingClient {
     override suspend fun sendTelemetry(update: LocationUpdate): Boolean = true
     override suspend fun sendTelemetryBatch(updates: List<LocationUpdate>): Boolean = true
     override suspend fun sendViolation(event: com.jd.core.shared.ViolationEvent): Boolean = true
+    override fun sendLastWord(cause: com.jd.core.shared.SilenceCause) = Unit
 
     override suspend fun requestBackfill(request: BackfillRequest): Boolean {
         return onRequestBackfill?.invoke(request) ?: true

@@ -49,6 +49,7 @@ class SignalingClientTest {
             override suspend fun sendTelemetry(update: LocationUpdate) = true
             override suspend fun sendTelemetryBatch(updates: List<LocationUpdate>) = true
             override suspend fun sendViolation(event: com.jd.core.shared.ViolationEvent) = true
+            override fun sendLastWord(cause: com.jd.core.shared.SilenceCause) = Unit
             override suspend fun requestBackfill(request: com.jd.core.shared.BackfillRequest) = true
             override suspend fun sendBackfillResponse(response: com.jd.core.shared.BackfillResponse) = true
             override val geofenceFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.GeofenceConfig>()

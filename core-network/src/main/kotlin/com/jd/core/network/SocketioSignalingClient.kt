@@ -431,6 +431,20 @@ class SocketioSignalingClient @Inject constructor(
         return true
     }
 
+    override fun sendLastWord(cause: com.jd.core.shared.SilenceCause) {
+        val sentAtMs = System.currentTimeMillis()
+        clientScope.launch {
+            val deviceId = currentDeviceId
+            if (deviceId == null || !_isConnected.value) {
+                SystemLogger.w("Signaling", "Last word ${cause.wire} not sent: not connected")
+                return@launch
+            }
+            flushPendingBatch() // The rows taken before the word reach the relay before it.
+            emitCounted(LastWordWire.EVENT, LastWordWire.encode(deviceId, cause, sentAtMs))
+            SystemLogger.i("Signaling", "Last word sent: ${cause.wire}")
+        }
+    }
+
     override suspend fun requestBackfill(request: BackfillRequest): Boolean {
         if (!_isConnected.value) return false
         val payload = JSONObject().apply {

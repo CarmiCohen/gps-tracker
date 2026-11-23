@@ -73,7 +73,9 @@ class PushedAlarmTest {
         fun offlineBooks() = books.count { book -> book.alarms.any { it.type == AlarmType.TRACKER_OFFLINE } }
     }
 
-    private fun AlarmBook.isOffline() = alarms.any { it.type == AlarmType.TRACKER_OFFLINE && it.isActive }
+    private fun AlarmBook.isOffline() = alarms.any { it.type in OFFLINE_ALARMS && it.isActive }
+
+    private val OFFLINE_ALARMS = setOf(AlarmType.TRACKER_OFFLINE, AlarmType.TRACKER_FORCED_OFFLINE)
 
     private fun row(status: String, sentAtMs: Long) = LocationUpdate(
         deviceId = "T", lat = 32.0, lng = 34.0, accuracy = 5f, batteryLevel = 80, isCharging = true,
@@ -164,7 +166,8 @@ class PushedAlarmTest {
         // On joining, the relay replays the last row it had; here it carries an alarm, to show it was taken.
         watch.relay.emit(earlier.copy(status = ACOUSTIC_ALERT_STATUS))
         val replayed = watch.awaitBook { it.needsSiren }
-        assertEquals(listOf(AlarmType.ACOUSTIC_ALERT), replayed.pending.map { it.type })
+        // The tracker's last row was an alarm, so its silence is now a forced disconnection (ISSUE-NOV22.10-O137).
+        assertEquals(listOf(AlarmType.TRACKER_FORCED_OFFLINE, AlarmType.ACOUSTIC_ALERT), replayed.pending.map { it.type })
         assertTrue("The replayed row is not news from the tracker", replayed.isOffline())
 
         watch.relay.emit(later)

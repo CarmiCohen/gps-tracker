@@ -68,6 +68,13 @@ interface SignalingClient {
     suspend fun sendViolation(event: ViolationEvent): Boolean
 
     /**
+     * Sensor: tells the relay why it is about to go silent, after the rows already taken (ISSUE-NOV22.10-O137).
+     * Sent on the client's own scope, so it outlives a stopping service. Best effort: nothing is sent while
+     * disconnected, and a word sent while the network drops may be lost.
+     */
+    fun sendLastWord(cause: com.jd.core.shared.SilenceCause)
+
+    /**
      * Monitor: Requests missing data range (R-ID 768).
      */
     suspend fun requestBackfill(request: BackfillRequest): Boolean

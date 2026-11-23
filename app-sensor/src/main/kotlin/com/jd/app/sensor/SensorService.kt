@@ -17,6 +17,8 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -174,6 +176,29 @@ class SensorService : Service(), SensorEventListener {
         }
     }
 
+    // The stop's last word, sent once: a shutdown's word is not followed by onDestroy's (ISSUE-NOV22.10-O137).
+    @Volatile private var stopWord: SilenceCause? = null
+
+    private val lastWordReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val cause = lastWordFor(intent, isOnMobileData(), lastBatteryLevel, lastIsPluggedIn) ?: return
+            eventLog.record(EventLevel.WARNING, "Going silent: ${cause.wire}")
+            if (intent.action == Intent.ACTION_SHUTDOWN) sayStopWord(cause) else signalingClient.sendLastWord(cause)
+        }
+    }
+
+    private fun sayStopWord(cause: SilenceCause) {
+        if (stopWord != null) return
+        stopWord = cause
+        signalingClient.sendLastWord(cause)
+    }
+
+    private fun isOnMobileData(): Boolean {
+        val connectivity = getSystemService(ConnectivityManager::class.java) ?: return false
+        return connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+            ?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
+    }
+
     private fun parseBatteryIntent(intent: Intent) {
         val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
@@ -234,6 +259,7 @@ class SensorService : Service(), SensorEventListener {
         SystemLogger.i("SensorService", "Initializing hardware components post-permission verification.")
         
         registerBatteryReceiver()
+        registerLastWordReceiver()
         registerThermalListener()
         acquireWakeLock()
         setupBackfillListener()
@@ -287,6 +313,16 @@ class SensorService : Service(), SensorEventListener {
         }
     }
 
+    private fun registerLastWordReceiver() {
+        try {
+            val filter = IntentFilter().apply { LAST_WORD_ACTIONS.forEach(::addAction) }
+            // System broadcasts reach an unexported receiver too; other apps cannot fake them.
+            ContextCompat.registerReceiver(this, lastWordReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        } catch (e: Exception) {
+            SystemLogger.e("SensorService", "Failed to register the last-word receiver: ${e.message}")
+        }
+    }
+
     private fun registerThermalListener() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             thermalListener?.let { powerManager.addThermalStatusListener(it) }
@@ -327,6 +363,7 @@ class SensorService : Service(), SensorEventListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP_SERVICE) {
             SystemLogger.i("SensorService", "Stop action received via intent. Stopping service...")
+            sayStopWord(SilenceCause.OWNER_STOP) // The owner's STOP raises no alarm on the Monitor (ISSUE-NOV22.10-O137).
             stopSelf()
             return START_NOT_STICKY
         }
@@ -1072,8 +1109,12 @@ class SensorService : Service(), SensorEventListener {
     }
 
     override fun onDestroy() {
-        if (isInitialized) eventLog.record(EventLevel.WARNING, SERVICE_STOPPED)
-        else SystemLogger.i("SensorService", "onDestroy before initialization")
+        if (isInitialized) {
+            eventLog.record(EventLevel.WARNING, SERVICE_STOPPED)
+            sayStopWord(SilenceCause.SERVICE_STOPPED) // Without the owner's STOP or a shutdown first, a forced stop.
+        } else {
+            SystemLogger.i("SensorService", "onDestroy before initialization")
+        }
         infoSource.unregister()
         acousticMonitor.stop()
         lightMonitor.stop()
@@ -1089,6 +1130,7 @@ class SensorService : Service(), SensorEventListener {
             fusedLocationClient.removeLocationUpdates(locationCallback)
             if (isGnssRegistered) getSystemService(LocationManager::class.java)?.let { LocationManagerCompat.unregisterGnssStatusCallback(it, gnssCallback) }
             try { unregisterReceiver(batteryReceiver) } catch (e: Exception) {}
+            try { unregisterReceiver(lastWordReceiver) } catch (e: Exception) {}
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 thermalListener?.let { powerManager.removeThermalStatusListener(it) }
             }

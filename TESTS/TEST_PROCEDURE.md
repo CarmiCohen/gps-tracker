@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov23.1 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov23.2 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1275,8 +1275,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **249.2 Device:** the A15's buffer is upgraded from version 6 to 7 by the new Sensor with its next sequence kept; `ProductionReadinessAuditTest` passes and the release Sensor starts with `davey_over_500ms=0 stacklog=0 fatal=0`.
 *   **249.3 Two phones:** with the relay back, the Monitor's HUD and `SENSOR'S NEWEST ROW` show the Sensor's battery and temperature (no `--` while the A15 reports both), and no low-battery or high-temperature alarm at normal values.
 
+## Chapter 250 - The Forced-Disconnection Alarm (Nov23.2)
+**Status: A / L** - 250.1 passed (1121 unit tests, relay 27/27); 250.2 passed on the A15 (airplane mode gave the last word, not sent without the relay; `ProductionReadinessAuditTest` 3/3, release Sensor start clean); 250.3 waits for relay v6.049 (O133) and a paired Monitor (ISSUE-NOV22.10-O137, SOT 1.490)
+*   **250.1 Unit:** `ForcedDisconnectionTest`: each forced cause raises `TRACKER_FORCED_OFFLINE` at once; a plain silence and the Monitor's own 35 s give the lost connection; the owner's STOP raises nothing, an empty battery only the battery alarm; a silence within 5 min after a Sensor alarm is forced, later not; with the Monitor's relay or internet down only that path's alarm; the forced alarm is first and follows the Peer Connection switch; in the book flow a forced notice raises it, a row sent before the word does not end it and a newer row does, the owner's STOP leaves the book empty with the tracker unheard, and a plain silence after an alarm row is forced. `LastWordsTest`: shutdown or empty battery, airplane mode only when on, a removed SIM only on mobile data, the three broadcasts. `SilenceCauseTest`, `SensorSilenceWireTest`: the cause on the wire, unknown or missing as a plain silence, the last word's fields. `PushedAlarmTest`, `PushedRowsTest` updated. Relay: `registry.test.js` (the word reported at once with its time, no silence after it, an older row does not end it; a closed socket after its grace, not after a rejoin or a row) and `relay.test.js` (a last word logged once and no silence; a transport closed by the phone reported `closed`, a Sensor leaving on purpose `silent`).
+*   **250.2 Device:** on the A15 with the new Sensor, airplane mode switched on and off by adb logs `Going silent: airplane_mode` and, with no relay, `Last word airplane_mode not sent: not connected`; `ProductionReadinessAuditTest` passes and the release Sensor starts with `davey_over_500ms=0 stacklog=0 fatal=0`.
+*   **250.3 Two phones:** with relay v6.049 deployed and a Monitor paired to `T`: the Sensor's STOP raises no alarm; airplane mode on the Sensor (with Wi-Fi off) raises "Tracker disconnected by force" at once or, if the word was lost, "Tracker no connection" after 35 s; a force stop of the Sensor app raises the forced alarm about 10 s later (relay log `closed`); each ends when rows return; turning the Monitor's own Wi-Fi off gives only "Monitor internet lost".
+
 ---
-**Active Testing Chapters: 238 of 249**
+**Active Testing Chapters: 239 of 250**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

@@ -94,14 +94,18 @@ class PushedRowsTest {
     }
 
     @Test
-    fun `the silence notice line tells how long and the last row`() {
+    fun `the silence notice line tells how long, the last row and the cause`() {
         assertEquals(
-            "Relay notice by push: tracker 'T' sent nothing for 35 s (last row seq 9)",
+            "Relay notice by push: tracker 'T' sent nothing for 35 s (last row seq 9, silent)",
             silenceArrivalLine(silence(9), isHighPriority = true)
         )
         assertEquals(
-            "Relay notice by push: tracker 'T' sent nothing for 35 s (last row seq 9) (delivered at normal priority)",
+            "Relay notice by push: tracker 'T' sent nothing for 35 s (last row seq 9, silent) (delivered at normal priority)",
             silenceArrivalLine(silence(9), isHighPriority = false)
+        )
+        assertEquals( // ISSUE-NOV22.10-O137
+            "Relay notice by push: tracker 'T' sent nothing for 35 s (last row seq 9, shutdown)",
+            silenceArrivalLine(silence(9).copy(cause = com.jd.core.shared.SilenceCause.SHUTDOWN), isHighPriority = true)
         )
     }
 

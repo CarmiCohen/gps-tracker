@@ -3,6 +3,7 @@ package com.jd.app.monitor
 import com.jd.core.network.SensorSilence
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.LocationUpdate
+import com.jd.core.shared.SilenceCause
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,12 @@ const val RELAY_FIRST_CONNECT_GRACE_MS = 30_000L
  */
 const val RELAY_RECONNECT_GRACE_MS = 30_000L
 
+/**
+ * A silent loss of the tracker this soon after a Sensor alarm (motion, light, noise, geofence) was heard counts as a
+ * forced disconnection, not a lost connection (ISSUE-NOV22.10-O137).
+ */
+const val FORCED_AFTER_ALARM_MS = 5 * 60_000L
+
 /** The tracker's GPS counts as lost once it has reported no position this long, so the time to a first fix does not sound the siren. */
 const val GPS_SIGNAL_LOSS_AFTER_MS = 30_000L
 
@@ -47,7 +54,9 @@ private const val HIGH_TEMPERATURE_CLEARS_AT = 44f
  * alarm reports a condition that lasts, so it ends as soon as the condition clears (ISSUE-NOV17.10-O110).
  */
 enum class AlarmType(val title: String, val isEvent: Boolean = false) {
-    TRACKER_OFFLINE("Tracker offline"),
+    // First: the highest priority (ISSUE-NOV22.10-O137).
+    TRACKER_FORCED_OFFLINE("Tracker disconnected by force"),
+    TRACKER_OFFLINE("Tracker no connection"),
     POWER_DISCONNECTED("Tracker power disconnected"),
     LOW_BATTERY("Tracker battery low"),
     HIGH_TEMPERATURE("Tracker temperature high"),
@@ -65,7 +74,7 @@ enum class AlarmType(val title: String, val isEvent: Boolean = false) {
 }
 
 fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) {
-    AlarmType.TRACKER_OFFLINE -> serverConnection // "Peer Connection Offline"
+    AlarmType.TRACKER_FORCED_OFFLINE, AlarmType.TRACKER_OFFLINE -> serverConnection // "Peer Connection Offline"
     AlarmType.POWER_DISCONNECTED -> power
     AlarmType.LOW_BATTERY -> lowBattery
     AlarmType.HIGH_TEMPERATURE -> highTemperature
@@ -133,7 +142,12 @@ fun newerReading(current: TrackerReading?, incoming: TrackerReading): TrackerRea
  * not connected counts as lost only after [RELAY_FIRST_CONNECT_GRACE_MS]. After that, [relayLostSinceMs] is when the
  * connection was lost; it counts after [RELAY_RECONNECT_GRACE_MS] (null: lost long ago).
  * [noGpsSignalSinceMs] is when the tracker started to report no position, or null while it reports one.
- * [isReportedSilent] is true while the relay's notice that the tracker went silent holds (ISSUE-NOV10.8-O86).
+ * [silenceCause] is the cause of the relay's silence notice while it holds (ISSUE-NOV10.8-O86), null without one.
+ * [lastSensorAlarmAtMs] is when the newest Sensor alarm was heard, Monitor time.
+ *
+ * An unheard tracker (ISSUE-NOV22.10-O137): with the Monitor's own relay or internet down, only that path's alarm;
+ * after the owner's STOP nothing; after an empty battery only the battery alarm; after a forced cause, or a silence
+ * within [FORCED_AFTER_ALARM_MS] of a Sensor alarm, the forced disconnection; otherwise the lost connection.
  */
 fun alarmConditions(
     reading: TrackerReading?,
@@ -147,10 +161,18 @@ fun alarmConditions(
     hasViolation: Boolean = false,
     violationType: String? = null,
     noGpsSignalSinceMs: Long? = null,
-    isReportedSilent: Boolean = false
+    silenceCause: SilenceCause? = null,
+    lastSensorAlarmAtMs: Long? = null
 ): Set<AlarmType> = buildSet {
-    if (isReportedSilent || nowMs - (reading?.receivedAtMs ?: watchingSinceMs) >= TRACKER_PRESENT_MS) {
-        add(AlarmType.TRACKER_OFFLINE)
+    if (!isTrackerHeard(reading, watchingSinceMs, nowMs, silenceCause) && isRelayConnected && isLocalInternet) {
+        val lastHeardMs = reading?.receivedAtMs ?: watchingSinceMs
+        val isSoonAfterAlarm = lastSensorAlarmAtMs != null && lastHeardMs - lastSensorAlarmAtMs <= FORCED_AFTER_ALARM_MS
+        when {
+            silenceCause == SilenceCause.OWNER_STOP -> Unit
+            silenceCause == SilenceCause.BATTERY_EMPTY -> add(AlarmType.LOW_BATTERY)
+            silenceCause?.isForced == true || isSoonAfterAlarm -> add(AlarmType.TRACKER_FORCED_OFFLINE)
+            else -> add(AlarmType.TRACKER_OFFLINE)
+        }
     }
     if (!isRelayConnected) {
         val isLost = if (hasRelayConnected) relayLostSinceMs == null || nowMs - relayLostSinceMs >= RELAY_RECONNECT_GRACE_MS
@@ -177,6 +199,10 @@ fun alarmConditions(
     val temperatureLimit = if (AlarmType.HIGH_TEMPERATURE in active) HIGH_TEMPERATURE_CLEARS_AT else HIGH_TEMPERATURE_ABOVE
     if (reading.tempCelsius != null && reading.tempCelsius > temperatureLimit) add(AlarmType.HIGH_TEMPERATURE)
 }
+
+/** The tracker is heard: its newest row is fresh and no silence notice holds. */
+fun isTrackerHeard(reading: TrackerReading?, watchingSinceMs: Long, nowMs: Long, silenceCause: SilenceCause?): Boolean =
+    silenceCause == null && nowMs - (reading?.receivedAtMs ?: watchingSinceMs) < TRACKER_PRESENT_MS
 
 /** Violation types with an alarm of their own; any other violation is a GPS jump. */
 private val SENSOR_VIOLATION_ALARMS = mapOf(
@@ -278,14 +304,19 @@ fun alarmBooks(
                     hasViolation = false,
                     violationType = null,
                     noGpsSignalSinceMs = if (reading.hasGpsSignal()) null else state.noGpsSignalSinceMs ?: reading.receivedAtMs,
-                    silentAfterSensorMs = state.silentAfterSensorMs?.takeIf { reading.sensorTimeMs <= it }
+                    silence = state.silence?.takeIf { reading.sensorTimeMs <= it.lastSensorTimeMs },
+                    lastSensorAlarmAtMs = if (event.reading.status in SENSOR_VIOLATION_ALARMS) event.reading.receivedAtMs
+                    else state.lastSensorAlarmAtMs
                 )
             }
-            is BookEvent.Violation -> state.copy(hasViolation = true, violationType = event.violation.type)
+            is BookEvent.Violation -> state.copy(
+                hasViolation = true,
+                violationType = event.violation.type,
+                lastSensorAlarmAtMs = if (event.violation.type in SENSOR_VIOLATION_ALARMS) clock() else state.lastSensorAlarmAtMs
+            )
             is BookEvent.Silence -> {
-                val lastHeardMs = event.silence.lastSensorTimeMs
-                if (state.reading != null && state.reading.sensorTimeMs > lastHeardMs) state
-                else state.copy(silentAfterSensorMs = lastHeardMs)
+                if (state.reading != null && state.reading.sensorTimeMs > event.silence.lastSensorTimeMs) state
+                else state.copy(silence = event.silence)
             }
             is BookEvent.Settings -> state.copy(settings = event.settings)
             BookEvent.Tick -> state
@@ -311,9 +342,11 @@ fun alarmBooks(
             hasViolation = next.hasViolation,
             violationType = next.violationType,
             noGpsSignalSinceMs = next.noGpsSignalSinceMs,
-            isReportedSilent = next.silentAfterSensorMs != null
+            silenceCause = next.silence?.cause,
+            lastSensorAlarmAtMs = next.lastSensorAlarmAtMs
         )
-        val isOnline = if (AlarmType.TRACKER_OFFLINE !in holding) true else next.book.isTrackerOnline?.let { false }
+        val isHeard = isTrackerHeard(next.reading, watchingSinceMs, nowMs, next.silence?.cause)
+        val isOnline = if (isHeard) true else next.book.isTrackerOnline?.let { false }
         next.copy(book = next.book.update(holding, alertSettings, nowMs).copy(isTrackerOnline = isOnline))
     }.map { it.book }
 }.distinctUntilChanged()
@@ -330,8 +363,10 @@ private data class WatchState(
     val hasViolation: Boolean = false,
     val violationType: String? = null,
     val noGpsSignalSinceMs: Long? = null,
-    /** While the relay's silence notice holds: the tracker time of the last row it had; a newer row ends it. */
-    val silentAfterSensorMs: Long? = null
+    /** The relay's silence notice while it holds; a row newer than its last row, on the tracker's clock, ends it. */
+    val silence: SensorSilence? = null,
+    /** When the newest Sensor alarm was heard, Monitor time (ISSUE-NOV22.10-O137). */
+    val lastSensorAlarmAtMs: Long? = null
 )
 
 private sealed interface BookEvent {
