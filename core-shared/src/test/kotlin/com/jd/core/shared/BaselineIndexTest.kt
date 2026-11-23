@@ -11,7 +11,8 @@ import kotlin.test.assertTrue
  * `STATUS/BASELINE/INDEX.md` lists each version with its commit. This test keeps the index complete and true:
  * a version that is recorded but not indexed, or a tag that points elsewhere than the index says (as the tags
  * Nov8.11 and Nov8.12 did before Nov8.13, ISSUE-NOV8.13-O53), fails. The version being closed has no commit yet, so its
- * row says `pending`; that is accepted only on the first row and only until its tag exists.
+ * row says `pending`; that is accepted only on the first row and only until its tag exists. Since Nov23.6-docs the index
+ * is frozen at Nov23.4 (user decision 2026-11-23): no rows are added, and this test keeps checking the rows it holds.
  */
 class BaselineIndexTest {
 

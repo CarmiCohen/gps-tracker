@@ -1,5 +1,7 @@
 # Baseline Index (R-ID 744, ISSUE-NOV8.5-O47, SIMP-NOV8.5-S1)
 
+*FROZEN at Nov23.4 (user decision 2026-11-23, Nov23.6-docs): no rows are added any more; `git tag` lists the later versions and `git rev-parse <tag>^{commit}` gives their commits. `BaselineIndexTest` still checks the rows below against their tags.*
+
 Since Nov8.14 the baseline of a version is its **git tag**: the exact files of that version, read with
 `git show <tag>:<path>` (for example `git show Nov8.13:DOCS/issues.md`), or listed with `git ls-tree -r --name-only <tag>`.
 No copies are made any more. User decision, 2026-11-08 (option C).
@@ -10,7 +12,7 @@ No copies are made any more. User decision, 2026-11-08 (option C).
 
 | Version | Commit | Notes |
 | :--- | :--- | :--- |
-| Nov23.4 | pending | |
+| Nov23.4 | 589247a | |
 | Nov23.2 | 98530da | |
 | Nov23.1 | d36e902 | |
 | Nov23.00 | 4700394 | |

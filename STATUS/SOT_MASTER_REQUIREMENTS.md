@@ -1,5 +1,7 @@
 # SOT Master Requirements & Hardening Status (Nov23.4)
 
+*FROZEN at Nov23.4 (user decision 2026-11-23, Nov23.6-docs): no rules are added any more; later requirements live in the code, its tests and the commit messages.*
+
 ## 🏗️ Architectural Master Rules (564 Rules)
 
 ### 1. Lifecycle & Resource Management

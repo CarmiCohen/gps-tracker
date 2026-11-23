@@ -14,8 +14,11 @@ import kotlin.test.assertTrue
  * oldest entries must survive. Since Nov8.100-Documentation the archive is the single home of resolved issues
  * (Documentation Rule D1), `issues.md` is a working file (D2), and `Handover.md` is short (D3); this test holds
  * those limits. Since Nov8.102-Documentation (SIMP-NOV8.100-S2, chapter 160) the SOT baseline is frozen at
- * Nov8.101-Tooling: it must hold every version up to then and nothing newer. The documents are declared as inputs of
- * `:core-shared:test`, so editing one re-runs it.
+ * Nov8.101-Tooling: it must hold every version up to then and nothing newer. Since Nov23.6-docs (lean workflow, user
+ * decision 2026-11-23) the archive, the SOT and the dashboard are frozen at Nov23.4, the commit message is a version's
+ * record, `issues.md` holds open work only without a dashboard, and `Handover.md` has at most 30 lines; the history
+ * checks below still guard the frozen files. The documents are declared as inputs of `:core-shared:test`, so editing
+ * one re-runs it.
  */
 class TrackingDocumentIntegrityTest {
 
@@ -25,13 +28,12 @@ class TrackingDocumentIntegrityTest {
     private val handover by lazy { document("Handover.md") }
 
     @Test
-    fun issuesIsALeanWorkingFileWithTheDashboardLast() {
+    fun issuesIsALeanWorkingFileOfOpenWork() {
         val headings = sectionHeadings(issues)
-        listOf("Next Resumption Focus", "Work Queue", "Open Gaps", "Strategic Simplification Ideas", "Hardening Progress Dashboard")
+        listOf("Next Resumption Focus", "Work Queue", "Open Gaps", "Operational Notes", "Strategic Simplification Ideas")
             .forEach { required -> assertTrue(headings.any { required in it }, "issues.md lost its '$required' section") }
-        assertTrue("Hardening Progress Dashboard" in headings.last { it.startsWith("## ") }, "the dashboard must stay the last section of issues.md")
-        assertTrue(headings.none { "Resolved Gaps" in it }, "issues.md must not hold Resolved Gaps; the archive is their home (D1, D2)")
-        assertTrue(dashboardRows(issues).size <= MAX_DASHBOARD_ROWS, "issues.md keeps at most $MAX_DASHBOARD_ROWS dashboard rows; move older ones to the archive (D2)")
+        assertTrue(headings.none { "Dashboard" in it }, "issues.md holds no dashboard since Nov23.6-docs (D2)")
+        assertTrue(headings.none { "Resolved Gaps" in it }, "issues.md must not hold Resolved Gaps (D2)")
         assertTrue(issues.length <= MAX_ISSUES_CHARS, "issues.md has ${issues.length} characters, more than $MAX_ISSUES_CHARS (D2)")
     }
 
@@ -39,9 +41,14 @@ class TrackingDocumentIntegrityTest {
     fun handoverFollowsTheShortTemplate() {
         val lines = handover.lines()
         assertTrue(lines.size <= MAX_HANDOVER_LINES, "Handover.md has ${lines.size} lines, more than $MAX_HANDOVER_LINES (D3)")
-        assertTrue(lines.first().startsWith("```"), "Handover.md must start with the Git block")
-        listOf("Resumption State", "Status: PASSED", "**Audit line**", "Next Resumption Focus")
+        assertTrue("```" !in handover, "Handover.md holds no copy of the commit message since Nov23.6-docs (D3)")
+        listOf("Resumption State", "Status: PASSED", "Next Resumption Focus")
             .forEach { part -> assertTrue(part in handover, "Handover.md lost its '$part' part") }
+    }
+
+    @Test
+    fun theArchiveIsFrozenAtNov23Point4() {
+        assertEquals(emptyList(), archivedVersions(archive).filter { it > ARCHIVE_FROZEN_AT }, "the archive is frozen at Nov23.4; a version's record is its commit message (D1)")
     }
 
     @Test
@@ -127,9 +134,9 @@ class TrackingDocumentIntegrityTest {
     }
 
     private companion object {
-        const val MAX_DASHBOARD_ROWS = 6
         const val MAX_ISSUES_CHARS = 40_000
-        const val MAX_HANDOVER_LINES = 70
+        const val MAX_HANDOVER_LINES = 30
+        val ARCHIVE_FROZEN_AT = Version(23, 4)
         /** Rules 1.1 to 1.303 predate this repository; the SOT records where they live (ISSUE-NOV8.14-O58). */
         const val FIRST_REPOSITORY_RULE = 304
         val SOT_FROZEN_AT = Version(8, 101)
