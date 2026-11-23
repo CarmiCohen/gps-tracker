@@ -185,6 +185,26 @@ class EventLogTest {
         assertEquals("Nothing left out: complete from the start", 0L, events.take(3).newestForPeer().afterMs)
     }
 
+    /** Chapter 251 (ISSUE-NOV23.4-O139). */
+    @Test
+    fun `the given detail ids show only with Details, and the Home Points received still go to the Monitor`() {
+        val events = listOf(event("echo", ageMs = 2_000, level = EventLevel.ALARM), event("now", ageMs = 1_000, level = EventLevel.ALARM))
+        assertEquals(listOf("now"), events.shown(ViewPeriod.HOUR, showDetails = false, nowMs = nowMs, detailIds = setOf("echo")).map { it.id })
+        assertEquals(listOf("now", "echo"), events.shown(ViewPeriod.HOUR, showDetails = true, nowMs = nowMs, detailIds = setOf("echo")).map { it.id })
+
+        val homePoints = event("home", ageMs = 0, level = EventLevel.DETAIL).copy(message = "$HOME_POINTS_RECEIVED: 2, radius 50 m")
+        assertEquals(listOf("home"), listOf(event("detail", ageMs = 0, level = EventLevel.DETAIL), homePoints).forPeer().map { it.id })
+    }
+
+    @Test
+    fun `a recorded kind is kept`() = runTest {
+        val log = log(EventSource.SENSOR)
+        log.record(EventLevel.ALARM, "Lift alert: 0.3 m", kind = LIFT_ALERT_STATUS)
+        log.record(EventLevel.INFO, "Relay connected")
+        runCurrent()
+        assertEquals(listOf(LIFT_ALERT_STATUS, null), log.events.value.map { it.kind })
+    }
+
     @Test
     fun `a request is answered with every event after, in chunks without holes (O98 part 4)`() {
         val events = (1..2 * EventLog.PEER_EVENTS_SENT + 10).map { event("e$it", ageMs = 1_000_000L - 1_000L * it) } +

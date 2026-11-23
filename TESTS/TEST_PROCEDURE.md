@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov23.2 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov23.4 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1281,8 +1281,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **250.2 Device:** on the A15 with the new Sensor, airplane mode switched on and off by adb logs `Going silent: airplane_mode` and, with no relay, `Last word airplane_mode not sent: not connected`; `ProductionReadinessAuditTest` passes and the release Sensor starts with `davey_over_500ms=0 stacklog=0 fatal=0`.
 *   **250.3 Two phones:** with relay v6.049 deployed and a Monitor paired to `T`: the Sensor's STOP raises no alarm; airplane mode on the Sensor (with Wi-Fi off) raises "Tracker disconnected by force" at once or, if the word was lost, "Tracker no connection" after 35 s; a force stop of the Sensor app raises the forced alarm about 10 s later (relay log `closed`); each ends when rows return; turning the Monitor's own Wi-Fi off gives only "Monitor internet lost".
 
+## Chapter 251 - A Quieter Events List (Nov23.4)
+**Status: A / L** - 251.1 passed (1127 unit tests); 251.2 passed on the A15 (`ProductionReadinessAuditTest` 3/3, release Sensor start clean; the Monitor not installed there); 251.3 waits for the relay (O133) and a paired Monitor (ISSUE-NOV23.4-O139, SOT 1.491)
+*   **251.1 Unit:** `MonitorEventsTest`: `Ended:` and `Acknowledged:` are DETAIL; a Sensor alarm whose kind raised the same Monitor alarm from 60 s before to 5 min after it is a detail, while one answered by another alarm, one with no kind, one outside the window, or any with no Monitor alarm stays listed; any other violation type matches the GPS jump. `EventLogTest`: the given detail ids are listed only with Details; the Home Points received go to the Monitor though DETAIL, other DETAIL events do not; a recorded kind is kept. `SensorEventsWireTest`: the kind travels as `k`, an event without one sends none and reads back null.
+*   **251.2 Device:** `ProductionReadinessAuditTest` on the A15, and the release Sensor starts there with `davey_over_500ms=0 stacklog=0 fatal=0`.
+*   **251.3 Two phones:** with the relay back and a Monitor paired to `T`, lift the resting Sensor and acknowledge the alarm: the Monitor's Events list shows `Alarm: Tracker lifted` only; with Details also the Sensor's `Lift alert`, `Acknowledged:` and `Ended:`. Adding a Home Point lists `Home point added` and the Sensor's `Home points received` only with Details.
+
 ---
-**Active Testing Chapters: 239 of 250**
+**Active Testing Chapters: 240 of 251**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

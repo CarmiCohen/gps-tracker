@@ -238,12 +238,12 @@ class MonitorViewModel @Inject constructor(
 
     fun addHomePoint(lat: Double, lng: Double) {
         viewModelScope.launch { dataStore.editGeofence { it.withPoint(HomePoint(lat, lng)) } }
-        eventLog.record(EventLevel.INFO, "Home point added")
+        eventLog.record(EventLevel.DETAIL, "Home point added") // Home Point changes are details (ISSUE-NOV23.4-O139).
     }
 
     fun removeHomePoint(index: Int) {
         viewModelScope.launch { dataStore.editGeofence { it.withoutPoint(index) } }
-        eventLog.record(EventLevel.INFO, "Home point ${index + 1} removed")
+        eventLog.record(EventLevel.DETAIL, "Home point ${index + 1} removed")
     }
 
     fun setGeofenceRadius(meters: Double) {
@@ -256,7 +256,7 @@ class MonitorViewModel @Inject constructor(
      */
     fun clearHomePoints() {
         viewModelScope.launch { dataStore.editGeofence { it.cleared() } }
-        eventLog.record(EventLevel.INFO, "All home points removed")
+        eventLog.record(EventLevel.DETAIL, "All home points removed")
     }
 
     /** Resets operational statistics and clears stored trail history (ISSUE-NOV7.1-O35). */

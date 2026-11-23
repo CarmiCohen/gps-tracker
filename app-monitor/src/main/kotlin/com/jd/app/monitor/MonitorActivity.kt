@@ -507,6 +507,7 @@ fun MonitorScreen(
             com.jd.core.ui.EventLogOverlay(
                 events = events,
                 showSource = true,
+                detailIds = remember(events) { echoedSensorAlarms(events) }, // ISSUE-NOV23.4-O139
                 onClear = onClearEvents,
                 onClose = closeEvents,
                 onShowGraphs = { timeMs ->

@@ -29,7 +29,7 @@ import org.junit.Test
 class SensorEventsWireTest {
 
     private val events = listOf(
-        EventEntry("S1", 1_800_000_000_000L, EventSource.SENSOR, EventLevel.ALARM, "Tilt alert: 40 degrees"),
+        EventEntry("S1", 1_800_000_000_000L, EventSource.SENSOR, EventLevel.ALARM, "Tilt alert: 40 degrees", kind = "TILT_ALERT"),
         EventEntry("S2", 1_800_000_001_000L, EventSource.SENSOR, EventLevel.INFO, "Relay connected")
     )
 
@@ -68,6 +68,16 @@ class SensorEventsWireTest {
         assertNull(GeofenceWire.decode(eventsWire))
         assertNull(SensorBehaviourWire.decode(eventsWire))
         assertNull(SensorEventsWire.decode(JSONObject(SensorSetupWire.encode("T", SensorSetupReport()).toString())))
+    }
+
+    /** Chapter 251 (ISSUE-NOV23.4-O139). */
+    @Test
+    fun `an alarm's kind travels as k, an event without one sends none`() {
+        val wire = JSONObject(SensorEventsWire.encode("T", events).toString())
+        val sent = wire.getJSONArray("events")
+        assertEquals("TILT_ALERT", sent.getJSONObject(0).getString("k"))
+        assertEquals(false, sent.getJSONObject(1).has("k"))
+        assertEquals(listOf("TILT_ALERT", null), SensorEventsWire.decode(wire)!!.events.map { it.kind })
     }
 
     @Test

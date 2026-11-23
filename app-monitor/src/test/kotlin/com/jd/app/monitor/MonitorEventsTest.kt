@@ -1,12 +1,20 @@
 package com.jd.app.monitor
 
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
+import com.jd.core.shared.EventSource
+import com.jd.core.shared.LIFT_ALERT_STATUS
+import com.jd.core.shared.TILT_ALERT_STATUS
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Chapter 190 (ISSUE-NOV10.8-O84 Nov15.4): the Monitor records each alarm raised, ended, and acknowledged. */
+/**
+ * Chapter 190 (ISSUE-NOV10.8-O84 Nov15.4): the Monitor records each alarm raised, ended, and acknowledged; chapter 251
+ * (ISSUE-NOV23.4-O139): the end and the acknowledgement as details, and the Sensor alarms it answered listed only with
+ * Details.
+ */
 class MonitorEventsTest {
 
     private val settings = AlertSettings()
@@ -25,7 +33,7 @@ class MonitorEventsTest {
     fun `an ended condition is recorded, and a new raise after acknowledgement too`() {
         val raised = AlarmBook().update(setOf(AlarmType.TILT_ALERT), settings, nowMs = 1_000L)
         val cleared = raised.update(emptySet(), settings, nowMs = 2_000L)
-        assertEquals(listOf(LoggedEvent(EventLevel.INFO, "Ended: ${AlarmType.TILT_ALERT.title}")), alarmEvents(raised, cleared))
+        assertEquals(listOf(LoggedEvent(EventLevel.DETAIL, "Ended: ${AlarmType.TILT_ALERT.title}")), alarmEvents(raised, cleared))
 
         val acknowledged = cleared.acknowledge()
         assertEquals("Acknowledging is recorded where the user gives it", emptyList<LoggedEvent>(), alarmEvents(cleared, acknowledged))
@@ -38,7 +46,7 @@ class MonitorEventsTest {
     fun `an acknowledged alarm whose condition then clears records Ended`() {
         val acknowledged = AlarmBook().update(setOf(AlarmType.TILT_ALERT), settings, nowMs = 1_000L).acknowledge()
         val cleared = acknowledged.update(emptySet(), settings, nowMs = 2_000L)
-        assertEquals(listOf(LoggedEvent(EventLevel.INFO, "Ended: ${AlarmType.TILT_ALERT.title}")), alarmEvents(acknowledged, cleared))
+        assertEquals(listOf(LoggedEvent(EventLevel.DETAIL, "Ended: ${AlarmType.TILT_ALERT.title}")), alarmEvents(acknowledged, cleared))
     }
 
     /** ISSUE-NOV17.10-O110: a state alarm that ends unacknowledged still records its start and its end. */
@@ -49,7 +57,7 @@ class MonitorEventsTest {
         val cleared = raised.update(emptySet(), settings, nowMs = 2_000L)
 
         assertEquals(listOf(LoggedEvent(EventLevel.ALARM, "Alarm: ${AlarmType.POWER_DISCONNECTED.title}")), alarmEvents(empty, raised))
-        assertEquals(listOf(LoggedEvent(EventLevel.INFO, "Ended: ${AlarmType.POWER_DISCONNECTED.title}")), alarmEvents(raised, cleared))
+        assertEquals(listOf(LoggedEvent(EventLevel.DETAIL, "Ended: ${AlarmType.POWER_DISCONNECTED.title}")), alarmEvents(raised, cleared))
         assertNull("Nothing is left to acknowledge", acknowledgementEvent(cleared))
     }
 
@@ -71,9 +79,29 @@ class MonitorEventsTest {
     fun `an acknowledgement names the alarms that waited for it`() {
         val raised = AlarmBook().update(setOf(AlarmType.TILT_ALERT, AlarmType.LIFT_ALERT), settings, nowMs = 1_000L)
         assertEquals(
-            LoggedEvent(EventLevel.INFO, "Acknowledged: ${AlarmType.TILT_ALERT.title}, ${AlarmType.LIFT_ALERT.title}"),
+            LoggedEvent(EventLevel.DETAIL, "Acknowledged: ${AlarmType.TILT_ALERT.title}, ${AlarmType.LIFT_ALERT.title}"),
             acknowledgementEvent(raised)
         )
         assertNull("Nothing waited", acknowledgementEvent(raised.acknowledge()))
+    }
+
+    /** Chapter 251 (ISSUE-NOV23.4-O139). */
+    @Test
+    fun `a Sensor alarm the Monitor answered with the same alarm is a detail, any other stays listed`() {
+        val t = 1_800_000_000_000L
+        fun sensor(id: String, atMs: Long, kind: String?) =
+            EventEntry(id, atMs, EventSource.SENSOR, EventLevel.ALARM, "Sensor alarm $id", trackerId = "T", kind = kind)
+        fun monitor(id: String, atMs: Long, type: AlarmType) = EventEntry(id, atMs, EventSource.MONITOR, EventLevel.ALARM, alarmMessage(type))
+        val events = listOf(
+            sensor("lift", t, LIFT_ALERT_STATUS), monitor("m-lift", t + 2_000, AlarmType.LIFT_ALERT),
+            sensor("tilt", t + 1_000, TILT_ALERT_STATUS), // No tilt alarm answered it; the lift alarm does not count.
+            sensor("old", t + 3_000, null), // A Sensor before Nov23.4 names no kind.
+            sensor("long-before", t + 2_000 - ECHO_AFTER_MS - 1, LIFT_ALERT_STATUS),
+            sensor("clock-ahead", t + 2_000 + ECHO_BEFORE_MS, LIFT_ALERT_STATUS),
+            sensor("too-far-ahead", t + 2_001 + ECHO_BEFORE_MS, LIFT_ALERT_STATUS),
+            sensor("jump", t + 10_000, "JUMP"), monitor("m-jump", t + 9_000, AlarmType.GPS_JUMP)
+        )
+        assertEquals(setOf("lift", "clock-ahead", "jump"), echoedSensorAlarms(events))
+        assertEquals("No Monitor alarm, nothing hidden", emptySet<String>(), echoedSensorAlarms(events.filter { it.source == EventSource.SENSOR }))
     }
 }

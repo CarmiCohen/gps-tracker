@@ -349,7 +349,8 @@ class SensorService : Service(), SensorEventListener {
             .onEach { config ->
                 val stored = sensorDataStore.saveGeofence(config)
                 SystemLogger.i("Geofence", "Received ${config.points.size} home points, radius ${config.radiusMeters} m, rev ${config.revision} (stored: $stored)")
-                if (stored) eventLog.record(EventLevel.INFO, "Home points received: ${config.points.size}, radius ${config.radiusMeters.toInt()} m")
+                // A detail, still sent to the Monitors (ISSUE-NOV23.4-O139).
+                if (stored) eventLog.record(EventLevel.DETAIL, "$HOME_POINTS_RECEIVED: ${config.points.size}, radius ${config.radiusMeters.toInt()} m")
             }
             .launchIn(serviceScope)
         sensorDataStore.geofence
@@ -992,7 +993,7 @@ class SensorService : Service(), SensorEventListener {
         update.status = status
         update.isCritical = true
         lastAlarmElapsedMs = SystemClock.elapsedRealtime() // Every alarm restarts the alarm window (ISSUE-NOV22.8-O136).
-        eventLog.record(EventLevel.ALARM, logLine)
+        eventLog.record(EventLevel.ALARM, logLine, kind = status) // The Monitor matches it with its own alarm (ISSUE-NOV23.4-O139).
         // Built before launching: the pooled update is zeroed on release, before the launched send runs.
         val violation = ViolationEvent(type = status, location = update.snapshot(), nonce = java.util.UUID.randomUUID().toString())
         serviceScope.launch { signalingClient.sendViolation(violation) }

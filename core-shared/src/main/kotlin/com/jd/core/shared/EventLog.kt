@@ -32,6 +32,8 @@ enum class EventLevel { ALARM, WARNING, INFO, DETAIL }
 /**
  * One event. [trackerId] is the Sensor a Monitor received a Sensor event from (ISSUE-NOV15.6-O100 part 7, Nov17.2), so
  * a re-paired Monitor can tell the Sensors apart; null for a phone's own events and for Sensor events received before.
+ * [kind] is the violation type of a Sensor alarm (ISSUE-NOV23.4-O139), so a Monitor can tell which of its own alarms
+ * answered it; null for any other event and for a Sensor before Nov23.4.
  */
 @Serializable
 data class EventEntry(
@@ -40,7 +42,8 @@ data class EventEntry(
     val source: EventSource,
     val level: EventLevel,
     val message: String,
-    val trackerId: String? = null
+    val trackerId: String? = null,
+    val kind: String? = null
 )
 
 /**
@@ -51,6 +54,12 @@ const val SERVICE_STARTED = "Sensor service started"
 const val SERVICE_STOPPED = "Sensor service stopped"
 
 fun EventEntry.isServiceLifecycle(): Boolean = message.startsWith(SERVICE_STARTED) || message.startsWith(SERVICE_STOPPED)
+
+/**
+ * The start of the Sensor's event for a Monitor's new Home Points: a DETAIL event (ISSUE-NOV23.4-O139) that is still
+ * sent to the Monitors, so theirs lists it under Details too.
+ */
+const val HOME_POINTS_RECEIVED = "Home points received"
 
 /**
  * The Sensor's service start and stop events a Monitor needs to shade the stops among the samples after [afterMs]
@@ -76,13 +85,20 @@ data class SensorEventBatch(val trackerId: String, val events: List<EventEntry>,
 /** Peer events to send, holding all of them newer than [afterMs] (ISSUE-NOV15.4-O98 part 4). */
 data class PeerEvents(val afterMs: Long, val events: List<EventEntry>)
 
-/** The events of [period] before [nowMs], newest first; DETAIL events only when [showDetails]. */
-fun List<EventEntry>.shown(period: ViewPeriod, showDetails: Boolean, nowMs: Long): List<EventEntry> =
-    filter { it.timestampMs >= nowMs - period.durationMs && (showDetails || it.level != EventLevel.DETAIL) }
+/**
+ * The events of [period] before [nowMs], newest first; DETAIL events, and the events of [detailIds] whatever their
+ * level (ISSUE-NOV23.4-O139), only when [showDetails].
+ */
+fun List<EventEntry>.shown(period: ViewPeriod, showDetails: Boolean, nowMs: Long, detailIds: Set<String> = emptySet()): List<EventEntry> =
+    filter { it.timestampMs >= nowMs - period.durationMs && (showDetails || (it.level != EventLevel.DETAIL && it.id !in detailIds)) }
         .sortedByDescending { it.timestampMs }
 
-/** The events the Sensor sends its Monitors (ISSUE-NOV10.8-O84): all but the DETAIL ones, oldest first. */
-fun List<EventEntry>.forPeer(): List<EventEntry> = filter { it.level != EventLevel.DETAIL }
+/**
+ * The events the Sensor sends its Monitors (ISSUE-NOV10.8-O84): all but the DETAIL ones, oldest first; the Home Points
+ * received are sent though DETAIL (ISSUE-NOV23.4-O139), rare and the Monitor's own change.
+ */
+fun List<EventEntry>.forPeer(): List<EventEntry> =
+    filter { it.level != EventLevel.DETAIL || it.message.startsWith(HOME_POINTS_RECEIVED) }
 
 /**
  * The newest [EventLog.PEER_EVENTS_SENT] peer events, sent each time a Monitor comes online and at each new event while
@@ -177,11 +193,11 @@ class EventLog(
         scope.launch { load() } // The single writer thread runs it before any later change.
     }
 
-    /** Adds an event of this phone now, and writes it to the debug log as well. */
-    fun record(level: EventLevel, message: String) {
+    /** Adds an event of this phone now, of [kind] if given (see [EventEntry.kind]), and writes it to the debug log as well. */
+    fun record(level: EventLevel, message: String, kind: String? = null) {
         val now = clock()
         SystemLogger.log(if (level == EventLevel.ALARM || level == EventLevel.WARNING) "W" else "I", "Event", message)
-        val entry = EventEntry(newId(now), now, source, level, message)
+        val entry = EventEntry(newId(now), now, source, level, message, kind = kind)
         scope.launch { add(listOf(entry)) }
     }
 

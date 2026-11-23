@@ -12,7 +12,8 @@ import timber.log.Timber
  * Wire form of the Sensor's newest events inside the relay's generic settings_update / settings_relay event
  * (ISSUE-NOV10.8-O84), so the relay needs no change and an older Monitor ignores it. It travels from the Sensor to the
  * Monitors of its room; `id` is the Sensor's own ID. `after`, when present, says the events are all the Sensor's peer
- * events newer than it (ISSUE-NOV15.4-O98 part 4); a Monitor before Nov17.5 ignores it.
+ * events newer than it (ISSUE-NOV15.4-O98 part 4); a Monitor before Nov17.5 ignores it. An event's `k`, when present, is
+ * its [EventEntry.kind] (ISSUE-NOV23.4-O139); a Monitor before Nov23.4 ignores it.
  */
 internal object SensorEventsWire {
     const val TYPE = "sensor_events"
@@ -28,6 +29,7 @@ internal object SensorEventsWire {
                     put("t", event.timestampMs)
                     put("l", event.level.name)
                     put("m", event.message)
+                    event.kind?.let { put("k", it) }
                 })
             }
         })
@@ -53,7 +55,8 @@ internal object SensorEventsWire {
                         source = EventSource.SENSOR,
                         level = EventLevel.entries.find { it.name == event.getString("l") } ?: EventLevel.INFO,
                         message = event.getString("m"),
-                        trackerId = trackerId
+                        trackerId = trackerId,
+                        kind = if (event.has("k")) event.getString("k") else null
                     )
                 },
                 completeAfterMs = if (data.has("after")) data.getLong("after") else null

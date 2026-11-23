@@ -214,6 +214,9 @@ private val SENSOR_VIOLATION_ALARMS = mapOf(
     com.jd.core.shared.VIBRATION_ALERT_STATUS to AlarmType.VIBRATION_ALERT
 )
 
+/** The alarm a Sensor violation of [type] raises (ISSUE-NOV23.4-O139: the Events list matches the two). */
+fun violationAlarm(type: String): AlarmType = SENSOR_VIOLATION_ALARMS[type] ?: AlarmType.GPS_JUMP
+
 /** One raised alarm. [isActive] is false once its condition has cleared, which only an event alarm outlives. */
 data class Alarm(
     val type: AlarmType,

@@ -45,7 +45,8 @@ import java.util.Locale
  * The menu's Events list of both apps (ISSUE-NOV10.8-O84): the [events] of the chosen period, newest first, with a
  * Details filter, Export through the share sheet, and Clear after a confirmation. [showSource] marks each event with
  * the phone it happened on, for the Monitor, whose list also holds the Sensor's events. A selected event's details
- * open the Graphs around its time with [onShowGraphs] (ISSUE-NOV15.6-O100 part 4).
+ * open the Graphs around its time with [onShowGraphs] (ISSUE-NOV15.6-O100 part 4). The events of [detailIds] are listed
+ * only with Details, like the DETAIL ones (ISSUE-NOV23.4-O139).
  */
 @Composable
 fun EventLogOverlay(
@@ -53,7 +54,8 @@ fun EventLogOverlay(
     showSource: Boolean,
     onClear: () -> Unit,
     onClose: () -> Unit,
-    onShowGraphs: (timeMs: Long) -> Unit = {}
+    onShowGraphs: (timeMs: Long) -> Unit = {},
+    detailIds: Set<String> = emptySet()
 ) {
     val context = LocalContext.current
     var period by rememberSaveable { mutableStateOf(ViewPeriod.DAY) }
@@ -68,7 +70,7 @@ fun EventLogOverlay(
     }
     // A new event moves the period's end too, so it is listed at once.
     val endMs = maxOf(nowMs, events.lastOrNull()?.timestampMs ?: 0L)
-    val listed = remember(events, period, showDetails, endMs) { events.shown(period, showDetails, endMs) }
+    val listed = remember(events, period, showDetails, endMs, detailIds) { events.shown(period, showDetails, endMs, detailIds) }
     val selected = listed.find { it.id == selectedId }
 
     if (isConfirmingClear) {
