@@ -15,40 +15,31 @@ import kotlin.math.round
  *
  * The light sensor reports only on a change, so a reading holds until the next one: feed each reading, and the held one
  * again at least every [LIGHT_TICK_MS], timed by a monotonic clock. Each call hands the reading that held since the
- * last one, as one span, to the [RiseConfirmer] and the background (SIMP-NOV22.4-S2). Not thread-safe: one
- * sensor thread owns it.
+ * last one, as one span, to the [RiseConfirmer] and the background (SIMP-NOV22.4-S2), which run as one [RiseDetector]
+ * (SIMP-NOV22.13-S1). Not thread-safe: one sensor thread owns it.
  */
 class LightDetector(
     @Volatile var riseRatio: Double = LIGHT_RISE_RATIO,
     private val minRiseLux: Double = LIGHT_MIN_RISE_LUX,
     warmUpMs: Long = BACKGROUND_WARM_UP_MS
 ) {
-    private val background = LearnedBackground(warmUpMs)
-
-    /** The learned background light, or null before the first reading. */
-    val floorLux: Double? get() = background.level
-
-    /** The background the last alert was compared against: the one just before its rise. Null before the first alert. */
-    val alertReferenceLux: Double? get() = confirmer.alertReference
-
-    private var lastMs = 0L
-    private var lastLux = 0.0 // The reading that held from lastMs until now.
-    private val confirmer = RiseConfirmer(LIGHT_CONFIRM_MS, LIGHT_CONFIRM_WINDOW_MS) { lux, reference ->
+    private val rise = RiseDetector(LIGHT_CONFIRM_MS, LIGHT_CONFIRM_WINDOW_MS, warmUpMs) { lux, reference ->
         lux - reference >= minRiseLux && lux >= reference * riseRatio
     }
 
+    /** The learned background light, or null before the first reading. */
+    val floorLux: Double? get() = rise.backgroundLevel
+
+    /** The background the last alert was compared against: the one just before its rise. Null before the first alert. */
+    val alertReferenceLux: Double? get() = rise.alertReference
+
+    private var lastMs = 0L
+    private var lastLux: Double? = null // The reading that held from lastMs until now; null before the first.
+
     /** Feeds [lux], which holds from [nowMs]; returns true when the reading held until [nowMs] completes an alert. */
     fun onLux(lux: Double, nowMs: Long): Boolean {
-        val floor = background.level
-        if (floor == null) {
-            background.start(lux, nowMs)
-            lastMs = nowMs
-            lastLux = lux
-            return false
-        }
-        val elapsedMs = (nowMs - lastMs).coerceAtLeast(0L)
-        val isAlert = !background.isWarmingUp(nowMs) && confirmer.onSpan(lastLux, nowMs, elapsedMs, floor)
-        background.follow(lastLux, nowMs, elapsedMs) // The reading that held during the elapsed time.
+        // The first reading only starts the background; later, the held reading is the span that ends now.
+        val isAlert = rise.onSpan(lastLux ?: lux, nowMs, (nowMs - lastMs).coerceAtLeast(0L))
         lastMs = nowMs
         lastLux = lux
         return isAlert

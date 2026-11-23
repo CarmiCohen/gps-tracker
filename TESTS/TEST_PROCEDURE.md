@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vNov22.14 - EXHAUSTIVE VERIFICATION BASELINE)
+# Test Procedure - GPS Tracker (vNov23.00 - EXHAUSTIVE VERIFICATION BASELINE)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -1258,8 +1258,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **247.1 Unit:** `LocationUpdateTest`: a snapshot keeps its sequence, light and vibration after the pooled row it came from is reset; a reset row equals a new `LocationUpdate()`, with the vibration 0. `LocationRowWireTest`: the vibration travels as `vib` on live and backfilled rows and reads back. `ForensicBufferStressTest` and `AlarmStealthTest` pass with `vibrationG`.
 *   **247.2 Device:** `ProductionReadinessAuditTest` and `ForensicPersistenceAuditTest` (the vibration written and read back through the buffer) on the A15, and the release Sensor starts there with `davey_over_500ms=0 stacklog=0 fatal=0`.
 
+## Chapter 248 - One Rise Detector (Nov23.00)
+**Status: A** - 248.1 passed (`RiseDetectorTest` 3/3, the noise, light, background and confirmer tests unchanged, 1080 unit tests); 248.2 passed on the A15 (`ProductionReadinessAuditTest` 3/3, release Sensor start clean; the Monitor not installed there) (SIMP-NOV22.13-S1, SOT 1.488)
+*   **248.1 Unit:** `RiseDetectorTest`: the first value only starts the background, whatever its span; no alert while the background warms up, which follows the value fast; after it, a rise of 2 s within 3 s alerts once against the background before the rise, while the background follows every span. `AcousticDetectorTest`, `LightDetectorTest`, `LearnedBackgroundTest` and `RiseConfirmerTest` pass unchanged.
+*   **248.2 Device:** `ProductionReadinessAuditTest` on the A15, and the release Sensor starts there with `davey_over_500ms=0 stacklog=0 fatal=0`. The live noise and light alerts are 241.4 and 237.3.
+
 ---
-**Active Testing Chapters: 236 of 247**
+**Active Testing Chapters: 237 of 248**
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
 *(Procedure exhaustive for all SOT Rules and Hardening Baselines)*

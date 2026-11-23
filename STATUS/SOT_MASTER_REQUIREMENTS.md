@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov22.14)
+# SOT Master Requirements & Hardening Status (Nov23.00)
 
-## 🏗️ Architectural Master Rules (560 Rules)
+## 🏗️ Architectural Master Rules (561 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   *Rules 1.1 to 1.303 are not in this repository (ISSUE-NOV8.14-O58)*: 1.1 to 1.294 belong to the pre-split single-app project and live only in the history of its repository (`before splitting/gps-tracker`, last commit `5e1d65a9`, Oct28.26), never more than 61 of them in one revision; 1.295 to 1.303 date from the versions between Oct28.26 and Revol30.6 and were never committed in either repository. Rules 1.304 to 1.340, dropped by whole-file rewrites (Revol31.9, Nov4.31, Nov4.32), are restored below verbatim from git history. Nov10.6-Documentation checked them against the code: 1.318, 1.333, 1.336 and 1.339 are marked retired; the others hold.
@@ -188,6 +188,7 @@
 *   **1.485 One Counted Emit**: every data event the signaling client sends (`ping_cmd`, `location_batch`, `violation_event`, `backfill_request`, `backfill_response`, `settings_update`) MUST leave through the one sender `emitCounted`, which counts its payload in the monthly data use; only the `join` and push-token control messages bypass it (SIMP-NOV22.9-S1, chapter 245).
 *   **1.486 One Learned Background**: the noise (`AcousticDetector`) and the light (`LightDetector`) detection MUST learn their background through the one core-shared `LearnedBackground`, fed spans, with one warm-up (`BACKGROUND_WARM_UP_MS`, 3 s) and one set of time constants (0.5 s in the warm-up, 1 s towards a lower and 10 s towards a higher value), so both detectors follow a level the same way in time, whatever their feed rate (SIMP-NOV22.10-S1, chapter 246).
 *   **1.487 Vibration On The Row**: a telemetry row MUST carry the sensing tick's vibration as the plain value `LocationUpdate.vibrationG` (`vib` on the wire, the same float in the forensic buffer), with no nested sensor snapshot, so `snapshot()` is a plain copy and `reset()` clears it with the other fields (SIMP-NOV22.11-S1, chapter 247).
+*   **1.488 One Rise Detector**: the noise (`AcousticDetector`) and the light (`LightDetector`) detection MUST run their shared steps through the one core-shared `RiseDetector.onSpan`: the first value only starts the `LearnedBackground`, no alert while it warms up, each later span is confirmed by the `RiseConfirmer` against the background before it and then followed by the background; each detector keeps only its span and its rise test (SIMP-NOV22.13-S1, chapter 248).
 
 ## 🛡️ Core Hardening Baseline
 *Frozen at Nov8.101-Tooling (SIMP-NOV8.100-S2, rule 1.398): later versions are recorded only in `STATUS/RESOLUTION_ARCHIVE.md`.*

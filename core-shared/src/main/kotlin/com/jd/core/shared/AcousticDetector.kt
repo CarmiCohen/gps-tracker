@@ -19,7 +19,8 @@ import kotlin.math.sqrt
  * ISSUE-NOV17.12-O112: nor is a coughing fit). After
  * an alert the level must fall below the limit before a new noise counts, so one noise raises one alert; the time
  * between alerts is the Sensor's per-kind cool-down ([AlertCoolDown]), which replaced a lockout here. The
- * debouncing is the [RiseConfirmer] the light detection shares (SIMP-NOV22.4-S2), fed one frame as one span.
+ * debouncing is the [RiseConfirmer] the light detection shares (SIMP-NOV22.4-S2), fed one frame as one span; the
+ * background and the debouncing run as one [RiseDetector] (SIMP-NOV22.13-S1).
  *
  * Feed one level per audio frame of about [ACOUSTIC_FRAME_MS], timed by a monotonic clock. Not thread-safe: one
  * audio thread owns it.
@@ -29,32 +30,21 @@ class AcousticDetector(
     private val minAlertDbfs: Double = ACOUSTIC_MIN_ALERT_DBFS,
     warmUpMs: Long = BACKGROUND_WARM_UP_MS
 ) {
-    private val background = LearnedBackground(warmUpMs)
+    private val rise = RiseDetector(ACOUSTIC_CONFIRM_MS, ACOUSTIC_CONFIRM_WINDOW_MS, warmUpMs) { level, reference ->
+        level - reference >= jumpDb && level >= minAlertDbfs
+    }
 
     /** The learned background level, or null before the first frame. */
-    val floorDbfs: Double? get() = background.level
+    val floorDbfs: Double? get() = rise.backgroundLevel
 
     /**
      * The background the last alert was compared against: the one at its noise's first loud frame, not [floorDbfs],
      * which rises during the noise (ISSUE-NOV18.9-O120). Null before the first alert.
      */
-    val alertReferenceDbfs: Double? get() = confirmer.alertReference
-
-    private val confirmer = RiseConfirmer(ACOUSTIC_CONFIRM_MS, ACOUSTIC_CONFIRM_WINDOW_MS) { level, reference ->
-        level - reference >= jumpDb && level >= minAlertDbfs
-    }
+    val alertReferenceDbfs: Double? get() = rise.alertReference
 
     /** Returns true when [levelDbfs] at [nowMs] is an alert. */
-    fun onLevel(levelDbfs: Double, nowMs: Long): Boolean {
-        val floor = background.level
-        if (floor == null) {
-            background.start(levelDbfs, nowMs)
-            return false
-        }
-        val isAlert = !background.isWarmingUp(nowMs) && confirmer.onSpan(levelDbfs, nowMs, ACOUSTIC_FRAME_MS, floor)
-        background.follow(levelDbfs, nowMs, ACOUSTIC_FRAME_MS)
-        return isAlert
-    }
+    fun onLevel(levelDbfs: Double, nowMs: Long): Boolean = rise.onSpan(levelDbfs, nowMs, ACOUSTIC_FRAME_MS)
 }
 
 /** The jump above the background that counts as an alert (user decision, 2026-11-08); the slider's middle. */
