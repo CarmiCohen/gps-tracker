@@ -8,15 +8,14 @@ import kotlin.math.abs
  * GeofenceIntegrityTest: Ported from OLD MainAlarmLogicTest.
  * Validates R018: Geofence Hysteresis and Bayesian Gap Suppression.
  * Ensures the Kotlin engine avoids false-positive alarms during GPS gaps.
+ * Nov23.12 (SIMP-NOV8.13-S1): checks the apps' own rule, [SentinelLogic.evaluateHomeZone].
  */
 class GeofenceIntegrityTest {
 
-    private val homeGeofence = SentinelLogic.Geofence(
-        id = "HOME",
-        lat = 32.0,
-        lng = 34.0,
-        radiusMeters = 100.0
-    )
+    private val homeGeofence = GeofenceConfig(points = listOf(HomePoint(32.0, 34.0)), radiusMeters = 100.0, revision = 1L)
+
+    private fun check(update: LocationUpdate, previous: SentinelLogic.GeofenceState) =
+        SentinelLogic.evaluateHomeZone(update.lat, update.lng, update.accuracy, homeGeofence, previous)
 
     /**
      * verifyGeofenceTransitionLogic: Verifies basic ENTER/EXIT detection.
@@ -27,16 +26,12 @@ class GeofenceIntegrityTest {
         val outsideUpdate = LocationUpdate(lat = 32.1, lng = 34.1) // Way outside
 
         // 1. Case: Moving OUT
-        val exitResult = SentinelLogic.evaluateGeofenceTransition(
-            outsideUpdate, homeGeofence, SentinelLogic.GeofenceState.INSIDE
-        )
+        val exitResult = check(outsideUpdate, SentinelLogic.GeofenceState.INSIDE)
         assertEquals("Should detect EXIT transition", SentinelLogic.GeofenceTransition.EXIT, exitResult.transition)
         assertEquals(SentinelLogic.GeofenceState.OUTSIDE, exitResult.currentState)
 
         // 2. Case: Moving IN
-        val enterResult = SentinelLogic.evaluateGeofenceTransition(
-            insideUpdate, homeGeofence, SentinelLogic.GeofenceState.OUTSIDE
-        )
+        val enterResult = check(insideUpdate, SentinelLogic.GeofenceState.OUTSIDE)
         assertEquals("Should detect ENTER transition", SentinelLogic.GeofenceTransition.ENTER, enterResult.transition)
         assertEquals(SentinelLogic.GeofenceState.INSIDE, enterResult.currentState)
     }
@@ -44,8 +39,7 @@ class GeofenceIntegrityTest {
     /**
      * verifyHysteresisBufferR018: Ensures that the system doesn't 
      * flip-flop when exactly on the boundary.
-     * Note: Pure geometric transition check is 1:1, but high-level 
-     * logic should use a 0.5x accuracy gate (Ported requirement).
+     * The accuracy band against boundary noise is covered by HomeZoneTest.
      */
     @Test
     fun verifyHysteresisBufferR018() {
@@ -53,9 +47,7 @@ class GeofenceIntegrityTest {
         // We verify that the distance calculation is stable.
         val boundaryUpdate = LocationUpdate(lat = 32.0009, lng = 34.0) // ~100m away
         
-        val result = SentinelLogic.evaluateGeofenceTransition(
-            boundaryUpdate, homeGeofence, SentinelLogic.GeofenceState.INSIDE
-        )
+        val result = check(boundaryUpdate, SentinelLogic.GeofenceState.INSIDE)
         
         // This confirms the distance math is precise enough for hysteresis gates
         assertTrue("Distance to center should be ~100m", abs(result.distanceToCenter - 100.0) < 5.0)

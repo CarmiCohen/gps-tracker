@@ -11,18 +11,13 @@ import java.io.File
 
 /**
  * GeofenceForensicTest: Audits Geofence transition recording for nanosecond precision and zero loss.
- * Part of ISSUE-REVOL30.1-F3.
+ * Part of ISSUE-REVOL30.1-F3. Nov23.12 (SIMP-NOV8.13-S1): uses the Sensor's own rule, [SentinelLogic.evaluateHomeZone].
  */
 @RunWith(AndroidJUnit4::class)
 class GeofenceForensicTest {
 
     private lateinit var forensicBuffer: ForensicBuffer
-    private val testGeofence = SentinelLogic.Geofence(
-        id = "TEST_ZONE",
-        lat = 37.7749,
-        lng = -122.4194,
-        radiusMeters = 100.0
-    )
+    private val testGeofence = GeofenceConfig(points = listOf(HomePoint(37.7749, -122.4194)), radiusMeters = 100.0, revision = 1L)
 
     @Before
     fun setup() {
@@ -50,7 +45,7 @@ class GeofenceForensicTest {
                 sequenceId = i.toLong()
             }
 
-            val result = SentinelLogic.evaluateGeofenceTransition(update, testGeofence, currentState)
+            val result = SentinelLogic.evaluateHomeZone(update.lat, update.lng, update.accuracy, testGeofence, currentState)
             
             if (result.transition != SentinelLogic.GeofenceTransition.NONE) {
                 transitionsFound.add(result.transition)

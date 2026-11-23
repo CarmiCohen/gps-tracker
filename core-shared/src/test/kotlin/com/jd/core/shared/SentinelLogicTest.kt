@@ -10,12 +10,8 @@ import kotlin.math.abs
  */
 class SentinelLogicTest {
 
-    private val homeGeofence = SentinelLogic.Geofence(
-        id = "HOME",
-        lat = 32.7940,
-        lng = 34.9896,
-        radiusMeters = 100.0
-    )
+    // Nov23.12 (SIMP-NOV8.13-S1): the geofence test uses the apps' own rule, evaluateHomeZone.
+    private val homeGeofence = GeofenceConfig(points = listOf(HomePoint(32.7940, 34.9896)), radiusMeters = 100.0, revision = 1L)
 
     @Test
     fun `Verify movement validation logic`() {
@@ -64,14 +60,14 @@ class SentinelLogicTest {
         val outsideUpdate = LocationUpdate(lat = 32.8000, lng = 35.0000)
 
         // Transition OUT
-        val exitRes = SentinelLogic.evaluateGeofenceTransition(
-            outsideUpdate, homeGeofence, SentinelLogic.GeofenceState.INSIDE
+        val exitRes = SentinelLogic.evaluateHomeZone(
+            outsideUpdate.lat, outsideUpdate.lng, outsideUpdate.accuracy, homeGeofence, SentinelLogic.GeofenceState.INSIDE
         )
         assertEquals(SentinelLogic.GeofenceTransition.EXIT, exitRes.transition)
 
         // Transition IN
-        val enterRes = SentinelLogic.evaluateGeofenceTransition(
-            insideUpdate, homeGeofence, SentinelLogic.GeofenceState.OUTSIDE
+        val enterRes = SentinelLogic.evaluateHomeZone(
+            insideUpdate.lat, insideUpdate.lng, insideUpdate.accuracy, homeGeofence, SentinelLogic.GeofenceState.OUTSIDE
         )
         assertEquals(SentinelLogic.GeofenceTransition.ENTER, enterRes.transition)
     }
