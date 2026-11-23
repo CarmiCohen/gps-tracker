@@ -1,6 +1,7 @@
 package com.jd.app.monitor
 
 import android.content.Context
+import androidx.datastore.core.DataMigration
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -13,7 +14,35 @@ import com.jd.core.shared.importedOver
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-val Context.monitorDataStore by preferencesDataStore(name = "monitor_settings")
+val Context.monitorDataStore by preferencesDataStore(
+    name = "monitor_settings",
+    produceMigrations = { listOf(SirenTypeIntoAlertSettingsMigration) }
+)
+
+/** The stored [AlertSettings] as JSON. */
+internal val ALERT_SETTINGS_KEY = stringPreferencesKey("alert_settings_json")
+
+/** The siren type's own key before SIMP-NOV7.3-S1; now [AlertSettings.sirenType] is the only copy. */
+internal val LEGACY_SIREN_TYPE_KEY = stringPreferencesKey("siren_type")
+
+internal fun decodeAlertSettings(json: String?): AlertSettings =
+    json?.takeIf { it.isNotBlank() }?.let { runCatching { Json.decodeFromString<AlertSettings>(it) }.getOrNull() } ?: AlertSettings()
+
+/**
+ * Moves an installed Monitor's [LEGACY_SIREN_TYPE_KEY] into its stored [AlertSettings] once, on the first read
+ * (SIMP-NOV7.3-S1). The Sensor's revision is kept: the siren type is not the Sensor's part.
+ */
+internal object SirenTypeIntoAlertSettingsMigration : DataMigration<Preferences> {
+    override suspend fun shouldMigrate(currentData: Preferences): Boolean = LEGACY_SIREN_TYPE_KEY in currentData
+
+    override suspend fun migrate(currentData: Preferences): Preferences = currentData.toMutablePreferences().apply {
+        val sirenType = currentData[LEGACY_SIREN_TYPE_KEY] ?: return@apply
+        this[ALERT_SETTINGS_KEY] = Json.encodeToString(decodeAlertSettings(currentData[ALERT_SETTINGS_KEY]).copy(sirenType = sirenType))
+        remove(LEGACY_SIREN_TYPE_KEY)
+    }.toPreferences()
+
+    override suspend fun cleanUp() = Unit
+}
 
 /**
  * MonitorDataStore: Persistent settings for the Watcher application.
@@ -23,8 +52,7 @@ val Context.monitorDataStore by preferencesDataStore(name = "monitor_settings")
 class MonitorDataStore(private val context: Context) {
     private val relayUrlKey = stringPreferencesKey("relay_url")
     private val isDndBypassEnabledKey = booleanPreferencesKey("dnd_bypass_enabled")
-    private val alertSettingsKey = stringPreferencesKey("alert_settings_json")
-    private val sirenTypeKey = stringPreferencesKey("siren_type")
+    private val alertSettingsKey = ALERT_SETTINGS_KEY
     private val geofenceKey = stringPreferencesKey("geofence_json")
     private val trailClearTrackerKey = stringPreferencesKey("trail_clear_tracker")
     private val trailClearAtKey = longPreferencesKey("trail_clear_at_ms")
@@ -65,10 +93,6 @@ class MonitorDataStore(private val context: Context) {
 
     val alertSettings: Flow<AlertSettings> = context.monitorDataStore.data.map { prefs -> decodeAlertSettings(prefs[alertSettingsKey]) }
 
-    val sirenType: Flow<String> = context.monitorDataStore.data.map { prefs ->
-        prefs[sirenTypeKey] ?: "Siren"
-    }
-
     /** The user's Home Points and radius; the Monitor is their source and the Sensor enforces them (ISSUE-NOV8.13-O51). */
     val geofence: Flow<GeofenceConfig> = context.monitorDataStore.data.map { prefs -> decodeGeofence(prefs[geofenceKey]) }
 
@@ -101,15 +125,6 @@ class MonitorDataStore(private val context: Context) {
         }
     }
 
-    private fun decodeAlertSettings(json: String?): AlertSettings =
-        json?.takeIf { it.isNotBlank() }?.let { runCatching { Json.decodeFromString<AlertSettings>(it) }.getOrNull() } ?: AlertSettings()
-
-    suspend fun saveSirenType(type: String) {
-        context.monitorDataStore.edit { prefs ->
-            prefs[sirenTypeKey] = type
-        }
-    }
-
     /** [file] with the stored settings filled in (ISSUE-NOV10.8-O80). */
     suspend fun exportInto(file: MonitorSettingsFile): MonitorSettingsFile {
         val prefs = context.monitorDataStore.data.first()
@@ -117,7 +132,6 @@ class MonitorDataStore(private val context: Context) {
             relayUrl = prefs[relayUrlKey],
             dndBypass = prefs[isDndBypassEnabledKey] ?: false,
             alertSettings = decodeAlertSettings(prefs[alertSettingsKey]),
-            sirenType = prefs[sirenTypeKey] ?: "Siren",
             geofence = decodeGeofence(prefs[geofenceKey])
         )
     }
@@ -132,7 +146,6 @@ class MonitorDataStore(private val context: Context) {
             if (relayUrl == null) prefs.remove(relayUrlKey) else prefs[relayUrlKey] = relayUrl
             prefs[isDndBypassEnabledKey] = file.dndBypass
             prefs[alertSettingsKey] = Json.encodeToString(file.alertSettings.importedOver(decodeAlertSettings(prefs[alertSettingsKey]), nowMs))
-            prefs[sirenTypeKey] = file.sirenType
             prefs[geofenceKey] = Json.encodeToString(file.geofence.importedOver(decodeGeofence(prefs[geofenceKey]), nowMs))
         }
     }

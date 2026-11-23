@@ -168,9 +168,6 @@ class MonitorViewModel @Inject constructor(
     val alertSettings: StateFlow<AlertSettings> = dataStore.alertSettings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AlertSettings())
 
-    val sirenType: StateFlow<String> = dataStore.sirenType
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Siren")
-
     /** True while the siren really plays, for an alarm or a test. */
     val isSirenPlaying: StateFlow<Boolean> = alarmEngine.isSirenOn
 
@@ -191,12 +188,6 @@ class MonitorViewModel @Inject constructor(
     fun updateAlertSettings(settings: AlertSettings) {
         viewModelScope.launch {
             dataStore.saveAlertSettings(settings)
-        }
-    }
-
-    fun updateSirenType(type: String) {
-        viewModelScope.launch {
-            dataStore.saveSirenType(type)
         }
     }
 
@@ -275,7 +266,6 @@ class MonitorViewModel @Inject constructor(
             identityManager.clearTargetId()
             setupReports.forget()
             dataStore.saveAlertSettings(AlertSettings())
-            dataStore.saveSirenType("Siren")
             dataStore.saveRelayUrl(RelayConfig.DEFAULT_URL)
             dataStore.editGeofence { GeofenceConfig() }
             repository.clearTrail(trackerId = null) // Unpaired: a new pairing gets the Sensor's whole history.

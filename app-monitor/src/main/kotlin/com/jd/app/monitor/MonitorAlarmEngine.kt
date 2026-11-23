@@ -117,10 +117,9 @@ class MonitorAlarmEngine @Inject constructor(
                 _alarms.map { it.needsSiren }.distinctUntilChanged(),
                 sirenTimedOut,
                 sirenTest,
-                dataStore.alertSettings,
-                dataStore.sirenType
-            ) { needsSiren, timedOut, testing, settings, waveType ->
-                if ((needsSiren && !timedOut) || testing) settings.sirenSound(waveType) else null
+                dataStore.alertSettings
+            ) { needsSiren, timedOut, testing, settings ->
+                if ((needsSiren && !timedOut) || testing) settings.sirenSound() else null
             }.distinctUntilChanged().onEach { sound ->
                 if (sound != null) siren.play(sound) else siren.stop()
             }.launchIn(this)

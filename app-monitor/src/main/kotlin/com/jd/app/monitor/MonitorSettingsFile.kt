@@ -16,6 +16,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Required
 import kotlinx.serialization.Serializable
@@ -46,8 +47,15 @@ data class MonitorSettingsFile(
     /** Null when the default relay was in use. */
     val relayUrl: String? = null,
     val dndBypass: Boolean = false,
+    /** Holds the siren type too (SIMP-NOV7.3-S1). */
     val alertSettings: AlertSettings = AlertSettings(),
-    val sirenType: String = "Siren",
+    /**
+     * The siren type of files written before SIMP-NOV7.3-S1; [readMonitorSettings] moves it into [alertSettings]. Never
+     * written, so older apps read the newer files with their own default.
+     */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val sirenType: String? = null,
     val geofence: GeofenceConfig = GeofenceConfig(),
     val trails: List<TrailEntity> = emptyList()
 )
@@ -64,7 +72,8 @@ fun readMonitorSettings(input: InputStream): MonitorSettingsFile {
         throw SettingsFileException("Not a $MONITOR_SETTINGS_FORMAT file")
     }
     checkSettingsFile(file.format, file.formatVersion, MONITOR_SETTINGS_FORMAT)
-    return file
+    val legacySirenType = file.sirenType ?: return file
+    return file.copy(alertSettings = file.alertSettings.copy(sirenType = legacySirenType), sirenType = null)
 }
 
 /** Writes and reads the Monitor's settings file at a place the user picked (ISSUE-NOV10.8-O80). */

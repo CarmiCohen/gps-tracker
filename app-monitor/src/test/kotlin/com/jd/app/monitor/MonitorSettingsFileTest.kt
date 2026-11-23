@@ -7,6 +7,10 @@ import com.jd.core.shared.SETTINGS_FILE_VERSION
 import com.jd.core.shared.SettingsFileException
 import com.jd.core.shared.importedOver
 import com.jd.core.shared.settingsFileName
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -27,8 +31,7 @@ class MonitorSettingsFileTest {
         trackerId = "T",
         relayUrl = "wss://relay.example",
         dndBypass = true,
-        alertSettings = AlertSettings(tiltAlert = false, alarmVolume = 0.5f, sensorRevision = 40L),
-        sirenType = "Pulse",
+        alertSettings = AlertSettings(tiltAlert = false, alarmVolume = 0.5f, sensorRevision = 40L, sirenType = "Pulse"),
         geofence = GeofenceConfig(listOf(HomePoint(32.1, 34.8), HomePoint(32.2, 34.9)), radiusMeters = 250.0, revision = 30L),
         trails = listOf(
             TrailEntity("T", 1_000L, 7L, 32.1, 34.8, 5f, "VALID"),
@@ -57,6 +60,18 @@ class MonitorSettingsFileTest {
         val text = ByteArrayOutputStream().also { writeMonitorSettings(file, it) }.toString(Charsets.UTF_8.name())
         assertTrue(text.contains("\"format\":\"$MONITOR_SETTINGS_FORMAT\""))
         assertTrue(text.contains("\"formatVersion\":$SETTINGS_FILE_VERSION"))
+    }
+
+    /** SIMP-NOV7.3-S1: the siren type travels only inside the alert settings; an older file's own field is moved there. */
+    @Test
+    fun theSirenTypeIsWrittenOnceAndAnOlderFilesIsMovedIntoTheAlertSettings() {
+        val text = ByteArrayOutputStream().also { writeMonitorSettings(file, it) }.toString(Charsets.UTF_8.name())
+        assertFalse("No top-level siren type", "sirenType" in Json.parseToJsonElement(text).jsonObject)
+
+        val older = """{"format":"$MONITOR_SETTINGS_FORMAT","formatVersion":1,"alertSettings":{"sirenType":"Siren"},"sirenType":"Chimes"}"""
+        val read = readMonitorSettings(older.byteInputStream())
+        assertEquals("Chimes", read.alertSettings.sirenType)
+        assertNull(read.sirenType)
     }
 
     @Test

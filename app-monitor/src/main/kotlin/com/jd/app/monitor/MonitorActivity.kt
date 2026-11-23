@@ -129,7 +129,6 @@ class MonitorActivity : ComponentActivity() {
                 }
 
                 val alertSettings by viewModel.alertSettings.collectAsStateWithLifecycle()
-                val sirenType by viewModel.sirenType.collectAsStateWithLifecycle()
                 val isSirenPlaying by viewModel.isSirenPlaying.collectAsStateWithLifecycle()
                 val alarmBook by viewModel.alarms.collectAsStateWithLifecycle()
                 val geofence by viewModel.geofence.collectAsStateWithLifecycle()
@@ -173,7 +172,6 @@ class MonitorActivity : ComponentActivity() {
                         trail = trail,
                         localTrail = localTrail,
                         alertSettings = alertSettings,
-                        sirenType = sirenType,
                         isSirenPlaying = isSirenPlaying,
                         sensorSetup = sensorSetup,
                         events = events,
@@ -182,7 +180,6 @@ class MonitorActivity : ComponentActivity() {
                         graphsOverlay = { onClose -> MonitorGraphsScreen(viewModel, onClose) },
                         onShowGraphsAt = viewModel::showGraphsAt,
                         onUpdateAlertSettings = { viewModel.updateAlertSettings(it) },
-                        onUpdateSirenType = { viewModel.updateSirenType(it) },
                         onUpdateAlarmVolume = { viewModel.updateAlarmVolume(it) },
                         onTestSiren = { viewModel.testSirenAudio() },
                         onReset = { 
@@ -349,10 +346,8 @@ fun MonitorScreen(
     trail: List<TrailEntity>,
     localTrail: List<TrailEntity>,
     alertSettings: AlertSettings,
-    sirenType: String,
     isSirenPlaying: Boolean,
     onUpdateAlertSettings: (AlertSettings) -> Unit,
-    onUpdateSirenType: (String) -> Unit,
     onUpdateAlarmVolume: (Float) -> Unit,
     onTestSiren: () -> Unit,
     onReset: () -> Unit,
@@ -531,10 +526,8 @@ fun MonitorScreen(
     if (showSoundOverlay) {
         com.jd.core.ui.AlarmSoundOverlay(
             draftAlertSettings = alertSettings,
-            selectedSirenType = sirenType,
             isSirenPlaying = isSirenPlaying,
             onUpdateAlertSettings = onUpdateAlertSettings,
-            onUpdateSirenType = onUpdateSirenType,
             onUpdateAlarmVolume = onUpdateAlarmVolume,
             onTestSiren = onTestSiren,
             onClose = { showSoundOverlay = false }

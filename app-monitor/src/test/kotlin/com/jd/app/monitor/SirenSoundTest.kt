@@ -11,7 +11,7 @@ class SirenSoundTest {
 
     @Test
     fun defaultsPlayAtForcedMaximumOnTheAlarmStreamWithVibration() {
-        val sound = AlertSettings().sirenSound("Siren")
+        val sound = AlertSettings().sirenSound()
 
         assertEquals(1f, sound.gain, 0f)
         assertTrue(sound.useAlarmStream)
@@ -23,15 +23,15 @@ class SirenSoundTest {
     fun customVolumeAppliesOnlyWithoutForcedMaximum() {
         val custom = AlertSettings(useMaxVolume = false, useCustomVolume = true, alarmVolume = 0.3f)
 
-        assertEquals(0.3f, custom.sirenSound("Siren").gain, 0.0001f)
-        assertEquals(1f, custom.copy(useMaxVolume = true).sirenSound("Siren").gain, 0f)
-        assertEquals(1f, custom.copy(useCustomVolume = false).sirenSound("Siren").gain, 0f)
+        assertEquals(0.3f, custom.sirenSound().gain, 0.0001f)
+        assertEquals(1f, custom.copy(useMaxVolume = true).sirenSound().gain, 0f)
+        assertEquals(1f, custom.copy(useCustomVolume = false).sirenSound().gain, 0f)
     }
 
     @Test
     fun withoutOverridingSilenceTheSirenFollowsTheNotificationStream() {
-        val quiet = AlertSettings(overrideSilence = false, useMaxVolume = false, vibrationEnabled = false)
-        val sound = quiet.sirenSound("Pulse")
+        val quiet = AlertSettings(overrideSilence = false, useMaxVolume = false, vibrationEnabled = false, sirenType = "Pulse")
+        val sound = quiet.sirenSound() // The wave is the settings' own siren type (SIMP-NOV7.3-S1).
 
         assertFalse(sound.useAlarmStream)
         assertFalse(sound.forceMaxVolume)

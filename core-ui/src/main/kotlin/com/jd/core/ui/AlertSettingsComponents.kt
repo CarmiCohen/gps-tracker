@@ -231,10 +231,8 @@ fun AlertManagementOverlay(
 @Composable
 fun AlarmSoundOverlay(
     draftAlertSettings: AlertSettings,
-    selectedSirenType: String,
     isSirenPlaying: Boolean,
     onUpdateAlertSettings: (AlertSettings) -> Unit,
-    onUpdateSirenType: (String) -> Unit,
     onUpdateAlarmVolume: (Float) -> Unit,
     onTestSiren: () -> Unit,
     onClose: () -> Unit
@@ -277,8 +275,8 @@ fun AlarmSoundOverlay(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 sirenOptions.forEach { type ->
                     FilterChip(
-                        selected = selectedSirenType == type,
-                        onClick = { onUpdateSirenType(type) },
+                        selected = draftAlertSettings.sirenType == type,
+                        onClick = { onUpdateAlertSettings(draftAlertSettings.copy(sirenType = type)) },
                         label = { Text(type) }
                     )
                 }

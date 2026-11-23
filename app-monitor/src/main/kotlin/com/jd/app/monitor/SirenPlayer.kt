@@ -34,10 +34,11 @@ data class SirenSound(
 
 /**
  * "Force Maximum" wins over the custom volume, as the settings screen states. Overriding silent mode plays on the
- * alarm stream, which the ringer switch does not mute; otherwise the siren follows the notification stream.
+ * alarm stream, which the ringer switch does not mute; otherwise the siren follows the notification stream. The wave
+ * is [AlertSettings.sirenType], the Monitor's only siren type setting (SIMP-NOV7.3-S1).
  */
-fun AlertSettings.sirenSound(waveType: String) = SirenSound(
-    waveType = waveType,
+fun AlertSettings.sirenSound() = SirenSound(
+    waveType = sirenType,
     gain = if (!useMaxVolume && useCustomVolume) alarmVolume.coerceIn(0f, 1f) else 1f,
     useAlarmStream = overrideSilence || useMaxVolume,
     forceMaxVolume = useMaxVolume,

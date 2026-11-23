@@ -3,10 +3,10 @@
 *Working file: open work only (Documentation Rule D2). What each version did is in its commit message (`git log`); up to Nov23.4 also in the frozen `STATUS/RESOLUTION_ARCHIVE.md`. The long history paragraph this section held up to Nov23.4 is in tag Nov23.4: `git show Nov23.4:DOCS/issues.md`.*
 
 ## 🎯 Next Resumption Focus
-1. Without phones: the next SIMP idea, SIMP-NOV7.3-S1 (one siren type setting).
+1. Without phones: the next SIMP idea, SIMP-NOV7.2-S1 (one fix copy in the Sensor).
 2. With the user at the A15: 241.4 (knock, alarm window) with 237.3 (torch); also 211.2 and 213.2's Active apps tap.
 3. O133 (row 73): after Render's reset the user deploys relay v6.050; then the waiting live checks 182.2, 238.2, 240.3, 241.3, 244.3, 249.3, 250.3, 251.3.
-4. With the S21FE: release Monitor, then 215.1, 226.3, 227.4, 228.2, 230.3, 233.3, 237.4; O112 when the user has noted false alarms.
+4. With the S21FE: release Monitor (its siren type chip keeps the chosen sound: SIMP-NOV7.3-S1 migration), then 215.1, 226.3, 227.4, 228.2, 230.3, 233.3, 237.4; O112 when the user has noted false alarms.
 5. O134: discuss the Home Points of two Monitors with the user.
 
 ### Work Queue
@@ -80,7 +80,6 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 *   **SIMP-NOV7.21-S1**: One Fix Freshness Rule. The Sensor stops sending a fix after 15 s (`FIX_STALE_AFTER_MS`), while its own HUD keeps showing that fix with a growing age and drops its speed only after 35 s (`SPEED_VALID_MS` in `FixReading.kt`). One freshness rule in `core-ui`, used by `SensorService`, the Sensor HUD, and `SensorFixStore`, would keep the Sensor's screen and its telemetry from disagreeing. With it, `ForensicBuffer.writeTrace` could read `update.isCritical` itself and drop its separate `isCritical` parameter.
 *   **SIMP-NOV7.17-S1**: One Sensor Service State. `SensorService` publishes two `@Singleton` stores, `SensorFixStore` and `SensorServiceStatus`, both cleared in `onDestroy`. A single `SensorServiceState` holding `running` and `fix` would be set and cleared in one place, and the HUD and Setup dialog would read one flow. It would also be the natural home for the `Location` of SIMP-NOV7.2-S1.
 *   **SIMP-NOV7.15-S1**: Chunk Backfill In The Signaling Client. The Sensor owns the 50-row chunk size and the stop-on-failure rule (`answerBackfill`), while the wire format belongs to `SocketioSignalingClient`. A single `sendBackfill(requestId, updates): Boolean` on `SignalingClient` would keep chunking, the completion flag, and the stop rule next to the payload code.
-*   **SIMP-NOV7.3-S1**: One Siren Type Setting. The siren type is stored twice in each app: in `AlertSettings.sirenType` and as a separate `siren_type` preference, which the chips use. Keep only the field in `AlertSettings`, so the alarm engine reads one value.
 *   **SIMP-NOV7.2-S1**: One Fix Copy In The Sensor. `SensorService` keeps `lastLocation` for telemetry and sampling, and also publishes a `FixReading` to `SensorFixStore`. If the store held the `Location` itself, the sensing loop, `refreshSamplingRate`, and the HUD would read one copy, and `lastLocation` could be removed.
 *   **SIMP-NOV7.1-S1**: One Unpair Control. The Monitor menu bar has two controls that do the same thing, the `Settings / Re-pair` gear and the `Disconnect` X. Keep `Disconnect` as the single unpair control, and either give the gear a real settings screen or remove it.
 *   **SIMP-REVOL39.0-S1**: Integrated Kinetic State Observer. Consolidate acceleration, velocity, and thermal status evaluation into a single unified observer in `core-shared`.
