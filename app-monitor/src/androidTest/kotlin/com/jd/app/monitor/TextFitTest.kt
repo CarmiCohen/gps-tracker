@@ -80,7 +80,7 @@ class TextFitTest {
 
     @Test
     fun theMonitorIdStaysWholeBesideLongTelemetry() {
-        val state = HudState(appMode = "monitor", selfId = "VIEWER", batteryLevel = 38, isCharging = true, tempCelsius = 29f,
+        val state = HudState(selfId = "VIEWER", batteryLevel = 38, isCharging = true, tempCelsius = 29f,
             accuracyMeters = 96f, telemetryAgeSec = 465L,
             leds = ownLeds(isInternet = true, isRelayConnected = true, gps = LedState.OK, peerLabel = "TRK", peer = LedState.OK))
         composeRule.setContent {
@@ -117,8 +117,8 @@ class TextFitTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
                 RevolutionTheme {
                     MonitorScreen(
-                        localHudState = HudState(appMode = "monitor"),
-                        remoteHudState = HudState(appMode = "sensor"),
+                        localHudState = HudState(),
+                        remoteHudState = HudState(),
                         localPosition = null,
                         trackerId = "T",
                         monitorId = "M",

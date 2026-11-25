@@ -29,8 +29,8 @@ class RotationStateRestorationTest {
         restorationTester.setContent {
             RevolutionTheme {
                 MonitorScreen(
-                    localHudState = HudState(appMode = "monitor"),
-                    remoteHudState = HudState(appMode = "sensor"),
+                    localHudState = HudState(),
+                    remoteHudState = HudState(),
                     localPosition = null,
                     trackerId = "T123",
                     monitorId = "M456",
@@ -66,8 +66,8 @@ class RotationStateRestorationTest {
         restorationTester.setContent {
             RevolutionTheme {
                 MonitorScreen(
-                    localHudState = HudState(appMode = "monitor"),
-                    remoteHudState = HudState(appMode = "sensor"),
+                    localHudState = HudState(),
+                    remoteHudState = HudState(),
                     localPosition = null,
                     trackerId = "T123",
                     monitorId = "M456",

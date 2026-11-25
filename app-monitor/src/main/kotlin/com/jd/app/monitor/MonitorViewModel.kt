@@ -379,10 +379,10 @@ class MonitorViewModel @Inject constructor(
         val isLinkUp = relayLinkUp(isInternet, isConnected)
 
         HudState(
-            appMode = "monitor",
             selfId = self,
             isRelayConnected = isConnected,
             isPeerActive = isTrackerPresent,
+            isSpeedDimmed = !isTrackerPresent, // this phone's own speed is gray while its Sensor is not heard (SIMP-NOV19.5-S1)
             // INT, SRV, GPS and TRK in green, red or gray (Nov19.5); DAT (INT and SRV again) and WDG are gone.
             leds = ownLeds(
                 isInternet = isInternet,
@@ -394,7 +394,7 @@ class MonitorViewModel @Inject constructor(
         ).withLocalReadings(fix?.reading, readBattery(context), now, speedValidMs = MONITOR_SPEED_VALID_MS)
     }
         .atUiRate()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "monitor"))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(isSpeedDimmed = true))
 
     val remoteHudState: StateFlow<HudState> = combine(
         identityManager.targetId.filterNotNull(),
@@ -412,7 +412,6 @@ class MonitorViewModel @Inject constructor(
         val lastFixAgeMs = lastFix?.takeIf { it.first == target }?.let { (now - it.second).coerceAtLeast(0L) }
 
         HudState(
-            appMode = "sensor",
             selfId = target, // this HUD describes the paired Sensor (ISSUE-NOV17.7-O105)
             isRelayConnected = isConnected,
             isPeerActive = isTrackerPresent,
@@ -431,7 +430,7 @@ class MonitorViewModel @Inject constructor(
         )
     }
         .atUiRate()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "sensor"))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState())
 
     val hudState: StateFlow<HudState> = remoteHudState
 

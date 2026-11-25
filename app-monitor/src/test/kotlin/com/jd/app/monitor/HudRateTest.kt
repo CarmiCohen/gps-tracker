@@ -34,7 +34,7 @@ class HudRateTest {
     fun hudStateStreamThrottlesRapidEmissionsToMaxTwoHertz() = runBlocking {
         val highRateHudStates = flow {
             repeat(10) { step ->
-                emit(HudState(appMode = "monitor", sequenceId = step.toLong()))
+                emit(HudState(sequenceId = step.toLong()))
                 delay(100) // 10Hz
             }
         }

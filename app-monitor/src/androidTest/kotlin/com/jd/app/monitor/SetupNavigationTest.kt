@@ -36,8 +36,8 @@ class SetupNavigationTest {
         composeRule.setContent {
             RevolutionTheme {
                 MonitorScreen(
-                    localHudState = HudState(appMode = "monitor"),
-                    remoteHudState = HudState(appMode = "sensor"),
+                    localHudState = HudState(),
+                    remoteHudState = HudState(),
                     localPosition = null,
                     trackerId = "T",
                     monitorId = "M",

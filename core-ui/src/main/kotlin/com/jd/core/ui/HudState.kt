@@ -19,10 +19,12 @@ const val WHOLE_METER_ACCURACY = 9.95f
  */
 @Immutable
 data class HudState(
-    val appMode: String = "monitor", // "monitor" (Viewer) or "sensor" (Tracker)
     val selfId: String = "--", // the ID of the phone this HUD describes (ISSUE-NOV17.7-O105)
     val isRelayConnected: Boolean = false,  // this phone's relay connection
-    val isPeerActive: Boolean = false,      // the other app is heard (the Monitor's map center and speed color)
+    val isPeerActive: Boolean = false,      // the other app is heard (the Monitor's map center)
+    // The speed drawn in gray, not white: the Monitor's own line while its Sensor is not heard. Set by the caller
+    // (SIMP-NOV19.5-S1; was the `appMode` string, and the never-set satsUsed and satsView went with it).
+    val isSpeedDimmed: Boolean = false,
     val leds: List<HudLed> = emptyList(),   // the LEDs this line shows, green, red or gray (Nov19.5, HudLeds.kt)
     val trackerState: String = NO_VALUE,    // "MOVING", "STATIONARY", "PARKING", or NO_VALUE
     val speedKmh: Float? = null,

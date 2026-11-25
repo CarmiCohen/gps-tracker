@@ -59,14 +59,16 @@ private val CompactHudTextStyle = HudTextStyle.copy(
     )
 )
 
+/** The speed's color: gray when the caller dims it, white otherwise (SIMP-NOV19.5-S1). */
+internal val HudState.speedColor: Color
+    get() = if (isSpeedDimmed) Color.Gray else Color.White
+
 @Composable
 private fun HudStatusBarContent(
     hudState: HudState,
     modifier: Modifier,
     verticalGap: Dp,
 ) {
-    val isMonitor = hudState.appMode == "monitor"
-
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = Color.Black.copy(alpha = 0.90f),
@@ -107,7 +109,7 @@ private fun HudStatusBarContent(
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = speedAnnotated(hudState.speedNumberText),
-                color = if (hudState.isPeerActive || !isMonitor) Color.White else Color.Gray,
+                color = hudState.speedColor,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,

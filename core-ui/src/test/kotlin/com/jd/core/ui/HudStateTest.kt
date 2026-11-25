@@ -29,23 +29,30 @@ class HudStateTest {
 
     @Test
     fun testPeerConnectionLedState() {
-        val monitorPeerActive = HudState(appMode = "monitor", isPeerActive = true)
-        val monitorPeerStale = HudState(appMode = "monitor", isPeerActive = false)
+        val monitorPeerActive = HudState(isPeerActive = true)
+        val monitorPeerStale = HudState(isPeerActive = false)
 
         assertTrue("TRK LED must be active on Monitor when target peer telemetry is fresh", monitorPeerActive.isPeerActive)
         assertFalse("TRK LED must be inactive on Monitor when target peer telemetry is stale", monitorPeerStale.isPeerActive)
 
-        val sensorPeerActive = HudState(appMode = "sensor", isPeerActive = true)
-        val sensorPeerInactive = HudState(appMode = "sensor", isPeerActive = false)
+        val sensorPeerActive = HudState(isPeerActive = true)
+        val sensorPeerInactive = HudState(isPeerActive = false)
 
         assertTrue("VWR LED must be active on Sensor when viewer connection is established", sensorPeerActive.isPeerActive)
         assertFalse("VWR LED must be inactive on Sensor when viewer connection is absent", sensorPeerInactive.isPeerActive)
     }
 
+    /** SIMP-NOV19.5-S1: the speed is gray only when the caller dims it (the Monitor's own line, its Sensor not heard). */
+    @Test
+    fun speedIsGrayOnlyWhenDimmed() {
+        assertEquals(androidx.compose.ui.graphics.Color.White, HudState().speedColor)
+        assertEquals(androidx.compose.ui.graphics.Color.White, HudState(isPeerActive = false).speedColor)
+        assertEquals(androidx.compose.ui.graphics.Color.Gray, HudState(isSpeedDimmed = true).speedColor)
+    }
+
     @Test
     fun testHudStatusBarFormattingConstraints() {
         val state = HudState(
-            appMode = "monitor",
             selfId = "viewer_654321",
             batteryLevel = 100,
             tempCelsius = 30.0f,
@@ -54,7 +61,7 @@ class HudStateTest {
         )
 
         assertEquals("VIEWER", state.idText)
-        assertEquals("T", HudState(appMode = "sensor", selfId = "t").idText)
+        assertEquals("T", HudState(selfId = "t").idText)
         assertEquals("100% 30° ±5.0m 0s", state.telemetryText)
     }
 

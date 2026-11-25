@@ -100,7 +100,6 @@ class HudLayoutAuditTest {
     }
 
     private val monitorLine = HudState(
-        appMode = "monitor",
         leds = ownLeds(isInternet = true, isRelayConnected = true, gps = LedState.OK, peerLabel = "TRK", peer = LedState.NOT_OK)
     )
 }

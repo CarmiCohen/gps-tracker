@@ -228,7 +228,6 @@ class SensorViewModel @Inject constructor(
         val isLinkUp = relayLinkUp(isInternet, isConnected)
 
         HudState(
-            appMode = "sensor",
             selfId = id,
             isRelayConnected = isConnected,
             isPeerActive = isViewerConnected,
@@ -243,5 +242,5 @@ class SensorViewModel @Inject constructor(
         ).withLocalReadings(fix, readBattery(context), now, speedValidMs = FIX_CURRENT_MS) // As the telemetry (SIMP-NOV7.21-S1).
     }
         .atUiRate()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "sensor"))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState())
 }

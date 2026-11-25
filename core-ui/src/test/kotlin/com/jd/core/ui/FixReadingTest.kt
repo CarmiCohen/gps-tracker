@@ -95,11 +95,11 @@ class FixReadingTest {
 
     @Test
     fun keepsTheConnectionFieldsOfTheLine() {
-        val line = HudState(appMode = "sensor", selfId = "T", isRelayConnected = true, isPeerActive = true)
+        val line = HudState(selfId = "T", isRelayConnected = true, isPeerActive = true, isSpeedDimmed = true)
 
         val state = line.withLocalReadings(fix(), battery, now, MONITOR_SPEED_VALID_MS)
 
-        assertEquals("sensor", state.appMode)
+        assertTrue(state.isSpeedDimmed) // SIMP-NOV19.5-S1; was the appMode string
         assertEquals("T", state.selfId)
         assertTrue(state.isRelayConnected)
         assertTrue(state.isPeerActive)
