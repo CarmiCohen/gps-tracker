@@ -381,6 +381,9 @@ fun MonitorScreen(
     var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
     // The FENCE button shows or hides the geofence circles (ISSUE-NOV17.7-O108); editing Home Points always shows them.
     var isFenceVisible by rememberSaveable { mutableStateOf(true) }
+    // Jump and OUT markers each have a show/hide button, as before the split (ISSUE-NOV25.22-O149).
+    var isJumpsVisible by rememberSaveable { mutableStateOf(true) }
+    var isBreachesVisible by rememberSaveable { mutableStateOf(true) }
     var showSetupDialog by rememberSaveable { mutableStateOf(false) }
     // What the Sensor phone lacks, as the Sensor reports it (ISSUE-NOV10.8-O83 part 2).
     val setupWarnings = remember(sensorSetup, alertSettings.acousticAlert, alertSettings.lightAlert) { sensorSetupWarnings(sensorSetup, alertSettings) }
@@ -621,6 +624,8 @@ fun MonitorScreen(
     val sensorPosition = sensorTrail.firstOrNull()
     val localPath = remember(localTrail) { knownPositions(localTrail) }
     val breaches = remember(trail) { geofenceBreaches(trail) }
+    val jumps = remember(trail) { gpsJumps(trail) }
+    val sensorSegments = remember(trail) { trailSegments(trail) }
     val mapCenter = resolveMapCenter(followMode, remoteHudState.isPeerActive, sensorPosition, localPosition)
 
     LaunchedEffect(needsCenter, mapCenter != null) {
@@ -634,7 +639,8 @@ fun MonitorScreen(
     }
 
     // Overlays
-    LaunchedEffect(remoteHudState.isPeerActive, trail, localTrail, localPosition, geofence, isEditingHome, isFenceVisible) {
+    LaunchedEffect(remoteHudState.isPeerActive, trail, localTrail, localPosition, geofence, isEditingHome, isFenceVisible,
+        isJumpsVisible, isBreachesVisible) {
         mapView.overlays.clear()
         mapView.overlays.add(scaleBar)
 
@@ -672,13 +678,27 @@ fun MonitorScreen(
         }
 
         // OUT markers: where the tracker reported leaving every Home Point.
-        breaches.forEach { breach ->
+        if (isBreachesVisible) breaches.forEach { breach ->
+            addAccuracyCircle(mapView, breach, BREACH_CIRCLE_COLOR)
             mapView.overlays.add(Marker(mapView).apply {
                 position = GeoPoint(breach.lat, breach.lng)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 icon = breachMarkerIcon(context)
                 title = "Geofence breach"
                 snippet = java.text.DateFormat.getDateTimeInstance().format(java.util.Date(breach.timestamp))
+            })
+        }
+
+        // Jump markers: fixes the tracker marked JUMP or OUTLIER, kept off the trail line (ISSUE-NOV25.22-O149, O153).
+        if (isJumpsVisible) jumps.forEach { jump ->
+            addAccuracyCircle(mapView, jump, JUMP_CIRCLE_COLOR)
+            mapView.overlays.add(Marker(mapView).apply {
+                position = GeoPoint(jump.lat, jump.lng)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = jumpMarkerIcon(context)
+                title = "GPS jump (${jump.status})"
+                snippet = java.text.DateFormat.getDateTimeInstance().format(java.util.Date(jump.timestamp)) +
+                    ", ±${jump.accuracy.toInt()} m"
             })
         }
 
@@ -703,14 +723,15 @@ fun MonitorScreen(
         }
 
         if (sensorTrail.isNotEmpty()) {
-            val points = sensorTrail.map { GeoPoint(it.lat, it.lng) }
-            val polyline = Polyline().apply {
-                setPoints(points)
-                outlinePaint.color = SENSOR_MARKER_COLOR // the trail in the Sensor's dot color (SIMP-NOV17.6-S1)
-                outlinePaint.strokeWidth = 5f
+            // One line per piece, so jumps, coarse fixes and outages draw no straight lines (ISSUE-NOV25.22-O153).
+            sensorSegments.forEach { segment ->
+                mapView.overlays.add(Polyline().apply {
+                    setPoints(segment.map { GeoPoint(it.lat, it.lng) })
+                    outlinePaint.color = SENSOR_MARKER_COLOR // the trail in the Sensor's dot color (SIMP-NOV17.6-S1)
+                    outlinePaint.strokeWidth = 5f
+                })
             }
-            mapView.overlays.add(polyline)
-            
+
             val latest = sensorTrail.first()
             val marker = Marker(mapView).apply {
                 position = GeoPoint(latest.lat, latest.lng)
@@ -832,6 +853,22 @@ fun MonitorScreen(
                                 onClick = { isFenceVisible = !isFenceVisible },
                                 iconColor = if (isFenceVisible) Color.White else com.jd.core.ui.SensorGreen,
                                 containerColor = if (isFenceVisible) com.jd.core.ui.SensorGreen else Color.White
+                            )
+                            MapToolButton(
+                                label = "OUTS",
+                                symbol = "●",
+                                onClick = { isBreachesVisible = !isBreachesVisible },
+                                iconColor = if (isBreachesVisible) Color.White else Color.Red,
+                                containerColor = if (isBreachesVisible) Color.Red else Color.White
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(MAP_BUTTON_GAP)) {
+                            MapToolButton(
+                                label = "JUMPS",
+                                symbol = "□",
+                                onClick = { isJumpsVisible = !isJumpsVisible },
+                                iconColor = if (isJumpsVisible) Color.White else Color.Magenta,
+                                containerColor = if (isJumpsVisible) Color.Magenta else Color.White
                             )
                         }
                     }
@@ -1187,6 +1224,36 @@ private fun breachMarkerIcon(context: android.content.Context): android.graphics
         intrinsicWidth = sizePx
         intrinsicHeight = sizePx
     }
+
+/** A hollow magenta square, as the jump marker before the split (ISSUE-NOV25.22-O149). */
+private fun jumpMarkerIcon(context: android.content.Context): android.graphics.drawable.Drawable {
+    val density = context.resources.displayMetrics.density
+    val sizePx = (12 * density).toInt()
+    val bitmap = android.graphics.Bitmap.createBitmap(sizePx, sizePx, android.graphics.Bitmap.Config.ARGB_8888)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        style = android.graphics.Paint.Style.STROKE
+        color = android.graphics.Color.MAGENTA
+        strokeWidth = 2f * density
+    }
+    val off = paint.strokeWidth / 2f
+    android.graphics.Canvas(bitmap).drawRect(off, off, sizePx - off, sizePx - off, paint)
+    return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
+}
+
+private const val JUMP_CIRCLE_COLOR = 0x60FF00FF
+private const val BREACH_CIRCLE_COLOR = 0x60FF0000
+
+/** A marked row's accuracy circle, outline only, that lets taps through (ISSUE-NOV25.22-O149). */
+private fun addAccuracyCircle(mapView: MapView, row: TrailEntity, color: Int) {
+    if (row.accuracy <= 0f) return
+    mapView.overlays.add(Polygon(mapView).apply {
+        points = Polygon.pointsAsCircle(GeoPoint(row.lat, row.lng), row.accuracy.toDouble())
+        fillPaint.color = 0
+        outlinePaint.color = color
+        outlinePaint.strokeWidth = 2f
+        setOnClickListener { _, _, _ -> false }
+    })
+}
 
 /** Device colors of the HUD (HudStatusBar): orange-brown for the Monitor, green for the Sensor (ISSUE-NOV19.2-O123). */
 internal val MONITOR_MARKER_COLOR = com.jd.core.ui.MonitorBrown.toArgb()

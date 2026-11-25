@@ -1305,8 +1305,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **254.4 Barometer phone:** on a Sensor phone with a barometer, the Info shows its air pressure and 254.2 passes the same.
 *   **254.5 Two phones:** with the relay back and a Monitor paired to `T`: a sit raises `Tracker sit detected` with the siren, listed above other Sensor events; `Sit / Seat Occupied Sensor` off stops it (the Sensor's settings page shows `Sit: Off`).
 
+## Chapter 255 - Map Trail Pieces and Jump Markers (Nov25.24)
+**Status: A / P** - 255.1 passed (unit tests, `MapCenterResolverTest`); 255.2 pending: device look skipped by user decision 2026-11-25, at the Monitor's next install (ISSUE-NOV25.22-O153, ISSUE-NOV25.22-O149)
+*   **255.1 Unit:** `trailSegments` leaves out (0,0), `JUMP`, `OUTLIER` and fixes over 100 m accuracy, and breaks the line only at a pause over 5 min that also moved over 200 m; `gpsJumps` lists the jump rows.
+*   **255.2 Device (a Monitor with a trail holding jumps):** no straight trail lines to far points; each jump is a small magenta square with a faint magenta accuracy circle (tap: time and accuracy); OUT dots have a red circle; JUMPS and OUTS hide and show their markers and keep their state on rotation.
+
 ---
-**Active Testing Chapters: 243 of 254**
+**Active Testing Chapters: 244 of 255**
 *Since Nov23.6-docs a new chapter is written only for a check that needs a person, a device or two phones and is still pending (Rule 15); unit tests are named in the commit message.*
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 

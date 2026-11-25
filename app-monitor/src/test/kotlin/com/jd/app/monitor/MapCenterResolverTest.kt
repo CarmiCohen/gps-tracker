@@ -24,6 +24,26 @@ class MapCenterResolverTest {
         assertEquals(listOf(sensor, local), knownPositions(trail))
     }
 
+    private fun row(minute: Long, lat: Double, status: String = "VALID", accuracy: Float = 5f) =
+        TrailEntity("T", minute * 60_000L, minute, lat, 34.78, accuracy, status)
+
+    @Test
+    fun trailSegmentsLeaveOutJumpsOutliersAndCoarseFixes() {
+        val trail = listOf(
+            row(5, 32.0004), row(4, 33.0, "JUMP"), row(3, 32.0003, "OUTLIER"),
+            row(2, 32.0002, accuracy = 900f), row(1, 32.0001), trailPoint(0, 0.0, 0.0)
+        )
+        assertEquals(listOf(listOf(MapPosition(32.0004, 34.78), MapPosition(32.0001, 34.78))), trailSegments(trail))
+        assertEquals(listOf(4L, 3L), gpsJumps(trail).map { it.sequenceId })
+    }
+
+    @Test
+    fun trailSegmentsBreakOnlyAtALongPauseThatAlsoMoved() {
+        // 10 minutes still (same place): one line; then 10 minutes and about 1.1 km: a new line.
+        val trail = listOf(row(30, 32.01), row(20, 32.0), row(10, 32.0), row(0, 32.0))
+        assertEquals(listOf(1, 3), trailSegments(trail).map { it.size })
+    }
+
     @Test
     fun knownPositionsKeepsEquatorAndMeridianPoints() {
         val trail = listOf(trailPoint(2, 0.0, 34.78), trailPoint(1, 32.08, 0.0))

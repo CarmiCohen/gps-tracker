@@ -1,7 +1,7 @@
-# Project Handover - Version Nov25.23 (Sit Detection)
+# Project Handover - Version Nov25.24 (Map Trail Pieces and Jump Markers)
 
 ## ▶️ Resumption State (Read First)
-- **Git**: Nov25.23 committed, tagged and pushed by Claude; relay v6.050 (`c460e25`) pushed earlier. The commit message is the record (D1); the archive, SOT, baseline index, dashboard and audit line are frozen at Nov23.4.
+- **Git**: Nov25.24 committed, tagged and pushed by Claude; relay v6.050 (`c460e25`) pushed earlier. The commit message is the record (D1); the archive, SOT, baseline index, dashboard and audit line are frozen at Nov23.4.
 - **Relay**: SUSPENDED (O133, row 73; 503 on 2026-11-25): after Render's reset (probably 2026-12-01) the user deploys relay v6.050 (`c460e25`); the waiting live checks are listed in `issues.md` focus item 3.
 - **PC**: if Kotlin compiles fail with `Daemon compilation failed: null`, run `gradlew --stop` and `gradlew clean`. The IDE's live analysis is unsynced; trust Gradle. `run_tests.ps1` takes about 100 s: run it in the background. `:core-shared:animalsnifferMain` (API 26 signature) fails the build on a JDK call Android 26 lacks. `install_release.ps1 -NoBuild` after a version bump fails as a downgrade: build again. A Gradle run piped through `Select-String` can end with exit code 1 from the JVM's stderr sharing warning alone: check `BUILD SUCCESSFUL`.
 - **User decisions**: Rule 17 (no test removal without confirmation); Claude pushes the main and relay repos; `//` = continue; O112 waits for the user's false-alarm notes; O122 last; SIMP-NOV25.0-S1's look waits for O133; SIMP-NOV9.3-S1 (R8) low, best after O72; SIMP-NOV22.8-S1, S2 low; O140 very low. 2026-11-25: O150 sit detection is for a phone on or under a seat, with a barometer part for phones that have one; for device tests the user wants one step at a time, answered by `//`. 2026-11-23: lean workflow; small related items may share a version; effort recommended once per item, no stop.
@@ -9,9 +9,9 @@
 - **Phones**: A15 (`R58X40GV2AR`, no screen lock: `adb shell wm dismiss-keyguard`): debug Sensor Nov25.23 running as `T`, lying under the user's chair cushion after the sit test (put it back where the user keeps it); no Monitor. S21FE (`R5CRC14PG4F`, not connected this session): release Monitor Nov25.16, Monitor `V`, `Tracker ID: T2` (do not re-pair). **Always check the S21FE's foreground app right before every tap.** With both connected, never `gradlew installDebug`: `adb -s <serial> install -r`, or `TESTS\install_release.ps1 -Serial <serial> -Apps monitor`.
 - **Test tips**: never `connectedDebugAndroidTest`; use `am instrument` with each app's `HiltTestRunner` (Operational Notes). Sit tuning: each sit check with a jolt logs `REV_Motion` `Sit trace` (0.1 s upward acceleration and tilt) and, unless it alerted, `Sit not confirmed (<why>)`. The Sensor's event file is in `/data/user_de/0/com.jd.app.sensor/files/`.
 
-## 🟢 Status: PASSED (Nov25.23)
-- ISSUE-NOV25.22-O150 done for a seat cushion: a jolt of 0.25 to 1.0 g whose first 0.1 s moves the phone down, then rest; standing up moves it up first. A15 chair test, final rule: 3 of 3 sits alerted; 2 stand-ups, a bump, knocks and a chair push did not. New ISSUE-NOV25.23-O154 (false lift alarms from knocks).
-- Unit tests and both builds: see the commit. Not run: the Monitor androidTests and the S21FE (not connected; the Monitor change is an alarm type and a switch, unit-tested); the release device audit (not needed: no start-up or service change); the car seat and barometer checks (254.3, 254.4).
+## 🟢 Status: PASSED (Nov25.24)
+- ISSUE-NOV25.22-O153 and O149 (Monitor map): the trail is drawn in pieces without `JUMP`/`OUTLIER` rows and fixes over 100 m accuracy, broken at a pause over 5 min that also moved over 200 m (`trailSegments`); jumps are magenta squares with accuracy circles, OUT dots got red circles; new JUMPS and OUTS buttons.
+- Unit tests and both builds: see the commit. Not run: the device look (chapter 255.2, skipped by user decision 2026-11-25; do it at the S21FE Monitor's next install); the release device audit (not needed: no start-up or service change).
 
 ## 🎯 Next Resumption Focus
-See `DOCS/issues.md`, Next Resumption Focus (item 1: O153 with O149, O150's car-seat test, O154; item 3: the relay's return).
+See `DOCS/issues.md`, Next Resumption Focus (item 1: O154, O150's car-seat test, the map look 255.2; item 3: the relay's return).
