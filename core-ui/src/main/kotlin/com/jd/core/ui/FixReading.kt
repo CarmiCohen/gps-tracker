@@ -5,9 +5,11 @@ import android.location.Location
 private const val MPS_TO_KMH = 3.6f
 private const val MOVING_ABOVE_KMH = 1.5f
 
-// A fix this old no longer tells the current speed: the Monitor's 10m filter sends no fix once it stops,
-// and the Sensor gets none while its GPS has no signal.
-private const val SPEED_VALID_MS = 35_000L
+/**
+ * How long the Monitor's own fix still tells its speed. Longer than [FIX_CURRENT_MS]: the Monitor's 10 m filter sends
+ * no fix once it stops. The Sensor's HUD uses [FIX_CURRENT_MS], the age at which its telemetry stops sending the fix.
+ */
+const val MONITOR_SPEED_VALID_MS = 35_000L
 
 /** One position fix from this device. [accuracyMeters] is 0 and [speedMps] null when not reported. */
 data class FixReading(
@@ -30,11 +32,14 @@ fun motionState(speedKmh: Float?): String = when {
     else -> "STATIONARY"
 }
 
-/** Fills this HUD line with the device's own readings. A missing [fix] shows no position values. */
-fun HudState.withLocalReadings(fix: FixReading?, battery: BatteryReading, nowMs: Long): HudState {
+/**
+ * Fills this HUD line with the device's own readings. A missing [fix] shows no position values; a fix [speedValidMs]
+ * old or older keeps its accuracy and age but no longer shows a speed.
+ */
+fun HudState.withLocalReadings(fix: FixReading?, battery: BatteryReading, nowMs: Long, speedValidMs: Long): HudState {
     val fixAgeMs = fix?.let { (nowMs - it.timeMs).coerceAtLeast(0L) }
     val speedKmh = fix?.speedMps
-        ?.takeIf { fixAgeMs != null && fixAgeMs < SPEED_VALID_MS }
+        ?.takeIf { fixAgeMs != null && fixAgeMs < speedValidMs }
         ?.let(::metersPerSecondToKmh)
     return copy(
         trackerState = motionState(speedKmh),

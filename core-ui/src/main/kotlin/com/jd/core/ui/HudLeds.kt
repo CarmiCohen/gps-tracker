@@ -20,9 +20,6 @@ data class HudLed(val label: String, val state: LedState)
  */
 const val GPS_MIN_SATELLITES = 4
 
-/** A satellite fix younger than this is current: the Sensor's own limit before it reports `NO_FIX` (FIX_STALE_AFTER_MS). */
-const val GPS_FIX_CURRENT_MS = 15_000L
-
 /** Without a satellite fix for this long the GPS LED turns gray: the last signal is too old to tell anything (user decision 2026-11-19). */
 const val GPS_NO_INFO_AFTER_MS = 120_000L
 
@@ -33,14 +30,14 @@ fun isSatelliteFix(satellitesUsed: Int): Boolean = satellitesUsed >= GPS_MIN_SAT
 
 /**
  * A phone's own GPS, by the time since its GNSS chip last reported a [isSatelliteFix] ([satelliteFixAgeMs], null
- * before the first one or without GNSS status): current green, older red, gray after [GPS_NO_INFO_AFTER_MS]. A
+ * before the first one or without GNSS status): current ([FIX_CURRENT_MS], the one freshness rule) green, older red, gray after [GPS_NO_INFO_AFTER_MS]. A
  * switched-off location setting is red. The satellite status keeps coming on a phone standing still, which the
  * Monitor's fixes do not (they wait for 10 m of movement).
  */
 fun gpsLed(isLocationOn: Boolean, satelliteFixAgeMs: Long?): LedState = when {
     !isLocationOn -> LedState.NOT_OK
     satelliteFixAgeMs == null || satelliteFixAgeMs >= GPS_NO_INFO_AFTER_MS -> LedState.UNKNOWN
-    satelliteFixAgeMs < GPS_FIX_CURRENT_MS -> LedState.OK
+    satelliteFixAgeMs < FIX_CURRENT_MS -> LedState.OK
     else -> LedState.NOT_OK
 }
 

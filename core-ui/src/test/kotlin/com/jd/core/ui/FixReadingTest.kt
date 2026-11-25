@@ -20,7 +20,7 @@ class FixReadingTest {
 
     @Test
     fun usesBatteryAndFixValues() {
-        val state = HudState().withLocalReadings(fix(ageMs = 4_000L), battery, now)
+        val state = HudState().withLocalReadings(fix(ageMs = 4_000L), battery, now, MONITOR_SPEED_VALID_MS)
 
         assertEquals(42, state.batteryLevel)
         assertTrue(state.isCharging)
@@ -33,7 +33,7 @@ class FixReadingTest {
 
     @Test
     fun noFixShowsNoPositionValues() {
-        val state = HudState().withLocalReadings(null, battery, now)
+        val state = HudState().withLocalReadings(null, battery, now, MONITOR_SPEED_VALID_MS)
 
         assertEquals("42%⚡|34°|--|--", state.telemetryText)
         assertEquals("-- km/h", state.speedText)
@@ -43,7 +43,7 @@ class FixReadingTest {
 
     @Test
     fun unknownBatteryShowsNoNumber() {
-        val state = HudState().withLocalReadings(null, BatteryReading(), now)
+        val state = HudState().withLocalReadings(null, BatteryReading(), now, MONITOR_SPEED_VALID_MS)
 
         assertEquals("--|--|--|--", state.telemetryText)
         assertFalse(state.isCharging)
@@ -51,7 +51,7 @@ class FixReadingTest {
 
     @Test
     fun oldFixKeepsItsAccuracyAndAgeButNotItsSpeed() {
-        val state = HudState().withLocalReadings(fix(ageMs = 35_000L), battery, now)
+        val state = HudState().withLocalReadings(fix(ageMs = 35_000L), battery, now, MONITOR_SPEED_VALID_MS)
 
         assertNull(state.speedKmh)
         assertEquals(NO_VALUE, state.trackerState)
@@ -59,9 +59,21 @@ class FixReadingTest {
         assertEquals(35L, state.telemetryAgeSec)
     }
 
+    /** SIMP-NOV7.21-S1: the Sensor HUD drops the speed at the age its telemetry stops sending the fix. */
+    @Test
+    fun theSensorLimitDropsTheSpeedWithTheTelemetry() {
+        val current = HudState().withLocalReadings(fix(ageMs = FIX_CURRENT_MS - 1), battery, now, FIX_CURRENT_MS)
+        val stale = HudState().withLocalReadings(fix(ageMs = FIX_CURRENT_MS), battery, now, FIX_CURRENT_MS)
+
+        assertEquals(36f, current.speedKmh!!, 0.001f)
+        assertNull(stale.speedKmh)
+        assertEquals(NO_VALUE, stale.trackerState)
+        assertEquals(15L, stale.telemetryAgeSec)
+    }
+
     @Test
     fun fixWithoutSpeedShowsNoSpeed() {
-        val state = HudState().withLocalReadings(fix(speedMps = null), battery, now)
+        val state = HudState().withLocalReadings(fix(speedMps = null), battery, now, MONITOR_SPEED_VALID_MS)
 
         assertNull(state.speedKmh)
         assertEquals(NO_VALUE, state.trackerState)
@@ -69,14 +81,14 @@ class FixReadingTest {
 
     @Test
     fun fixWithoutAccuracyShowsNoAccuracy() {
-        val state = HudState().withLocalReadings(fix(accuracy = 0f), battery, now)
+        val state = HudState().withLocalReadings(fix(accuracy = 0f), battery, now, MONITOR_SPEED_VALID_MS)
 
         assertEquals("42%⚡|34°|--|0s", state.telemetryText)
     }
 
     @Test
     fun fixAheadOfTheClockHasZeroAge() {
-        val state = HudState().withLocalReadings(fix(ageMs = -5_000L), battery, now)
+        val state = HudState().withLocalReadings(fix(ageMs = -5_000L), battery, now, MONITOR_SPEED_VALID_MS)
 
         assertEquals(0L, state.telemetryAgeSec)
     }
@@ -85,7 +97,7 @@ class FixReadingTest {
     fun keepsTheConnectionFieldsOfTheLine() {
         val line = HudState(appMode = "sensor", selfId = "T", isRelayConnected = true, isPeerActive = true)
 
-        val state = line.withLocalReadings(fix(), battery, now)
+        val state = line.withLocalReadings(fix(), battery, now, MONITOR_SPEED_VALID_MS)
 
         assertEquals("sensor", state.appMode)
         assertEquals("T", state.selfId)

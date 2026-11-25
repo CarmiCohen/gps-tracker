@@ -1,7 +1,9 @@
 package com.jd.app.sensor
 
 import android.location.Location
+import android.os.SystemClock
 import com.jd.core.ui.FixReading
+import com.jd.core.ui.isFixFresh
 import com.jd.core.ui.toFixReading
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +24,13 @@ class SensorFixStore @Inject constructor() {
     /** Written on the service's main looper, read by its sensing loop and sensor threads. */
     @Volatile var location: Location? = null
         private set
+
+    /**
+     * [location] while it is still the current position by the one freshness rule (`isFixFresh`, SIMP-NOV7.21-S1),
+     * null once it is older: the telemetry then sends `NO_FIX`, and the HUD drops its speed at the same age.
+     */
+    fun currentLocation(nowElapsedNanos: Long = SystemClock.elapsedRealtimeNanos()): Location? =
+        location?.takeIf { isFixFresh(it.elapsedRealtimeNanos, nowElapsedNanos) }
 
     private val satelliteFix = MutableStateFlow<Long?>(null)
 

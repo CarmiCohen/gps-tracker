@@ -30,6 +30,7 @@ import com.jd.core.ui.peerLed
 import com.jd.core.ui.relayLinkUp
 import com.jd.core.ui.readBattery
 import com.jd.core.ui.withLocalReadings
+import com.jd.core.ui.FIX_CURRENT_MS
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -236,7 +237,7 @@ class SensorViewModel @Inject constructor(
                 peerLabel = "VWR",
                 peer = peerLed(isPaired = true, isRelayConnected = isLinkUp, isPeerHeard = isViewerConnected)
             )
-        ).withLocalReadings(fix, readBattery(context), now)
+        ).withLocalReadings(fix, readBattery(context), now, speedValidMs = FIX_CURRENT_MS) // As the telemetry (SIMP-NOV7.21-S1).
     }
         .atUiRate()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "sensor"))

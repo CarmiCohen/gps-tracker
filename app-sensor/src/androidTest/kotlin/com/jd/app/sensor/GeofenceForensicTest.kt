@@ -52,7 +52,8 @@ class GeofenceForensicTest {
                 // In a real scenario, the service would write a ViolationEvent or a tagged trace.
                 // Here we verify the trace itself is stored with the transition status.
                 update.status = "GEOFENCE_${result.transition}"
-                forensicBuffer.writeTrace(update, isCritical = true)
+                update.isCritical = true
+                forensicBuffer.writeTrace(update)
             }
             
             currentState = result.currentState

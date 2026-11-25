@@ -393,7 +393,8 @@ class ForensicBuffer(
         }
     }
 
-    fun writeTrace(update: LocationUpdate, isCritical: Boolean = false) {
+    /** Stores [update]; a [LocationUpdate.isCritical] row forces its header to storage at once (SIMP-NOV7.21-S1). */
+    fun writeTrace(update: LocationUpdate) {
         if (!verifyFileIntegrity()) {
             if (!initialize()) return 
         }
@@ -447,7 +448,7 @@ class ForensicBuffer(
 
                 // R197: Commit header with NEW indices before advancing in-memory state
                 // This ensures that if we crash now, the data we just wrote is visible on next load.
-                commitHeader(nextIdx, newCount, nextWrapped, newReserved, force = isCritical || reserveSpent)
+                commitHeader(nextIdx, newCount, nextWrapped, newReserved, force = update.isCritical || reserveSpent)
 
                 // Finalize update in memory only after successful commit
                 writeIdx.set(nextIdx)

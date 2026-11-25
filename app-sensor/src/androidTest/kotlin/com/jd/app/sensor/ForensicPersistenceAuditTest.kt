@@ -96,8 +96,9 @@ class ForensicPersistenceAuditTest {
                 timestamp = 1000L + i
                 sequenceId = i.toLong()
                 vibrationG = i.toFloat()
+                isCritical = true
             }
-            buffer.writeTrace(update, isCritical = true)
+            buffer.writeTrace(update)
             PoolRegistry.locationUpdatePool.release(update)
         }
         

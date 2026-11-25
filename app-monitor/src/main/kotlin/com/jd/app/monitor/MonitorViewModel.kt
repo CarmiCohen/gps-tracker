@@ -42,6 +42,7 @@ import com.jd.core.ui.motionState
 import com.jd.core.ui.readBattery
 import com.jd.core.ui.readPhoneState
 import com.jd.core.ui.withLocalReadings
+import com.jd.core.ui.MONITOR_SPEED_VALID_MS
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -383,7 +384,7 @@ class MonitorViewModel @Inject constructor(
                 peerLabel = "TRK",
                 peer = peerLed(isPaired = !target.isNullOrBlank(), isRelayConnected = isLinkUp, isPeerHeard = isTrackerPresent)
             )
-        ).withLocalReadings(fix?.reading, readBattery(context), now)
+        ).withLocalReadings(fix?.reading, readBattery(context), now, speedValidMs = MONITOR_SPEED_VALID_MS)
     }
         .atUiRate()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "monitor"))

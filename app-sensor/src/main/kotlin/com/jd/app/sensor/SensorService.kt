@@ -35,6 +35,7 @@ import com.jd.core.network.SignalingClient
 import com.jd.core.network.peerDeliveries
 import com.jd.core.network.relayDeliveries
 import com.jd.core.shared.*
+import com.jd.core.ui.FIX_CURRENT_MS
 import com.jd.core.ui.getAppVersionName
 import com.jd.core.ui.readPhoneState
 import dagger.hilt.android.AndroidEntryPoint
@@ -718,7 +719,7 @@ class SensorService : Service(), SensorEventListener {
                         behaviour = sensorBehaviour,
                         vibrationLimitMps2 = motionSentinel.vibrationThreshold,
                         tiltLimitDeg = motionSentinel.tiltThresholdDegrees,
-                        fixAccuracyM = fixStore.location?.takeIf { isFixFresh(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) }?.accuracy,
+                        fixAccuracyM = fixStore.currentLocation()?.accuracy,
                         gnss = if (isGnssRegistered) gnssSummary(satellites) else null,
                         linkUpPercent = linkUpPercent(previousLink, previousMs, link, timeMs),
                         latencyMs = link.latencyMs,
@@ -925,13 +926,13 @@ class SensorService : Service(), SensorEventListener {
                 update.lightLux = lightMonitor.lux?.toFloat() // SIMP-NOV22.4-S1
                 
                 val hasPhysicalMotion = update.vibrationG > 0.12f
-                // A fix older than FIX_STALE_AFTER_MS is no longer the current position: send NO_FIX without one.
-                val currentFix = fixStore.location?.takeIf { isFixFresh(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) }
+                // A fix older than FIX_CURRENT_MS is no longer the current position: send NO_FIX without one.
+                val currentFix = fixStore.currentLocation()
                 if (currentFix == null) update.status = NO_FIX_STATUS
                 if ((currentFix == null) != isReportingNoFix) {
                     isReportingNoFix = currentFix == null
                     if (isReportingNoFix) {
-                        eventLog.record(EventLevel.WARNING, "No current GPS fix (none, or older than ${FIX_STALE_AFTER_MS / 1000} s)")
+                        eventLog.record(EventLevel.WARNING, "No current GPS fix (none, or older than ${FIX_CURRENT_MS / 1000} s)")
                     } else {
                         eventLog.record(EventLevel.INFO, "GPS fix current again")
                     }
@@ -973,7 +974,7 @@ class SensorService : Service(), SensorEventListener {
                 pendingAlarms.takeForTick(breach, movement)?.let { reportViolation(update, it.status, it.logLine) }
                 if (pendingAlarms.isNotEmpty()) orchestrator.preemptLoop("sensing_loop")
                 
-                forensicBuffer.writeTrace(update, isCritical = update.isCritical)
+                forensicBuffer.writeTrace(update)
                 signalingClient.sendTelemetry(update)
                 refreshSamplingRate(preempt = false) // An alarm starts the window at once; its end is seen within a second.
 

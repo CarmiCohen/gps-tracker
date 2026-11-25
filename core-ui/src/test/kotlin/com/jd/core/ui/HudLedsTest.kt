@@ -26,8 +26,8 @@ class HudLedsTest {
     @Test
     fun anOwnGpsFollowsTheAgeOfItsLastSatelliteFix() {
         assertEquals(LedState.OK, gpsLed(isLocationOn = true, satelliteFixAgeMs = 0L))
-        assertEquals(LedState.OK, gpsLed(true, GPS_FIX_CURRENT_MS - 1))
-        assertEquals(LedState.NOT_OK, gpsLed(true, GPS_FIX_CURRENT_MS))
+        assertEquals(LedState.OK, gpsLed(true, FIX_CURRENT_MS - 1))
+        assertEquals(LedState.NOT_OK, gpsLed(true, FIX_CURRENT_MS))
         assertEquals(LedState.NOT_OK, gpsLed(true, GPS_NO_INFO_AFTER_MS - 1))
         assertEquals("gray after 2 min without a fix", LedState.UNKNOWN, gpsLed(true, GPS_NO_INFO_AFTER_MS))
         assertEquals("gray before the first fix or without GNSS status", LedState.UNKNOWN, gpsLed(true, null))

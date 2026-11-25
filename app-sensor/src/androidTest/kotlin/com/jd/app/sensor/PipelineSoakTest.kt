@@ -126,7 +126,8 @@ class PipelineSoakTest {
                 update.status = validation.status.name
 
                 // B. Forensic Persistence
-                forensicBuffer.writeTrace(update, isCritical = (i % 100 == 0))
+                update.isCritical = i % 100 == 0 // As in SensorService: the row's own flag (SIMP-NOV7.21-S1).
+                forensicBuffer.writeTrace(update)
 
                 // C. Signaling Transmission
                 signalingClient.sendTelemetry(update)
