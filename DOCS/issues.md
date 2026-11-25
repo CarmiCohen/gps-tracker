@@ -4,10 +4,10 @@
 
 ## 🎯 Next Resumption Focus
 1. Without phones: the user names the next item (SIMP-NOV25.0-S1 done in Nov25.8; its look on the S21FE Monitor waits for a real finished alarm).
-2. With the user at the A15: 241.4 (knock, alarm window) with 237.3 (torch); also 211.2 and 213.2's Active apps tap.
-3. O133 (row 73): after Render's reset the user deploys relay v6.050; then the waiting live checks 182.2, 238.2, 240.3, 241.3, 244.3, 249.3, 250.3, 251.3.
+2. With the user at the A15 only: nothing left (241.4, 237.3, 211.2, 213.2's Sensor tap passed in Nov25.9 docs).
+3. O133 (row 73): after Render's reset the user deploys relay v6.050; then the waiting live checks 182.2, 237.3's light-off-on-the-Monitor part, 238.2, 240.3, 241.3, 244.3, 249.3, 250.3, 251.3.
 3a. Right after item 3's live checks pass, before new feature work (user decision 2026-11-25): O72 in one dedicated version, `/effort high`: Kotlin 1.9.24 to 2.x with the Compose compiler Gradle plugin, Hilt and Room from kapt to KSP (removes the warning), a raised Compose BOM (unblocks SIMP-NOV19.6-S1); verify with all unit tests, both androidTests on the A15 by `am instrument`, the release device audit and a short Two-phone test. AGP 9 and Gradle 9 come later, separately.
-4. With the S21FE (release Monitor Nov25.2 installed 2026-11-25; its siren type chip kept the chosen Chimes, SIMP-NOV7.3-S1 migration passed): 215.1, 226.3, 227.4, 228.2, 230.3, 233.3, 237.4; O112 when the user has noted false alarms.
+4. With the S21FE (release Monitor Nov25.2 installed 2026-11-25; its siren type chip kept the chosen Chimes, SIMP-NOV7.3-S1 migration passed): 213.2's Monitor Active apps tap, 215.1, 226.3, 227.4, 228.2, 230.3, 233.3, 237.4; O112 when the user has noted false alarms.
 5. O134: discuss the Home Points of two Monitors with the user.
 
 ### Work Queue
