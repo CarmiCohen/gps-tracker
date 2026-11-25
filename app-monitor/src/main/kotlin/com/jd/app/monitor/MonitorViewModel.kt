@@ -90,8 +90,9 @@ class MonitorViewModel @Inject constructor(
                 val file = settingsTransfer.export(uri)
                 val counts = "${file.geofence.points.size} home points, ${file.trails.size} trail points"
                 eventLog.record(FILE_SAVED_LEVEL, "Settings exported: $counts" + savedTo.asSuffix())
-                // The toast names the file only; the full path cut it short on the S21FE (ISSUE-NOV25.11-O141).
-                if (savedTo == null) "Settings exported: $counts" else "Settings exported to ${savedTo.substringAfterLast('/')}"
+                // The toast names the folder only: the full path, and then the file name alone, were cut by the
+                // S21FE's two-line toast (ISSUE-NOV25.11-O141, Nov25.15). The Events line keeps the full path.
+                if (savedTo == null) "Settings exported: $counts" else "Settings saved in Download/GPS-Tracker"
             } catch (e: Exception) {
                 "Export failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
             }
