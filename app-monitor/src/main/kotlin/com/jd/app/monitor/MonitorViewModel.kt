@@ -2,8 +2,6 @@ package com.jd.app.monitor
 
 import android.content.Context
 import android.net.Uri
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jd.core.network.ForensicIdentityManager
@@ -39,6 +37,8 @@ import com.jd.core.ui.remoteGpsLed
 import com.jd.core.ui.getAppVersionName
 import com.jd.core.ui.metersPerSecondToKmh
 import com.jd.core.ui.motionState
+import com.jd.core.ui.isLocationProviderEnabled
+import com.jd.core.ui.isNetworkAvailable
 import com.jd.core.ui.readBattery
 import com.jd.core.ui.readPhoneState
 import com.jd.core.ui.withLocalReadings
@@ -539,27 +539,6 @@ class MonitorViewModel @Inject constructor(
         viewModelScope.launch {
             identityManager.clearTargetId()
             setupReports.forget() // The Sensor phone warnings were about the unpaired tracker.
-        }
-    }
-
-    private fun isNetworkAvailable(ctx: Context): Boolean {
-        return try {
-            val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            val network = cm?.activeNetwork ?: return false
-            val caps = cm.getNetworkCapabilities(network) ?: return false
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    private fun isLocationProviderEnabled(ctx: Context): Boolean {
-        return try {
-            val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
-            lm?.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) == true ||
-                    lm?.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) == true
-        } catch (_: Exception) {
-            false
         }
     }
 }

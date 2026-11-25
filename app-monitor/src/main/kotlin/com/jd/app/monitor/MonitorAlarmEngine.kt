@@ -14,6 +14,7 @@ import com.jd.core.network.SignalingClient
 import com.jd.core.shared.EventLevel
 import com.jd.core.shared.EventLog
 import com.jd.core.shared.SystemLogger
+import com.jd.core.ui.isNetworkAvailable
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -31,8 +32,6 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -75,17 +74,6 @@ class MonitorAlarmEngine @Inject constructor(
             delay(1.seconds)
         }
     }.distinctUntilChanged()
-
-    private fun isNetworkAvailable(ctx: Context): Boolean {
-        return try {
-            val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            val network = cm?.activeNetwork ?: return false
-            val caps = cm.getNetworkCapabilities(network) ?: return false
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        } catch (_: Exception) {
-            false
-        }
-    }
 
     /** Starts watching in [scope]; a second call while watching does nothing. */
     @Synchronized

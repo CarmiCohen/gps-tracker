@@ -1,10 +1,7 @@
 package com.jd.app.sensor
 
 import android.content.Context
-import android.location.LocationManager
 import android.net.Uri
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jd.core.network.ForensicIdentityManager
@@ -28,6 +25,8 @@ import com.jd.core.ui.gpsLed
 import com.jd.core.ui.ownLeds
 import com.jd.core.ui.peerLed
 import com.jd.core.ui.relayLinkUp
+import com.jd.core.ui.isLocationProviderEnabled
+import com.jd.core.ui.isNetworkAvailable
 import com.jd.core.ui.readBattery
 import com.jd.core.ui.withLocalReadings
 import com.jd.core.ui.FIX_CURRENT_MS
@@ -241,25 +240,4 @@ class SensorViewModel @Inject constructor(
     }
         .atUiRate()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(appMode = "sensor"))
-
-    private fun isNetworkAvailable(ctx: Context): Boolean {
-        return try {
-            val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            val network = cm?.activeNetwork ?: return false
-            val caps = cm.getNetworkCapabilities(network) ?: return false
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    private fun isLocationProviderEnabled(ctx: Context): Boolean {
-        return try {
-            val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-            lm?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true ||
-                    lm?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true
-        } catch (_: Exception) {
-            false
-        }
-    }
 }

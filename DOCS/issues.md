@@ -3,7 +3,7 @@
 *Working file: open work only (Documentation Rule D2). What each version did is in its commit message (`git log`); up to Nov23.4 also in the frozen `STATUS/RESOLUTION_ARCHIVE.md`. The long history paragraph this section held up to Nov23.4 is in tag Nov23.4: `git show Nov23.4:DOCS/issues.md`.*
 
 ## 🎯 Next Resumption Focus
-1. Without phones: SIMP-NOV6.1-S1 (shared device status; Claude's pick after Nov25.2, the user may name another).
+1. Without phones: SIMP-NOV6.0-S1 (lint for `core-shared`; Claude's pick after Nov25.3, the user may name another).
 2. With the user at the A15: 241.4 (knock, alarm window) with 237.3 (torch); also 211.2 and 213.2's Active apps tap.
 3. O133 (row 73): after Render's reset the user deploys relay v6.050; then the waiting live checks 182.2, 238.2, 240.3, 241.3, 244.3, 249.3, 250.3, 251.3.
 3a. Right after item 3's live checks pass, before new feature work (user decision 2026-11-25): O72 in one dedicated version, `/effort high`: Kotlin 1.9.24 to 2.x with the Compose compiler Gradle plugin, Hilt and Room from kapt to KSP (removes the warning), a raised Compose BOM (unblocks SIMP-NOV19.6-S1); verify with all unit tests, both androidTests on the A15 by `am instrument`, the release device audit and a short Two-phone test. AGP 9 and Gradle 9 come later, separately.
@@ -84,6 +84,5 @@ Take one item at a time, and display it before fixing it (Rule 1). Row numbers a
 *   **SIMP-REVOL39.0-S1**: Integrated Kinetic State Observer. Consolidate acceleration, velocity, and thermal status evaluation into a single unified observer in `core-shared`.
 *   **SIMP-REVOL38.3-S1**: Dynamic Buffer Auto-tuner. Consolidate bitrate detection and buffer resizing into an adaptive native manager.
 *   **SIMP-NOV6.0-S1**: Lint For `core-shared`. Run Gradle lint on `core-shared`, or build it against `android.jar`. That would catch calls missing from older Android across the whole module and could replace the single-class check in `ForensicBufferApiLevelTest`.
-*   **SIMP-NOV6.1-S1**: Shared Device Status. `isNetworkAvailable` and `isLocationProviderEnabled` are copied in `MonitorViewModel` and `SensorViewModel`. Move them next to `readBattery` in `core-ui`; since Nov15.5 `readPhoneState` there already names the network, so `isNetworkAvailable` could become `network != NO_NETWORK`.
 
 

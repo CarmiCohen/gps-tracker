@@ -2,6 +2,7 @@ package com.jd.core.ui
 
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
@@ -27,6 +28,18 @@ fun readPhoneState(context: Context): PhoneState {
         isBatteryExempt = power?.isIgnoringBatteryOptimizations(context.packageName) == true,
         freeStorageMb = runCatching { StatFs(context.filesDir.absolutePath).availableBytes / (1024L * 1024L) }.getOrNull()
     )
+}
+
+/** True when the active network has internet; shared by both apps' INT LED and the Monitor's alarms (SIMP-NOV6.1-S1). */
+fun isNetworkAvailable(context: Context): Boolean = networkName(context) != NO_NETWORK
+
+/** True when the GPS or the network location provider is on (the GPS LED, SIMP-NOV6.1-S1). */
+fun isLocationProviderEnabled(context: Context): Boolean = try {
+    val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+    lm?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true ||
+        lm?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true
+} catch (_: Exception) {
+    false
 }
 
 /** `Wi-Fi`, `Mobile`, `Ethernet`, `Other`, or [NO_NETWORK] when no network has internet. */
