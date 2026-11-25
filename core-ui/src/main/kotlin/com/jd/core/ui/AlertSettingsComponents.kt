@@ -305,12 +305,13 @@ fun AlarmSoundOverlay(
                 FilterChip(
                     selected = !draftAlertSettings.useCustomVolume,
                     onClick = { onUpdateAlertSettings(draftAlertSettings.copy(useCustomVolume = false)) },
-                    label = { Text("System Stream Control") }
+                    // Short one-line labels: the long ones broke mid-word on the narrow S21FE (ISSUE-NOV25.11-O141).
+                    label = { Text("System Stream", maxLines = 1, softWrap = false) }
                 )
                 FilterChip(
                     selected = draftAlertSettings.useCustomVolume,
                     onClick = { onUpdateAlertSettings(draftAlertSettings.copy(useCustomVolume = true)) },
-                    label = { Text("Custom App Volume") }
+                    label = { Text("Custom Volume", maxLines = 1, softWrap = false) }
                 )
             }
 

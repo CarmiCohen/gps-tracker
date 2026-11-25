@@ -21,7 +21,7 @@ The audio synthesis and siren behavior configuration overlay provides:
   - Haptic Device Vibration (`vibrationEnabled`)
   - Override System Silent / Do Not Disturb (`overrideSilence`)
   - Force Maximum Hardware Volume (`useMaxVolume`)
-- **Volume Control Mode**: System Stream Control vs Custom App Volume (with 0%–100% volume slider).
+- **Volume Control Mode**: System Stream vs Custom Volume (one-line chips since Nov25.14) (with 0%–100% volume slider).
 
 ## 3. Role-Based Stealth Authority (R872)
 - **Tracker Mode (Sentinel)**: Operates in absolute stealth mode. Local audio synthesis and visual red alert flashes are suppressed at the engine level. Violations are transmitted to the Viewer only.

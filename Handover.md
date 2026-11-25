@@ -1,7 +1,7 @@
-# Project Handover - Version Nov25.13-Events (Filter Row Fits The S21FE)
+# Project Handover - Version Nov25.14 (Two Cut Texts On The S21FE Monitor)
 
 ## ▶️ Resumption State (Read First)
-- **Git**: Nov25.13-Events committed, tagged and pushed by Claude; relay v6.050 (`c460e25`) pushed earlier. The commit message is the record (D1); the archive, SOT, baseline index, dashboard and audit line are frozen at Nov23.4.
+- **Git**: Nov25.14 committed, tagged and pushed by Claude; relay v6.050 (`c460e25`) pushed earlier. The commit message is the record (D1); the archive, SOT, baseline index, dashboard and audit line are frozen at Nov23.4.
 - **Relay**: SUSPENDED (O133, row 73; still 503 on 2026-11-25): after Render's reset (probably 2026-12-01) the user deploys relay v6.050 (`c460e25`); the waiting live checks are listed in `issues.md` focus item 3.
 - **PC**: if Kotlin compiles fail with `Daemon compilation failed: null`, run `gradlew --stop` and `gradlew clean`. The IDE's live analysis is unsynced; trust Gradle. `run_tests.ps1` takes about 100 s: run it in the background. Since Nov25.5 `:core-shared:animalsnifferMain` (API 26 signature) runs before its jar and tests: a JDK call Android 26 lacks fails the build. `install_release.ps1 -NoBuild` after a version bump fails as a downgrade: build again.
 - **User decisions**: Rule 17 (no test removal without confirmation); Claude pushes the main and relay repos; `//` = continue; O112 waits for the user's false-alarm notes; O122 last; O134 to discuss; SIMP-NOV19.5-S1 deferred; SIMP-NOV22.8-S1, S2 low (2026-11-25); SIMP-NOV9.3-S1 (R8) low; O140 (tamper suspicion, row 76) very low. 2026-11-23: lean workflow; small related items may share a version; effort recommended once per item, no stop.
@@ -9,9 +9,9 @@
 - **Phones**: A15 (`R58X40GV2AR`, no screen lock: `adb shell wm dismiss-keyguard` unlocks it): debug Sensor with the Nov25.13 code (built before the bump, shows Nov25.12) running as `T`, no Monitor, battery simulation reset. S21FE (`R5CRC14PG4F`): release Monitor with the Nov25.13 code (shows Nov25.12; session running, no test APK, stay-awake off), Monitor `V`; its Setup showed `Tracker ID: T` on 2026-11-25 (do not re-pair: the user's responsibility, user decision 2026-11-25); Global Mute was off. Its screen must be awake for `am instrument` (dozing failed 32 Compose tests). With both connected, never `gradlew installDebug` (it installs on both): `adb -s <serial> install -r`.
 - **Test tips**: never `connectedDebugAndroidTest`; use `am instrument` with each app's `HiltTestRunner` (Operational Notes). The Sensor's event file is in device-protected storage: `/data/user_de/0/com.jd.app.sensor/files/`. A noise alert needs about 2 s of steady loud sound, so a short shout is not enough; the per-minute peaks are in `graph_history_sensor.jsonl`. Screenshots: `adb -s <serial> shell screencap` then `pull` to a new file name each time.
 
-## 🟢 Status: PASSED (Nov25.13-Events)
-- ISSUE-NOV25.12-O142 follow-up: 252.2 failed with Nov25.12 on the S21FE (`More` wrapped); chips now 7 dp padding, 4 dp apart, one-line labels; 252.2 passed on the S21FE Monitor and the A15 Sensor.
-- Unit tests, assembleDebug and assembleRelease: see the commit message. Device audit not needed (no start-up, service or first-screen change).
+## 🟢 Status: PASSED (Nov25.14, no-phone build)
+- ISSUE-NOV25.11-O141: Siren page chips `System Stream` / `Custom Volume` on one line; the Monitor's export toast names the file only (the Events line keeps the full path). Not yet seen on the S21FE: `issues.md` focus item 2. The phones still run the Nov25.13 code.
+- Unit tests, assembleDebug and assembleRelease passed. Device audit not needed (no start-up, service or first-screen change).
 
 ## 🎯 Next Resumption Focus
-See `DOCS/issues.md`, Next Resumption Focus (item 1: the user names the next no-phone item, O141 a small one).
+See `DOCS/issues.md`, Next Resumption Focus (item 1: the user names the next no-phone item; item 2: the S21FE look at Nov25.14).

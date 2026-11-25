@@ -88,8 +88,10 @@ class MonitorViewModel @Inject constructor(
         viewModelScope.launch {
             val message = try {
                 val file = settingsTransfer.export(uri)
-                ("Settings exported: ${file.geofence.points.size} home points, ${file.trails.size} trail points" + savedTo.asSuffix())
-                    .also { eventLog.record(FILE_SAVED_LEVEL, it) }
+                val counts = "${file.geofence.points.size} home points, ${file.trails.size} trail points"
+                eventLog.record(FILE_SAVED_LEVEL, "Settings exported: $counts" + savedTo.asSuffix())
+                // The toast names the file only; the full path cut it short on the S21FE (ISSUE-NOV25.11-O141).
+                if (savedTo == null) "Settings exported: $counts" else "Settings exported to ${savedTo.substringAfterLast('/')}"
             } catch (e: Exception) {
                 "Export failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
             }
