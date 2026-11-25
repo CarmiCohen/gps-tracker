@@ -503,6 +503,7 @@ fun MonitorScreen(
                 events = events,
                 showSource = true,
                 detailIds = remember(events) { echoedSensorAlarms(events) }, // ISSUE-NOV23.4-O139
+                summaries = remember(events) { finishedAlarmTexts(events) }, // SIMP-NOV25.0-S1
                 onClear = onClearEvents,
                 onClose = closeEvents,
                 onShowGraphs = { timeMs ->

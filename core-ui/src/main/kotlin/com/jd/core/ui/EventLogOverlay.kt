@@ -46,7 +46,8 @@ import java.util.Locale
  * Details filter, Export through the share sheet, and Clear after a confirmation. [showSource] marks each event with
  * the phone it happened on, for the Monitor, whose list also holds the Sensor's events. A selected event's details
  * open the Graphs around its time with [onShowGraphs] (ISSUE-NOV15.6-O100 part 4). The events of [detailIds] are listed
- * only with Details, like the DETAIL ones (ISSUE-NOV23.4-O139).
+ * only with Details, like the DETAIL ones (ISSUE-NOV23.4-O139). Without Details an event of [summaries] is shown, and
+ * exported, with that text instead of its own (SIMP-NOV25.0-S1: one row per finished alarm).
  */
 @Composable
 fun EventLogOverlay(
@@ -55,7 +56,8 @@ fun EventLogOverlay(
     onClear: () -> Unit,
     onClose: () -> Unit,
     onShowGraphs: (timeMs: Long) -> Unit = {},
-    detailIds: Set<String> = emptySet()
+    detailIds: Set<String> = emptySet(),
+    summaries: Map<String, String> = emptyMap()
 ) {
     val context = LocalContext.current
     var period by rememberSaveable { mutableStateOf(ViewPeriod.DAY) }
@@ -70,7 +72,10 @@ fun EventLogOverlay(
     }
     // A new event moves the period's end too, so it is listed at once.
     val endMs = maxOf(nowMs, events.lastOrNull()?.timestampMs ?: 0L)
-    val listed = remember(events, period, showDetails, endMs, detailIds) { events.shown(period, showDetails, endMs, detailIds) }
+    val listed = remember(events, period, showDetails, endMs, detailIds, summaries) {
+        events.shown(period, showDetails, endMs, detailIds)
+            .map { event -> summaries[event.id]?.takeIf { !showDetails }?.let { event.copy(message = it) } ?: event }
+    }
     val selected = listed.find { it.id == selectedId }
 
     if (isConfirmingClear) {

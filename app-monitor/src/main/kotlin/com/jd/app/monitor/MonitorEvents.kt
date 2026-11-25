@@ -3,6 +3,9 @@ package com.jd.app.monitor
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
 import com.jd.core.shared.EventSource
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** An event to record: its level and text (ISSUE-NOV10.8-O84). */
 data class LoggedEvent(val level: EventLevel, val message: String)
@@ -18,7 +21,7 @@ fun alarmEvents(previous: AlarmBook, current: AlarmBook): List<LoggedEvent> {
     val raised = current.alarms.filter { (it.type to it.raisedAtMs) !in known }
         .map { LoggedEvent(EventLevel.ALARM, alarmMessage(it.type)) }
     val ended = (previous.conditions - current.conditions).sortedBy { it.ordinal }
-        .map { LoggedEvent(EventLevel.DETAIL, "Ended: ${it.title}") }
+        .map { LoggedEvent(EventLevel.DETAIL, "$ENDED_PREFIX${it.title}") }
     return raised + ended + listOfNotNull(trackerLinkEvent(previous.isTrackerOnline, current.isTrackerOnline))
 }
 
@@ -29,12 +32,12 @@ fun trackerLinkEvent(previous: Boolean?, current: Boolean?): LoggedEvent? = when
     else -> LoggedEvent(EventLevel.WARNING, "Sensor offline: nothing received for ${TRACKER_PRESENT_MS / 1000} s or the relay reported it silent")
 }
 
-fun alarmMessage(type: AlarmType): String = "Alarm: ${type.title}"
+fun alarmMessage(type: AlarmType): String = "$ALARM_PREFIX${type.title}"
 
 /** The event of an acknowledgement, a detail (ISSUE-NOV23.4-O139), or null when no alarm was waiting for one. */
 fun acknowledgementEvent(book: AlarmBook): LoggedEvent? =
     book.pending.takeIf { it.isNotEmpty() }
-        ?.let { pending -> LoggedEvent(EventLevel.DETAIL, "Acknowledged: ${pending.joinToString { it.type.title }}") }
+        ?.let { pending -> LoggedEvent(EventLevel.DETAIL, "$ACKNOWLEDGED_PREFIX${pending.joinToString { it.type.title }}") }
 
 /** A Monitor alarm answers a Sensor alarm raised up to this long before it, on the Sensor's clock... */
 const val ECHO_AFTER_MS = 5 * 60_000L
@@ -58,6 +61,37 @@ fun echoedSensorAlarms(events: List<EventEntry>): Set<String> {
             }
     }.mapTo(HashSet()) { it.id }
 }
+
+/**
+ * The one-line text of each Monitor alarm that has both ended and been acknowledged (SIMP-NOV25.0-S1), by event id:
+ * `Alarm: <type>, ended hh:mm, acknowledged hh:mm`. Its end and acknowledgement are the first of each, for its type,
+ * after it and before the next alarm of that type; an alarm still waiting for either keeps its own text. Display only:
+ * without Details the list shows this text, with Details the separate events as recorded.
+ */
+fun finishedAlarmTexts(events: List<EventEntry>, formatTime: (Long) -> String = ::shortTime): Map<String, String> {
+    val monitor = events.filter { it.source == EventSource.MONITOR }.sortedBy { it.timestampMs }
+    val result = HashMap<String, String>()
+    monitor.forEachIndexed { index, alarm ->
+        if (alarm.level != EventLevel.ALARM || !alarm.message.startsWith(ALARM_PREFIX)) return@forEachIndexed
+        val title = alarm.message.removePrefix(ALARM_PREFIX)
+        val after = monitor.drop(index + 1).takeWhile { it.level != EventLevel.ALARM || it.message != alarm.message }
+        val ended = after.firstOrNull { it.level == EventLevel.DETAIL && it.message == "$ENDED_PREFIX$title" }
+        val acknowledged = after.firstOrNull {
+            it.level == EventLevel.DETAIL && it.message.startsWith(ACKNOWLEDGED_PREFIX) &&
+                title in it.message.removePrefix(ACKNOWLEDGED_PREFIX).split(", ")
+        }
+        if (ended != null && acknowledged != null) {
+            result[alarm.id] = "${alarm.message}, ended ${formatTime(ended.timestampMs)}, acknowledged ${formatTime(acknowledged.timestampMs)}"
+        }
+    }
+    return result
+}
+
+private fun shortTime(timeMs: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timeMs))
+
+private const val ALARM_PREFIX = "Alarm: "
+private const val ENDED_PREFIX = "Ended: "
+private const val ACKNOWLEDGED_PREFIX = "Acknowledged: "
 
 fun relayLinkEvent(isConnected: Boolean): LoggedEvent =
     if (isConnected) LoggedEvent(EventLevel.INFO, "Relay connected") else LoggedEvent(EventLevel.WARNING, "Relay connection lost")

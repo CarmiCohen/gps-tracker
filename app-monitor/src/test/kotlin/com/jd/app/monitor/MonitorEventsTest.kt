@@ -104,4 +104,33 @@ class MonitorEventsTest {
         assertEquals(setOf("lift", "clock-ahead", "jump"), echoedSensorAlarms(events))
         assertEquals("No Monitor alarm, nothing hidden", emptySet<String>(), echoedSensorAlarms(events.filter { it.source == EventSource.SENSOR }))
     }
+
+    /** SIMP-NOV25.0-S1: one row per alarm that has both ended and been acknowledged. */
+    @Test
+    fun `an alarm both ended and acknowledged gets one summary line, any other keeps its own`() {
+        fun event(id: String, atMs: Long, level: EventLevel, message: String, source: EventSource = EventSource.MONITOR) =
+            EventEntry(id, atMs, source, level, message)
+        val lift = AlarmType.LIFT_ALERT.title
+        val tilt = AlarmType.TILT_ALERT.title
+        val power = AlarmType.POWER_DISCONNECTED.title
+        val events = listOf(
+            event("lift-1", 1, EventLevel.ALARM, alarmMessage(AlarmType.LIFT_ALERT)),
+            event("tilt-1", 2, EventLevel.ALARM, alarmMessage(AlarmType.TILT_ALERT)),
+            event("sensor-ended", 3, EventLevel.DETAIL, "Ended: $lift", EventSource.SENSOR), // Not the Monitor's.
+            event("ack-1", 4, EventLevel.DETAIL, "Acknowledged: $lift, $tilt"),
+            event("lift-ended", 5, EventLevel.DETAIL, "Ended: $lift"),
+            event("power", 6, EventLevel.ALARM, alarmMessage(AlarmType.POWER_DISCONNECTED)),
+            event("power-ended", 7, EventLevel.DETAIL, "Ended: $power"), // Ended, never acknowledged.
+            event("lift-2", 8, EventLevel.ALARM, alarmMessage(AlarmType.LIFT_ALERT)),
+            event("tilt-ended", 9, EventLevel.DETAIL, "Ended: $tilt"), // After a later alarm of another type: still tilt-1's.
+            event("ack-2", 10, EventLevel.DETAIL, "Acknowledged: $lift") // lift-2 acknowledged, not ended.
+        )
+        assertEquals(
+            mapOf(
+                "lift-1" to "Alarm: $lift, ended t5, acknowledged t4",
+                "tilt-1" to "Alarm: $tilt, ended t9, acknowledged t4"
+            ),
+            finishedAlarmTexts(events) { "t$it" }
+        )
+    }
 }
