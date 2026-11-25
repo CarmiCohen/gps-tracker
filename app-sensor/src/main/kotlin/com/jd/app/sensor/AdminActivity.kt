@@ -255,7 +255,6 @@ class AdminActivity : ComponentActivity() {
                                         viewModel.showGraphsAt(null)
                                         showGraphsOverlay = true
                                     },
-                                    onClose = { moveTaskToBack(true) },
                                     onOpenPhoneSetup = { showPhoneSetupOverlay = true }
                                 )
                             }
@@ -400,8 +399,7 @@ fun SettingsOverlay(
             title = "CONFIGURATION",
             color = androidx.compose.material3.LocalContentColor.current,
             onClose = onClose,
-            fontSize = MaterialTheme.typography.headlineSmall.fontSize,
-            closeTint = androidx.compose.material3.LocalContentColor.current
+            fontSize = MaterialTheme.typography.headlineSmall.fontSize
         )
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -547,7 +545,6 @@ fun SensorAdminConsole(
     onEventsClick: () -> Unit,
     onInfoClick: () -> Unit,
     onGraphsClick: () -> Unit,
-    onClose: () -> Unit,
     onOpenPhoneSetup: () -> Unit
 ) {
     val context = LocalContext.current
@@ -559,7 +556,8 @@ fun SensorAdminConsole(
     val setupMissing = setupStatus.missingCount(remember { sensorSetupItems() })
 
     Column {
-        // Menu Upper Line: Setup, Settings and Info; the red X sends the app to the background (ISSUE-NOV10.8-O76).
+        // Menu Upper Line: Setup, Events, Info and Graphs. No close X since ISSUE-NOV25.22-O151: Back sends the app to the
+        // background, as the X did (ISSUE-NOV10.8-O76).
         // Events since ISSUE-NOV10.8-O84 Nov15.4, the detailed Info since Nov15.5, the Graphs since Nov15.6. The Sensor has
         // no map (user decision, 2026-11-12).
         Surface(
@@ -581,7 +579,6 @@ fun SensorAdminConsole(
                 com.jd.core.ui.MenuBarIcon(com.jd.core.ui.GraphsIcon, "Graphs", com.jd.core.ui.GraphsViolet, onGraphsClick, share)
                 // This Sensor's STATIONARY / MOVING replaces the `SENSOR: T` header (Nov19.3); always whole (Nov19.5).
                 com.jd.core.ui.SensorMotionLabel(trackerState = hudState.trackerState, active = true)
-                com.jd.core.ui.MenuBarIcon(Icons.Default.Close, "Close", com.jd.core.ui.Rose500, onClose, share)
             }
         }
 

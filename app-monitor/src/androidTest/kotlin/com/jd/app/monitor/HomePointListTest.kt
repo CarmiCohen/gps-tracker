@@ -49,7 +49,6 @@ class HomePointListTest {
                     onClearHomePoints = {},
                     onResetStats = {},
                     onFullInit = {},
-                    onClose = {},
                     geofence = GeofenceConfig(points = listOf(HomePoint(32.1, 34.8), HomePoint(31.25, 34.791234))),
                     onRemoveHomePoint = { removed += it }
                 )

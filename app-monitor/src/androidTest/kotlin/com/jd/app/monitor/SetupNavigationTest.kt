@@ -1,16 +1,16 @@
 package com.jd.app.monitor
 
 import androidx.activity.ComponentActivity
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.EventEntry
+import com.jd.core.shared.EventLevel
+import com.jd.core.shared.EventSource
 import com.jd.core.ui.HudState
 import com.jd.core.ui.RevolutionTheme
 import org.junit.Assert.assertFalse
@@ -19,10 +19,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Chapter 178: Back on a Monitor setup screen returns to the map instead of closing the app (ISSUE-NOV10.8-O78),
- * the Phone Setup screen offers a visible Close (ISSUE-NOV10.8-O77), and since Nov19.1 every overlay's shared header
- * (SIMP-NOV10.8-S1) shows its close X on screen and handles Back, on Alerts, Siren, Clean Setup and Events too
- * (ISSUE-NOV10.7-O74).
+ * Chapter 178: Back on a Monitor setup screen returns to the map instead of closing the app (ISSUE-NOV10.8-O78), and
+ * every overlay's shared header (SIMP-NOV10.8-S1) handles Back, on Alerts, Siren, Clean Setup and Events too
+ * (ISSUE-NOV10.7-O74). Since ISSUE-NOV25.22-O151 Back is the only way: no overlay shows a close X or a Close button,
+ * and Back in an event's details closes the details before the list.
  */
 @RunWith(AndroidJUnit4::class)
 class SetupNavigationTest {
@@ -32,7 +32,7 @@ class SetupNavigationTest {
 
     private val phoneSetupTitle = "Phone Setup & Capabilities"
 
-    private fun showMap() {
+    private fun showMap(events: List<EventEntry> = emptyList()) {
         composeRule.setContent {
             RevolutionTheme {
                 MonitorScreen(
@@ -50,7 +50,8 @@ class SetupNavigationTest {
                     onUpdateAlarmVolume = {},
                     onTestSiren = {},
                     onReset = {},
-                    onUpdateRelayUrl = {}
+                    onUpdateRelayUrl = {},
+                    events = events
                 )
             }
         }
@@ -72,10 +73,11 @@ class SetupNavigationTest {
         assertFalse(composeRule.activity.isFinishing)
     }
 
-    /** The header's X is on screen (ISSUE-NOV10.7-O74) and closes; a fresh open, then Back closes too. */
-    private fun assertHeaderAndBackClose(button: String, title: String) {
+    /** The header shows no close X (ISSUE-NOV25.22-O151) and Back closes; a second open closes by Back again. */
+    private fun assertNoXAndBackCloses(button: String, title: String) {
         openFromSetup(button, title)
-        composeRule.onAllNodesWithContentDescription("Close")[0].assertIsDisplayed().performClick()
+        composeRule.onNodeWithContentDescription("Close").assertDoesNotExist()
+        Espresso.pressBack()
         assertBackOnMap(title)
         composeRule.onNodeWithContentDescription("Setup").performClick()
         composeRule.onNodeWithText(button).performClick()
@@ -92,32 +94,50 @@ class SetupNavigationTest {
     }
 
     @Test
-    fun headerCloseIsShownAndCloses() {
+    fun phoneSetupHeaderShowsNoCloseX() {
         openPhoneSetup()
-        composeRule.onAllNodesWithContentDescription("Close")[0].assertIsDisplayed().performClick()
+        composeRule.onNodeWithContentDescription("Close").assertDoesNotExist()
+        Espresso.pressBack()
         assertBackOnMap()
     }
 
     @Test
-    fun bottomCloseButtonCloses() {
+    fun phoneSetupHasNoBottomCloseButton() {
         openPhoneSetup()
-        composeRule.onNodeWithText("Close").performScrollTo().performClick()
+        composeRule.onNodeWithText("Close").assertDoesNotExist()
+        Espresso.pressBack()
         assertBackOnMap()
     }
 
     @Test
-    fun alertsHeaderAndBackClose() = assertHeaderAndBackClose("ALERTS", "ALERTS & SENSORS SETUP")
+    fun alertsHeaderAndBackClose() = assertNoXAndBackCloses("ALERTS", "ALERTS & SENSORS SETUP")
 
     @Test
-    fun sirenHeaderAndBackClose() = assertHeaderAndBackClose("SIREN", "SIREN & AUDIO SETUP")
+    fun sirenHeaderAndBackClose() = assertNoXAndBackCloses("SIREN", "SIREN & AUDIO SETUP")
 
     @Test
-    fun cleanSetupHeaderAndBackClose() = assertHeaderAndBackClose("CLEAN", "MAINTENANCE & CLEAN SETUP")
+    fun cleanSetupHeaderAndBackClose() = assertNoXAndBackCloses("CLEAN", "MAINTENANCE & CLEAN SETUP")
 
     @Test
     fun backFromEventsReturnsToTheMap() {
         showMap()
         composeRule.onNodeWithContentDescription("Events").performClick()
+        composeRule.onNodeWithText("EVENTS").assertExists()
+        Espresso.pressBack()
+        assertBackOnMap("EVENTS")
+    }
+
+    /** An event's details have no X (ISSUE-NOV25.22-O151): the first Back closes them, the second the list. */
+    @Test
+    fun backClosesEventDetailsBeforeTheList() {
+        val event = EventEntry("e1", System.currentTimeMillis(), EventSource.MONITOR, EventLevel.INFO, "Test event")
+        showMap(listOf(event))
+        composeRule.onNodeWithContentDescription("Events").performClick()
+        composeRule.onNodeWithText("Test event").performClick()
+        composeRule.onNodeWithText("Graphs at this time").assertExists()
+        composeRule.onNodeWithContentDescription("Close details").assertDoesNotExist()
+        Espresso.pressBack()
+        composeRule.onNodeWithText("Graphs at this time").assertDoesNotExist()
         composeRule.onNodeWithText("EVENTS").assertExists()
         Espresso.pressBack()
         assertBackOnMap("EVENTS")

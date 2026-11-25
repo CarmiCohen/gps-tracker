@@ -21,7 +21,7 @@ val MENU_ICON_TAP = 40.dp
 val MENU_ICON_SIZE = 20.dp
 
 /**
- * One icon of the menu bar in both apps (Setup, Map, Events, Info, Graphs and the close X). The bars give every icon
+ * One icon of the menu bar in both apps (Setup, Events, Info and Graphs; the close X went in ISSUE-NOV25.22-O151). The bars give every icon
  * an equal share of the width beside the motion label (`Modifier.weight(1f)`), and the whole share is the tap area, so
  * the icons spread over the bar on a wide phone and still get about 38 dp each on the narrow S21FE (Nov19.5, user request).
  */

@@ -202,8 +202,7 @@ class MonitorActivity : ComponentActivity() {
                         onImportSettings = importSettings,
                         onSaveTrails = saveTrails,
                         onLoadTrails = { loadTrailsLauncher.launch(arrayOf("*/*")) }, // The content is checked on reading.
-                        onClearTrails = viewModel::clearTrails,
-                        onClose = { moveTaskToBack(true) }
+                        onClearTrails = viewModel::clearTrails
                     )
                 }
             }
@@ -368,7 +367,6 @@ fun MonitorScreen(
     onSaveTrails: () -> Unit = {},
     onLoadTrails: () -> Unit = {},
     onClearTrails: () -> Unit = {},
-    onClose: () -> Unit = {},
     sensorSetup: SensorSetupReport? = null,
     events: List<EventEntry> = emptyList(),
     onClearEvents: () -> Unit = {},
@@ -739,8 +737,7 @@ fun MonitorScreen(
                     onGraphs = {
                         onShowGraphsAt(null)
                         showGraphsOverlay = true
-                    },
-                    onClose = onClose
+                    }
                 )
                 // Line 1: Local Device Status
                 HudStatusBar(hudState = localHudState, compact = true)
@@ -1022,11 +1019,11 @@ fun MonitorMenuBar(
     onSetup: () -> Unit,
     onEvents: () -> Unit,
     onInfo: () -> Unit,
-    onGraphs: () -> Unit,
-    onClose: () -> Unit
+    onGraphs: () -> Unit
 ) {
     // Events since ISSUE-NOV10.8-O84 Nov15.4, the detailed Info since Nov15.5, the Graphs since Nov15.6. One setup icon: unpairing
-    // is the Setup dialog's UNPAIR button, no longer a gear (ISSUE-NOV17.7-O109); the red X sends the app to the background (ISSUE-NOV10.8-O76).
+    // is the Setup dialog's UNPAIR button, no longer a gear (ISSUE-NOV17.7-O109). No close X since ISSUE-NOV25.22-O151:
+    // Back on the map sends the app to the background, as the X did (ISSUE-NOV10.8-O76).
     Surface(
         color = Color.Black.copy(alpha = 0.85f),
         contentColor = Color.White
@@ -1045,7 +1042,6 @@ fun MonitorMenuBar(
             com.jd.core.ui.MenuBarIcon(com.jd.core.ui.GraphsIcon, "Graphs", com.jd.core.ui.GraphsViolet, onGraphs, share)
             // The Sensor's STATIONARY / MOVING replaces the `MONITOR: V -> TRK: T` header (Nov19.3); always whole (Nov19.5).
             com.jd.core.ui.SensorMotionLabel(trackerState = sensorState, active = isSensorHeard)
-            com.jd.core.ui.MenuBarIcon(Icons.Default.Close, "Close", com.jd.core.ui.Rose500, onClose, share)
         }
     }
 }

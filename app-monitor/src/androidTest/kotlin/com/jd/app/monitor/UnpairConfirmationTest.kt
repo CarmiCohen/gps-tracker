@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jd.core.shared.AlertSettings
 import com.jd.core.ui.HudState
@@ -16,8 +17,9 @@ import org.junit.runner.RunWith
 
 /**
  * Verifies Chapter 127: no control on the real Monitor screen unpairs without confirmation (ISSUE-NOV5.2-O15),
- * and chapter 183: the red X closes the screen and never unpairs; the Tools and Disconnect buttons are gone (ISSUE-NOV10.8-O76).
- * Events (chapter 190) and Graphs (chapter 192) came back with ISSUE-NOV10.8-O84.
+ * and chapter 183: the Tools and Disconnect buttons are gone (ISSUE-NOV10.8-O76); since ISSUE-NOV25.22-O151 the menu has no
+ * red X either (Back on the map sends the app away). Events (chapter 190) and Graphs (chapter 192) came back with
+ * ISSUE-NOV10.8-O84 and close by Back.
  */
 @RunWith(AndroidJUnit4::class)
 class UnpairConfirmationTest {
@@ -27,7 +29,6 @@ class UnpairConfirmationTest {
 
     private var resetCount = 0
     private var fullInitCount = 0
-    private var closeCount = 0
     private val maintenanceCalls = mutableListOf<String>()
 
     private fun showMonitorScreen() {
@@ -52,7 +53,6 @@ class UnpairConfirmationTest {
                     onClearHomePoints = { maintenanceCalls += "clear" },
                     onResetStats = { maintenanceCalls += "stats" },
                     onFullInit = { fullInitCount++ },
-                    onClose = { closeCount++ },
                     graphsOverlay = { onClose ->
                         com.jd.core.ui.GraphsOverlay(
                             title = "GRAPHS",
@@ -94,11 +94,10 @@ class UnpairConfirmationTest {
     }
 
     @Test
-    fun redXClosesTheScreenWithoutUnpairing() {
+    fun menuHasNoRedXAndNothingUnpairs() {
         showMonitorScreen()
-        composeRule.onNodeWithContentDescription("Close").performClick()
+        composeRule.onNodeWithContentDescription("Close").assertDoesNotExist()
 
-        assertEquals(1, closeCount)
         composeRule.onNodeWithText("Unpair from tracker T?").assertDoesNotExist()
         assertEquals(0, resetCount)
     }
@@ -111,18 +110,18 @@ class UnpairConfirmationTest {
         }
     }
 
-    /** The menu's Events button opens the Events list, and its Close button returns to the map (ISSUE-NOV10.8-O84). */
+    /** The menu's Events button opens the Events list, and Back returns to the map (ISSUE-NOV10.8-O84, ISSUE-NOV25.22-O151). */
     @Test
     fun eventsButtonOpensTheEventsList() {
         showMonitorScreen()
         composeRule.onNodeWithContentDescription("Events").performClick()
         composeRule.onNodeWithText("EVENTS").assertExists()
         composeRule.onNodeWithText("24 h").assertExists()
-        composeRule.onNodeWithContentDescription("Close").performClick()
+        Espresso.pressBack()
         composeRule.onNodeWithText("EVENTS").assertDoesNotExist()
     }
 
-    /** The menu's Graphs button opens the Graphs, and its Close button returns to the map (ISSUE-NOV10.8-O84 part 3). */
+    /** The menu's Graphs button opens the Graphs, and Back returns to the map (ISSUE-NOV10.8-O84 part 3, ISSUE-NOV25.22-O151). */
     @Test
     fun graphsButtonOpensTheGraphs() {
         showMonitorScreen()
@@ -130,7 +129,7 @@ class UnpairConfirmationTest {
         composeRule.onNodeWithText("GRAPHS").assertExists()
         composeRule.onNodeWithText("SENSOR - MOTION").assertExists()
         composeRule.onNodeWithText("7 d").assertExists()
-        composeRule.onNodeWithContentDescription("Close").performClick()
+        Espresso.pressBack()
         composeRule.onNodeWithText("GRAPHS").assertDoesNotExist()
     }
 

@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -186,22 +186,18 @@ private fun EventRow(event: EventEntry, time: String, showSource: Boolean, isSel
 
 @Composable
 private fun EventDetail(event: EventEntry, onClose: () -> Unit, onShowGraphs: () -> Unit) {
+    // Composed after the list's header, so Back closes the details first, then the list (ISSUE-NOV25.22-O151).
+    BackHandler(onBack = onClose)
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.6f), contentColor = Color.White)
     ) {
         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(event.timestampMs)),
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Close details", modifier = Modifier.size(16.dp))
-                }
-            }
+            Text(
+                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(event.timestampMs)),
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace
+            )
             Text("${event.source.label} phone - ${event.level.name}", color = levelColor(event.level), fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Text(event.message, fontSize = 13.sp)
             TextButton(onClick = onShowGraphs, contentPadding = PaddingValues(horizontal = 0.dp)) {

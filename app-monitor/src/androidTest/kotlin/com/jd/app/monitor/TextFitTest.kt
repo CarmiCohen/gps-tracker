@@ -67,13 +67,13 @@ class TextFitTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 1.3f)) {
                 RevolutionTheme {
                     androidx.compose.foundation.layout.Box(Modifier.width(320.dp)) {
-                        MonitorMenuBar("STATIONARY", true, {}, {}, {}, {}, {})
+                        MonitorMenuBar("STATIONARY", true, {}, {}, {}, {})
                     }
                 }
             }
         }
         composeRule.onNodeWithText(com.jd.core.ui.motionLabelText("STATIONARY")).assertTextFits()
-        listOf("Setup", "Events", "Info", "Graphs", "Close").forEach {
+        listOf("Setup", "Events", "Info", "Graphs").forEach { // no close X since ISSUE-NOV25.22-O151
             composeRule.onNodeWithContentDescription(it).assertIsDisplayed()
         }
     }
@@ -134,8 +134,7 @@ class TextFitTest {
                         onUpdateRelayUrl = {},
                         onClearHomePoints = {},
                         onResetStats = {},
-                        onFullInit = {},
-                        onClose = {}
+                        onFullInit = {}
                     )
                 }
             }

@@ -231,12 +231,7 @@ internal fun SensorPhoneSetupOverlay(
                 Spacer(Modifier.height(12.dp))
             }
 
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
-                Spacer(Modifier.width(8.dp))
-                Text("Close", color = Color.White, fontSize = 13.sp)
-            }
+            // No Close button: Back closes the screen (ISSUE-NOV25.22-O151).
             Spacer(Modifier.height(48.dp))
         }
     }
