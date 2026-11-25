@@ -6,7 +6,6 @@ import kotlin.math.*
  * SentinelLogic: The core validation engine for Project Revolution.
  * Determines if a location update is a "Visual Jump" or valid movement.
  * Nov23.12 (SIMP-NOV8.13-S1): [evaluateHomeZone] is the one geofence rule; the single-fence check of Revol31.8 is gone.
- * Updated Nov2.1: Integrated Anomaly Correlation (R133) for Silent Failure detection.
  * Updated Nov2.21: Increased MAX_PHYSICAL_SPEED_MPS to 55.0 to support high-speed rail/transport (ISSUE-REVOL38.1-F1).
  */
 object SentinelLogic {
@@ -15,11 +14,6 @@ object SentinelLogic {
     private const val JUMP_GATE_SPEED_ACCURACY_LOW_MPS = 22.2
     private const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0
     private const val ACCEL_LIMIT = 5.0 // m/s^2 (Raised from 2.0 to allow for rapid acceleration in vehicles)
-
-    // R133 Hardened Thresholds
-    const val SILENT_FAILURE_CPU_THRESHOLD = 0.85
-    const val SILENT_FAILURE_IOW_THRESHOLD = 0.40
-    const val SILENT_FAILURE_LATENCY_THRESHOLD_MS = 800L
 
     enum class SentinelStatus {
         VALID,
@@ -96,26 +90,6 @@ object SentinelLogic {
             speedMps > MAX_PHYSICAL_SPEED_MPS -> ValidationResult(SentinelStatus.JUMP, "Speed Threshold Exceeded: $measured", jumpScore)
             else -> ValidationResult(SentinelStatus.VALID)
         }
-    }
-
-    /**
-     * isSilentFailure: Detects Anomaly Correlation (R133).
-     * Returns true if a GPS stall is correlated with high hardware resource load.
-     */
-    fun isSilentFailure(
-        gpsStalled: Boolean,
-        isTamperDetected: Boolean,
-        cpuLoad: Double,
-        ioWait: Double,
-        maxIoLatency: Long,
-        isThermalThrottling: Boolean
-    ): Boolean {
-        if (!gpsStalled || isTamperDetected) return false
-
-        return cpuLoad >= SILENT_FAILURE_CPU_THRESHOLD ||
-               ioWait >= SILENT_FAILURE_IOW_THRESHOLD ||
-               maxIoLatency >= SILENT_FAILURE_LATENCY_THRESHOLD_MS ||
-               isThermalThrottling
     }
 
     /**

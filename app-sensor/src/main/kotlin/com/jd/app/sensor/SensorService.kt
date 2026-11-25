@@ -230,8 +230,7 @@ class SensorService : Service(), SensorEventListener {
             createDeviceProtectedStorageContext()
         } else this
         
-        val capacity = ForensicBuffer.calculateAdaptiveCapacity(sampleRateHz = 100, retentionSeconds = 100)
-        forensicBuffer = ForensicBuffer(protectedContext.filesDir, capacity = capacity)
+        forensicBuffer = ForensicBuffer(protectedContext.filesDir) // 10 000 rows (SIMP-NOV25.19-S1)
         
         initJob = serviceScope.launch(Dispatchers.IO) {
             try {

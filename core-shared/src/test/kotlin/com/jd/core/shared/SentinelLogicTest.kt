@@ -71,29 +71,4 @@ class SentinelLogicTest {
         )
         assertEquals(SentinelLogic.GeofenceTransition.ENTER, enterRes.transition)
     }
-
-    @Test
-    fun `Verify Silent Failure Anomaly Correlation R133`() {
-        // High load + GPS Stall = Silent Failure
-        val isSilent = SentinelLogic.isSilentFailure(
-            gpsStalled = true,
-            isTamperDetected = false,
-            cpuLoad = 0.9,
-            ioWait = 0.1,
-            maxIoLatency = 100,
-            isThermalThrottling = false
-        )
-        assertTrue("High CPU load MUST trigger silent failure if GPS stalled", isSilent)
-
-        // Low load = Not Silent
-        val isNotSilent = SentinelLogic.isSilentFailure(
-            gpsStalled = true,
-            isTamperDetected = false,
-            cpuLoad = 0.1,
-            ioWait = 0.1,
-            maxIoLatency = 100,
-            isThermalThrottling = false
-        )
-        assertFalse(isNotSilent)
-    }
 }
