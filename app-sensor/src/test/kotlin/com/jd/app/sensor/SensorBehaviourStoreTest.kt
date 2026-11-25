@@ -60,6 +60,7 @@ class SensorBehaviourStoreTest {
         val lines = sensorBehaviourLines(SensorBehaviour(tiltAlert = false, noiseSensitivity = 1.0f))
         assertEquals(
             listOf(
+                "Sit: On", // ISSUE-NOV25.22-O150
                 "Vibration: On, alert above 0.13 g",
                 "Tilt: Off",
                 "Noise: On, alert above 15 dB over the background",

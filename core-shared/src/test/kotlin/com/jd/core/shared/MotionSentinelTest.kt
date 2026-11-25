@@ -473,6 +473,185 @@ class MotionSentinelTest {
         assertEquals(0.83, pressureAltitudeMeters(1013.15) - pressureAltitudeMeters(1013.25), 0.02)
     }
 
+    // Sit (ISSUE-NOV25.22-O150): the phone lies on or under a seat and someone sits down.
+
+    /** The seat sinks [dropM] under the phone in [overMs]: down at a steady rate, then braked the same way. */
+    private fun Phone.sink(dropM: Double, overMs: Long = 400, angleDeg: Double = 0.0) {
+        val half = overMs / 2
+        val a = dropM / ((half / 1000.0) * (half / 1000.0)) // a·T² for T = half.
+        feed(overMs) { t ->
+            val r = tilted(angleDeg * t / overMs)
+            val scale = (g + if (t < half) -a else a) / g
+            doubleArrayOf(r[0] * scale, r[1] * scale, r[2] * scale)
+        }
+    }
+
+    private val Phone.sits get() = alerts.filter { it.kind == MotionSentinel.Kind.SIT }
+
+    /**
+     * Someone sits down or stands up over the phone under a seat cushion, as measured on the A15 (Nov25.23): a jolt of
+     * 0.5 g with the cushion first pressing the phone down 0.3 m/s² ([isDownFirst]) or first letting it spring up, while
+     * it tips from [fromDeg] to [toDeg]; then rest there.
+     */
+    private fun Phone.cushion(fromDeg: Double, toDeg: Double, isDownFirst: Boolean = true, restMs: Long = SIT_REST_MS + 800) {
+        val first = if (isDownFirst) -0.3 else 0.3
+        feed(300) { t ->
+            val r = tilted(fromDeg + (toDeg - fromDeg) * t / 300)
+            val scale = (g + if (t < 100) first else if (t < 200) -first else 0.0) / g
+            doubleArrayOf(r[0] * scale, r[1] * scale + if (t < 100) 5.0 else 0.0, r[2] * scale)
+        }
+        rest(restMs, angleDeg = toDeg)
+    }
+
+    @Test
+    fun aSitOnTheCushionIsASit() {
+        val phone = armedPhone()
+        phone.cushion(0.0, 1.5)
+        assertEquals(listOf(MotionSentinel.Kind.SIT), phone.tiltOrLift.map { it.kind })
+        val detail = phone.sits.single().detail
+        assertTrue(detail, detail.startsWith("first move down 0."))
+        assertTrue(detail, detail.contains("jolt 0.5"))
+        assertFalse("One disturbance, one alert", phone.sentinel.isArmed)
+    }
+
+    /** The A15's sit at 23:24:02 tipped it only 0.1 degrees. */
+    @Test
+    fun aSitThatDoesNotTipThePhoneIsASitToo() {
+        val phone = armedPhone()
+        phone.cushion(0.0, 0.0)
+        assertEquals(listOf(MotionSentinel.Kind.SIT), phone.tiltOrLift.map { it.kind })
+    }
+
+    /** Under a cushion standing up jolts and tips the phone as much as sitting down; it moves up first (A15, Nov25.23). */
+    @Test
+    fun standingUpIsNoSit() {
+        val notes = mutableListOf<String>()
+        val phone = Phone(MotionSentinel(onNote = { notes += it })).apply { rest(MOTION_ARM_AFTER_STILL_MS + 1_000) }
+        phone.cushion(0.0, 2.0)
+        phone.rest(MOTION_ARM_AFTER_STILL_MS + 1_000, angleDeg = 2.0) // Re-armed under the sitter.
+        phone.cushion(2.0, 0.0, isDownFirst = false)
+        assertEquals("Only the sit", 1, phone.sits.size)
+        assertTrue("$notes", notes.any { it.startsWith("Sit not confirmed (up first") })
+        assertTrue("Standing up does not disarm", phone.sentinel.isArmed)
+        phone.rest(5_000)
+        phone.cushion(0.0, 2.0)
+        assertEquals("The next sit alerts again", 2, phone.sits.size)
+    }
+
+    /** A hard knock on the chair's frame jolted the A15 1.2 to 5.7 g (Nov25.23); a cushion damps a sit to about 0.5 g. */
+    @Test
+    fun aHardKnockMovingThePhoneDownFirstIsNoSit() {
+        val notes = mutableListOf<String>()
+        val phone = Phone(MotionSentinel(onNote = { notes += it })).apply { rest(MOTION_ARM_AFTER_STILL_MS + 1_000) }
+        phone.feed(200) { t -> doubleArrayOf(if (t < 40) 12.0 else 0.0, 0.0, g + if (t < 100) -1.0 else 1.0) }
+        phone.rest(2_000)
+        assertTrue("${phone.alerts}", phone.sits.isEmpty())
+        assertTrue("$notes", notes.any { it.startsWith("Sit not confirmed (too sharp") })
+    }
+
+    @Test
+    fun aSecondPersonSittingDownIsASitToo() {
+        val phone = armedPhone()
+        phone.cushion(0.0, 2.0)
+        phone.rest(MOTION_ARM_AFTER_STILL_MS + 1_000, angleDeg = 2.0)
+        phone.cushion(2.0, 4.0)
+        assertEquals(2, phone.sits.size)
+    }
+
+    @Test
+    fun aSitThatTipsThePhoneOverTheTiltLimitIsATilt() {
+        val phone = armedPhone()
+        phone.cushion(0.0, 20.0, restMs = TILT_CONFIRM_MS + 500)
+        assertEquals(listOf(MotionSentinel.Kind.TILT), phone.tiltOrLift.map { it.kind })
+    }
+
+    /** A sitter shaking the phone sideways (the A15 saw 0.37 g) adds nothing along the resting direction. */
+    @Test
+    fun aSitWithStrongSidewaysShakingIsASit() {
+        val phone = armedPhone()
+        phone.feed(1_000) { t ->
+            phone.tilted(2.4 * minOf(t, 300L) / 300).also {
+                it[2] += if (t < 100) -0.3 else if (t < 200) 0.3 else 0.0
+                it[1] += if ((t / 40) % 2 == 0L) 3.6 else -3.6
+            }
+        }
+        phone.rest(SIT_REST_MS + 800, angleDeg = 2.4)
+        assertEquals(listOf(MotionSentinel.Kind.SIT), phone.tiltOrLift.map { it.kind })
+    }
+
+    @Test
+    fun aPhonePickedUpAndPutBackTurnedIsNoSit() {
+        val phone = armedPhone()
+        // Up 10 cm and back down, set down 3 degrees turned, within a second.
+        phone.feed(800) { t -> phone.tilted(3.0 * t / 800).also { it[2] += if (t < 200 || t >= 600) 2.5 else -2.5 } }
+        phone.rest(3_000, angleDeg = 3.0)
+        assertTrue("${phone.alerts}", phone.sits.isEmpty())
+    }
+
+    @Test
+    fun aSlowSinkWithoutAJoltIsNoSit() {
+        val phone = armedPhone()
+        phone.sink(0.05, overMs = 2_000) // Peak speed 0.05 m/s, never a jolt.
+        phone.rest(3_000)
+        assertTrue("${phone.alerts}", phone.alerts.isEmpty())
+        assertTrue("Still armed", phone.sentinel.isArmed)
+    }
+
+    @Test
+    fun aJoltUnderTheSitLimitIsNoSit() {
+        val phone = armedPhone()
+        phone.sink(0.015, overMs = 200) // Down first, but 0.15 g, as knocks on the chair (0.11 to 0.18 g on the A15).
+        phone.rest(3_000)
+        assertTrue("${phone.alerts}", phone.sits.isEmpty())
+    }
+
+    @Test
+    fun aSitBeforeThePhoneHasRestedIsNotDetected() {
+        val phone = Phone()
+        phone.rest(MOTION_ARM_AFTER_STILL_MS - 5_000)
+        phone.cushion(0.0, 2.0)
+        phone.rest(3_000)
+        assertTrue("${phone.alerts}", phone.sits.isEmpty())
+    }
+
+    @Test
+    fun aJoltWithoutASignLeavesANoteForTuning() {
+        val notes = mutableListOf<String>()
+        val phone = Phone(MotionSentinel(onNote = { notes += it })).apply { rest(MOTION_ARM_AFTER_STILL_MS + 1_000) }
+        phone.jolt(3.0)
+        phone.rest(2_000)
+        assertTrue("${phone.alerts}", phone.sits.isEmpty())
+        // 0.31 g sideways: no move along the resting direction.
+        assertTrue("$notes", notes.single { it.startsWith("Sit not") }.startsWith("Sit not confirmed (no clear first move): "))
+        assertTrue("$notes", notes.single { it.startsWith("Sit trace") }.contains("up cm/s2: "))
+        phone.cushion(0.0, 2.0)
+        assertEquals("A confirmed sit leaves no 'not confirmed' note", 1, notes.count { it.startsWith("Sit not") })
+        assertEquals("Each check with a force leaves its trace", 2, notes.count { it.startsWith("Sit trace") })
+    }
+
+    @Test
+    fun onAPhoneWithABarometerAHeightDropOf15CmWithAJoltIsASit() {
+        val phone = Phone()
+        phone.sentinel.onPressure(1013.25, 0)
+        phone.rest(MOTION_ARM_AFTER_STILL_MS + 1_000)
+        phone.sentinel.feedPressure(phone, 1013.25, 1013.25, 5_000)
+        phone.jolt(3.0) // 0.31 g sideways: no first move for the accelerometer.
+        // 15 cm lower is 0.018 hPa more.
+        phone.sentinel.feedPressure(phone, 1013.268, 1013.268, SIT_WINDOW_MS)
+        assertEquals(listOf(MotionSentinel.Kind.SIT), phone.tiltOrLift.map { it.kind })
+        assertTrue(phone.sits.single().detail, phone.sits.single().detail.contains("barometer drop "))
+    }
+
+    @Test
+    fun aBarometerDropWithoutAJoltIsNoSit() {
+        val phone = Phone()
+        phone.sentinel.onPressure(1013.25, 0)
+        phone.rest(MOTION_ARM_AFTER_STILL_MS + 1_000)
+        phone.sentinel.feedPressure(phone, 1013.25, 1013.25, 5_000)
+        phone.sentinel.feedPressure(phone, 1013.268, 1013.268, SIT_WINDOW_MS)
+        assertTrue("${phone.alerts}", phone.alerts.isEmpty())
+    }
+
     /** Chapter 191 (ISSUE-NOV10.8-O84 part 2): the values the Info screens show. */
     @Test
     fun infoValuesFollowTheMotion() {

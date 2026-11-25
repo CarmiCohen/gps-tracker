@@ -63,6 +63,8 @@ enum class AlarmType(val title: String, val isEvent: Boolean = false) {
     RELAY_DISCONNECTED("Relay disconnected"),
     LOCAL_INTERNET_OFFLINE("Monitor internet lost"),
     GPS_SIGNAL_LOSS("Tracker GPS signal loss"),
+    // The most important Sensor event, above leaving range (user 2026-11-25, ISSUE-NOV25.22-O150).
+    SIT_ALERT("Tracker sit detected", isEvent = true),
     GPS_JUMP("Tracker GPS jump", isEvent = true),
     GEOFENCE_BREACH("Geofence boundary breach", isEvent = true),
     ACOUSTIC_ALERT("Tracker noise detected", isEvent = true),
@@ -89,6 +91,7 @@ fun AlertSettings.allows(type: AlarmType): Boolean = !globalMute && when (type) 
     AlarmType.LIGHT_ALERT -> lightAlert // "Ambient Light Sensor" (ISSUE-NOV22.4-O130)
     AlarmType.TILT_ALERT -> tiltAlert // "Tilt Angle Detection Sensor"
     AlarmType.LIFT_ALERT -> liftAlert // "Lift / Height Change Sensor"
+    AlarmType.SIT_ALERT -> sitAlert // "Sit / Seat Occupied Sensor" (ISSUE-NOV25.22-O150)
     AlarmType.VIBRATION_ALERT -> tamperAlert // "Tamper / Vibration Sensor"
     AlarmType.NOISE_DETECTION_OFF -> acousticAlert // A noise alarm the Sensor cannot raise (ISSUE-NOV8.103-O60).
 }
@@ -207,6 +210,7 @@ private val SENSOR_VIOLATION_ALARMS = mapOf(
     com.jd.core.shared.LIGHT_ALERT_STATUS to AlarmType.LIGHT_ALERT,
     com.jd.core.shared.TILT_ALERT_STATUS to AlarmType.TILT_ALERT,
     com.jd.core.shared.LIFT_ALERT_STATUS to AlarmType.LIFT_ALERT,
+    com.jd.core.shared.SIT_ALERT_STATUS to AlarmType.SIT_ALERT,
     com.jd.core.shared.VIBRATION_ALERT_STATUS to AlarmType.VIBRATION_ALERT
 )
 

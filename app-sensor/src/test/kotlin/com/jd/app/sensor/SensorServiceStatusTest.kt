@@ -122,11 +122,11 @@ class SensorServiceStatusTest {
         assertEquals("Armed (accelerometer + barometer)", motionStatusText(MotionState(true, true, true, true)))
         // Each re-arms on its own: a knock leaves tilt and lift armed, a tilt leaves vibration armed.
         assertEquals(
-            "Tilt and lift armed, vibration after the phone rests 30 s",
+            "Tilt, lift and sit armed, vibration after the phone rests 30 s",
             motionStatusText(MotionState(isRunning = true, isArmed = true))
         )
         assertEquals(
-            "Vibration armed, tilt and lift after the phone rests 30 s",
+            "Vibration armed, tilt, lift and sit after the phone rests 30 s",
             motionStatusText(MotionState(isRunning = true, isVibrationArmed = true))
         )
 
@@ -148,7 +148,12 @@ class SensorServiceStatusTest {
             "Arms after the phone rests 30 s; tilt and lift off on the Monitor",
             motionStatusText(MotionState(isRunning = true), behaviour.copy(tiltAlert = false, liftAlert = false))
         )
-        val allOff = behaviour.copy(tiltAlert = false, liftAlert = false, vibrationAlert = false)
+        // ISSUE-NOV25.22-O150: sit is a motion kind too.
+        assertEquals(
+            "Armed (accelerometer); tilt, sit and vibration off on the Monitor",
+            motionStatusText(armed, behaviour.copy(tiltAlert = false, sitAlert = false, vibrationAlert = false))
+        )
+        val allOff = behaviour.copy(tiltAlert = false, liftAlert = false, sitAlert = false, vibrationAlert = false)
         assertEquals("Off (switched off on the Monitor)", motionStatusText(armed, allOff))
         // A stopped service says Off, whatever the switches.
         assertEquals("Off", motionStatusText(MotionState(), allOff))

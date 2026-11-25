@@ -3,6 +3,7 @@ package com.jd.app.monitor
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.LIFT_ALERT_STATUS
 import com.jd.core.shared.LocationUpdate
+import com.jd.core.shared.SIT_ALERT_STATUS
 import com.jd.core.shared.TILT_ALERT_STATUS
 import com.jd.core.shared.VIBRATION_ALERT_STATUS
 import kotlinx.coroutines.CoroutineScope
@@ -119,6 +120,19 @@ class MotionAlarmTest {
         assertTrue(noVibration.allows(AlarmType.LIFT_ALERT))
         assertFalse(AlertSettings(globalMute = true).allows(AlarmType.TILT_ALERT))
         assertFalse(AlertSettings(globalMute = true).allows(AlarmType.VIBRATION_ALERT))
+    }
+
+    /** ISSUE-NOV25.22-O150: the sit alarm, switched by `Sit / Seat Occupied Sensor` (`sitAlert`), ranks above leaving range. */
+    @Test
+    fun `a sit status raises the sit alarm, switched by its own setting`() {
+        assertEquals(listOf(AlarmType.SIT_ALERT), pendingFor(SIT_ALERT_STATUS))
+        assertEquals("Tracker sit detected", AlarmType.SIT_ALERT.title)
+        assertTrue(pendingFor(SIT_ALERT_STATUS, AlertSettings(sitAlert = false)).isEmpty())
+        assertTrue(AlertSettings(sitAlert = false).allows(AlarmType.TILT_ALERT))
+        assertTrue(AlertSettings(tiltAlert = false, liftAlert = false, tamperAlert = false).allows(AlarmType.SIT_ALERT))
+        val order = AlarmType.entries
+        assertTrue("Above leaving range", order.indexOf(AlarmType.SIT_ALERT) < order.indexOf(AlarmType.GEOFENCE_BREACH))
+        assertEquals(AlarmType.SIT_ALERT, violationAlarm(SIT_ALERT_STATUS))
     }
 
     @Test

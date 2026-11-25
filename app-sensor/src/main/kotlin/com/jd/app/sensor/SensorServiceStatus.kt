@@ -139,8 +139,9 @@ fun backgroundLocationStatusText(isAllowedAllTheTime: Boolean): String = "Locati
     if (isAllowedAllTheTime) "Automatic (allowed all the time)" else "Needs a tap on the notification"
 
 /**
- * What tilt and lift (ISSUE-NOV5.2-O11 Group 5) and vibration (Group 7) detection is doing. [isRunning] is false while
- * the service is stopped. [isArmed] is tilt and lift; vibration arms on its own, so a knock leaves tilt and lift armed.
+ * What tilt and lift (ISSUE-NOV5.2-O11 Group 5), sit (ISSUE-NOV25.22-O150) and vibration (Group 7) detection is doing.
+ * [isRunning] is false while the service is stopped. [isArmed] is tilt, lift and sit; vibration arms on its own, so a
+ * knock leaves them armed.
  */
 data class MotionState(
     val isRunning: Boolean = false,
@@ -153,8 +154,13 @@ data class MotionState(
 fun switchedOffMotionKinds(behaviour: SensorBehaviour): List<String> = listOfNotNull(
     "tilt".takeUnless { behaviour.tiltAlert },
     "lift".takeUnless { behaviour.liftAlert },
+    "sit".takeUnless { behaviour.sitAlert },
     "vibration".takeUnless { behaviour.vibrationAlert }
 )
+
+/** `a`, `a and b`, `a, b and c`. */
+private fun List<String>.joinedWithAnd(): String =
+    if (size <= 1) joinToString() else dropLast(1).joinToString(", ") + " and " + last()
 
 /**
  * The Motion value of the Info screens, its one place since SIMP-NOV15.5-S1 (the Info line carries the label); it names
@@ -163,14 +169,14 @@ fun switchedOffMotionKinds(behaviour: SensorBehaviour): List<String> = listOfNot
 fun motionStatusText(state: MotionState, behaviour: SensorBehaviour = SensorBehaviour()): String {
     val rest = "after the phone rests ${com.jd.core.shared.MOTION_ARM_AFTER_STILL_MS / 1000} s"
     val off = switchedOffMotionKinds(behaviour)
-    val switchedOff = if (state.isRunning && off.size in 1..2) "; ${off.joinToString(" and ")} off on the Monitor" else ""
+    val switchedOff = if (state.isRunning && off.size in 1..3) "; ${off.joinedWithAnd()} off on the Monitor" else ""
     return when {
         !state.isRunning -> "Off"
-        off.size == 3 -> "Off (switched off on the Monitor)"
+        off.size == 4 -> "Off (switched off on the Monitor)"
         state.isArmed && state.isVibrationArmed ->
             "Armed (" + (if (state.hasBarometer) "accelerometer + barometer" else "accelerometer") + ")"
-        state.isArmed -> "Tilt and lift armed, vibration $rest"
-        state.isVibrationArmed -> "Vibration armed, tilt and lift $rest"
+        state.isArmed -> "Tilt, lift and sit armed, vibration $rest"
+        state.isVibrationArmed -> "Vibration armed, tilt, lift and sit $rest"
         else -> "Arms $rest"
     } + switchedOff
 }

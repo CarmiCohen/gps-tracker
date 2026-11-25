@@ -119,6 +119,9 @@ const val TILT_ALERT_STATUS = "TILT_ALERT"
 /** Telemetry status and violation type the Sensor sends when the resting tracker is lifted (ISSUE-NOV5.2-O11 Group 5). */
 const val LIFT_ALERT_STATUS = "LIFT_ALERT"
 
+/** Telemetry status and violation type the Sensor sends when someone sits on the seat the tracker rests on (ISSUE-NOV25.22-O150). */
+const val SIT_ALERT_STATUS = "SIT_ALERT"
+
 /** Telemetry status and violation type the Sensor sends when the resting tracker is knocked or shaken (ISSUE-NOV5.2-O11 Group 7). */
 const val VIBRATION_ALERT_STATUS = "VIBRATION_ALERT"
 
@@ -202,6 +205,8 @@ data class AlertSettings(
     /** The Sensor's light detection and its limit (ISSUE-NOV22.4-O130); absent from files before Nov22.4: on, the default limit. */
     val lightAlert: Boolean = true,
     val lightSensitivity: Float = DEFAULT_LIGHT_SENSITIVITY,
+    /** The Sensor's sit detection (ISSUE-NOV25.22-O150); absent from files before Nov25.23: on. */
+    val sitAlert: Boolean = true,
     /** The revision of the Sensor's part ([sensorBehaviour]), stamped by the Monitor's store on each change (ISSUE-NOV10.8-O83). */
     val sensorRevision: Long = 0L,
     val sirenType: String = "Siren"
@@ -217,6 +222,7 @@ data class AlertSettings(
         noiseSensitivity = noiseSensitivity,
         lightAlert = lightAlert,
         lightSensitivity = lightSensitivity,
+        sitAlert = sitAlert,
         revision = sensorRevision
     )
 
@@ -243,6 +249,8 @@ data class SensorBehaviour(
     val noiseSensitivity: Float = DEFAULT_NOISE_SENSITIVITY,
     val lightAlert: Boolean = true,
     val lightSensitivity: Float = DEFAULT_LIGHT_SENSITIVITY,
+    /** Sit came with ISSUE-NOV25.22-O150; a Monitor before Nov25.23 sends none: on. */
+    val sitAlert: Boolean = true,
     val revision: Long = 0L
 ) {
     /** False for an alert [status] whose kind is switched off. */
@@ -252,6 +260,7 @@ data class SensorBehaviour(
         ACOUSTIC_ALERT_STATUS -> noiseAlert
         LIFT_ALERT_STATUS -> liftAlert
         LIGHT_ALERT_STATUS -> lightAlert
+        SIT_ALERT_STATUS -> sitAlert
         else -> true
     }
 }

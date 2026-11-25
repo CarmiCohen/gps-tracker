@@ -654,6 +654,7 @@ internal object SensorBehaviourWire {
         put("noiseSens", behaviour.noiseSensitivity.toDouble())
         put("light", behaviour.lightAlert)
         put("lightSens", behaviour.lightSensitivity.toDouble())
+        put("sit", behaviour.sitAlert)
     }
 
     /** Returns null for another settings type or a malformed payload. */
@@ -671,6 +672,8 @@ internal object SensorBehaviourWire {
                 // Absent from Monitors before Nov22.4 (ISSUE-NOV22.4-O130): light detection on, at the default limit.
                 lightAlert = data.optBoolean("light", true),
                 lightSensitivity = data.optDouble("lightSens", DEFAULT_LIGHT_SENSITIVITY.toDouble()).toFloat(),
+                // Absent from Monitors before Nov25.23 (ISSUE-NOV25.22-O150): sit detection on.
+                sitAlert = data.optBoolean("sit", true),
                 revision = data.getLong("rev")
             )
         } catch (e: Exception) {

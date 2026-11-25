@@ -63,7 +63,7 @@ fun AlertManagementOverlay(
                                     distance = true, power = true, lowBattery = true, batteryHealth = true,
                                     highTemperature = true, longTimeGap = true, tamperAlert = true,
                                     tiltAlert = true, acousticAlert = true, liftAlert = true, lightAlert = true,
-                                    systemStorageLow = true
+                                    sitAlert = true, systemStorageLow = true
                                 )
                             )
                         },
@@ -80,7 +80,7 @@ fun AlertManagementOverlay(
                                     distance = false, power = false, lowBattery = false, batteryHealth = false,
                                     highTemperature = false, longTimeGap = false, tamperAlert = false,
                                     tiltAlert = false, acousticAlert = false, liftAlert = false, lightAlert = false,
-                                    systemStorageLow = false
+                                    sitAlert = false, systemStorageLow = false
                                 )
                             )
                         },
@@ -170,6 +170,10 @@ fun AlertManagementOverlay(
                 SENSOR_SETTINGS_SENT_NOTE,
                 color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
             )
+            // First: the most important Sensor alarm (ISSUE-NOV25.22-O150).
+            AlarmToggle("Sit / Seat Occupied Sensor", draftAlertSettings.sitAlert) {
+                onUpdateAlertSettings(draftAlertSettings.copy(sitAlert = it))
+            }
             AlarmToggle("Tamper / Vibration Sensor", draftAlertSettings.tamperAlert) {
                 onUpdateAlertSettings(draftAlertSettings.copy(tamperAlert = it))
             }

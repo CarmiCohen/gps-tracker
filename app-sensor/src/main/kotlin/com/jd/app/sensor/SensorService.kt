@@ -90,7 +90,8 @@ class SensorService : Service(), SensorEventListener {
     private var lastGravity = DoubleArray(3)
     // Tilt, lift (ISSUE-NOV5.2-O11 Group 5), and vibration (Group 7) of the resting tracker; its gravity estimate also
     // replaces the gravity sensor that phones like the A15 lack, whose vibration value was always 0 before Nov9.0.
-    private val motionSentinel = MotionSentinel()
+    // Sit checks with a force but no sign go to logcat only, for tuning on the phone (ISSUE-NOV25.22-O150).
+    private val motionSentinel = MotionSentinel(onNote = { SystemLogger.i("Motion", it) })
     // The phone's own ringing shakes it like a knock (ISSUE-NOV9.2-O62): vibration alerts pause while it rings.
     private var ownVibrationWatch: OwnVibrationWatch? = null
     private var motionThread: HandlerThread? = null
@@ -793,7 +794,7 @@ class SensorService : Service(), SensorEventListener {
         serviceStatus.setMotion(MotionState(isRunning = accel != null, hasBarometer = hasBarometer))
         SystemLogger.i(
             "Motion",
-            "Accelerometer: ${accel != null}, gravity sensor: $hasGravitySensor, barometer: $hasBarometer. Tilt and lift arm after ${MOTION_ARM_AFTER_STILL_MS / 1000} s of rest"
+            "Accelerometer: ${accel != null}, gravity sensor: $hasGravitySensor, barometer: $hasBarometer. Tilt, lift and sit arm after ${MOTION_ARM_AFTER_STILL_MS / 1000} s of rest"
         )
     }
 
@@ -860,7 +861,7 @@ class SensorService : Service(), SensorEventListener {
                 if (motionSentinel.isArmed != publishedMotionArmed) {
                     publishedMotionArmed = motionSentinel.isArmed
                     publishMotion()
-                    eventLog.record(EventLevel.DETAIL, if (motionSentinel.isArmed) "Tilt and lift armed" else "Tilt and lift waiting for the phone to rest")
+                    eventLog.record(EventLevel.DETAIL, if (motionSentinel.isArmed) "Tilt, lift and sit armed" else "Tilt, lift and sit waiting for the phone to rest")
                 }
                 if (motionSentinel.isVibrationArmed != publishedVibrationArmed) {
                     publishedVibrationArmed = motionSentinel.isVibrationArmed
@@ -888,6 +889,7 @@ class SensorService : Service(), SensorEventListener {
             MotionSentinel.Kind.TILT -> queueAlert(TILT_ALERT_STATUS, "Tilt alert: ${alert.detail}")
             MotionSentinel.Kind.LIFT -> queueAlert(LIFT_ALERT_STATUS, "Lift alert: ${alert.detail}")
             MotionSentinel.Kind.VIBRATION -> queueAlert(VIBRATION_ALERT_STATUS, "Vibration alert: ${alert.detail}")
+            MotionSentinel.Kind.SIT -> queueAlert(SIT_ALERT_STATUS, "Sit alert: ${alert.detail}")
         }
     }
 

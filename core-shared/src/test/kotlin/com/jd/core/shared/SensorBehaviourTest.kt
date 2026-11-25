@@ -15,12 +15,12 @@ class SensorBehaviourTest {
     fun `the Monitor's switches and sliders make the Sensor's settings`() {
         val settings = AlertSettings(
             tiltAlert = false, tamperAlert = true, acousticAlert = false, liftAlert = true,
-            tiltSensitivity = 0.3f, vibrationSensitivity = 0.7f, noiseSensitivity = 0.9f, sensorRevision = 42L
+            tiltSensitivity = 0.3f, vibrationSensitivity = 0.7f, noiseSensitivity = 0.9f, sitAlert = false, sensorRevision = 42L
         )
         assertEquals(
             SensorBehaviour(
                 tiltAlert = false, vibrationAlert = true, noiseAlert = false, liftAlert = true,
-                tiltSensitivity = 0.3f, vibrationSensitivity = 0.7f, noiseSensitivity = 0.9f, revision = 42L
+                tiltSensitivity = 0.3f, vibrationSensitivity = 0.7f, noiseSensitivity = 0.9f, sitAlert = false, revision = 42L
             ),
             settings.sensorBehaviour()
         )
@@ -39,6 +39,7 @@ class SensorBehaviourTest {
             "A clock that went back still gives a newer revision",
             1_001L, stored.copy(liftAlert = false).revisedAfter(stored, nowMs = 10L).sensorRevision
         )
+        assertEquals("The sit switch is the Sensor's", 5_000L, stored.copy(sitAlert = false).revisedAfter(stored, nowMs = 5_000L).sensorRevision)
         assertEquals(
             "A stale revision in the edited copy is replaced by the stored one",
             1_000L, stored.copy(sensorRevision = 3L).revisedAfter(stored, nowMs = 5_000L).sensorRevision
@@ -47,8 +48,8 @@ class SensorBehaviourTest {
 
     @Test
     fun `a switched-off kind sends no alert, other rows always pass`() {
-        val behaviour = SensorBehaviour(tiltAlert = false, vibrationAlert = false, noiseAlert = false, liftAlert = false)
-        listOf(TILT_ALERT_STATUS, VIBRATION_ALERT_STATUS, ACOUSTIC_ALERT_STATUS, LIFT_ALERT_STATUS).forEach {
+        val behaviour = SensorBehaviour(tiltAlert = false, vibrationAlert = false, noiseAlert = false, liftAlert = false, sitAlert = false)
+        listOf(TILT_ALERT_STATUS, VIBRATION_ALERT_STATUS, ACOUSTIC_ALERT_STATUS, LIFT_ALERT_STATUS, SIT_ALERT_STATUS).forEach {
             assertFalse(it, behaviour.allows(it))
             assertTrue(it, SensorBehaviour().allows(it))
         }

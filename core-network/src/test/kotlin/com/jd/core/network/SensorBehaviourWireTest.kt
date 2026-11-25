@@ -22,6 +22,7 @@ class SensorBehaviourWireTest {
         noiseSensitivity = 0.7f,
         lightAlert = false,
         lightSensitivity = 0.8f,
+        sitAlert = false,
         revision = 1_794_000_000_000L
     )
 
@@ -48,6 +49,13 @@ class SensorBehaviourWireTest {
         wire.remove("lightSens")
         val read = SensorBehaviourWire.decode(wire)
         assertEquals(behaviour.copy(lightAlert = true, lightSensitivity = com.jd.core.shared.DEFAULT_LIGHT_SENSITIVITY), read)
+    }
+
+    @Test
+    fun `a Monitor before Nov25 23 sends no sit setting, and the Sensor keeps sit detection on`() {
+        val wire = JSONObject(SensorBehaviourWire.encode("TRK-1", behaviour).toString())
+        wire.remove("sit")
+        assertEquals(behaviour.copy(sitAlert = true), SensorBehaviourWire.decode(wire))
     }
 
     @Test

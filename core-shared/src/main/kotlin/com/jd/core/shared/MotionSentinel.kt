@@ -31,13 +31,27 @@ import kotlin.math.sqrt
  *   after, no vibration alerts and vibration stays armed (ISSUE-NOV9.2-O62). A vibration alert is held for
  *   [VIBRATION_HOLD_MS] and dropped if the phone's own vibration is reported meanwhile, since the motor may start a
  *   little before Android reports the ringing.
+ * - **Sit** (ISSUE-NOV25.22-O150, user decision 2026-11-25: the phone lies on or under a seat): the first motion of the
+ *   armed phone opens a sit check of at most [SIT_WINDOW_MS]. A sit is a jolt of [SIT_JOLT_MS2] whose first clear
+ *   vertical move ([SIT_FIRST_MOVE_MS2] over its first 0.1 s) is downward, then the phone at rest for [SIT_REST_MS],
+ *   tilted less than the tilt limit (more is the tilt alarm's). Standing up moves it upward first, as does a pickup. On a
+ *   phone with a barometer, a height drop of [SIT_BARO_MIN_M] to [SIT_BARO_MAX_M] counts when the first move is unclear.
+ *   Measured on the A15 under a seat cushion (Nov25.23): the phone lies on the hard seat and barely moves; sits and
+ *   stand-ups both jolt it 0.4 to 0.6 g and tilt it 0.1 to 2.8 degrees, so neither the tilt nor an integrated height
+ *   (its speed never returned to zero: 7 and 18 cm of false drop) tells them apart; the first 0.1 s did (down 0.15 and
+ *   0.67 m/s² sitting, up 0.07 and 0.15 standing). Knocks on the chair and moving while seated: 0.11 to 0.18 g; hard
+ *   knocks on its frame 1.2 g and more, over [SIT_JOLT_MAX_MS2].
  *
  * Times are monotonic milliseconds (sensor event time). Not thread-safe: one sensor thread owns it; [gravity],
- * [isArmed], and [isVibrationArmed] may be read from any thread.
+ * [isArmed], and [isVibrationArmed] may be read from any thread. [onNote] gets two lines for each sit check with a
+ * jolt, its 0.1 s trace and, unless it alerted, why not: for tuning on the phone.
  */
-class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_MS) {
+class MotionSentinel(
+    private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_MS,
+    private val onNote: (String) -> Unit = {}
+) {
 
-    enum class Kind { TILT, LIFT, VIBRATION }
+    enum class Kind { TILT, LIFT, VIBRATION, SIT }
 
     data class Alert(val kind: Kind, val detail: String)
 
@@ -100,6 +114,17 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
     private var lastPressureMs = -1L
     private var baroSinceMs: Long? = null
 
+    // The open sit check (ISSUE-NOV25.22-O150), null when none.
+    private var sitStartMs: Long? = null
+    private var sitRefX = 0.0
+    private var sitRefY = 0.0
+    private var sitRefZ = 0.0
+    private var sitRefPressure: Double? = null
+    private var sitVelocity = 0.0 // For the trace only.
+    private var sitPeakJolt = 0.0
+    private var sitFirstMove: Double? = null // The first 0.1 s mean of the upward acceleration of [SIT_FIRST_MOVE_MS2] or more.
+    private var sitQuietSinceMs: Long? = null
+
     /** The estimated gravity vector in m/s², or null before the first sample. */
     fun gravity(): DoubleArray? = gravitySnapshot
 
@@ -123,10 +148,15 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
             gx = x; gy = y; gz = z
             publishGravity()
             liftStartMs = null
+            sitStartMs = null
             lastMotionMs = nowMs
             return emptyList()
         }
         val dt = gapMs / 1000.0
+        // The resting direction before this sample, for a sit check that opens on it.
+        val previousGx = gx
+        val previousGy = gy
+        val previousGz = gz
         // Measured against the gravity before this sample, so a single sharp knock counts at its full size.
         val vibration = norm(x - gx, y - gy, z - gz)
         this.vibration = vibration
@@ -146,7 +176,112 @@ class MotionSentinel(private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_
         if (isMoving || vibrationAlert != null) lastMotionMs = nowMs
         val hasRested = nowMs - lastMotionMs >= armAfterStillMs
         if (hasRested) isVibrationArmed = true
-        return listOfNotNull(vibrationAlert, tiltOrLift(x, y, z, nowMs, dt, isMoving, hasRested))
+        if (sitStartMs == null && isArmed && isMoving && !isOwnVibrationRecent(nowMs)) openSit(nowMs, previousGx, previousGy, previousGz)
+        val sitAlert = checkSit(x, y, z, nowMs, dt, vibration, isMoving)
+        return listOfNotNull(vibrationAlert, sitAlert, tiltOrLift(x, y, z, nowMs, dt, isMoving, hasRested))
+    }
+
+    private fun isOwnVibrationRecent(nowMs: Long): Boolean = ownVibrationSeenMs?.let { nowMs - it <= OWN_VIBRATION_TAIL_MS } == true
+
+    private fun openSit(nowMs: Long, refX: Double, refY: Double, refZ: Double) {
+        sitStartMs = nowMs
+        sitRefX = refX; sitRefY = refY; sitRefZ = refZ
+        sitRefPressure = pressureSmoothed
+        sitVelocity = 0.0
+        sitPeakJolt = 0.0
+        sitFirstMove = null
+        sitQuietSinceMs = null
+        sitTraceUp.setLength(0)
+        sitTraceTilt.setLength(0)
+        sitBinStartMs = nowMs
+        sitBinSum = 0.0
+        sitBinCount = 0
+    }
+
+    // A 0.1 s trace of the open sit check, for tuning on the phone (Nov25.23): upward acceleration and tilt.
+    private val sitTraceUp = StringBuilder()
+    private val sitTraceTilt = StringBuilder()
+    private var sitBinStartMs = 0L
+    private var sitBinSum = 0.0
+    private var sitBinCount = 0
+
+    private fun traceSit(upward: Double, nowMs: Long) {
+        sitBinSum += upward
+        sitBinCount++
+        if (nowMs - sitBinStartMs < 100) return
+        val mean = sitBinSum / sitBinCount
+        if (sitFirstMove == null && abs(mean) >= SIT_FIRST_MOVE_MS2) sitFirstMove = mean
+        if (sitTraceUp.isNotEmpty()) { sitTraceUp.append(' '); sitTraceTilt.append(' ') }
+        sitTraceUp.append(kotlin.math.round(mean * 100).toInt())
+        sitTraceTilt.append(kotlin.math.round(angleDegrees(gx, gy, gz, sitRefX, sitRefY, sitRefZ) * 10).toInt())
+        sitBinStartMs = nowMs
+        sitBinSum = 0.0
+        sitBinCount = 0
+    }
+
+    private fun noteSitTrace(nowMs: Long) = onNote(
+        "Sit trace over ${nowMs - (sitStartMs ?: nowMs)} ms, end speed ${"%.2f".format(java.util.Locale.US, sitVelocity)} m/s; up cm/s2: $sitTraceUp; tilt 0.1 deg: $sitTraceTilt"
+    )
+
+    /** Follows the open sit check (ISSUE-NOV25.22-O150); returns a sit alert when it is confirmed. */
+    private fun checkSit(x: Double, y: Double, z: Double, nowMs: Long, dt: Double, vibration: Double, isMoving: Boolean): Alert? {
+        val start = sitStartMs ?: return null
+        // Along the resting direction before the check: a sideways jolt adds nothing, as the current estimate leans
+        // towards it; a small tilt adds only -g(1 - cos), 0.01 m/s² at 3 degrees.
+        val refLength = sitRefMagnitude().coerceAtLeast(1.0)
+        val upward = (x * sitRefX + y * sitRefY + z * sitRefZ) / refLength - refLength
+        sitVelocity += upward * dt
+        traceSit(upward, nowMs)
+        sitPeakJolt = maxOf(sitPeakJolt, vibration)
+        sitQuietSinceMs = if (isMoving) null else sitQuietSinceMs ?: nowMs
+        val isRested = sitQuietSinceMs?.let { nowMs - it >= SIT_REST_MS } == true
+        val isOver = nowMs - start >= SIT_WINDOW_MS
+        if (!isRested && !isOver) return null
+        val hasJolt = sitPeakJolt >= SIT_JOLT_MS2
+        val isKnock = sitPeakJolt > SIT_JOLT_MAX_MS2
+        val firstMove = sitFirstMove
+        val isDownFirst = firstMove != null && firstMove < 0
+        val isUpFirst = firstMove != null && firstMove > 0
+        val tilt = angleDegrees(gx, gy, gz, sitRefX, sitRefY, sitRefZ)
+        val isOverTiltLimit = tilt >= tiltThresholdDegrees
+        val baroDrop = sitBaroDrop()
+        val isBaroDrop = baroDrop != null && baroDrop >= SIT_BARO_MIN_M && baroDrop <= SIT_BARO_MAX_M
+        val detail = listOfNotNull(
+            firstMove?.let { "first move ${if (it < 0) "down" else "up"} ${"%.2f".format(java.util.Locale.US, abs(it))} m/s²" },
+            "jolt ${"%.2f".format(java.util.Locale.US, sitPeakJolt / STANDARD_GRAVITY)} g",
+            "tilt ${"%.1f".format(java.util.Locale.US, tilt)} deg",
+            baroDrop?.let { "barometer ${if (it >= 0) "drop" else "rise"} ${(abs(it) * 100).toInt()} cm" }
+        ).joinToString(", ")
+        val isCandidate = isRested && hasJolt && !isKnock && !isOverTiltLimit && !isUpFirst
+        if (isCandidate && (isDownFirst || isBaroDrop)) {
+            noteSitTrace(nowMs)
+            sitStartMs = null
+            return disarm(nowMs, Alert(Kind.SIT, detail))
+        }
+        // No clear first move: a barometer, lagging its 2 s smoothing, may still show the drop later in the window.
+        if (isCandidate && !isOver && sitRefPressure != null && pressureSmoothed != null) return null
+        if (hasJolt) {
+            noteSitTrace(nowMs)
+            val why = when {
+                !isRested -> "no rest within ${SIT_WINDOW_MS / 1000} s"
+                isKnock -> "too sharp: a knock or a blow"
+                isUpFirst -> "up first: standing up or a pickup"
+                isOverTiltLimit -> "tilted over the limit"
+                else -> "no clear first move"
+            }
+            onNote("Sit not confirmed ($why): $detail")
+        }
+        sitStartMs = null
+        return null
+    }
+
+    private fun sitRefMagnitude(): Double = norm(sitRefX, sitRefY, sitRefZ)
+
+    /** The barometric height drop since the sit check opened in m (a rise is negative), null without a barometer. */
+    private fun sitBaroDrop(): Double? {
+        val reference = sitRefPressure ?: return null
+        val now = pressureSmoothed ?: return null
+        return pressureAltitudeMeters(reference) - pressureAltitudeMeters(now)
     }
 
     /**
@@ -366,6 +501,29 @@ fun vibrationThresholdForSensitivity(sensitivity: Float): Double {
     val g = if (s <= 0.5) 0.82 + (0.13 - 0.82) * (s - 0.1) / 0.4 else 0.13 + (0.10 - 0.13) * (s - 0.5) / 0.5
     return g * STANDARD_GRAVITY
 }
+
+/** A sit check lasts at most this long from the first motion (the old `CHAIR_PLUNGE_PHASE_TIMEOUT_MS`, ISSUE-NOV25.22-O150). */
+const val SIT_WINDOW_MS = 5_000L
+
+/** The seat has taken the weight once the phone has rested this long. */
+const val SIT_REST_MS = 500L
+
+/** A jolt this strong (m/s², 0.25 g) may be a sit: sits measured 0.37 to 0.53 g, knocks on the chair 0.11 to 0.18 (A15, Nov25.23). */
+const val SIT_JOLT_MS2 = 0.25 * STANDARD_GRAVITY
+
+/**
+ * A jolt stronger than this (m/s², 1.0 g) is a knock or a blow, not a sit, which the cushion damps: sits measured 0.28 to
+ * 0.53 g, stand-ups 0.39 to 0.63, knocks on the chair's frame 1.21 and 5.71 (A15, Nov25.23). A knock between the two
+ * limits that moves the phone down first is taken for a sit.
+ */
+const val SIT_JOLT_MAX_MS2 = 1.0 * STANDARD_GRAVITY
+
+/** The first 0.1 s whose mean upward acceleration (m/s²) is this large, up or down, is a check's first move. */
+const val SIT_FIRST_MOVE_MS2 = 0.05
+
+/** A barometric height drop in this range (m) is a sign of a sit (the old spec's 0.08 m); more is no seat. */
+const val SIT_BARO_MIN_M = 0.08
+const val SIT_BARO_MAX_M = 0.5
 
 /** The barometric height change that counts as a lift (the old spec's 0.8 m). */
 const val LIFT_BARO_MIN_M = 0.8
