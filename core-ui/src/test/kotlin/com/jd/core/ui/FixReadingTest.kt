@@ -35,7 +35,7 @@ class FixReadingTest {
     fun noFixShowsNoPositionValues() {
         val state = HudState().withLocalReadings(null, battery, now, MONITOR_SPEED_VALID_MS)
 
-        assertEquals("42%⚡|34°|--|--", state.telemetryText)
+        assertEquals("42%⚡ 34° -- --", state.telemetryText)
         assertEquals("-- km/h", state.speedText)
         assertNull(state.speedKmh)
         assertEquals(NO_VALUE, state.trackerState)
@@ -45,7 +45,7 @@ class FixReadingTest {
     fun unknownBatteryShowsNoNumber() {
         val state = HudState().withLocalReadings(null, BatteryReading(), now, MONITOR_SPEED_VALID_MS)
 
-        assertEquals("--|--|--|--", state.telemetryText)
+        assertEquals("-- -- -- --", state.telemetryText)
         assertFalse(state.isCharging)
     }
 
@@ -83,7 +83,7 @@ class FixReadingTest {
     fun fixWithoutAccuracyShowsNoAccuracy() {
         val state = HudState().withLocalReadings(fix(accuracy = 0f), battery, now, MONITOR_SPEED_VALID_MS)
 
-        assertEquals("42%⚡|34°|--|0s", state.telemetryText)
+        assertEquals("42%⚡ 34° -- 0s", state.telemetryText)
     }
 
     @Test

@@ -85,7 +85,7 @@ class SensorHudValuesTest {
         assertEquals("7.2 km/h", state.speedText)
         // The ticker supplies the clock and may be up to 1s behind the publish.
         assertTrue("Age ${state.telemetryAgeSec}", state.telemetryAgeSec in 2L..4L)
-        assertTrue(state.telemetryText, state.telemetryText.endsWith("|±13m|${state.telemetryAgeSec}s"))
+        assertTrue(state.telemetryText, state.telemetryText.endsWith(" ±13m ${state.telemetryAgeSec}s"))
     }
 
     @Test

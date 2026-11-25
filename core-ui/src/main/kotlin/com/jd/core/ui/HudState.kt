@@ -51,7 +51,7 @@ data class HudState(
 
     /**
      * No icons and no labels (Nov19.6; icons since ISSUE-NOV17.7-O106): the `%`, `°`, `±` and `s` tell the values
-     * apart, `42%⚡|34°|±5.0m|0s`. An accuracy of [WHOLE_METER_ACCURACY] or more drops its decimal: `±13m`.
+     * apart, `42%⚡ 34° ±5.0m 0s` (spaces, not pipes, since Nov25.4). An accuracy of [WHOLE_METER_ACCURACY] or more drops its decimal: `±13m`.
      */
     val telemetryText: String
         get() {
@@ -63,6 +63,6 @@ data class HudState(
                 else -> String.format(Locale.US, "±%.1fm", accuracyMeters)
             }
             val age = if (telemetryAgeSec >= 0) "${telemetryAgeSec}s" else NO_VALUE
-            return "$battery|$temperature|$accuracy|$age"
+            return "$battery $temperature $accuracy $age"
         }
 }

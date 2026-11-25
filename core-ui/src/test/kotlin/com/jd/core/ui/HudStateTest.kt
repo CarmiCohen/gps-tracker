@@ -55,14 +55,14 @@ class HudStateTest {
 
         assertEquals("VIEWER", state.idText)
         assertEquals("T", HudState(appMode = "sensor", selfId = "t").idText)
-        assertEquals("100%|30°|±5.0m|0s", state.telemetryText)
+        assertEquals("100% 30° ±5.0m 0s", state.telemetryText)
     }
 
     @Test
     fun unknownValuesShowNoNumber() {
         val state = HudState()
 
-        assertEquals("--|--|--|--", state.telemetryText)
+        assertEquals("-- -- -- --", state.telemetryText)
         assertEquals("-- km/h", state.speedText)
         assertEquals(NO_VALUE, state.trackerState)
     }
@@ -71,7 +71,7 @@ class HudStateTest {
     fun knownValuesAreFormatted() {
         val state = HudState(batteryLevel = 7, isCharging = true, tempCelsius = 41.6f, speedKmh = 12.34f)
 
-        assertEquals("7%⚡|42°|--|--", state.telemetryText)
+        assertEquals("7%⚡ 42° -- --", state.telemetryText)
         assertEquals("12.3 km/h", state.speedText)
         assertEquals("12.3", state.speedNumberText)
     }
@@ -80,7 +80,7 @@ class HudStateTest {
     fun zeroIsAKnownValue() {
         val state = HudState(batteryLevel = 0, tempCelsius = 0f, speedKmh = 0f)
 
-        assertEquals("0%|0°|--|--", state.telemetryText)
+        assertEquals("0% 0° -- --", state.telemetryText)
         assertEquals("0.0 km/h", state.speedText)
     }
 
@@ -92,14 +92,14 @@ class HudStateTest {
     fun valuesCarryOnlyTheirUnitSigns() {
         val text = HudState(batteryLevel = 55, tempCelsius = 31f, accuracyMeters = 4f, telemetryAgeSec = 7).telemetryText
 
-        assertEquals("55%|31°|±4.0m|7s", text)
+        assertEquals("55% 31° ±4.0m 7s", text)
         listOf("🔋", "🌡", "B:", "T:", "A:", "AGE:", "C").forEach { assertFalse(text, text.contains(it)) }
     }
 
     /** Nov19.6: from 9.95 m on the accuracy has no decimal. */
     @Test
     fun largeAccuracyDropsItsDecimal() {
-        fun accuracy(m: Float) = HudState(accuracyMeters = m).telemetryText.split("|")[2]
+        fun accuracy(m: Float) = HudState(accuracyMeters = m).telemetryText.split(" ")[2]
 
         assertEquals("±9.9m", accuracy(9.94f))
         assertEquals("±10m", accuracy(9.95f))
