@@ -333,7 +333,7 @@ class SensorService : Service(), SensorEventListener {
                 initJob?.join()
                 SystemLogger.i("Backfill", "Received request for range ${request.startSequenceId} to ${request.endSequenceId}")
                 val updates = forensicBuffer.readRange(request.startSequenceId, request.endSequenceId)
-                val sent = answerBackfill(request.requestId, updates, signalingClient::sendBackfillResponse)
+                val sent = signalingClient.sendBackfill(request.requestId, updates)
                 if (!sent) {
                     SystemLogger.w("Backfill", "Send failed for ${request.requestId}. Remaining chunks dropped; the Monitor will ask again.")
                 }

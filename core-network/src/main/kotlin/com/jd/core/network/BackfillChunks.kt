@@ -1,4 +1,4 @@
-package com.jd.app.sensor
+package com.jd.core.network
 
 import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.LocationUpdate
@@ -8,7 +8,7 @@ internal const val BACKFILL_CHUNK_SIZE = 50
 
 /**
  * Answers one backfill request in chunks, and stops at the first chunk that cannot be sent
- * (ISSUE-NOV6.4-O33).
+ * (ISSUE-NOV6.4-O33). Kept beside the wire format since Nov25.2 (SIMP-NOV7.15-S1).
  *
  * The last chunk tells the Monitor the range is answered. Sending it after a lost chunk would
  * make the Monitor treat the missing rows as unfillable. Without it, the Monitor's request
@@ -16,7 +16,7 @@ internal const val BACKFILL_CHUNK_SIZE = 50
  *
  * Returns true if every chunk was sent.
  */
-internal suspend fun answerBackfill(
+internal suspend fun sendBackfillChunks(
     requestId: String,
     updates: List<LocationUpdate>,
     send: suspend (BackfillResponse) -> Boolean

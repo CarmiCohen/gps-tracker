@@ -76,9 +76,11 @@ interface SignalingClient {
     suspend fun requestBackfill(request: BackfillRequest): Boolean
 
     /**
-     * Sensor: Sends backfill data in response to a request (R-ID 768).
+     * Sensor: answers the backfill request [requestId] with [updates] (R-ID 768), in chunks of 50 rows; only the last
+     * carries the completion flag. Stops at the first chunk that cannot be sent, so the Monitor asks again
+     * (ISSUE-NOV6.4-O33, SIMP-NOV7.15-S1). Returns true if every chunk was sent.
      */
-    suspend fun sendBackfillResponse(response: BackfillResponse): Boolean
+    suspend fun sendBackfill(requestId: String, updates: List<LocationUpdate>): Boolean
 
     /**
      * Sensor: geofence configurations sent by the paired Monitor (ISSUE-NOV8.13-O51).

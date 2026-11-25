@@ -3,7 +3,6 @@ package com.jd.core.network
 import com.jd.core.network.SignalingBatchTest.FakeSocket
 import com.jd.core.network.SignalingBatchTest.FakeSocketFactory
 import com.jd.core.shared.BackfillRequest
-import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.LocationUpdate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,7 +37,7 @@ class CountedEmitTest {
             val row = LocationUpdate(lat = 32.5, lng = 35.25, timestamp = 5L, sequenceId = 7L)
             assertTrue(client.sendTelemetryBatch(listOf(row)))
             assertTrue(client.requestBackfill(BackfillRequest("T", 1L, 7L, "req")))
-            assertTrue(client.sendBackfillResponse(BackfillResponse("req", listOf(row), true)))
+            assertTrue(client.sendBackfill("req", listOf(row)))
             assertTrue(client.sendGeofence("T", GeofenceConfig()))
             client.registerPushToken("token2")
             runCurrent()

@@ -170,7 +170,7 @@ class SignalingBatchTest {
             runCurrent()
 
             val stored = LocationUpdate(lat = 32.5, lng = 35.25, timestamp = 5L, sequenceId = 7L)
-            client.sendBackfillResponse(com.jd.core.shared.BackfillResponse("req", listOf(stored), true))
+            client.sendBackfill("req", listOf(stored))
 
             val payload = fakeSocket.emittedEvents.first { it.first == "backfill_response" }.second as JSONObject
             assertEquals("The relay routes on id", "T", payload.getString("id"))

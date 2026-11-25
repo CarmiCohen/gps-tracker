@@ -438,7 +438,10 @@ class SocketioSignalingClient @Inject constructor(
         return true
     }
 
-    override suspend fun sendBackfillResponse(response: BackfillResponse): Boolean {
+    override suspend fun sendBackfill(requestId: String, updates: List<LocationUpdate>): Boolean =
+        sendBackfillChunks(requestId, updates, ::emitBackfillChunk)
+
+    private fun emitBackfillChunk(response: BackfillResponse): Boolean {
         val deviceId = currentDeviceId ?: return false
         if (!_isConnected.value) return false
         val payload = JSONObject().apply {

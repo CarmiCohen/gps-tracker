@@ -246,7 +246,7 @@ class FakeSignalingClient : SignalingClient {
         return onRequestBackfill?.invoke(request) ?: true
     }
 
-    override suspend fun sendBackfillResponse(response: BackfillResponse): Boolean = true
+    override suspend fun sendBackfill(requestId: String, updates: List<LocationUpdate>): Boolean = true
 
     override val geofenceFlow: Flow<com.jd.core.shared.GeofenceConfig> = MutableSharedFlow()
     override suspend fun sendGeofence(targetId: String, config: com.jd.core.shared.GeofenceConfig): Boolean = true
