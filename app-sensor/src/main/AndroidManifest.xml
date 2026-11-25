@@ -30,7 +30,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="GPS Sensor"
         android:roundIcon="@mipmap/ic_launcher"
-        android:supportsRtl="true"
+        android:supportsRtl="false"
         android:theme="@style/Theme.AppCompat.NoActionBar"
         android:directBootAware="true">
 
