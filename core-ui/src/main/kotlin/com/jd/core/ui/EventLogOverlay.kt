@@ -117,7 +117,8 @@ fun EventLogOverlay(
                     Icon(Icons.Default.Delete, contentDescription = "Clear", tint = if (events.isNotEmpty()) Rose500 else Slate500)
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Six chips: 4 dp apart, so they fit one line on the narrow S21FE with its large font (ISSUE-NOV25.12-O142).
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 ViewPeriod.entries.forEach { option ->
                     EventChip(option.label, isOn = option == period, onClick = { period = option })
                 }
@@ -225,9 +226,16 @@ internal fun EventChip(label: String, isOn: Boolean, color: Color = MonitorBrown
             .background(if (isOn) color.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f), shape)
             .border(1.dp, if (isOn || isMarked) color else Color.White.copy(alpha = 0.15f), shape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .padding(horizontal = 7.dp, vertical = 6.dp)
     ) {
-        Text(label, color = if (isOn || isMarked) color else Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+        // A label never wraps: a squeezed chip showed "More" as M / or / e on the S21FE (ISSUE-NOV25.12-O142).
+        Text(
+            label,
+            color = if (isOn || isMarked) color else Color.White.copy(alpha = 0.7f),
+            fontSize = 12.sp,
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }
 

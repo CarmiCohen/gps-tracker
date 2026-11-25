@@ -4,7 +4,7 @@
 
 ## 🎯 Next Resumption Focus
 1. Without phones: the user names the next item (SIMP-NOV25.0-S1's look on the S21FE Monitor waits for a real finished alarm); O141 is a small one.
-2. With the phones but no relay: 252.2 (Nov25.12's Alarms and More filters, after installing Nov25.12).
+2. With the phones but no relay: nothing left (252.2 passed with Nov25.13).
 3. O133 (row 73): after Render's reset the user deploys relay v6.050; then the waiting live checks 182.2, 226.3, 227.4, 237.3's light-off-on-the-Monitor part, 237.4's siren, 238.2, 240.3, 241.3, 244.3, 249.3, 250.3, 251.3.
 3a. Right after item 3's live checks pass, before new feature work (user decision 2026-11-25): O72 in one dedicated version, `/effort high`: Kotlin 1.9.24 to 2.x with the Compose compiler Gradle plugin, Hilt and Room from kapt to KSP (removes the warning), a raised Compose BOM (unblocks SIMP-NOV19.6-S1); verify with all unit tests, both androidTests on the A15 by `am instrument`, the release device audit and a short Two-phone test. AGP 9 and Gradle 9 come later, separately.
 4. With the S21FE (release Monitor Nov25.11 since 2026-11-25): O112 when the user has noted false alarms.

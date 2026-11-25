@@ -1288,7 +1288,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **251.3 Two phones:** with the relay back and a Monitor paired to `T`, lift the resting Sensor and acknowledge the alarm: the Monitor's Events list shows `Alarm: Tracker lifted` only; with More (named Details before Nov25.12) also the Sensor's `Lift alert`, `Acknowledged:` and `Ended:`. Adding a Home Point lists `Home point added` and the Sensor's `Home points received` only with More.
 
 ## Chapter 252 - The Events List's Alarms and More Filters (Nov25.12)
-**Status: A** - 252.1 passed (unit tests); 252.2 waits for a look on a phone (ISSUE-NOV25.12-O142)
+**Status: A** - 252.1 passed (unit tests); 252.2 failed on the S21FE with Nov25.12 (`More` wrapped to `M / or / e`), passed with Nov25.13 on the S21FE Monitor and the A15 Sensor (one line; Alarms listed only the alarms, 7 of 24 and 25 of 62); the saved file's event under More rests on 252.1 (ISSUE-NOV25.12-O142)
 *   **252.1 Unit:** `EventLogTest`: the Alarms filter lists only ALARM events, an alarm the Monitor answered only with More too; a saved file's event (`FILE_SAVED_LEVEL`) is listed only under More and not sent to the Monitor.
 *   **252.2 Device:** in either app's Events list the filter row fits on one line (also on the narrow S21FE): `1 h 6 h 24 h 7 d`, a red-outlined `Alarms` and `More`. Alarms on lists only the red alarm rows (`No alarms in the last ...` when none); a new `Settings exported` (and on the Monitor `Trails saved`) appears only with More.
 
