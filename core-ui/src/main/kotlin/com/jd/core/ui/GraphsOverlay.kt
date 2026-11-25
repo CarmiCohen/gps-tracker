@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +35,7 @@ import com.jd.core.shared.GraphScreenState
 import com.jd.core.shared.GraphSpan
 import com.jd.core.shared.ServiceStop
 import com.jd.core.shared.GraphTone
+import com.jd.core.shared.graphTicks
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -81,8 +83,10 @@ fun GraphsOverlay(
                 // A period centred on an older event needs its date as well.
                 val withDate = period.durationMs >= DAY_MS || state.focusMs != null
                 val timeFormat = remember(withDate) { SimpleDateFormat(if (withDate) "dd/MM HH:mm" else "HH:mm", Locale.getDefault()) }
-                val startText = timeFormat.format(Date(state.startMs))
-                val endText = timeFormat.format(Date(state.endMs))
+                // Ticks and their labels on the time axis (ISSUE-NOV25.17-O143): clock times, days on 7 d.
+                val ticks = remember(period, state.startMs, state.endMs) { graphTicks(period, state.startMs, state.endMs) }
+                val tickFormat = remember(period) { SimpleDateFormat(if (period == ViewPeriod.WEEK) "dd/MM" else "HH:mm", Locale.getDefault()) }
+                val tickLabels = remember(ticks, tickFormat) { ticks.map { it.fraction to tickFormat.format(Date(it.timeMs)) } }
                 ServiceStopList(state.serviceStops) { timeFormat.format(Date(it)) }
                 LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     state.sections.forEach { section ->
@@ -96,7 +100,7 @@ fun GraphsOverlay(
                             )
                         }
                         items(section.panels, key = { "${section.title}-${it.title}" }) { panel ->
-                            GraphPanelView(panel, section.stoppedSpans, state.focusFraction, startText, endText)
+                            GraphPanelView(panel, section.stoppedSpans, state.focusFraction, tickLabels)
                         }
                     }
                 }
@@ -120,7 +124,7 @@ private fun ServiceStopList(stops: List<ServiceStop>, timeText: (Long) -> String
 }
 
 @Composable
-private fun GraphPanelView(panel: GraphPanel, stoppedSpans: List<GraphSpan>, focusFraction: Float?, startText: String, endText: String) {
+private fun GraphPanelView(panel: GraphPanel, stoppedSpans: List<GraphSpan>, focusFraction: Float?, tickLabels: List<Pair<Float, String>>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -145,21 +149,54 @@ private fun GraphPanelView(panel: GraphPanel, stoppedSpans: List<GraphSpan>, foc
                 Text(axisText(panel.minY), color = Slate500, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
             }
             Spacer(Modifier.width(4.dp))
-            Box(modifier = Modifier.weight(1f).height(GRAPH_HEIGHT)) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawStoppedSpans(stoppedSpans)
-                    drawPanel(panel)
-                    focusFraction?.let { drawFocus(it) }
+            Column(modifier = Modifier.weight(1f)) {
+                Box(modifier = Modifier.fillMaxWidth().height(GRAPH_HEIGHT)) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawStoppedSpans(stoppedSpans)
+                        drawTicks(tickLabels)
+                        drawPanel(panel)
+                        focusFraction?.let { drawFocus(it) }
+                    }
+                    if (!panel.hasData) {
+                        Text("No data", color = Slate500, fontSize = 11.sp, modifier = Modifier.align(Alignment.Center))
+                    }
                 }
-                if (!panel.hasData) {
-                    Text("No data", color = Slate500, fontSize = 11.sp, modifier = Modifier.align(Alignment.Center))
+                TickLabels(tickLabels)
+            }
+        }
+    }
+}
+
+/** Each tick's label centred under it, kept inside the graph; a label that would overlap the previous one is left out. */
+@Composable
+private fun TickLabels(labels: List<Pair<Float, String>>) {
+    Layout(
+        content = { labels.forEach { Text(it.second, color = Slate500, fontSize = 9.sp, maxLines = 1, softWrap = false) } },
+        modifier = Modifier.fillMaxWidth()
+    ) { measurables, constraints ->
+        val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
+        val width = constraints.maxWidth
+        val height = placeables.maxOfOrNull { it.height } ?: 0
+        layout(width, height) {
+            var nextFreeX = 0
+            placeables.forEachIndexed { index, placeable ->
+                val x = (labels[index].first * width - placeable.width / 2f).toInt().coerceIn(0, maxOf(0, width - placeable.width))
+                if (x >= nextFreeX) {
+                    placeable.place(x, 0)
+                    nextFreeX = x + placeable.width + 4
                 }
             }
         }
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(startText, color = Slate500, fontSize = 9.sp, modifier = Modifier.weight(1f).padding(start = 28.dp))
-            Text(endText, color = Slate500, fontSize = 9.sp)
-        }
+    }
+}
+
+/** A faint vertical line at each tick, with a short mark at the bottom. */
+private fun DrawScope.drawTicks(labels: List<Pair<Float, String>>) {
+    val mark = 4.dp.toPx()
+    labels.forEach { (fraction, _) ->
+        val x = fraction * size.width
+        drawLine(Color.White.copy(alpha = 0.06f), Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
+        drawLine(Color.White.copy(alpha = 0.4f), Offset(x, size.height - mark), Offset(x, size.height), strokeWidth = 1f)
     }
 }
 
