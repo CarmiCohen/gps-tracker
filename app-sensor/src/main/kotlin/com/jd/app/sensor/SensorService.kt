@@ -15,7 +15,6 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.location.Location
 import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -38,7 +37,6 @@ import com.jd.core.network.relayDeliveries
 import com.jd.core.shared.*
 import com.jd.core.ui.getAppVersionName
 import com.jd.core.ui.readPhoneState
-import com.jd.core.ui.toFixReading
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -103,7 +101,6 @@ class SensorService : Service(), SensorEventListener {
     // Adaptive Sampling & Throttling State
     private var currentIntervalMs = 1000L
     @Volatile private var lastAlarmElapsedMs: Long? = null // Monotonic; starts the alarm window (ISSUE-NOV22.8-O136).
-    @Volatile private var lastLocation: Location? = null // Written on the main looper, read by the sensing loop.
     private val sequenceIdCounter = java.util.concurrent.atomic.AtomicLong(0L)
     private var initJob: Job? = null
     
@@ -164,8 +161,7 @@ class SensorService : Service(), SensorEventListener {
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
             result.lastLocation?.let { location ->
-                lastLocation = location
-                fixStore.publish(location.toFixReading())
+                fixStore.publish(location)
                 refreshSamplingRate()
             }
         }
@@ -653,7 +649,7 @@ class SensorService : Service(), SensorEventListener {
         val startedElapsedMs = serviceStatus.startTimeMillis.value
         val motion = serviceStatus.motion.value
         val microphone = serviceStatus.microphone.value
-        val fix = lastLocation
+        val fix = fixStore.location
         val home = geofence
         val hasAccelerometer = motion.isRunning
         val inView = satellites // one read, so the list and its summary agree
@@ -722,7 +718,7 @@ class SensorService : Service(), SensorEventListener {
                         behaviour = sensorBehaviour,
                         vibrationLimitMps2 = motionSentinel.vibrationThreshold,
                         tiltLimitDeg = motionSentinel.tiltThresholdDegrees,
-                        fixAccuracyM = lastLocation?.takeIf { isFixFresh(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) }?.accuracy,
+                        fixAccuracyM = fixStore.location?.takeIf { isFixFresh(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) }?.accuracy,
                         gnss = if (isGnssRegistered) gnssSummary(satellites) else null,
                         linkUpPercent = linkUpPercent(previousLink, previousMs, link, timeMs),
                         latencyMs = link.latencyMs,
@@ -828,7 +824,7 @@ class SensorService : Service(), SensorEventListener {
      * new interval right after its tick anyway.
      */
     private fun refreshSamplingRate(preempt: Boolean = true) {
-        val speed = if (lastLocation != null && lastLocation!!.hasSpeed()) lastLocation!!.speed else 0f
+        val speed = fixStore.location?.takeIf { it.hasSpeed() }?.speed ?: 0f
         val isAlarmed = SensingEngine.isInAlarmWindow(lastAlarmElapsedMs, SystemClock.elapsedRealtime())
         val newInterval = SensingEngine.getOptimalIntervalMs(
             currentTemp = lastTempCelsius,
@@ -930,7 +926,7 @@ class SensorService : Service(), SensorEventListener {
                 
                 val hasPhysicalMotion = update.vibrationG > 0.12f
                 // A fix older than FIX_STALE_AFTER_MS is no longer the current position: send NO_FIX without one.
-                val currentFix = lastLocation?.takeIf { isFixFresh(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) }
+                val currentFix = fixStore.location?.takeIf { isFixFresh(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) }
                 if (currentFix == null) update.status = NO_FIX_STATUS
                 if ((currentFix == null) != isReportingNoFix) {
                     isReportingNoFix = currentFix == null

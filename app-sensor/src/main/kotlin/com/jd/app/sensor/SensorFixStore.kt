@@ -1,6 +1,8 @@
 package com.jd.app.sensor
 
+import android.location.Location
 import com.jd.core.ui.FixReading
+import com.jd.core.ui.toFixReading
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -8,13 +10,18 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * The latest fix [SensorService] received, the same one it sends as telemetry.
- * Null while the service is not running or has no fix yet, so the HUD shows no position values.
+ * The latest fix [SensorService] received: the one copy (SIMP-NOV7.2-S1) its telemetry, sampling rate and Info read as
+ * [location], and the HUD as [fix]. Both null while the service is not running or has no fix yet, so the HUD shows no
+ * position values.
  */
 @Singleton
 class SensorFixStore @Inject constructor() {
     private val latest = MutableStateFlow<FixReading?>(null)
     val fix: StateFlow<FixReading?> = latest.asStateFlow()
+
+    /** Written on the service's main looper, read by its sensing loop and sensor threads. */
+    @Volatile var location: Location? = null
+        private set
 
     private val satelliteFix = MutableStateFlow<Long?>(null)
 
@@ -24,7 +31,14 @@ class SensorFixStore @Inject constructor() {
      */
     val satelliteFixTimeMs: StateFlow<Long?> = satelliteFix.asStateFlow()
 
+    fun publish(location: Location) {
+        this.location = location
+        latest.value = location.toFixReading()
+    }
+
+    /** A HUD reading without a [Location], for the HUD tests: [location] is cleared, so the two never disagree. */
     fun publish(fix: FixReading) {
+        location = null
         latest.value = fix
     }
 
@@ -33,6 +47,7 @@ class SensorFixStore @Inject constructor() {
     }
 
     fun clear() {
+        location = null
         latest.value = null
         satelliteFix.value = null
     }

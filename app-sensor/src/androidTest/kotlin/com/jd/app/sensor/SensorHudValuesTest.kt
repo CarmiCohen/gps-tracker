@@ -117,4 +117,28 @@ class SensorHudValuesTest {
 
         assertEquals(FixReading(5_678L, 4.5f, 3f), location.toFixReading())
     }
+
+    /** SIMP-NOV7.2-S1: the service's one fix copy; the telemetry's Location and the HUD's reading are set and cleared together. */
+    @Test
+    fun thePublishedLocationIsTheOneCopyTheHudShows() {
+        val location = Location(LocationManager.GPS_PROVIDER).apply {
+            time = System.currentTimeMillis()
+            accuracy = 6f
+            speed = 0f
+        }
+
+        fixStore.publish(location)
+
+        assertTrue(fixStore.location === location)
+        assertEquals(location.toFixReading(), fixStore.fix.value)
+        assertEquals(6f, hudMatching { it.accuracyMeters == 6f }.accuracyMeters, 0f)
+
+        fixStore.publish(FixReading(System.currentTimeMillis(), 9f, null))
+        assertNull("A reading without a Location clears the old one", fixStore.location)
+
+        fixStore.publish(location)
+        fixStore.clear()
+        assertNull(fixStore.location)
+        assertNull(fixStore.fix.value)
+    }
 }
