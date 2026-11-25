@@ -3,6 +3,7 @@ package com.jd.app.monitor
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
 import com.jd.core.shared.EventSource
+import com.jd.core.shared.GeofenceConfig
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -92,6 +93,10 @@ private fun shortTime(timeMs: Long): String = SimpleDateFormat("HH:mm", Locale.g
 private const val ALARM_PREFIX = "Alarm: "
 private const val ENDED_PREFIX = "Ended: "
 private const val ACKNOWLEDGED_PREFIX = "Acknowledged: "
+
+/** This Monitor took a newer shared set of Home Points from the Sensor or another Monitor (ISSUE-NOV22.7-O134). */
+fun sharedHomePointsEvent(config: GeofenceConfig): LoggedEvent =
+    LoggedEvent(EventLevel.INFO, "Home points updated to the shared set: ${config.points.size}, radius ${config.radiusMeters.toInt()} m")
 
 fun relayLinkEvent(isConnected: Boolean): LoggedEvent =
     if (isConnected) LoggedEvent(EventLevel.INFO, "Relay connected") else LoggedEvent(EventLevel.WARNING, "Relay connection lost")

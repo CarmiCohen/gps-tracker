@@ -52,6 +52,7 @@ class SignalingClientTest {
             override suspend fun sendBackfill(requestId: String, updates: List<LocationUpdate>) = true
             override val geofenceFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.GeofenceConfig>()
             override suspend fun sendGeofence(targetId: String, config: com.jd.core.shared.GeofenceConfig) = true
+            override suspend fun shareGeofence(config: com.jd.core.shared.GeofenceConfig) = true
             override val sensorBehaviourFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.SensorBehaviour>()
             override suspend fun sendSensorBehaviour(targetId: String, behaviour: com.jd.core.shared.SensorBehaviour) = true
             override val sensorSetupFlow = kotlinx.coroutines.flow.MutableStateFlow<com.jd.core.shared.SensorSetupReport?>(null)

@@ -1292,8 +1292,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **252.1 Unit:** `EventLogTest`: the Alarms filter lists only ALARM events, an alarm the Monitor answered only with More too; a saved file's event (`FILE_SAVED_LEVEL`) is listed only under More and not sent to the Monitor.
 *   **252.2 Device:** in either app's Events list the filter row fits on one line (also on the narrow S21FE): `1 h 6 h 24 h 7 d`, a red-outlined `Alarms` and `More`. Alarms on lists only the red alarm rows (`No alarms in the last ...` when none); a new `Settings exported` (and on the Monitor `Trails saved`) appears only with More.
 
+## Chapter 253 - One Shared Set of Home Points (Nov25.19)
+**Status: A / L** - 253.1 passed (unit tests); 253.2 waits for the relay (O133) and two Monitors paired to `T` (ISSUE-NOV22.7-O134)
+*   **253.1 Unit:** `HomeZoneTest`: only a newer revision replaces a set, the same revision never (no reply loop). `SharedGeofenceTest`: the Sensor's shared set goes to its own room without a Monitor ID and reaches a Monitor's geofence flow, as does another Monitor's edit. `SettingsSenderTest`: the shared set is a Sensor message. `MonitorEventsTest`: the Monitor's `Home points updated to the shared set` event.
+*   **253.2 Two Monitors:** with the relay back, the S21FE Monitor and a second Monitor (the A15 with a temporary debug Monitor, or a second phone) both paired to `T`. Edit the Home Points on one: the other shows the same points at once and lists `Home points updated to the shared set`. Then, with the second Monitor offline, edit on the first; bring the second back: the Sensor logs `sent back to the Monitors`, and the second Monitor takes the newer set instead of replacing it. An edit on either then keeps the other's points.
+
 ---
-**Active Testing Chapters: 241 of 252**
+**Active Testing Chapters: 242 of 253**
 *Since Nov23.6-docs a new chapter is written only for a check that needs a person, a device or two phones and is still pending (Rule 15); unit tests are named in the commit message.*
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 

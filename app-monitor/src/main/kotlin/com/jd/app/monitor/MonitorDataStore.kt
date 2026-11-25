@@ -104,6 +104,21 @@ class MonitorDataStore(private val context: Context) {
         }
     }
 
+    /**
+     * Stores [config], received from the Sensor or another Monitor, with its own revision when it is newer than the
+     * stored one, so this Monitor shows and edits the one shared set (ISSUE-NOV22.7-O134); returns true when stored.
+     */
+    suspend fun adoptGeofence(config: GeofenceConfig): Boolean {
+        var stored = false
+        context.monitorDataStore.edit { prefs ->
+            if (config.supersedes(decodeGeofence(prefs[geofenceKey]))) {
+                prefs[geofenceKey] = Json.encodeToString(config)
+                stored = true
+            }
+        }
+        return stored
+    }
+
     private fun decodeGeofence(json: String?): GeofenceConfig =
         json?.let { runCatching { Json.decodeFromString<GeofenceConfig>(it) }.getOrNull() } ?: GeofenceConfig()
 

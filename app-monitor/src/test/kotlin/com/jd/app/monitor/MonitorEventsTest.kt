@@ -4,6 +4,8 @@ import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
 import com.jd.core.shared.EventSource
+import com.jd.core.shared.GeofenceConfig
+import com.jd.core.shared.HomePoint
 import com.jd.core.shared.LIFT_ALERT_STATUS
 import com.jd.core.shared.TILT_ALERT_STATUS
 import org.junit.Assert.assertEquals
@@ -131,6 +133,16 @@ class MonitorEventsTest {
                 "tilt-1" to "Alarm: $tilt, ended t9, acknowledged t4"
             ),
             finishedAlarmTexts(events) { "t$it" }
+        )
+    }
+
+    /** Chapter 253 (ISSUE-NOV22.7-O134): a Monitor that takes the shared set says so in its list, not only with More. */
+    @Test
+    fun `taking the shared Home Points is listed`() {
+        val shared = GeofenceConfig(listOf(HomePoint(32.1, 34.8), HomePoint(32.2, 34.9)), radiusMeters = 150.0, revision = 9L)
+        assertEquals(
+            LoggedEvent(EventLevel.INFO, "Home points updated to the shared set: 2, radius 150 m"),
+            sharedHomePointsEvent(shared)
         )
     }
 }

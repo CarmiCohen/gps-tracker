@@ -86,6 +86,15 @@ class MonitorSessionService : Service() {
                     SystemLogger.i("MonitorService", "Geofence rev ${config.revision} (${config.points.size} points, ${config.radiusMeters.toInt()} m) sent to $targetId: $sent")
                 }
             }
+            // One shared set (ISSUE-NOV22.7-O134): a newer set from the Sensor or another Monitor replaces this one.
+            launch {
+                signalingClient.geofenceFlow.collect { config ->
+                    if (dataStore.adoptGeofence(config)) {
+                        SystemLogger.i("MonitorService", "Shared geofence rev ${config.revision} taken (${config.points.size} points, ${config.radiusMeters.toInt()} m)")
+                        sharedHomePointsEvent(config).let { event -> eventLog.record(event.level, event.message) }
+                    }
+                }
+            }
             // The Sensor's detection switches and limits are set here and sent the same way (ISSUE-NOV10.8-O83).
             launch {
                 peerDeliveries(dataStore.alertSettings.map { it.sensorBehaviour() }, signalingClient.viewerStatusFlow).collect { behaviour ->

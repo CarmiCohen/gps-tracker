@@ -83,7 +83,8 @@ interface SignalingClient {
     suspend fun sendBackfill(requestId: String, updates: List<LocationUpdate>): Boolean
 
     /**
-     * Sensor: geofence configurations sent by the paired Monitor (ISSUE-NOV8.13-O51).
+     * Every geofence sent in the room (ISSUE-NOV8.13-O51): the Sensor reads the Monitors' sets; a Monitor reads the
+     * set the Sensor sends back and another Monitor's edits (ISSUE-NOV22.7-O134). Each phone keeps only a newer one.
      */
     val geofenceFlow: Flow<GeofenceConfig>
 
@@ -92,6 +93,12 @@ interface SignalingClient {
      * Returns false when not connected; the caller sends again once the tracker is reachable.
      */
     suspend fun sendGeofence(targetId: String, config: GeofenceConfig): Boolean
+
+    /**
+     * Sensor: sends the geofence it enforces to the Monitors of its room, when a Monitor sent an older one, so every
+     * Monitor shows and edits the one shared set (ISSUE-NOV22.7-O134). Returns false when not connected.
+     */
+    suspend fun shareGeofence(config: GeofenceConfig): Boolean
 
     /**
      * Sensor: the detection settings sent by the paired Monitor (ISSUE-NOV10.8-O83).

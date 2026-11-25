@@ -155,6 +155,12 @@ data class GeofenceConfig(
     fun revisedAfter(previous: GeofenceConfig, nowMs: Long): GeofenceConfig =
         copy(revision = maxOf(nowMs, previous.revision + 1))
 
+    /**
+     * True when this set replaces [other]. All the phones of a Sensor share one set, and the newest edit wins on each of
+     * them: the Sensor, and every Monitor, which also takes a newer set from the Sensor or another Monitor (ISSUE-NOV22.7-O134).
+     */
+    fun supersedes(other: GeofenceConfig): Boolean = revision > other.revision
+
     companion object {
         const val DEFAULT_RADIUS_METERS = 100.0
         const val MIN_RADIUS_METERS = 50.0

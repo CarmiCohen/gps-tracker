@@ -102,4 +102,15 @@ class HomeZoneTest {
         assertEquals(6_000L, config.revisedAfter(previous, nowMs = 6_000L).revision)
         assertEquals("A clock that went back still yields a newer revision", 5_001L, config.revisedAfter(previous, nowMs = 10L).revision)
     }
+
+    /** Chapter 253 (ISSUE-NOV22.7-O134): one shared set, the newest edit wins on every phone. */
+    @Test
+    fun `only a newer revision replaces a set`() {
+        val older = config.copy(revision = 5L)
+        val newer = config.cleared().copy(revision = 6L)
+        assertTrue(newer.supersedes(older))
+        assertFalse("An older set never replaces a newer one", older.supersedes(newer))
+        assertFalse("The same revision is the same set: no reply, no loop", older.supersedes(older.withRadius(300.0)))
+        assertTrue("A Monitor that never edited takes any edited set", older.supersedes(GeofenceConfig()))
+    }
 }

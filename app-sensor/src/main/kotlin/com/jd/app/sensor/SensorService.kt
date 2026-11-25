@@ -345,8 +345,14 @@ class SensorService : Service(), SensorEventListener {
     private fun setupGeofenceListener() {
         signalingClient.geofenceFlow
             .onEach { config ->
-                val stored = sensorDataStore.saveGeofence(config)
+                val kept = sensorDataStore.saveGeofence(config)
+                val stored = kept === config
                 SystemLogger.i("Geofence", "Received ${config.points.size} home points, radius ${config.radiusMeters} m, rev ${config.revision} (stored: $stored)")
+                // One shared set (ISSUE-NOV22.7-O134): a Monitor that sent an older set gets the one in force back.
+                if (kept.supersedes(config)) {
+                    val sent = signalingClient.shareGeofence(kept)
+                    SystemLogger.i("Geofence", "Rev ${config.revision} is older than rev ${kept.revision} in force: sent back to the Monitors: $sent")
+                }
                 // A detail, still sent to the Monitors (ISSUE-NOV23.4-O139).
                 if (stored) eventLog.record(
                     EventLevel.DETAIL,

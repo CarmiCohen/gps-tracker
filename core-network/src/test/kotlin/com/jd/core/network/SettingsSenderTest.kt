@@ -18,9 +18,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Chapter 242 (SIMP-NOV22.3-S1): the nine settings messages leave through one sender, so each one is sent only while
+ * Chapter 242 (SIMP-NOV22.3-S1): the ten settings messages leave through one sender, so each one is sent only while
  * connected, as one `settings_update` counted in the data use, a Monitor's stamped with its own ID and a Sensor's
- * carrying the Sensor's ID.
+ * carrying the Sensor's ID. The Sensor's shared geofence came with ISSUE-NOV22.7-O134.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsSenderTest {
@@ -28,7 +28,7 @@ class SettingsSenderTest {
     private fun TestScope.client(socket: FakeSocket) =
         SocketioSignalingClient(FakeSocketFactory(socket), StandardTestDispatcher(testScheduler))
 
-    /** The nine settings senders, each named by the wire type it must send. */
+    /** The ten settings senders, each named by the wire type it must send; the Monitor's come first. */
     private val senders: List<Pair<String, suspend SocketioSignalingClient.() -> Boolean>> = listOf(
         GeofenceWire.TYPE to { sendGeofence("T", GeofenceConfig()) },
         SensorBehaviourWire.TYPE to { sendSensorBehaviour("T", SensorBehaviour()) },
@@ -38,9 +38,10 @@ class SettingsSenderTest {
         SensorSetupWire.TYPE to { sendSensorSetup(SensorSetupReport()) },
         SensorEventsWire.TYPE to { sendSensorEvents(emptyList(), null) },
         SensorInfoWire.TYPE to { sendSensorInfo(SensorInfo()) },
-        GraphSamplesWire.TYPE to { sendGraphSamples(emptyList(), compressed = false) }
+        GraphSamplesWire.TYPE to { sendGraphSamples(emptyList(), compressed = false) },
+        GeofenceWire.TYPE to { shareGeofence(GeofenceConfig()) }
     )
-    private val monitorTypes = senders.take(5).map { it.first }.toSet()
+    private val monitorSenderCount = 5
 
     @Test
     fun `nothing is sent or counted before a connection`() = runTest {
@@ -68,14 +69,14 @@ class SettingsSenderTest {
             runCurrent()
             val bytesBefore = client.getMonthlyDataUsageBytes()
 
-            senders.forEach { (type, send) ->
+            senders.forEachIndexed { index, (type, send) ->
                 val before = socket.emittedEvents.size
                 assertTrue(type, client.send())
                 val sent = socket.emittedEvents.drop(before)
                 assertEquals("$type: one event", listOf("settings_update"), sent.map { it.first })
                 val payload = sent.single().second as JSONObject
                 assertEquals(type, payload.getString("type"))
-                if (type in monitorTypes) {
+                if (index < monitorSenderCount) {
                     assertEquals("$type is stamped with the Monitor's ID", "D1", payload.getString(SettingsWire.FROM))
                     assertEquals("$type is routed to its Sensor", "T", payload.getString("id"))
                 } else {

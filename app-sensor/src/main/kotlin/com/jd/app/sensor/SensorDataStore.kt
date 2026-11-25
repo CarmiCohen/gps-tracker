@@ -66,16 +66,14 @@ class SensorDataStore(context: Context) {
     /** The geofence last received from the Monitor, kept across restarts so it is enforced offline (ISSUE-NOV8.13-O51). */
     val geofence: Flow<GeofenceConfig> = dataStore.data.map { prefs -> decodeGeofence(prefs[geofenceKey]) }
 
-    /** Stores [config] unless the stored one is newer; returns true when stored. */
-    suspend fun saveGeofence(config: GeofenceConfig): Boolean {
-        var stored = false
+    /** Stores [config] unless the stored one is as new or newer; returns the set kept, [config] when stored. */
+    suspend fun saveGeofence(config: GeofenceConfig): GeofenceConfig {
+        var kept = config
         dataStore.edit { prefs ->
-            if (config.revision > decodeGeofence(prefs[geofenceKey]).revision) {
-                prefs[geofenceKey] = Json.encodeToString(config)
-                stored = true
-            }
+            val current = decodeGeofence(prefs[geofenceKey])
+            if (config.supersedes(current)) prefs[geofenceKey] = Json.encodeToString(config) else kept = current
         }
-        return stored
+        return kept
     }
 
     private fun decodeGeofence(json: String?): GeofenceConfig =

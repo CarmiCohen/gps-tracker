@@ -461,6 +461,9 @@ class SocketioSignalingClient @Inject constructor(
     override suspend fun sendGeofence(targetId: String, config: GeofenceConfig): Boolean =
         emitFromMonitor { GeofenceWire.encode(targetId, config) }
 
+    override suspend fun shareGeofence(config: GeofenceConfig): Boolean =
+        emitFromSensor { deviceId -> GeofenceWire.encode(deviceId, config) }
+
     override suspend fun sendSensorBehaviour(targetId: String, behaviour: SensorBehaviour): Boolean =
         emitFromMonitor { SensorBehaviourWire.encode(targetId, behaviour) }
 
