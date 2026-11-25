@@ -9,6 +9,7 @@ import com.jd.core.network.SignalingClient
 import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
+import com.jd.core.shared.FILE_SAVED_LEVEL
 import com.jd.core.shared.EventLog
 import com.jd.core.shared.ForensicIdentity
 import com.jd.core.shared.ViewPeriod
@@ -79,13 +80,16 @@ class MonitorViewModel @Inject constructor(
     /** The name the file picker suggests for an export. */
     fun exportFileName(): String = settingsFileName("Monitor", System.currentTimeMillis())
 
-    /** [savedTo] is the shown path when the file went straight to the GPS-Tracker folder (Nov19.3). */
+    /**
+     * [savedTo] is the shown path when the file went straight to the GPS-Tracker folder (Nov19.3). The event is a
+     * DETAIL one, listed under More (ISSUE-NOV25.12-O142), like the trails saved.
+     */
     fun exportSettings(uri: Uri, savedTo: String? = null) {
         viewModelScope.launch {
             val message = try {
                 val file = settingsTransfer.export(uri)
                 ("Settings exported: ${file.geofence.points.size} home points, ${file.trails.size} trail points" + savedTo.asSuffix())
-                    .also { eventLog.record(EventLevel.INFO, it) }
+                    .also { eventLog.record(FILE_SAVED_LEVEL, it) }
             } catch (e: Exception) {
                 "Export failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
             }
@@ -115,7 +119,7 @@ class MonitorViewModel @Inject constructor(
     fun saveTrails(uri: Uri, savedTo: String? = null) {
         viewModelScope.launch {
             val message = try {
-                ("Trails saved: ${trailTransfer.save(uri).trails.size} points" + savedTo.asSuffix()).also { eventLog.record(EventLevel.INFO, it) }
+                ("Trails saved: ${trailTransfer.save(uri).trails.size} points" + savedTo.asSuffix()).also { eventLog.record(FILE_SAVED_LEVEL, it) } // ISSUE-NOV25.12-O142
             } catch (e: Exception) {
                 "Trail save failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
             }

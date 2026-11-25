@@ -8,6 +8,7 @@ import com.jd.core.network.ForensicIdentityManager
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.EventLevel
+import com.jd.core.shared.FILE_SAVED_LEVEL
 import com.jd.core.shared.SettingsFileException
 import com.jd.core.shared.settingsFileName
 import com.jd.core.shared.EventLog
@@ -65,14 +66,17 @@ class SensorViewModel @Inject constructor(
     /** The name the file picker suggests for an export. */
     fun exportFileName(): String = settingsFileName("Sensor", System.currentTimeMillis())
 
-    /** [savedTo] is the shown path when the file went straight to the GPS-Tracker folder (Nov19.3). */
+    /**
+     * [savedTo] is the shown path when the file went straight to the GPS-Tracker folder (Nov19.3). The event is a
+     * DETAIL one, listed under More and kept on this phone (ISSUE-NOV25.12-O142).
+     */
     fun exportSettings(uri: Uri, savedTo: String? = null) {
         viewModelScope.launch {
             val message = try {
                 val file = settingsTransfer.export(uri)
                 ("Settings exported: ID ${file.sensorId}, next sequence ${file.nextSequenceId ?: "unknown"}" +
                     (savedTo?.let { " to $it" } ?: ""))
-                    .also { eventLog.record(EventLevel.INFO, it) }
+                    .also { eventLog.record(FILE_SAVED_LEVEL, it) }
             } catch (e: Exception) {
                 "Export failed: ${e.userMessage()}".also { eventLog.record(EventLevel.WARNING, it) }
             }

@@ -14,7 +14,7 @@ data class LoggedEvent(val level: EventLevel, val message: String)
  * The events between two alarm books (ISSUE-NOV10.8-O84): each newly raised alarm, and each condition that no longer
  * holds, whether it cleared or its alarm was switched off; and the tracker going offline or returning, also with its
  * alarm switched off or muted (ISSUE-NOV15.4-O98 part 2). Acknowledgements are recorded where the user gives them.
- * An end is a detail (ISSUE-NOV23.4-O139): the list shows the alarm, and its end only with Details.
+ * An end is a detail (ISSUE-NOV23.4-O139): the list shows the alarm, and its end only with More.
  */
 fun alarmEvents(previous: AlarmBook, current: AlarmBook): List<LoggedEvent> {
     val known = previous.alarms.mapTo(HashSet()) { it.type to it.raisedAtMs }
@@ -47,7 +47,7 @@ const val ECHO_BEFORE_MS = 60_000L
 
 /**
  * The Sensor alarms the Monitor answered with its own alarm of the same kind (ISSUE-NOV23.4-O139), listed only with
- * Details, so an alarm shows as one line, the Monitor's. A Sensor alarm the Monitor did not answer (switched off, muted,
+ * More, so an alarm shows as one line, the Monitor's. A Sensor alarm the Monitor did not answer (switched off, muted,
  * or learned after the alarm window) stays listed, and so does one from a Sensor before Nov23.4, which names no kind.
  */
 fun echoedSensorAlarms(events: List<EventEntry>): Set<String> {
@@ -66,7 +66,7 @@ fun echoedSensorAlarms(events: List<EventEntry>): Set<String> {
  * The one-line text of each Monitor alarm that has both ended and been acknowledged (SIMP-NOV25.0-S1), by event id:
  * `Alarm: <type>, ended hh:mm, acknowledged hh:mm`. Its end and acknowledgement are the first of each, for its type,
  * after it and before the next alarm of that type; an alarm still waiting for either keeps its own text. Display only:
- * without Details the list shows this text, with Details the separate events as recorded.
+ * without More the list shows this text, with More the separate events as recorded.
  */
 fun finishedAlarmTexts(events: List<EventEntry>, formatTime: (Long) -> String = ::shortTime): Map<String, String> {
     val monitor = events.filter { it.source == EventSource.MONITOR }.sortedBy { it.timestampMs }

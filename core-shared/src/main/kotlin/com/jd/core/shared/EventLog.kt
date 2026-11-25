@@ -25,7 +25,7 @@ import kotlin.random.Random
 @Serializable
 enum class EventSource(val label: String) { MONITOR("Monitor"), SENSOR("Sensor") }
 
-/** How an event is shown: ALARM and WARNING stand out, DETAIL is listed only with the Details filter on. */
+/** How an event is shown: ALARM and WARNING stand out, DETAIL is listed only with the More filter on. */
 @Serializable
 enum class EventLevel { ALARM, WARNING, INFO, DETAIL }
 
@@ -56,7 +56,7 @@ const val SERVICE_STOPPED = "Sensor service stopped"
 
 /**
  * The start of the Sensor's event for a Monitor's new Home Points: a DETAIL event (ISSUE-NOV23.4-O139) that is still
- * sent to the Monitors, so theirs lists it under Details too.
+ * sent to the Monitors, so theirs lists it under More too.
  */
 const val HOME_POINTS_RECEIVED = "Home points received"
 
@@ -68,6 +68,12 @@ const val HOME_POINTS_RECEIVED = "Home points received"
 const val SERVICE_STARTED_KIND = "SERVICE_STARTED"
 const val SERVICE_STOPPED_KIND = "SERVICE_STOPPED"
 const val HOME_POINTS_RECEIVED_KIND = "HOME_POINTS_RECEIVED"
+
+/**
+ * The level of a saved file's event, both apps' `Settings exported` and the Monitor's `Trails saved`: a DETAIL, listed
+ * under More (ISSUE-NOV25.12-O142); a failed save stays a WARNING.
+ */
+val FILE_SAVED_LEVEL = EventLevel.DETAIL
 
 fun EventEntry.isServiceStart(): Boolean = isOfKind(SERVICE_STARTED_KIND, SERVICE_STARTED)
 fun EventEntry.isServiceStop(): Boolean = isOfKind(SERVICE_STOPPED_KIND, SERVICE_STOPPED)
@@ -103,11 +109,21 @@ data class PeerEvents(val afterMs: Long, val events: List<EventEntry>)
 
 /**
  * The events of [period] before [nowMs], newest first; DETAIL events, and the events of [detailIds] whatever their
- * level (ISSUE-NOV23.4-O139), only when [showDetails].
+ * level (ISSUE-NOV23.4-O139), only when [showDetails] (the More filter). With [alarmsOnly] (the Alarms filter,
+ * ISSUE-NOV25.12-O142) only the ALARM events are listed.
  */
-fun List<EventEntry>.shown(period: ViewPeriod, showDetails: Boolean, nowMs: Long, detailIds: Set<String> = emptySet()): List<EventEntry> =
-    filter { it.timestampMs >= nowMs - period.durationMs && (showDetails || (it.level != EventLevel.DETAIL && it.id !in detailIds)) }
-        .sortedByDescending { it.timestampMs }
+fun List<EventEntry>.shown(
+    period: ViewPeriod,
+    showDetails: Boolean,
+    nowMs: Long,
+    detailIds: Set<String> = emptySet(),
+    alarmsOnly: Boolean = false
+): List<EventEntry> =
+    filter {
+        it.timestampMs >= nowMs - period.durationMs &&
+            (showDetails || (it.level != EventLevel.DETAIL && it.id !in detailIds)) &&
+            (!alarmsOnly || it.level == EventLevel.ALARM)
+    }.sortedByDescending { it.timestampMs }
 
 /**
  * The events the Sensor sends its Monitors (ISSUE-NOV10.8-O84): all but the DETAIL ones, oldest first; the Home Points

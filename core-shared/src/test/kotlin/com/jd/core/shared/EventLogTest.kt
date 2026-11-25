@@ -172,6 +172,31 @@ class EventLogTest {
         assertEquals(EventLog.RETENTION_MS, ViewPeriod.WEEK.durationMs)
     }
 
+    /** ISSUE-NOV25.12-O142: the red Alarms filter lists only the alarms, with or without More. */
+    @Test
+    fun `the Alarms filter lists only the alarms, an alarm answered by the Monitor only with More`() {
+        val events = listOf(
+            event("warning", ageMs = 5_000, level = EventLevel.WARNING),
+            event("echo", ageMs = 4_000, level = EventLevel.ALARM),
+            event("info", ageMs = 3_000),
+            event("detail", ageMs = 2_000, level = EventLevel.DETAIL),
+            event("alarm", ageMs = 1_000, level = EventLevel.ALARM)
+        )
+        val echo = setOf("echo")
+        assertEquals(listOf("alarm"), events.shown(ViewPeriod.HOUR, showDetails = false, nowMs = nowMs, detailIds = echo, alarmsOnly = true).map { it.id })
+        assertEquals(listOf("alarm", "echo"), events.shown(ViewPeriod.HOUR, showDetails = true, nowMs = nowMs, detailIds = echo, alarmsOnly = true).map { it.id })
+        assertEquals(listOf("alarm", "info", "warning"), events.shown(ViewPeriod.HOUR, showDetails = false, nowMs = nowMs, detailIds = echo).map { it.id })
+    }
+
+    /** ISSUE-NOV25.12-O142: Settings exported and Trails saved are listed only under More, and stay on the Sensor. */
+    @Test
+    fun `a saved file's event is listed only under More`() {
+        val saved = listOf(event("saved", ageMs = 1_000, level = FILE_SAVED_LEVEL))
+        assertEquals(emptyList<String>(), saved.shown(ViewPeriod.HOUR, showDetails = false, nowMs = nowMs).map { it.id })
+        assertEquals(listOf("saved"), saved.shown(ViewPeriod.HOUR, showDetails = true, nowMs = nowMs).map { it.id })
+        assertEquals(emptyList<EventEntry>(), saved.forPeer())
+    }
+
     @Test
     fun `the Sensor sends its newest events without details`() {
         val events = (1..EventLog.PEER_EVENTS_SENT + 5).map { event("e$it", ageMs = 1_000L * (100 - it)) } +

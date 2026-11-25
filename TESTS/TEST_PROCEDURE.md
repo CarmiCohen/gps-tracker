@@ -1285,10 +1285,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: A / L** - 251.1 passed (1127 unit tests); 251.2 passed on the A15 (`ProductionReadinessAuditTest` 3/3, release Sensor start clean; the Monitor not installed there); 251.3 waits for the relay (O133) and a paired Monitor (ISSUE-NOV23.4-O139, SOT 1.491)
 *   **251.1 Unit:** `MonitorEventsTest`: `Ended:` and `Acknowledged:` are DETAIL; a Sensor alarm whose kind raised the same Monitor alarm from 60 s before to 5 min after it is a detail, while one answered by another alarm, one with no kind, one outside the window, or any with no Monitor alarm stays listed; any other violation type matches the GPS jump. `EventLogTest`: the given detail ids are listed only with Details; the Home Points received go to the Monitor though DETAIL, other DETAIL events do not; a recorded kind is kept. `SensorEventsWireTest`: the kind travels as `k`, an event without one sends none and reads back null.
 *   **251.2 Device:** `ProductionReadinessAuditTest` on the A15, and the release Sensor starts there with `davey_over_500ms=0 stacklog=0 fatal=0`.
-*   **251.3 Two phones:** with the relay back and a Monitor paired to `T`, lift the resting Sensor and acknowledge the alarm: the Monitor's Events list shows `Alarm: Tracker lifted` only; with Details also the Sensor's `Lift alert`, `Acknowledged:` and `Ended:`. Adding a Home Point lists `Home point added` and the Sensor's `Home points received` only with Details.
+*   **251.3 Two phones:** with the relay back and a Monitor paired to `T`, lift the resting Sensor and acknowledge the alarm: the Monitor's Events list shows `Alarm: Tracker lifted` only; with More (named Details before Nov25.12) also the Sensor's `Lift alert`, `Acknowledged:` and `Ended:`. Adding a Home Point lists `Home point added` and the Sensor's `Home points received` only with More.
+
+## Chapter 252 - The Events List's Alarms and More Filters (Nov25.12)
+**Status: A** - 252.1 passed (unit tests); 252.2 waits for a look on a phone (ISSUE-NOV25.12-O142)
+*   **252.1 Unit:** `EventLogTest`: the Alarms filter lists only ALARM events, an alarm the Monitor answered only with More too; a saved file's event (`FILE_SAVED_LEVEL`) is listed only under More and not sent to the Monitor.
+*   **252.2 Device:** in either app's Events list the filter row fits on one line (also on the narrow S21FE): `1 h 6 h 24 h 7 d`, a red-outlined `Alarms` and `More`. Alarms on lists only the red alarm rows (`No alarms in the last ...` when none); a new `Settings exported` (and on the Monitor `Trails saved`) appears only with More.
 
 ---
-**Active Testing Chapters: 240 of 251**
+**Active Testing Chapters: 241 of 252**
 *Since Nov23.6-docs a new chapter is written only for a check that needs a person, a device or two phones and is still pending (Rule 15); unit tests are named in the commit message.*
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 

@@ -43,10 +43,11 @@ import java.util.Locale
 
 /**
  * The menu's Events list of both apps (ISSUE-NOV10.8-O84): the [events] of the chosen period, newest first, with a
- * Details filter, Export through the share sheet, and Clear after a confirmation. [showSource] marks each event with
+ * More filter (the DETAIL events; named Details before ISSUE-NOV25.12-O142), a red Alarms filter that lists only the
+ * ALARM events (ISSUE-NOV25.12-O142), Export through the share sheet, and Clear after a confirmation. [showSource] marks each event with
  * the phone it happened on, for the Monitor, whose list also holds the Sensor's events. A selected event's details
  * open the Graphs around its time with [onShowGraphs] (ISSUE-NOV15.6-O100 part 4). The events of [detailIds] are listed
- * only with Details, like the DETAIL ones (ISSUE-NOV23.4-O139). Without Details an event of [summaries] is shown, and
+ * only with More, like the DETAIL ones (ISSUE-NOV23.4-O139). Without More an event of [summaries] is shown, and
  * exported, with that text instead of its own (SIMP-NOV25.0-S1: one row per finished alarm).
  */
 @Composable
@@ -62,6 +63,7 @@ fun EventLogOverlay(
     val context = LocalContext.current
     var period by rememberSaveable { mutableStateOf(ViewPeriod.DAY) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
+    var alarmsOnly by rememberSaveable { mutableStateOf(false) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var isConfirmingClear by rememberSaveable { mutableStateOf(false) }
     val nowMs by produceState(System.currentTimeMillis()) {
@@ -72,8 +74,8 @@ fun EventLogOverlay(
     }
     // A new event moves the period's end too, so it is listed at once.
     val endMs = maxOf(nowMs, events.lastOrNull()?.timestampMs ?: 0L)
-    val listed = remember(events, period, showDetails, endMs, detailIds, summaries) {
-        events.shown(period, showDetails, endMs, detailIds)
+    val listed = remember(events, period, showDetails, alarmsOnly, endMs, detailIds, summaries) {
+        events.shown(period, showDetails, endMs, detailIds, alarmsOnly)
             .map { event -> summaries[event.id]?.takeIf { !showDetails }?.let { event.copy(message = it) } ?: event }
     }
     val selected = listed.find { it.id == selectedId }
@@ -120,12 +122,13 @@ fun EventLogOverlay(
                     EventChip(option.label, isOn = option == period, onClick = { period = option })
                 }
                 Spacer(Modifier.weight(1f))
-                EventChip("Details", isOn = showDetails, onClick = { showDetails = !showDetails })
+                EventChip("Alarms", isOn = alarmsOnly, color = Rose500, onClick = { alarmsOnly = !alarmsOnly })
+                EventChip("More", isOn = showDetails, onClick = { showDetails = !showDetails })
             }
             Spacer(Modifier.height(6.dp))
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 if (listed.isEmpty()) {
-                    Text("No events in the last ${period.label}", color = Slate500, modifier = Modifier.align(Alignment.Center))
+                    Text("No ${if (alarmsOnly) "alarms" else "events"} in the last ${period.label}", color = Slate500, modifier = Modifier.align(Alignment.Center))
                 } else {
                     val timeFormat = remember(period) { SimpleDateFormat(if (period.durationMs > DAY_MS) "dd/MM HH:mm" else "HH:mm:ss", Locale.getDefault()) }
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -209,18 +212,22 @@ private fun EventDetail(event: EventEntry, onClose: () -> Unit, onShowGraphs: ()
     }
 }
 
-/** A period or filter chip of the Events list, also used by the Graphs (ISSUE-NOV10.8-O84 part 3). */
+/**
+ * A period or filter chip of the Events list, also used by the Graphs (ISSUE-NOV10.8-O84 part 3). A [color] other than
+ * the brand's marks the chip in it even when off, as the red Alarms filter (ISSUE-NOV25.12-O142).
+ */
 @Composable
-internal fun EventChip(label: String, isOn: Boolean, onClick: () -> Unit) {
+internal fun EventChip(label: String, isOn: Boolean, color: Color = MonitorBrown, onClick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
+    val isMarked = color != MonitorBrown
     Box(
         modifier = Modifier
-            .background(if (isOn) MonitorBrown.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f), shape)
-            .border(1.dp, if (isOn) MonitorBrown else Color.White.copy(alpha = 0.15f), shape)
+            .background(if (isOn) color.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f), shape)
+            .border(1.dp, if (isOn || isMarked) color else Color.White.copy(alpha = 0.15f), shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
-        Text(label, color = if (isOn) MonitorBrown else Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+        Text(label, color = if (isOn || isMarked) color else Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
     }
 }
 
