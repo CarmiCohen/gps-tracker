@@ -1,7 +1,7 @@
-# Project Handover - Version Nov25.6 (Oct Test Files Archived)
+# Project Handover - Version Nov25.7 (One Unpair Control Already Done)
 
 ## ▶️ Resumption State (Read First)
-- **Git**: Nov25.6 committed, tagged and pushed by Claude; relay v6.050 (`c460e25`) pushed earlier. The commit message is the record (D1); the archive, SOT, baseline index, dashboard and audit line are frozen at Nov23.4.
+- **Git**: Nov25.7 committed, tagged and pushed by Claude; relay v6.050 (`c460e25`) pushed earlier. The commit message is the record (D1); the archive, SOT, baseline index, dashboard and audit line are frozen at Nov23.4.
 - **Relay**: SUSPENDED (O133, row 73; still 503 on 2026-11-25): after Render's reset (probably 2026-12-01) the user deploys relay v6.050 (`c460e25`); the waiting live checks are listed in `issues.md` focus item 3.
 - **PC**: if Kotlin compiles fail with `Daemon compilation failed: null`, run `gradlew --stop` and `gradlew clean`. The IDE's live analysis is unsynced; trust Gradle. `run_tests.ps1` takes about 100 s: run it in the background. Since Nov25.5 `:core-shared:animalsnifferMain` (API 26 signature) runs before its jar and tests: a JDK call Android 26 lacks fails the build. `install_release.ps1 -NoBuild` after a version bump fails as a downgrade: build again.
 - **User decisions**: Rule 17 (no test removal without confirmation); Claude pushes the main and relay repos; `//` = continue; O112 waits for the user's false-alarm notes; O122 last; O134 to discuss; SIMP-NOV19.5-S1 deferred; SIMP-NOV22.8-S1, S2 low (2026-11-25); SIMP-NOV9.3-S1 (R8) low; SIMP-NOV7.17-S1 low. 2026-11-23: lean workflow; small related items may share a version; effort recommended once per item, no stop.
@@ -9,10 +9,9 @@
 - **Phones**: A15 (`R58X40GV2AR`, no screen lock: `adb shell wm dismiss-keyguard` unlocks it): debug Sensor Nov25.4 running as `T`, no Monitor. S21FE (`R5CRC14PG4F`): release Monitor Nov25.4 (installed 2026-11-25 over Nov25.2, data kept), Monitor `V` paired to Tracker ID `tracker ` (not `T`: the user's responsibility, user decision 2026-11-25, do not re-pair).
 - **Test tips**: never `connectedDebugAndroidTest`; use `am instrument` with each app's `HiltTestRunner` (Operational Notes). The Sensor's event file is in device-protected storage: `/data/user_de/0/com.jd.app.sensor/files/`. Screenshots: `adb -s <serial> shell screencap` then `pull` to a new file name each time (a reused name once showed an old image); the Sensor's "System Idle" screen opens with one tap.
 
-## 🟢 Status: PASSED (Nov25.6)
-- SIMP-NOV8.102-S1: `handoverTesting.md`, `MAP_sot.md` and `Alarms.md` moved from `TESTS/` to `ARCHIVE/` with `git mv`; the two requirement lists describe the single app before the split (none of their symbols remain in the code; R872 is in the SOT), so nothing was carried over.
-- Docs only (D5): `:core-shared:test` passed; no builds, no device audit.
-- Phones unchanged: A15 debug Sensor Nov25.4; S21FE release Monitor Nov25.4.
+## 🟢 Status: PASSED (Nov25.7)
+- SIMP-NOV7.1-S1: already done in Nov18.7 (`072430b`, O109): the gear is gone, unpairing is the Setup dialog's UNPAIR (with confirmation), and the red X is Close. Removed the stale entry and fixed the S21FE Operational Note wording.
+- Docs only (D5): `:core-shared:test` passed; no builds, no device audit. Phones unchanged.
 
 ## 🎯 Next Resumption Focus
-See `DOCS/issues.md`, Next Resumption Focus (item 1: SIMP-NOV7.1-S1, no phones needed, `/effort medium`).
+See `DOCS/issues.md`, Next Resumption Focus (item 1: the user names the next no-phone item).
