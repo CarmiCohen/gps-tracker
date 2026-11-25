@@ -6,7 +6,7 @@
 1. Without phones: SIMP-NOV6.1-S1 (shared device status; Claude's pick after Nov25.2, the user may name another).
 2. With the user at the A15: 241.4 (knock, alarm window) with 237.3 (torch); also 211.2 and 213.2's Active apps tap.
 3. O133 (row 73): after Render's reset the user deploys relay v6.050; then the waiting live checks 182.2, 238.2, 240.3, 241.3, 244.3, 249.3, 250.3, 251.3.
-4. With the S21FE: release Monitor (its siren type chip keeps the chosen sound: SIMP-NOV7.3-S1 migration), then 215.1, 226.3, 227.4, 228.2, 230.3, 233.3, 237.4; O112 when the user has noted false alarms.
+4. With the S21FE (release Monitor Nov25.2 installed 2026-11-25; its siren type chip kept the chosen Chimes, SIMP-NOV7.3-S1 migration passed): 215.1, 226.3, 227.4, 228.2, 230.3, 233.3, 237.4; O112 when the user has noted false alarms.
 5. O134: discuss the Home Points of two Monitors with the user.
 
 ### Work Queue
