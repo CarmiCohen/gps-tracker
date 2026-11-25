@@ -1069,13 +1069,10 @@ class SensorService : Service(), SensorEventListener {
                 null
             }
         }
-        var base = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) base = base or ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
         val location = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-        val microphone = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasMicrophonePermission()) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
-        // The full set first, then without the microphone, then without location: each refusal throws before anything changes.
-        val attempts = listOfNotNull((base or location or microphone).takeIf { microphone != 0 }, base or location, base)
-        for (type in attempts) {
+        val withMicrophone = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasMicrophonePermission()
+        val microphone = if (withMicrophone) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+        for (type in foregroundTypeAttempts(Build.VERSION.SDK_INT, withMicrophone)) {
             try {
                 startForeground(1, notification, type)
                 return ForegroundStart(
@@ -1102,6 +1099,23 @@ class SensorService : Service(), SensorEventListener {
         private const val RESTART_NOTIFICATION_ID = 2 // The foreground service notification is 1.
         private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L
         private const val SETUP_STATUS_CHECK_MS = 30_000L
+
+        /**
+         * The foreground service types to try on API 29+, most first: the full set, then without the microphone, then
+         * without location; each refusal throws before anything changes. The base type, which Android never refuses,
+         * keeps the service and its relay connection running. On API 34+ it is `remoteMessaging` alone: Android 15
+         * forbids starting a `dataSync` service from `BOOT_COMPLETED` once `targetSdk` is 35+, and limits `dataSync` to
+         * 6 hours a day (ISSUE-NOV9.1-O61). Below API 34 `remoteMessaging` does not exist, so `dataSync` stays the base.
+         * The type constants are compile-time ints, inlined, so reading them below their API level is safe.
+         */
+        @android.annotation.SuppressLint("InlinedApi")
+        internal fun foregroundTypeAttempts(sdkInt: Int, withMicrophone: Boolean): List<Int> {
+            val base = if (sdkInt >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+                else ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            val location = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            val full = base or location or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            return listOfNotNull(full.takeIf { withMicrophone }, base or location, base)
+        }
     }
 
     /** The Sensor process's recent ends as Android recorded them (API 30+), for [unrecordedStopEvent] (ISSUE-NOV15.4-O98). */
