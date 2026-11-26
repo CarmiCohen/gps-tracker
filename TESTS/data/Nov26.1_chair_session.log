@@ -1,0 +1,103 @@
+--------- beginning of main
+11-26 10:55:32.914 I/REV_Event(29058): Vibration waiting for the phone to rest
+11-26 10:55:32.915 W/REV_Event(29058): Vibration alert: 4 hits in 1.4 s, strongest 0.15 g (limit 0.13 g)
+11-26 10:55:34.884 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 10:55:34.885 W/REV_Event(29058): Lift alert: accelerometer, about 31 cm up for 1.0 s
+11-26 10:56:07.201 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 10:56:07.204 I/REV_Event(29058): Vibration armed
+11-26 10:58:57.720 I/REV_Motion(29058): Sit trace over 1600 ms, end speed -0.01 m/s; up cm/s2: 12 82 -36 -54 -14 17 -4 1 -7 -3 3 -5 -1 -3 1 -3; tilt 0.1 deg: 7 2 11 22 20 35 30 36 36 38 40 40 41 41 42 42
+11-26 10:58:57.721 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 0.12 m/s², jolt 0.48 g, tilt 4.2 deg
+11-26 11:00:47.720 I/REV_Motion(29058): Lift not confirmed: a knock of 1.08 g voided the integration
+11-26 11:00:50.281 I/REV_Motion(29058): Sit trace over 2840 ms, end speed -0.38 m/s; up cm/s2: -6 -87 73 -31 -37 -3 -12 -12 -16 -6 -12 -11 -13 -21 -13 -20 1 40 -30 -29 -24 -19 -16 -15 -14 -16 -14 -13; tilt 0.1 deg: 2 25 50 55 66 76 81 85 93 92 94 95 96 98 103 105 96 101 108 117 119 116 111 109 108 108 107 105
+11-26 11:00:50.282 I/REV_Motion(29058): Sit not confirmed (too sharp: a knock or a blow): first move down 0.06 m/s², jolt 1.08 g, tilt 10.4 deg
+11-26 11:00:56.222 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 11:00:56.223 W/REV_Event(29058): Tilt alert: tilted 15 deg (limit 15 deg)
+11-26 11:01:34.526 I/REV_Event(29058): Vibration waiting for the phone to rest
+11-26 11:01:34.528 W/REV_Event(29058): Vibration alert: 4 hits in 2.5 s, strongest 0.92 g (limit 0.13 g)
+11-26 11:02:35.363 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 11:02:35.365 I/REV_Event(29058): Vibration armed
+11-26 11:03:56.738 I/REV_Motion(29058): Sit trace over 1500 ms, end speed -0.05 m/s; up cm/s2: -3 102 -33 -98 -27 22 -4 7 2 -6 -1 -4 -1 -3 -3; tilt 0.1 deg: 2 8 3 8 12 13 13 15 15 15 16 16 17 17 17
+11-26 11:03:56.739 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 1.02 m/s², jolt 0.76 g, tilt 1.7 deg
+11-26 11:04:15.042 I/REV_Motion(29058): Sit trace over 960 ms, end speed -0.05 m/s; up cm/s2: -50 -3 2 6 3 0 1 4 -1; tilt 0.1 deg: 16 5 1 1 2 1 1 1 1
+11-26 11:04:15.057 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 11:04:15.058 W/REV_Event(29058): Sit alert: first move down 0.50 m/s², jolt 0.49 g, tilt 0.0 deg
+11-26 11:04:52.814 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 11:05:21.364 I/REV_Motion(29058): Sit trace over 1180 ms, end speed 0.05 m/s; up cm/s2: 0 -33 56 7 -7 22 4 1 -7 6 2; tilt 0.1 deg: 3 3 20 14 11 14 9 8 9 7 5
+11-26 11:05:21.370 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 11:05:21.372 W/REV_Event(29058): Sit alert: first move down 0.33 m/s², jolt 0.29 g, tilt 0.5 deg
+11-26 11:05:58.598 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 11:07:28.997 I/REV_Motion(29058): Sit trace over 1480 ms, end speed -0.08 m/s; up cm/s2: -7 100 -134 57 -63 -6 3 -7 5 -1 -6 -6 -7 -3; tilt 0.1 deg: 1 3 5 5 14 15 15 17 16 16 17 17 17 18
+11-26 11:07:29.009 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 11:07:29.010 W/REV_Event(29058): Sit alert: first move down 0.07 m/s², jolt 0.45 g, tilt 1.8 deg
+11-26 11:08:20.320 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 11:09:26.498 I/REV_Motion(29058): Sit trace over 1660 ms, end speed 0.05 m/s; up cm/s2: -20 -78 125 -9 -25 40 1 9 -2 -8 17 -9 1 2 0 4; tilt 0.1 deg: 10 11 11 7 2 1 1 1 4 4 5 7 8 8 7 6
+11-26 11:09:26.510 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 11:09:26.511 W/REV_Event(29058): Sit alert: first move down 0.20 m/s², jolt 0.38 g, tilt 0.5 deg
+11-26 11:09:56.496 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 11:10:11.298 I/REV_Motion(29058): Sit trace over 1340 ms, end speed 0.08 m/s; up cm/s2: 32 6 118 -127 49 -10 3 23 -3 -2 0 -4 -4; tilt 0.1 deg: 3 12 16 7 9 12 15 13 12 12 12 12 11
+11-26 11:10:11.298 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 0.32 m/s², jolt 0.77 g, tilt 1.1 deg
+11-26 11:10:14.963 I/REV_Motion(29058): Lift not confirmed: 146 cm in 5000 ms, but the speed never returned to zero (0.32 m/s): a knock
+11-26 11:27:27.688 I/REV_Event(29058): Vibration waiting for the phone to rest
+11-26 11:27:27.690 W/REV_Event(29058): Vibration alert: 4 hits in 5.6 s, strongest 0.19 g (limit 0.13 g)
+11-26 11:27:57.656 I/REV_Event(29058): Vibration armed
+11-26 11:30:15.215 I/REV_Motion(29058): Sit trace over 1680 ms, end speed -0.03 m/s; up cm/s2: 14 -3 5 -6 5 43 -13 -7 -3 -9 -71 8 4 -1 0 -1; tilt 0.1 deg: 0 0 2 5 6 6 10 11 9 9 9 7 7 9 10 11
+11-26 11:30:15.216 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 0.14 m/s², jolt 0.49 g, tilt 1.3 deg
+11-26 11:31:05.977 I/REV_Motion(29058): Sit trace over 1600 ms, end speed -0.02 m/s; up cm/s2: 10 45 9 -15 -10 -7 5 9 -25 -21 -4 -9 -2 -1 1 -6; tilt 0.1 deg: 10 7 15 21 19 19 20 21 14 11 10 9 8 7 8 8
+11-26 11:31:05.978 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 0.10 m/s², jolt 0.27 g, tilt 0.8 deg
+11-26 11:31:41.378 I/REV_Motion(29058): Sit trace over 2540 ms, end speed -0.08 m/s; up cm/s2: -20 -17 -7 -22 19 -4 3 13 3 -1 -6 5 13 -29 -12 -7 33 -31 -15 16 -12 -2 -3 6 3; tilt 0.1 deg: 16 10 25 14 14 14 14 11 7 9 11 13 14 15 15 9 20 22 23 20 20 19 17 14 13
+11-26 11:31:41.396 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 11:31:41.396 W/REV_Event(29058): Sit alert: first move down 0.20 m/s², jolt 0.36 g, tilt 1.2 deg
+11-26 11:31:45.775 I/REV_Event(29058): Vibration waiting for the phone to rest
+11-26 11:31:45.777 W/REV_Event(29058): Vibration alert: 4 hits in 7.7 s, strongest 0.18 g (limit 0.13 g)
+11-26 11:32:17.336 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 11:32:17.339 I/REV_Event(29058): Vibration armed
+11-26 11:33:26.735 I/REV_Motion(29058): Sit trace over 1500 ms, end speed 0.21 m/s; up cm/s2: -1 1 4 -3 218 -8 0 2 5 -5 0 2 -6 4 -5; tilt 0.1 deg: 1 1 0 2 9 8 6 4 4 3 2 2 2 2 3
+11-26 11:33:26.736 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 2.18 m/s², jolt 0.76 g, tilt 0.3 deg
+11-26 11:36:03.957 I/REV_Motion(29058): Sit trace over 1180 ms, end speed 0.04 m/s; up cm/s2: 24 70 -59 -17 3 21 -6 -6 8 -2 1; tilt 0.1 deg: 10 10 15 12 9 8 8 7 9 7 8
+11-26 11:36:03.958 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 0.24 m/s², jolt 0.45 g, tilt 0.7 deg
+11-26 12:30:57.346 I/REV_Event(29058): Vibration waiting for the phone to rest
+11-26 12:30:57.348 W/REV_Event(29058): Vibration alert: 4 hits in 2.7 s, strongest 0.28 g (limit 0.13 g)
+11-26 12:30:58.276 I/REV_Motion(29058): Sit trace over 2020 ms, end speed 0.21 m/s; up cm/s2: -6 -30 -14 32 15 0 10 45 11 20 107 32 7 1 -4 1 2 -1 -6 -8; tilt 0.1 deg: 13 11 10 4 8 8 8 23 25 23 19 24 27 25 19 15 11 8 8 7
+11-26 12:30:58.278 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 12:30:58.281 W/REV_Event(29058): Sit alert: first move down 0.06 m/s², jolt 0.31 g, tilt 0.7 deg
+11-26 12:31:29.614 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 12:31:29.616 I/REV_Event(29058): Vibration armed
+11-26 12:42:36.297 I/REV_Motion(29058): Sit trace over 1880 ms, end speed -0.03 m/s; up cm/s2: 16 -5 -2 3 -3 3 -1 4 87 -51 -46 -3 -15 -9 2 -8 3 1; tilt 0.1 deg: 3 2 4 2 3 2 5 3 14 11 10 13 15 15 16 15 15 14
+11-26 12:42:36.298 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 0.16 m/s², jolt 0.29 g, tilt 1.5 deg
+11-26 12:51:42.321 I/REV_Event(29058): Vibration waiting for the phone to rest
+11-26 12:51:42.324 W/REV_Event(29058): Vibration alert: 4 hits in 3.9 s, strongest 0.16 g (limit 0.13 g)
+11-26 12:51:43.204 I/REV_Motion(29058): Sit trace over 5000 ms, end speed 0.09 m/s; up cm/s2: 26 6 -11 6 -13 10 -2 -9 9 -15 8 0 -7 11 -10 3 2 -4 -12 6 -11 -6 29 -8 -9 0 36 12 -19 7 -2 -3 -4 6 8 -1 1 7 -3 38 -39 24 6 2 3 4 -1 2 3 2; tilt 0.1 deg: 11 8 3 6 4 6 5 2 5 3 5 5 4 6 4 9 10 12 15 16 22 21 23 24 22 13 5 2 6 12 12 11 9 11 9 6 6 8 19 26 16 12 25 31 25 16 9 5 4 6
+11-26 12:51:43.205 I/REV_Motion(29058): Sit not confirmed (no rest within 5 s): first move up 0.26 m/s², jolt 0.26 g, tilt 0.6 deg
+11-26 12:52:16.013 I/REV_Event(29058): Vibration armed
+11-26 12:56:03.778 I/REV_Motion(29058): Sit trace over 1880 ms, end speed -0.06 m/s; up cm/s2: -3 -8 1 1 6 14 10 131 -77 -96 -33 -5 -2 3 2 -7 1 -2; tilt 0.1 deg: 5 0 4 12 21 23 27 9 16 12 10 5 4 2 2 1 1 1
+11-26 12:56:03.796 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 12:56:03.797 W/REV_Event(29058): Sit alert: first move down 0.08 m/s², jolt 0.61 g, tilt 0.2 deg
+11-26 12:56:33.776 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 13:00:11.753 I/REV_Event(29058): Vibration waiting for the phone to rest
+11-26 13:00:11.754 W/REV_Event(29058): Vibration alert: 4 hits in 1.6 s, strongest 0.21 g (limit 0.13 g)
+11-26 13:00:12.975 I/REV_Motion(29058): Sit trace over 3160 ms, end speed -0.10 m/s; up cm/s2: -18 -83 57 43 -63 -20 -23 10 26 29 -40 25 5 0 -2 13 5 -45 34 -75 -10 50 -25 -6 -4 -4 6 4 2 0 6; tilt 0.1 deg: 15 30 38 57 60 50 54 46 35 33 29 27 25 32 36 39 26 26 21 26 36 46 54 56 53 43 37 36 37 37 34
+11-26 13:00:12.977 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 13:00:12.979 W/REV_Event(29058): Sit alert: first move down 0.18 m/s², jolt 0.38 g, tilt 3.0 deg
+11-26 13:00:43.854 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 13:00:43.856 I/REV_Event(29058): Vibration armed
+11-26 13:01:06.241 I/REV_Motion(29058): Sit trace over 3080 ms, end speed -0.02 m/s; up cm/s2: -8 -9 -7 -3 3 5 2 -1 -3 2 -2 1 2 1 11 1 5 -2 9 56 35 -163 68 -9 -5 -1 4 -3 0 -2; tilt 0.1 deg: 5 9 15 24 19 20 21 17 11 6 5 5 5 4 4 6 5 7 12 15 6 3 5 10 9 11 11 15 17 18
+11-26 13:01:06.242 I/REV_Event(29058): Sit alert: first move down 0.08 m/s², jolt 0.47 g, tilt 1.9 deg: not sent, the same kind alerted less than 60 s ago
+11-26 13:01:06.244 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 13:01:36.242 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 13:08:40.535 I/REV_Motion(29058): Sit trace over 1100 ms, end speed -0.07 m/s; up cm/s2: 8 -87 10 -4 3 0 2 -2 1 1 1; tilt 0.1 deg: 7 18 16 12 6 4 3 2 1 0 1
+11-26 13:08:40.536 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 0.08 m/s², jolt 0.36 g, tilt 0.1 deg
+11-26 13:09:00.537 I/REV_Motion(29058): Sit trace over 1180 ms, end speed -0.34 m/s; up cm/s2: -241 -53 -1 -6 5 -1 -1 -1 4 1 1; tilt 0.1 deg: 53 33 22 17 13 9 7 5 4 3 3
+11-26 13:09:00.538 I/REV_Motion(29058): Sit not confirmed (too sharp: a knock or a blow): first move down 2.41 m/s², jolt 1.27 g, tilt 0.3 deg
+11-26 13:09:20.175 I/REV_Motion(29058): Sit trace over 1000 ms, end speed -0.17 m/s; up cm/s2: -186 43 0 3 -4 0 0 1 5 2; tilt 0.1 deg: 10 10 6 5 3 2 1 1 1 1
+11-26 13:09:20.198 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 13:09:20.200 W/REV_Event(29058): Sit alert: first move down 1.86 m/s², jolt 0.51 g, tilt 0.1 deg
+11-26 13:09:50.678 I/REV_Event(29058): Tilt, lift and sit armed
+11-26 13:09:52.359 I/REV_Motion(29058): Sit trace over 1080 ms, end speed 0.04 m/s; up cm/s2: 7 42 -17 -3 2 4 1 -1 0 1; tilt 0.1 deg: 4 4 4 2 2 1 1 1 1 1
+11-26 13:09:52.360 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 0.07 m/s², jolt 0.68 g, tilt 0.1 deg
+11-26 13:10:21.479 I/REV_Motion(29058): Sit trace over 1200 ms, end speed -0.05 m/s; up cm/s2: 7 -93 66 -25 11 1 -5 -6 1 -4 0 -3; tilt 0.1 deg: 14 7 6 5 2 4 2 2 1 1 1 1
+11-26 13:10:21.479 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 0.07 m/s², jolt 0.51 g, tilt 0.1 deg
+11-26 13:10:47.042 I/REV_Motion(29058): Sit trace over 1360 ms, end speed 0.30 m/s; up cm/s2: 34 165 128 -34 3 -1 10 -6 5 -6 2 -6 -4; tilt 0.1 deg: 6 24 29 31 23 17 12 10 6 6 4 3 2
+11-26 13:10:47.042 I/REV_Motion(29058): Sit not confirmed (up first: standing up or a pickup): first move up 0.34 m/s², jolt 0.88 g, tilt 0.2 deg
+11-26 13:10:47.644 I/REV_Event(29058): Tilt, lift and sit waiting for the phone to rest
+11-26 13:10:47.645 W/REV_Event(29058): Lift alert: accelerometer, about 48 cm up for 1.0 s
+11-26 13:11:39.680 I/REV_Event(29058): Tilt, lift and sit armed
