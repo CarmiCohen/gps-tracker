@@ -35,15 +35,17 @@ fun AlertManagementOverlay(
     onClose: () -> Unit,
     /** The Sensor's learned sit examples and the requests about them (ISSUE-NOV26.0-O163 part 2). */
     sitExamples: com.jd.core.shared.SitExampleReport? = null,
-    onSitLearn: (com.jd.core.shared.SitLearnRequest) -> Unit = {}
+    onSitLearn: (com.jd.core.shared.SitLearnRequest) -> Unit = {},
+    /** Opened from the after-drive question: the SEAT PLACEMENT screen at once, and its Back closes both (O163 part 1). */
+    startOnPlacements: Boolean = false
 ) {
     // The SEAT PLACEMENT screen opens over this page; its Back returns here (ISSUE-NOV26.0-O163).
-    var showPlacements by rememberSaveable { mutableStateOf(false) }
+    var showPlacements by rememberSaveable { mutableStateOf(startOnPlacements) }
     if (showPlacements) {
         SeatPlacementOverlay(
             settings = draftAlertSettings,
             onUpdateAlertSettings = onUpdateAlertSettings,
-            onClose = { showPlacements = false },
+            onClose = { if (startOnPlacements) onClose() else showPlacements = false },
             sitExamples = sitExamples,
             onSitLearn = onSitLearn
         )

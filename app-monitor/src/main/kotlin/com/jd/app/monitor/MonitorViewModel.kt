@@ -39,6 +39,7 @@ import com.jd.core.ui.getAppVersionName
 import com.jd.core.ui.metersPerSecondToKmh
 import com.jd.core.ui.motionState
 import com.jd.core.shared.MovementTracker
+import com.jd.core.shared.asksAfterDrive
 import com.jd.core.ui.isLocationProviderEnabled
 import com.jd.core.ui.isNetworkAvailable
 import com.jd.core.ui.readBattery
@@ -70,6 +71,7 @@ class MonitorViewModel @Inject constructor(
     private val settingsTransfer: MonitorSettingsTransfer,
     private val trailTransfer: MonitorTrailTransfer,
     private val setupReports: SensorSetupReports,
+    private val driveQuestion: DriveQuestion,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -176,6 +178,20 @@ class MonitorViewModel @Inject constructor(
 
     val alertSettings: StateFlow<AlertSettings> = dataStore.alertSettings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AlertSettings())
+
+    /**
+     * The after-drive question of the paired Sensor (ISSUE-NOV26.0-O163 part 1); hidden once a car seat is in use,
+     * chosen here or on the SEAT PLACEMENT screen.
+     */
+    val driveQuestionShown: StateFlow<DriveEnd?> =
+        combine(driveQuestion.pending, dataStore.alertSettings, identityManager.targetId) { pending, settings, target ->
+            pending?.takeIf { it.trackerId == target && settings.asksAfterDrive() }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /** The question answered: kept, or switched by [updateAlertSettings]. */
+    fun dismissDriveQuestion() {
+        driveQuestion.dismiss()
+    }
 
     /** True while the siren really plays, for an alarm or a test. */
     val isSirenPlaying: StateFlow<Boolean> = alarmEngine.isSirenOn

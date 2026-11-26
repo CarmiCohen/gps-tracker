@@ -42,6 +42,7 @@ class MonitorSessionService : Service() {
     @Inject lateinit var eventLog: EventLog
     @Inject lateinit var graphs: MonitorGraphs
     @Inject lateinit var setupReports: SensorSetupReports
+    @Inject lateinit var driveQuestion: DriveQuestion
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var signalingJob: Job? = null
@@ -63,6 +64,7 @@ class MonitorSessionService : Service() {
         
         startSignaling()
         alarmEngine.watch(serviceScope)
+        driveQuestion.watch(serviceScope) // ISSUE-NOV26.0-O163 part 1: the after-drive question
         
         return START_STICKY
     }

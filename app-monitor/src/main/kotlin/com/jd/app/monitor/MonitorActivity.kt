@@ -48,6 +48,7 @@ import com.jd.core.shared.EventEntry
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.RelayConfig
 import com.jd.core.shared.SensorSetupReport
+import com.jd.core.shared.withActivePlacement
 import com.jd.core.network.ForensicIdentityManager
 import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
@@ -134,6 +135,7 @@ class MonitorActivity : ComponentActivity() {
                 val geofence by viewModel.geofence.collectAsStateWithLifecycle()
                 val sensorSetup by viewModel.sensorSetup.collectAsStateWithLifecycle()
                 val sitExamples by viewModel.sitExamples.collectAsStateWithLifecycle()
+                val driveQuestion by viewModel.driveQuestionShown.collectAsStateWithLifecycle()
                 val events by viewModel.events.collectAsStateWithLifecycle()
 
                 LaunchedEffect(pairing) {
@@ -177,6 +179,8 @@ class MonitorActivity : ComponentActivity() {
                         sensorSetup = sensorSetup,
                         sitExamples = sitExamples,
                         onSitLearn = viewModel::requestSitLearning,
+                        driveQuestion = driveQuestion,
+                        onDriveQuestionAnswered = viewModel::dismissDriveQuestion,
                         events = events,
                         onClearEvents = viewModel::clearEvents,
                         infoOverlay = { onClose -> MonitorInfoScreen(viewModel, onClose) },
@@ -381,7 +385,10 @@ fun MonitorScreen(
     onShowGraphsAt: (timeMs: Long?) -> Unit = {},
     /** The Sensor's learned sit examples and the SEAT PLACEMENT screen's requests (ISSUE-NOV26.0-O163 part 2). */
     sitExamples: com.jd.core.shared.SitExampleReport? = null,
-    onSitLearn: (com.jd.core.shared.SitLearnRequest) -> Unit = {}
+    onSitLearn: (com.jd.core.shared.SitLearnRequest) -> Unit = {},
+    /** The after-drive question, null when none waits, and its answer (ISSUE-NOV26.0-O163 part 1). */
+    driveQuestion: DriveEnd? = null,
+    onDriveQuestionAnswered: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
@@ -395,6 +402,8 @@ fun MonitorScreen(
     val setupWarnings = remember(sensorSetup, alertSettings.acousticAlert, alertSettings.lightAlert) { sensorSetupWarnings(sensorSetup, alertSettings) }
     var showSetupWarnings by rememberSaveable { mutableStateOf(false) }
     var showAlertsOverlay by rememberSaveable { mutableStateOf(false) }
+    // The after-drive question's SEAT PLACEMENT opens that screen alone (ISSUE-NOV26.0-O163 part 1).
+    var showPlacementsOverlay by rememberSaveable { mutableStateOf(false) }
     var showEventsOverlay by rememberSaveable { mutableStateOf(false) }
     var showInfoOverlay by rememberSaveable { mutableStateOf(false) }
     var showGraphsOverlay by rememberSaveable { mutableStateOf(false) }
@@ -520,6 +529,34 @@ fun MonitorScreen(
             )
         }
         return
+    }
+
+    if (showPlacementsOverlay) {
+        com.jd.core.ui.AlertManagementOverlay(
+            draftAlertSettings = alertSettings,
+            onUpdateAlertSettings = onUpdateAlertSettings,
+            onClose = { showPlacementsOverlay = false },
+            sitExamples = sitExamples,
+            onSitLearn = onSitLearn,
+            startOnPlacements = true
+        )
+        return
+    }
+
+    driveQuestion?.let { drive ->
+        com.jd.core.ui.DriveQuestionDialog(
+            settings = alertSettings,
+            parkedSinceText = clockText(drive.parkedSinceMs),
+            onChoose = { placement ->
+                onDriveQuestionAnswered()
+                onUpdateAlertSettings(alertSettings.withActivePlacement(placement.id))
+            },
+            onOpenPlacements = {
+                onDriveQuestionAnswered()
+                showPlacementsOverlay = true
+            },
+            onKeep = onDriveQuestionAnswered
+        )
     }
 
     if (showAlertsOverlay) {

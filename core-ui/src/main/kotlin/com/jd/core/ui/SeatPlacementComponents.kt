@@ -32,6 +32,9 @@ import com.jd.core.shared.sitLearnWaitText
 import com.jd.core.shared.sitOccupiedInstruction
 import com.jd.core.shared.sitOverlapWarning
 import com.jd.core.shared.activePlacement
+import com.jd.core.shared.DRIVE_QUESTION_TITLE
+import com.jd.core.shared.carSeatPlacements
+import com.jd.core.shared.driveQuestionText
 import com.jd.core.shared.seatPlacementNameError
 import com.jd.core.shared.withActivePlacement
 import com.jd.core.shared.withPlacementAdded
@@ -378,5 +381,46 @@ private fun PlacementEditDialog(
             Button(onClick = { onSave(name, type) }, enabled = error == null) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+/** The after-drive question's button that keeps the placement in use. */
+const val DRIVE_QUESTION_KEEP = "KEEP"
+
+/** ...and the one that opens the SEAT PLACEMENT screen, to add a car seat or choose another. */
+const val DRIVE_QUESTION_OPEN = "SEAT PLACEMENT"
+
+/**
+ * The Monitor's question after the Sensor was driven and parked (ISSUE-NOV26.0-O163 part 1): one button per car seat
+ * placement switches to it ([onChoose]), SEAT PLACEMENT opens the screen, KEEP leaves it. Nothing switches by itself;
+ * Back or a tap outside keeps the placement as well.
+ */
+@Composable
+fun DriveQuestionDialog(
+    settings: AlertSettings,
+    parkedSinceText: String,
+    onChoose: (SeatPlacement) -> Unit,
+    onOpenPlacements: () -> Unit,
+    onKeep: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onKeep,
+        title = { Text(DRIVE_QUESTION_TITLE) },
+        text = {
+            Column {
+                Text(driveQuestionText(settings, parkedSinceText))
+                Spacer(Modifier.height(8.dp))
+                // One choice per line, for the S21FE's large font (ISSUE-NOV25.11-O141).
+                settings.carSeatPlacements().forEach { placement ->
+                    Button(
+                        onClick = { onChoose(placement) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MonitorBrown),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Use ${placement.name}", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onOpenPlacements) { Text(DRIVE_QUESTION_OPEN) } },
+        dismissButton = { TextButton(onClick = onKeep) { Text(DRIVE_QUESTION_KEEP) } }
     )
 }
