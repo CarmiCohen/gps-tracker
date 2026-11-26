@@ -49,7 +49,7 @@ class ProductionReadinessAuditTest {
             currentTemp = 46f,
             isCharging = false,
             batteryLevel = 50,
-            velocityMps = 10f
+            isMoving = true
         )
         assertEquals("Critical Thermal protection MUST scale to 0.1Hz", 10000L, criticalTempInterval)
     }

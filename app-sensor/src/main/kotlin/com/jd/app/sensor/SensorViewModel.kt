@@ -68,7 +68,7 @@ class SensorViewModel @Inject constructor(
 
     /**
      * [savedTo] is the shown path when the file went straight to the GPS-Tracker folder (Nov19.3). The event is a
-     * DETAIL one, listed under More and kept on this phone (ISSUE-NOV25.12-O142).
+     * DETAIL one, listed under All and kept on this phone (ISSUE-NOV25.12-O142).
      */
     fun exportSettings(uri: Uri, savedTo: String? = null) {
         viewModelScope.launch {

@@ -165,16 +165,19 @@ class EventLogTest {
             event("detail", ageMs = 60_000, level = EventLevel.DETAIL),
             event("now", ageMs = 1_000, level = EventLevel.ALARM)
         )
-        assertEquals(listOf("now"), events.shown(ViewPeriod.HOUR, showDetails = false, nowMs = nowMs).map { it.id })
-        assertEquals(listOf("now", "detail"), events.shown(ViewPeriod.HOUR, showDetails = true, nowMs = nowMs).map { it.id })
-        assertEquals(listOf("now", "hours"), events.shown(ViewPeriod.SIX_HOURS, showDetails = false, nowMs = nowMs).map { it.id })
-        assertEquals(listOf("now", "hours", "week"), events.shown(ViewPeriod.WEEK, showDetails = false, nowMs = nowMs).map { it.id })
+        assertEquals(listOf("now"), events.shown(ViewPeriod.HOUR, EventFilter.MAIN, nowMs = nowMs).map { it.id })
+        assertEquals(listOf("now", "detail"), events.shown(ViewPeriod.HOUR, EventFilter.ALL, nowMs = nowMs).map { it.id })
+        assertEquals(listOf("now", "hours"), events.shown(ViewPeriod.SIX_HOURS, EventFilter.MAIN, nowMs = nowMs).map { it.id })
+        assertEquals(listOf("now", "hours", "week"), events.shown(ViewPeriod.WEEK, EventFilter.MAIN, nowMs = nowMs).map { it.id })
         assertEquals(EventLog.RETENTION_MS, ViewPeriod.WEEK.durationMs)
     }
 
-    /** ISSUE-NOV25.12-O142: the red Alarms filter lists only the alarms, with or without More. */
+    /**
+     * ISSUE-NOV25.12-O142: the red Alarms filter lists only the alarms. ISSUE-NOV25.25-O156: one choice of three, Main
+     * between Alarms and All; an alarm answered by the Monitor only under All.
+     */
     @Test
-    fun `the Alarms filter lists only the alarms, an alarm answered by the Monitor only with More`() {
+    fun `the Alarms filter lists only the alarms, an alarm answered by the Monitor only under All`() {
         val events = listOf(
             event("warning", ageMs = 5_000, level = EventLevel.WARNING),
             event("echo", ageMs = 4_000, level = EventLevel.ALARM),
@@ -183,17 +186,18 @@ class EventLogTest {
             event("alarm", ageMs = 1_000, level = EventLevel.ALARM)
         )
         val echo = setOf("echo")
-        assertEquals(listOf("alarm"), events.shown(ViewPeriod.HOUR, showDetails = false, nowMs = nowMs, detailIds = echo, alarmsOnly = true).map { it.id })
-        assertEquals(listOf("alarm", "echo"), events.shown(ViewPeriod.HOUR, showDetails = true, nowMs = nowMs, detailIds = echo, alarmsOnly = true).map { it.id })
-        assertEquals(listOf("alarm", "info", "warning"), events.shown(ViewPeriod.HOUR, showDetails = false, nowMs = nowMs, detailIds = echo).map { it.id })
+        assertEquals(listOf("alarm"), events.shown(ViewPeriod.HOUR, EventFilter.ALARMS, nowMs = nowMs, detailIds = echo).map { it.id })
+        assertEquals(listOf("alarm", "info", "warning"), events.shown(ViewPeriod.HOUR, EventFilter.MAIN, nowMs = nowMs, detailIds = echo).map { it.id })
+        assertEquals(listOf("alarm", "detail", "info", "echo", "warning"), events.shown(ViewPeriod.HOUR, EventFilter.ALL, nowMs = nowMs, detailIds = echo).map { it.id })
+        assertEquals(listOf("Alarms", "Main", "All"), EventFilter.entries.map { it.label })
     }
 
-    /** ISSUE-NOV25.12-O142: Settings exported and Trails saved are listed only under More, and stay on the Sensor. */
+    /** ISSUE-NOV25.12-O142: Settings exported and Trails saved are listed only under All (More before O156), and stay on the Sensor. */
     @Test
-    fun `a saved file's event is listed only under More`() {
+    fun `a saved file's event is listed only under All`() {
         val saved = listOf(event("saved", ageMs = 1_000, level = FILE_SAVED_LEVEL))
-        assertEquals(emptyList<String>(), saved.shown(ViewPeriod.HOUR, showDetails = false, nowMs = nowMs).map { it.id })
-        assertEquals(listOf("saved"), saved.shown(ViewPeriod.HOUR, showDetails = true, nowMs = nowMs).map { it.id })
+        assertEquals(emptyList<String>(), saved.shown(ViewPeriod.HOUR, EventFilter.MAIN, nowMs = nowMs).map { it.id })
+        assertEquals(listOf("saved"), saved.shown(ViewPeriod.HOUR, EventFilter.ALL, nowMs = nowMs).map { it.id })
         assertEquals(emptyList<EventEntry>(), saved.forPeer())
     }
 
@@ -212,10 +216,10 @@ class EventLogTest {
 
     /** Chapter 251 (ISSUE-NOV23.4-O139). */
     @Test
-    fun `the given detail ids show only with Details, and the Home Points received still go to the Monitor`() {
+    fun `the given detail ids show only under All, and the Home Points received still go to the Monitor`() {
         val events = listOf(event("echo", ageMs = 2_000, level = EventLevel.ALARM), event("now", ageMs = 1_000, level = EventLevel.ALARM))
-        assertEquals(listOf("now"), events.shown(ViewPeriod.HOUR, showDetails = false, nowMs = nowMs, detailIds = setOf("echo")).map { it.id })
-        assertEquals(listOf("now", "echo"), events.shown(ViewPeriod.HOUR, showDetails = true, nowMs = nowMs, detailIds = setOf("echo")).map { it.id })
+        assertEquals(listOf("now"), events.shown(ViewPeriod.HOUR, EventFilter.MAIN, nowMs = nowMs, detailIds = setOf("echo")).map { it.id })
+        assertEquals(listOf("now", "echo"), events.shown(ViewPeriod.HOUR, EventFilter.ALL, nowMs = nowMs, detailIds = setOf("echo")).map { it.id })
 
         val homePoints = event("home", ageMs = 0, level = EventLevel.DETAIL).copy(message = "$HOME_POINTS_RECEIVED: 2, radius 50 m")
         assertEquals(listOf("home"), listOf(event("detail", ageMs = 0, level = EventLevel.DETAIL), homePoints).forPeer().map { it.id })

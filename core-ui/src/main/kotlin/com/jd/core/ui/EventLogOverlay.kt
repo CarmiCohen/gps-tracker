@@ -8,6 +8,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -30,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.jd.core.shared.EventEntry
+import com.jd.core.shared.EventFilter
 import com.jd.core.shared.EventLevel
 import com.jd.core.shared.ViewPeriod
 import com.jd.core.shared.EventSource
@@ -42,13 +45,14 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * The menu's Events list of both apps (ISSUE-NOV10.8-O84): the [events] of the chosen period, newest first, with a
- * More filter (the DETAIL events; named Details before ISSUE-NOV25.12-O142), a red Alarms filter that lists only the
- * ALARM events (ISSUE-NOV25.12-O142), Export through the share sheet, and Clear after a confirmation. [showSource] marks each event with
+ * The menu's Events list of both apps (ISSUE-NOV10.8-O84): the [events] of the chosen period, newest first, through one
+ * filter of three, Alarms (red), Main and All ([EventFilter], ISSUE-NOV25.25-O156), Export through the share sheet, and
+ * Clear after a confirmation. [showSource] marks each event with
  * the phone it happened on, for the Monitor, whose list also holds the Sensor's events. A selected event's details
  * open the Graphs around its time with [onShowGraphs] (ISSUE-NOV15.6-O100 part 4). The events of [detailIds] are listed
- * only with More, like the DETAIL ones (ISSUE-NOV23.4-O139). Without More an event of [summaries] is shown, and
- * exported, with that text instead of its own (SIMP-NOV25.0-S1: one row per finished alarm).
+ * only under All, like the DETAIL ones (ISSUE-NOV23.4-O139). Under Alarms and Main an event of [summaries] is shown, and
+ * exported, with that text instead of its own (SIMP-NOV25.0-S1: one row per finished alarm). On a screen wider than
+ * tall the header, periods and filters form a side column beside the list (ISSUE-NOV25.25-O156).
  */
 @Composable
 fun EventLogOverlay(
@@ -62,8 +66,7 @@ fun EventLogOverlay(
 ) {
     val context = LocalContext.current
     var period by rememberSaveable { mutableStateOf(ViewPeriod.DAY) }
-    var showDetails by rememberSaveable { mutableStateOf(false) }
-    var alarmsOnly by rememberSaveable { mutableStateOf(false) }
+    var filter by rememberSaveable { mutableStateOf(EventFilter.MAIN) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var isConfirmingClear by rememberSaveable { mutableStateOf(false) }
     val nowMs by produceState(System.currentTimeMillis()) {
@@ -74,9 +77,9 @@ fun EventLogOverlay(
     }
     // A new event moves the period's end too, so it is listed at once.
     val endMs = maxOf(nowMs, events.lastOrNull()?.timestampMs ?: 0L)
-    val listed = remember(events, period, showDetails, alarmsOnly, endMs, detailIds, summaries) {
-        events.shown(period, showDetails, endMs, detailIds, alarmsOnly)
-            .map { event -> summaries[event.id]?.takeIf { !showDetails }?.let { event.copy(message = it) } ?: event }
+    val listed = remember(events, period, filter, endMs, detailIds, summaries) {
+        events.shown(period, filter, endMs, detailIds)
+            .map { event -> summaries[event.id]?.takeIf { filter != EventFilter.ALL }?.let { event.copy(message = it) } ?: event }
     }
     val selected = listed.find { it.id == selectedId }
 
@@ -102,14 +105,9 @@ fun EventLogOverlay(
     // The events are English: a right-to-left phone language must not mirror the list or turn "24 h" into "h 24".
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     Surface(modifier = Modifier.fillMaxSize(), color = Slate900, contentColor = Color.White) {
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp)) {
-            OverlayHeader(
-                title = "EVENTS",
-                color = MonitorBrown,
-                onClose = onClose,
-                fontSize = 18.sp,
-                subtitle = eventCountText(listed.size)
-            ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp)) {
+            val isLandscape = maxWidth > maxHeight
+            val actions: @Composable RowScope.() -> Unit = {
                 IconButton(onClick = { shareEvents(context, listed.reversed(), period) }, enabled = listed.isNotEmpty()) {
                     Icon(Icons.Default.Share, contentDescription = "Export", tint = if (listed.isNotEmpty()) Color.White else Slate500)
                 }
@@ -117,38 +115,97 @@ fun EventLogOverlay(
                     Icon(Icons.Default.Delete, contentDescription = "Clear", tint = if (events.isNotEmpty()) Rose500 else Slate500)
                 }
             }
-            // Six chips: 4 dp apart, so they fit one line on the narrow S21FE with its large font (ISSUE-NOV25.12-O142).
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                ViewPeriod.entries.forEach { option ->
-                    EventChip(option.label, isOn = option == period, onClick = { period = option })
-                }
-                Spacer(Modifier.weight(1f))
-                EventChip("Alarms", isOn = alarmsOnly, color = Rose500, onClick = { alarmsOnly = !alarmsOnly })
-                EventChip("More", isOn = showDetails, onClick = { showDetails = !showDetails })
+            // Composed before the details, so Back closes the details first, then the list (ISSUE-NOV25.22-O151).
+            val header = @Composable { headerActions: @Composable RowScope.() -> Unit ->
+                OverlayHeader(
+                    title = "EVENTS",
+                    color = MonitorBrown,
+                    onClose = onClose,
+                    fontSize = 18.sp,
+                    subtitle = eventCountText(listed.size),
+                    actions = headerActions
+                )
             }
-            Spacer(Modifier.height(6.dp))
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                if (listed.isEmpty()) {
-                    Text("No ${if (alarmsOnly) "alarms" else "events"} in the last ${period.label}", color = Slate500, modifier = Modifier.align(Alignment.Center))
-                } else {
-                    val timeFormat = remember(period) { SimpleDateFormat(if (period.durationMs > DAY_MS) "dd/MM HH:mm" else "HH:mm:ss", Locale.getDefault()) }
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(listed, key = { it.id }) { event ->
-                            EventRow(
-                                event = event,
-                                time = timeFormat.format(Date(event.timestampMs)),
-                                showSource = showSource,
-                                isSelected = event.id == selectedId,
-                                onClick = { selectedId = if (event.id == selectedId) null else event.id }
-                            )
+            val list = @Composable { modifier: Modifier ->
+                Box(modifier = modifier) {
+                    if (listed.isEmpty()) {
+                        Text("No ${if (filter == EventFilter.ALARMS) "alarms" else "events"} in the last ${period.label}", color = Slate500, modifier = Modifier.align(Alignment.Center))
+                    } else {
+                        val timeFormat = remember(period) { SimpleDateFormat(if (period.durationMs > DAY_MS) "dd/MM HH:mm" else "HH:mm:ss", Locale.getDefault()) }
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            items(listed, key = { it.id }) { event ->
+                                EventRow(
+                                    event = event,
+                                    time = timeFormat.format(Date(event.timestampMs)),
+                                    showSource = showSource,
+                                    isSelected = event.id == selectedId,
+                                    onClick = { selectedId = if (event.id == selectedId) null else event.id }
+                                )
+                            }
                         }
                     }
                 }
             }
-            selected?.let { EventDetail(it, onClose = { selectedId = null }, onShowGraphs = { onShowGraphs(it.timestampMs) }) }
+            val detail = @Composable {
+                selected?.let { EventDetail(it, onClose = { selectedId = null }, onShowGraphs = { onShowGraphs(it.timestampMs) }) }
+            }
+            if (isLandscape) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier.width(SIDE_COLUMN_WIDTH).fillMaxHeight().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        header {} // The narrow column has no room for the buttons beside the title.
+                        Row(content = actions)
+                        ViewPeriod.entries.chunked(2).forEach { pair ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                pair.forEach { option ->
+                                    EventChip(option.label, isOn = option == period, modifier = Modifier.weight(1f), onClick = { period = option })
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        EventFilter.entries.forEach { option ->
+                            FilterChoice(option, filter, Modifier.fillMaxWidth(), onChoose = { filter = it })
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        list(Modifier.weight(1f).fillMaxWidth())
+                        detail()
+                    }
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    header(actions)
+                    // Seven chips: 4 dp apart, so they fit one line on the narrow S21FE with its large font (ISSUE-NOV25.12-O142).
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ViewPeriod.entries.forEach { option ->
+                            EventChip(option.label, isOn = option == period, onClick = { period = option })
+                        }
+                        Spacer(Modifier.weight(1f))
+                        EventFilter.entries.forEach { option -> FilterChoice(option, filter, onChoose = { filter = it }) }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    list(Modifier.weight(1f).fillMaxWidth())
+                    detail()
+                }
+            }
         }
     }
     }
+}
+
+/** One of the three filters, highlighted when chosen like the periods; Alarms is red (ISSUE-NOV25.25-O156). */
+@Composable
+private fun FilterChoice(option: EventFilter, chosen: EventFilter, modifier: Modifier = Modifier, onChoose: (EventFilter) -> Unit) {
+    EventChip(
+        option.label,
+        isOn = option == chosen,
+        color = if (option == EventFilter.ALARMS) Rose500 else MonitorBrown,
+        modifier = modifier,
+        onClick = { onChoose(option) }
+    )
 }
 
 @Composable
@@ -156,10 +213,10 @@ private fun EventRow(event: EventEntry, time: String, showSource: Boolean, isSel
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 1.dp)
             .background(if (isSelected) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.03f))
             .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 3.dp),
+            // Rows without a gap between them (ISSUE-NOV25.25-O156; 1 dp apart and 3 dp inside before).
+            .padding(horizontal = 4.dp, vertical = 1.dp),
         verticalAlignment = Alignment.Top
     ) {
         Text(time, color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
@@ -214,11 +271,12 @@ private fun EventDetail(event: EventEntry, onClose: () -> Unit, onShowGraphs: ()
  * the brand's marks the chip in it even when off, as the red Alarms filter (ISSUE-NOV25.12-O142).
  */
 @Composable
-internal fun EventChip(label: String, isOn: Boolean, color: Color = MonitorBrown, onClick: () -> Unit) {
+internal fun EventChip(label: String, isOn: Boolean, modifier: Modifier = Modifier, color: Color = MonitorBrown, onClick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
     val isMarked = color != MonitorBrown
     Box(
-        modifier = Modifier
+        contentAlignment = Alignment.Center,
+        modifier = modifier
             .background(if (isOn) color.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f), shape)
             .border(1.dp, if (isOn || isMarked) color else Color.White.copy(alpha = 0.15f), shape)
             .clickable(onClick = onClick)
@@ -280,6 +338,9 @@ private fun shareEvents(context: Context, events: List<EventEntry>, period: View
 const val EVENTS_STATE_KEY = "events"
 
 private const val NOW_REFRESH_MS = 30_000L
+
+/** The landscape side column's width (ISSUE-NOV25.25-O156): two period chips a row, the S21FE's large font included. */
+private val SIDE_COLUMN_WIDTH = 150.dp
 private const val DAY_MS = 24 * 3_600_000L
 private const val EXPORT_DIRECTORY = "event_exports"
 

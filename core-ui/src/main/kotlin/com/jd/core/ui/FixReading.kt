@@ -3,7 +3,6 @@ package com.jd.core.ui
 import android.location.Location
 
 private const val MPS_TO_KMH = 3.6f
-private const val MOVING_ABOVE_KMH = 1.5f
 
 /**
  * How long the Monitor's own fix still tells its speed. Longer than [FIX_CURRENT_MS]: the Monitor's 10 m filter sends
@@ -11,24 +10,33 @@ private const val MOVING_ABOVE_KMH = 1.5f
  */
 const val MONITOR_SPEED_VALID_MS = 35_000L
 
-/** One position fix from this device. [accuracyMeters] is 0 and [speedMps] null when not reported. */
+/**
+ * One position fix from this device. [accuracyMeters] is 0 and [speedMps] null when not reported. [isMoving] is the
+ * device's debounced movement up to this fix ([com.jd.core.shared.MovementTracker], ISSUE-NOV25.25-O162).
+ */
 data class FixReading(
     val timeMs: Long,
     val accuracyMeters: Float,
-    val speedMps: Float?
+    val speedMps: Float?,
+    val isMoving: Boolean = false
 )
 
-fun Location.toFixReading() = FixReading(
+fun Location.toFixReading(isMoving: Boolean = false) = FixReading(
     timeMs = time,
     accuracyMeters = if (hasAccuracy()) accuracy else 0f,
-    speedMps = if (hasSpeed()) speed else null
+    speedMps = if (hasSpeed()) speed else null,
+    isMoving = isMoving
 )
 
 fun metersPerSecondToKmh(speedMps: Float): Float = speedMps * MPS_TO_KMH
 
-fun motionState(speedKmh: Float?): String = when {
+/**
+ * The HUD's STATIONARY / MOVING: [isMoving] from a [com.jd.core.shared.MovementTracker] (ISSUE-NOV25.25-O162; one fix's
+ * speed over 1.5 km/h before), no value while no current speed is known.
+ */
+fun motionState(speedKmh: Float?, isMoving: Boolean): String = when {
     speedKmh == null -> NO_VALUE
-    speedKmh > MOVING_ABOVE_KMH -> "MOVING"
+    isMoving -> "MOVING"
     else -> "STATIONARY"
 }
 
@@ -42,7 +50,7 @@ fun HudState.withLocalReadings(fix: FixReading?, battery: BatteryReading, nowMs:
         ?.takeIf { fixAgeMs != null && fixAgeMs < speedValidMs }
         ?.let(::metersPerSecondToKmh)
     return copy(
-        trackerState = motionState(speedKmh),
+        trackerState = motionState(speedKmh, fix?.isMoving == true),
         speedKmh = speedKmh,
         batteryLevel = battery.level,
         isCharging = battery.isCharging,

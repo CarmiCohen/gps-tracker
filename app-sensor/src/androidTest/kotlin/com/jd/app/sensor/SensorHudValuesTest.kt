@@ -77,7 +77,7 @@ class SensorHudValuesTest {
 
     @Test
     fun showsThePublishedFix() {
-        fixStore.publish(FixReading(System.currentTimeMillis() - 3_000L, 12.5f, 2f))
+        fixStore.publish(FixReading(System.currentTimeMillis() - 3_000L, 12.5f, 2f, isMoving = true)) // Debounced (ISSUE-NOV25.25-O162).
 
         val state = hudMatching { it.accuracyMeters == 12.5f }
 

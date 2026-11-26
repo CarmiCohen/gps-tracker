@@ -181,6 +181,94 @@ class MotionSentinelTest {
         assertTrue("${phone.alerts}", phone.tiltOrLift.isEmpty())
     }
 
+    /**
+     * A hard knock on the chair's frame as the A15 saw it under a cushion (Nov25.23, ISSUE-NOV25.23-O154): the spike falls
+     * in one 50 Hz sample, [spikeG] up, then the cushion rings ±0.5 m/s² for 1.5 s. Integrated as it was, 1.2 g left
+     * 0.24 m/s and a lift of about 40 cm, as on the phone.
+     */
+    private fun Phone.knockCaughtInOneSample(spikeG: Double) {
+        var flip = false
+        feed(1_500) { t -> flip = !flip; doubleArrayOf(0.0, 0.0, g + if (t == 0L) spikeG * g else if (flip) 0.5 else -0.5) }
+        rest(3_000)
+    }
+
+    @Test
+    fun aKnockCaughtInOneSampleIsNoLift() {
+        for (spikeG in listOf(1.2, 5.7)) {
+            val phone = armedPhone()
+            phone.knockCaughtInOneSample(spikeG)
+            assertTrue("$spikeG g: ${phone.alerts}", phone.tiltOrLift.isEmpty())
+            assertTrue("$spikeG g: still armed", phone.sentinel.isArmed)
+        }
+    }
+
+    /**
+     * The knock of 4.78 g on the A15's chair at 09:27:51 (Nov25.25, ISSUE-NOV25.23-O154), replayed from its 0.1 s trace
+     * (upward cm/s²): a push over a whole 0.1 s passes the median and leaves 0.77 m/s while the phone rests; it raised
+     * `Lift alert: accelerometer, about 79 cm up` until the hold required a speed near zero.
+     */
+    @Test
+    fun aKnockThatPushesForATenthOfASecondIsNoLift() {
+        val trace = listOf(795, -68, 2, 205, -29, -12, -388, 140, -23, -15, 5, -3, -4, 4, 0, 2, -1, 1, 2, -2)
+        val notes = mutableListOf<String>()
+        val phone = Phone(MotionSentinel(onNote = { notes += it })).apply { rest(MOTION_ARM_AFTER_STILL_MS + 1_000) }
+        phone.feed(trace.size * 100L) { t -> doubleArrayOf(0.0, 0.0, g + trace[(t / 100).toInt()] / 100.0) }
+        phone.rest(LIFT_GIVE_UP_MS + 1_000)
+        assertTrue("${phone.alerts}", phone.alerts.none { it.kind == MotionSentinel.Kind.LIFT })
+        assertTrue("$notes", notes.any { it.startsWith("Lift not confirmed: ") && it.contains("the speed never returned to zero (0.6") }) // Flat bins: 0.61, the phone 0.77.
+        assertTrue("Still armed", phone.sentinel.isArmed)
+    }
+
+    /**
+     * The knock of 2.46 g at 09:32:29 (Nov25.25, ISSUE-NOV25.23-O154) left only about 0.28 m/s and raised `about 48 cm up`
+     * under the speed rule alone: its trace, with its peak sample in the first bin. A jolt over [LIFT_KNOCK_MS2] voids it.
+     */
+    @Test
+    fun aKnockOver1GVoidsTheLiftIntegration() {
+        val trace = listOf(-366, 42, 11, -9, 439, -73, 8, -193, 149, -1, 19, -4, 5, -15, 4, 3, 7, 4, -3, 3, 4)
+        val notes = mutableListOf<String>()
+        val phone = Phone(MotionSentinel(onNote = { notes += it })).apply { rest(MOTION_ARM_AFTER_STILL_MS + 1_000) }
+        phone.feed(trace.size * 100L) { t -> doubleArrayOf(if (t == 40L) 2.46 * g else 0.0, 0.0, g + trace[(t / 100).toInt()] / 100.0) }
+        phone.rest(LIFT_GIVE_UP_MS + 1_000)
+        assertTrue("${phone.alerts}", phone.alerts.none { it.kind == MotionSentinel.Kind.LIFT })
+        assertTrue("$notes", notes.any { it.startsWith("Lift not confirmed: a knock of 2.4") })
+        assertTrue("Still armed", phone.sentinel.isArmed)
+    }
+
+    /**
+     * A thief may bump the phone first: once it has rested 0.3 s after the knock, a pickup is a lift again. After a 3 g
+     * knock the gravity estimate settles for about 0.5 s first, so a pickup within about 0.8 s is not integrated (tilt
+     * may still alert).
+     */
+    @Test
+    fun aPickupAfterAKnockIsStillALift() {
+        val phone = armedPhone()
+        phone.feed(40) { t -> doubleArrayOf(if (t == 0L) 3.0 * g else 0.0, 0.0, g) }
+        phone.rest(1_000)
+        phone.feed(800) { t -> doubleArrayOf(0.0, 0.0, g + if (t < 400) 2.0 else -2.0) }
+        phone.rest(LIFT_HOLD_MS + 200)
+        assertEquals(listOf(MotionSentinel.Kind.LIFT), phone.tiltOrLift.map { it.kind })
+    }
+
+    /** A snatch: up at 6 m/s² for 0.2 s and braking as hard, 24 cm, held. The knock filter must not hide it (ISSUE-NOV25.23-O154). */
+    @Test
+    fun aQuickSnatchIsStillALift() {
+        val phone = armedPhone()
+        phone.feed(400) { t -> doubleArrayOf(0.0, 0.0, g + if (t < 200) 6.0 else -6.0) }
+        phone.rest(LIFT_HOLD_MS + 200)
+        assertEquals(listOf(MotionSentinel.Kind.LIFT), phone.tiltOrLift.map { it.kind })
+    }
+
+    @Test
+    fun aRiseThatFallsBackLeavesANoteForTuning() {
+        val notes = mutableListOf<String>()
+        val phone = Phone(MotionSentinel(onNote = { notes += it })).apply { rest(MOTION_ARM_AFTER_STILL_MS + 1_000) }
+        phone.feed(1_600) { t -> doubleArrayOf(0.0, 0.0, g + if (t < 400 || t >= 1_200) 2.0 else -2.0) } // Up 32 cm and back.
+        phone.rest(3_000)
+        assertTrue("${phone.alerts}", phone.tiltOrLift.isEmpty())
+        assertTrue("$notes", notes.single { it.startsWith("Lift") }.startsWith("Lift not confirmed: up to 3"))
+    }
+
     // Vibration (chapter 164, ISSUE-NOV5.2-O11 Group 7).
 
     @Test
@@ -271,7 +359,7 @@ class MotionSentinelTest {
         phone.knocks(VIBRATION_HITS + 2)
         assertEquals(listOf(MotionSentinel.Kind.VIBRATION), phone.alerts.map { it.kind })
         val detail = phone.alerts.single().detail
-        assertTrue(detail, detail.startsWith("3 hits in 2.4 s, strongest 0.6"))
+        assertTrue(detail, detail.startsWith("4 hits in 3.6 s, strongest 0.6")) // 3 hits in 2.4 s before ISSUE-NOV25.25-O162.
         assertTrue(detail, detail.endsWith("(limit 0.13 g)"))
         assertFalse("One disturbance, one alert", phone.sentinel.isVibrationArmed)
         assertTrue("Knocks leave tilt and lift armed", phone.sentinel.isArmed)
@@ -342,14 +430,13 @@ class MotionSentinelTest {
     @Test
     fun aShakenPickupIsBothVibrationAndLift() {
         val phone = armedPhone()
-        // Three jerks of 6 m/s² up for 0.1 s, then 2 m/s² up for 0.4 s and braking: well over 20 cm.
-        phone.feed(1_400) { t ->
-            doubleArrayOf(0.0, 0.0, g + when {
-                t % 400 < 100 && t < 1_200 -> 6.0
-                t < 500 -> 2.0
-                else -> -3.0 // Braking to a stop in the hand.
-            })
+        // Grabbed roughly: [VIBRATION_HITS] sideways jerks of 6 m/s² for 0.1 s, 0.4 s apart (ISSUE-NOV25.25-O162: four
+        // since then; three upward jerks during the rise before), then up 32 cm as in aPickupOf30CmAlertsAsLift.
+        repeat(VIBRATION_HITS) {
+            phone.jolt(6.0)
+            phone.rest(200)
         }
+        phone.feed(800) { t -> doubleArrayOf(0.0, 0.0, g + if (t < 400) 2.0 else -2.0) }
         phone.rest(LIFT_HOLD_MS + 500)
         assertEquals(setOf(MotionSentinel.Kind.VIBRATION, MotionSentinel.Kind.LIFT), phone.alerts.map { it.kind }.toSet())
         assertEquals(2, phone.alerts.size)

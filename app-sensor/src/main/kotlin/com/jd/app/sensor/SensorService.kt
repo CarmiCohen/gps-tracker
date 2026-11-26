@@ -837,12 +837,12 @@ class SensorService : Service(), SensorEventListener {
             currentTemp = lastTempCelsius,
             isCharging = lastIsPluggedIn, // On outside power the fast rate costs no battery (ISSUE-NOV17.15-O114).
             batteryLevel = lastBatteryLevel,
-            velocityMps = speed,
+            isMoving = fixStore.isMoving, // Debounced, not one fix's speed (ISSUE-NOV25.25-O162).
             isAlarmed = isAlarmed
         )
         
         if (newInterval != currentIntervalMs) {
-            SystemLogger.i("SensorService", "Sampling Updated: ${newInterval}ms (Speed: ${speed}m/s, Bat: ${lastBatteryLevel?.let { "$it%" } ?: "unknown"}, Temp: ${lastTempCelsius?.let { "${it}C" } ?: "unknown"}, Alarm window: $isAlarmed)")
+            SystemLogger.i("SensorService", "Sampling Updated: ${newInterval}ms (Speed: ${speed}m/s, moving: ${fixStore.isMoving}, Bat: ${lastBatteryLevel?.let { "$it%" } ?: "unknown"}, Temp: ${lastTempCelsius?.let { "${it}C" } ?: "unknown"}, Alarm window: $isAlarmed)")
             currentIntervalMs = newInterval
             if (preempt) orchestrator.preemptLoop("sensing_loop")
         }

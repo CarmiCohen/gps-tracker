@@ -78,7 +78,8 @@ const val ACOUSTIC_MIN_ALERT_DBFS = -50.0
 
 /**
  * How long a noise must be loud to alert (ISSUE-NOV17.10-O111); its loud frames may have gaps, like speech. 2 s since
- * ISSUE-NOV17.12-O112 (user decision, 2026-11-18): a coughing fit filled the old 1 s within 2 s.
+ * ISSUE-NOV17.12-O112 (user decision, 2026-11-18): a coughing fit filled the old 1 s within 2 s. Kept by user decision
+ * 2026-11-26 (ISSUE-NOV25.25-O162): 3 s within 10 s would let a coughing fit of 5 s or more alert.
  */
 const val ACOUSTIC_CONFIRM_MS = 2_000L
 

@@ -15,8 +15,8 @@ class FixReadingTest {
     private val now = 1_000_000L
     private val battery = BatteryReading(level = 42, isCharging = true, tempCelsius = 33.5f)
 
-    private fun fix(ageMs: Long = 0L, accuracy: Float = 8f, speedMps: Float? = 10f) =
-        FixReading(now - ageMs, accuracy, speedMps)
+    private fun fix(ageMs: Long = 0L, accuracy: Float = 8f, speedMps: Float? = 10f, isMoving: Boolean = true) =
+        FixReading(now - ageMs, accuracy, speedMps, isMoving)
 
     @Test
     fun usesBatteryAndFixValues() {
@@ -105,11 +105,17 @@ class FixReadingTest {
         assertTrue(state.isPeerActive)
     }
 
+    /**
+     * ISSUE-NOV25.25-O162: the label follows the debounced movement, not one fix's speed; the 1.5 km/h threshold is
+     * the tracker's (`MovementTrackerTest`).
+     */
     @Test
-    fun motionStateFollowsTheThreshold() {
-        assertEquals(NO_VALUE, motionState(null))
-        assertEquals("STATIONARY", motionState(0f))
-        assertEquals("STATIONARY", motionState(1.5f))
-        assertEquals("MOVING", motionState(1.6f))
+    fun motionStateFollowsTheTracker() {
+        assertEquals(NO_VALUE, motionState(null, isMoving = true))
+        assertEquals("STATIONARY", motionState(0f, isMoving = false))
+        assertEquals("STATIONARY", motionState(36f, isMoving = false))
+        assertEquals("MOVING", motionState(1.6f, isMoving = true))
+        val noisy = HudState().withLocalReadings(fix(isMoving = false), battery, now, MONITOR_SPEED_VALID_MS)
+        assertEquals("A single fast fix is no movement", "STATIONARY", noisy.trackerState)
     }
 }

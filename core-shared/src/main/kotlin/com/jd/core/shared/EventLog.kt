@@ -25,7 +25,7 @@ import kotlin.random.Random
 @Serializable
 enum class EventSource(val label: String) { MONITOR("Monitor"), SENSOR("Sensor") }
 
-/** How an event is shown: ALARM and WARNING stand out, DETAIL is listed only with the More filter on. */
+/** How an event is shown: ALARM and WARNING stand out, DETAIL is listed only under the All filter ([EventFilter]). */
 @Serializable
 enum class EventLevel { ALARM, WARNING, INFO, DETAIL }
 
@@ -56,7 +56,7 @@ const val SERVICE_STOPPED = "Sensor service stopped"
 
 /**
  * The start of the Sensor's event for a Monitor's new Home Points: a DETAIL event (ISSUE-NOV23.4-O139) that is still
- * sent to the Monitors, so theirs lists it under More too.
+ * sent to the Monitors, so theirs lists it under All too.
  */
 const val HOME_POINTS_RECEIVED = "Home points received"
 
@@ -71,7 +71,7 @@ const val HOME_POINTS_RECEIVED_KIND = "HOME_POINTS_RECEIVED"
 
 /**
  * The level of a saved file's event, both apps' `Settings exported` and the Monitor's `Trails saved`: a DETAIL, listed
- * under More (ISSUE-NOV25.12-O142); a failed save stays a WARNING.
+ * under All (ISSUE-NOV25.12-O142); a failed save stays a WARNING.
  */
 val FILE_SAVED_LEVEL = EventLevel.DETAIL
 
@@ -108,21 +108,34 @@ data class SensorEventBatch(val trackerId: String, val events: List<EventEntry>,
 data class PeerEvents(val afterMs: Long, val events: List<EventEntry>)
 
 /**
- * The events of [period] before [nowMs], newest first; DETAIL events, and the events of [detailIds] whatever their
- * level (ISSUE-NOV23.4-O139), only when [showDetails] (the More filter). With [alarmsOnly] (the Alarms filter,
- * ISSUE-NOV25.12-O142) only the ALARM events are listed.
+ * The Events list's filter, one choice of three (ISSUE-NOV25.25-O156; until then two toggles, Alarms and More). The
+ * DETAIL events, and the events of a list's `detailIds` whatever their level (ISSUE-NOV23.4-O139), are listed only
+ * under [ALL].
  */
+enum class EventFilter(val label: String) {
+    /** Only the ALARM events (ISSUE-NOV25.12-O142). */
+    ALARMS("Alarms"),
+
+    /** Every event but the details: the list as it opens. */
+    MAIN("Main"),
+
+    /** Every event (named More, and Details before ISSUE-NOV25.12-O142). */
+    ALL("All")
+}
+
+/** The events of [period] before [nowMs] that pass [filter], newest first; see [EventFilter] for [detailIds]. */
 fun List<EventEntry>.shown(
     period: ViewPeriod,
-    showDetails: Boolean,
+    filter: EventFilter,
     nowMs: Long,
-    detailIds: Set<String> = emptySet(),
-    alarmsOnly: Boolean = false
+    detailIds: Set<String> = emptySet()
 ): List<EventEntry> =
     filter {
-        it.timestampMs >= nowMs - period.durationMs &&
-            (showDetails || (it.level != EventLevel.DETAIL && it.id !in detailIds)) &&
-            (!alarmsOnly || it.level == EventLevel.ALARM)
+        it.timestampMs >= nowMs - period.durationMs && when (filter) {
+            EventFilter.ALL -> true
+            EventFilter.MAIN -> it.level != EventLevel.DETAIL && it.id !in detailIds
+            EventFilter.ALARMS -> it.level == EventLevel.ALARM && it.id !in detailIds
+        }
     }.sortedByDescending { it.timestampMs }
 
 /**

@@ -19,7 +19,13 @@ import kotlin.math.sqrt
  *   minus the resting gravity, is integrated twice over at most [LIFT_WINDOW_MS]; a height of [LIFT_MIN_HEIGHT_M]
  *   held for [LIFT_HOLD_MS] alerts (ISSUE-NOV17.10-O111: a rise that falls back is no lift). Following the gravity
  *   direction keeps a turning phone right, a sideways push adds nothing to first order, and subtracting the resting
- *   magnitude cancels the sensor's own offset.
+ *   magnitude cancels the sensor's own offset. The integration takes the median of the last [LIFT_MEDIAN_SAMPLES]
+ *   samples (ISSUE-NOV25.23-O154): a knock is a spike of a few ms that the 50 Hz sampling catches in one sample at a
+ *   random size, and integrated it leaves a speed that never returns to zero (on the A15 under a cushion, knocks of
+ *   1.2 and 5.7 g gave one sample each, 0.2 and 1.2 m/s, and lifts of 40 and 144 cm); a hand's push lasts far longer.
+ *   A harder knock pushes for a whole 0.1 s and passes the median: a jolt over [LIFT_KNOCK_MS2] voids the integration
+ *   it falls in, and a new one waits for rest; and the hold counts only while the integrated speed is near zero
+ *   ([LIFT_HELD_MAX_SPEED_MPS]): a held phone has none, a weaker knock may leave one that never returns.
  * - **Lift (barometer)**: the smoothed pressure moves at least [LIFT_BARO_MIN_M] of height away from a reference that
  *   follows slowly (so weather does not count), for [BARO_CONFIRM_MS].
  * - **Vibration**: [VIBRATION_HITS] hits within [VIBRATION_HIT_WINDOW_MS] (ISSUE-NOV17.10-O111: a single knock on the
@@ -44,7 +50,8 @@ import kotlin.math.sqrt
  *
  * Times are monotonic milliseconds (sensor event time). Not thread-safe: one sensor thread owns it; [gravity],
  * [isArmed], and [isVibrationArmed] may be read from any thread. [onNote] gets two lines for each sit check with a
- * jolt, its 0.1 s trace and, unless it alerted, why not: for tuning on the phone.
+ * jolt, its 0.1 s trace and, unless it alerted, why not, and one line for a lift integration that rose
+ * [LIFT_NOTE_HEIGHT_M] without a lift: for tuning on the phone.
  */
 class MotionSentinel(
     private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_MS,
@@ -108,6 +115,11 @@ class MotionSentinel(
     private var liftHeight = 0.0
     private var liftQuietSinceMs: Long? = null
     private var liftHeldSinceMs: Long? = null
+    private var liftPeakHeight = 0.0 // For the note of an integration that ends without a lift.
+    private var isLiftAfterKnock = false // A knock voided the integration; none until the phone rests (ISSUE-NOV25.23-O154).
+    private var liftAfterKnockQuietSinceMs: Long? = null
+    private val recentUpward = DoubleArray(LIFT_MEDIAN_SAMPLES) // The last samples' upward acceleration, a ring.
+    private var recentUpwardNext = 0
 
     @Volatile private var pressureSmoothed: Double? = null
     private var pressureReference: Double? = null
@@ -148,6 +160,7 @@ class MotionSentinel(
             gx = x; gy = y; gz = z
             publishGravity()
             liftStartMs = null
+            recentUpward.fill(0.0)
             sitStartMs = null
             lastMotionMs = nowMs
             return emptyList()
@@ -178,7 +191,7 @@ class MotionSentinel(
         if (hasRested) isVibrationArmed = true
         if (sitStartMs == null && isArmed && isMoving && !isOwnVibrationRecent(nowMs)) openSit(nowMs, previousGx, previousGy, previousGz)
         val sitAlert = checkSit(x, y, z, nowMs, dt, vibration, isMoving)
-        return listOfNotNull(vibrationAlert, sitAlert, tiltOrLift(x, y, z, nowMs, dt, isMoving, hasRested))
+        return listOfNotNull(vibrationAlert, sitAlert, tiltOrLift(x, y, z, nowMs, dt, vibration, isMoving, hasRested))
     }
 
     private fun isOwnVibrationRecent(nowMs: Long): Boolean = ownVibrationSeenMs?.let { nowMs - it <= OWN_VIBRATION_TAIL_MS } == true
@@ -321,7 +334,7 @@ class MotionSentinel(
         return held
     }
 
-    private fun tiltOrLift(x: Double, y: Double, z: Double, nowMs: Long, dt: Double, isMoving: Boolean, hasRested: Boolean): Alert? {
+    private fun tiltOrLift(x: Double, y: Double, z: Double, nowMs: Long, dt: Double, vibration: Double, isMoving: Boolean, hasRested: Boolean): Alert? {
         if (!isArmed) {
             if (hasRested) arm()
             return null
@@ -338,20 +351,49 @@ class MotionSentinel(
             tiltSinceMs = null
         }
 
+        val gravityLength = norm(gx, gy, gz).coerceAtLeast(1.0) // Only near free fall could it be smaller.
+        val upward = medianUpward((x * gx + y * gy + z * gz) / gravityLength - refMagnitude)
+        if (vibration > LIFT_KNOCK_MS2) {
+            // A knock: its burst of a few samples cannot be integrated, so the integration it falls in is void, and a
+            // new one waits for the phone to rest (ISSUE-NOV25.23-O154: knocks of 2.3 to 4.8 g left 0.28 to 0.77 m/s).
+            if (liftStartMs != null && !isLiftAfterKnock) {
+                onNote("Lift not confirmed: a knock of ${"%.2f".format(java.util.Locale.US, vibration / STANDARD_GRAVITY)} g voided the integration")
+            }
+            liftStartMs = null
+            liftHeldSinceMs = null
+            isLiftAfterKnock = true
+            liftAfterKnockQuietSinceMs = null
+            return null
+        }
+        if (isLiftAfterKnock) {
+            liftAfterKnockQuietSinceMs = if (isMoving) null else liftAfterKnockQuietSinceMs ?: nowMs
+            if (liftAfterKnockQuietSinceMs?.let { nowMs - it >= LIFT_SETTLE_MS } != true) return null
+            isLiftAfterKnock = false
+        }
         if (liftStartMs == null && isMoving) {
             liftStartMs = nowMs
             liftVelocity = 0.0
             liftHeight = 0.0
+            liftPeakHeight = 0.0
             liftQuietSinceMs = null
             liftHeldSinceMs = null
         }
         val start = liftStartMs ?: return null
-        val gravityLength = norm(gx, gy, gz).coerceAtLeast(1.0) // Only near free fall could it be smaller.
-        val upward = (x * gx + y * gy + z * gz) / gravityLength - refMagnitude
         liftVelocity += upward * dt
         liftHeight += liftVelocity * dt
+        liftPeakHeight = maxOf(liftPeakHeight, liftHeight)
         if (liftHeight >= LIFT_MIN_HEIGHT_M) {
-            // Held up, moving or not: the integration goes on until the hold ends (ISSUE-NOV17.10-O111).
+            // Held up, moving or not: the integration goes on until the hold ends (ISSUE-NOV17.10-O111). A held phone has
+            // no speed, so the hold counts only while the integrated speed is near zero; a knock's push leaves a speed
+            // that never returns (ISSUE-NOV25.23-O154: 0.77 m/s and 79 cm on the A15, Nov25.25).
+            if (abs(liftVelocity) > LIFT_HELD_MAX_SPEED_MPS) {
+                liftHeldSinceMs = null
+                if (nowMs - start >= LIFT_GIVE_UP_MS) {
+                    liftStartMs = null
+                    onNote("Lift not confirmed: ${(liftHeight * 100).toInt()} cm in ${nowMs - start} ms, but the speed never returned to zero (${"%.2f".format(java.util.Locale.US, liftVelocity)} m/s): a knock")
+                }
+                return null
+            }
             val heldSince = liftHeldSinceMs ?: nowMs.also { liftHeldSinceMs = it }
             if (nowMs - heldSince >= LIFT_HOLD_MS) {
                 return disarm(nowMs, Alert(Kind.LIFT, "accelerometer, about ${(liftHeight * 100).toInt()} cm up for ${LIFT_HOLD_MS / 1000.0} s"))
@@ -361,8 +403,23 @@ class MotionSentinel(
         liftHeldSinceMs = null // Fell back below the height: put down again, or a rebound.
         liftQuietSinceMs = if (isMoving) null else liftQuietSinceMs ?: nowMs
         val settled = liftQuietSinceMs?.let { nowMs - it >= LIFT_SETTLE_MS } == true
-        if (settled || nowMs - start >= LIFT_WINDOW_MS) liftStartMs = null
+        if (settled || nowMs - start >= LIFT_WINDOW_MS) {
+            liftStartMs = null
+            if (liftPeakHeight >= LIFT_NOTE_HEIGHT_M) {
+                onNote("Lift not confirmed: up to ${(liftPeakHeight * 100).toInt()} cm in ${nowMs - start} ms, end speed ${"%.2f".format(java.util.Locale.US, liftVelocity)} m/s")
+            }
+        }
         return null
+    }
+
+    /**
+     * The median of the last [LIFT_MEDIAN_SAMPLES] upward accelerations, [upward] included (ISSUE-NOV25.23-O154): a knock's
+     * one or two sample spike drops out, a push of three samples (60 ms) or more passes, two samples late.
+     */
+    private fun medianUpward(upward: Double): Double {
+        recentUpward[recentUpwardNext] = upward
+        recentUpwardNext = (recentUpwardNext + 1) % recentUpward.size
+        return recentUpward.sortedArray()[recentUpward.size / 2]
     }
 
     /** Feeds one barometer sample in hPa; returns an alert or null. */
@@ -405,6 +462,7 @@ class MotionSentinel(
         tiltSinceMs = null
         liftStartMs = null
         liftHeldSinceMs = null
+        recentUpward.fill(0.0)
         pressureReference = pressureSmoothed
         baroSinceMs = null
     }
@@ -469,7 +527,30 @@ const val LIFT_SETTLE_MS = 300L
 /** The phone must stay [LIFT_MIN_HEIGHT_M] up this long to be a lift (ISSUE-NOV17.10-O111). */
 const val LIFT_HOLD_MS = 1_000L
 
+/** The lift integration takes the median of this many samples, 0.1 s at 50 Hz, so a knock's spike drops out (ISSUE-NOV25.23-O154). */
+const val LIFT_MEDIAN_SAMPLES = 5
+
+/**
+ * The hold of a lift counts only while the integrated speed is at most this (m/s), as a held phone has none
+ * (ISSUE-NOV25.23-O154): a knock on the A15's chair left 0.77 m/s at rest (Nov25.25), real pickups end near 0.
+ */
+const val LIFT_HELD_MAX_SPEED_MPS = 0.3
+
+/** An integration over the height whose speed has not returned to [LIFT_HELD_MAX_SPEED_MPS] ends this long after its start. */
+const val LIFT_GIVE_UP_MS = 5_000L
+
+/** An integration that rose this high (m) without a lift logs a note, for tuning on the phone (ISSUE-NOV25.23-O154). */
+const val LIFT_NOTE_HEIGHT_M = 0.10
+
 const val STANDARD_GRAVITY = 9.80665
+
+/**
+ * A jolt stronger than this (m/s², 1.0 g, as [SIT_JOLT_MAX_MS2]) is a knock: it voids the lift integration it falls in
+ * (ISSUE-NOV25.23-O154). Knocks on the A15's chair measured 1.2 to 5.7 g (Nov25.23, Nov25.25); a hand's pickup stays far
+ * below (stand-ups under a cushion 0.4 to 0.6 g). A snatch over 1 g is no accelerometer lift; its vibration or tilt
+ * usually still alerts.
+ */
+const val LIFT_KNOCK_MS2 = 1.0 * STANDARD_GRAVITY
 
 const val DEFAULT_VIBRATION_SENSITIVITY = 0.5f
 
@@ -478,9 +559,10 @@ const val VIBRATION_HOLD_MS = 200L
 
 /**
  * The hits within [VIBRATION_HIT_WINDOW_MS] that make a vibration alert (ISSUE-NOV17.10-O111): on the A15 resting on a
- * desk, single hits over the 0.13 g default came about once in 20 to 60 minutes, each alone.
+ * desk, single hits over the 0.13 g default came about once in 20 to 60 minutes, each alone. 4 since ISSUE-NOV25.25-O162
+ * (user decision, 2026-11-26: a few hits over about 10 s; 3 before).
  */
-const val VIBRATION_HITS = 3
+const val VIBRATION_HITS = 4
 
 const val VIBRATION_HIT_WINDOW_MS = 10_000L
 

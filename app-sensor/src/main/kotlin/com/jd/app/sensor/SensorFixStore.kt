@@ -2,6 +2,7 @@ package com.jd.app.sensor
 
 import android.location.Location
 import android.os.SystemClock
+import com.jd.core.shared.MovementTracker
 import com.jd.core.ui.FixReading
 import com.jd.core.ui.isFixFresh
 import com.jd.core.ui.toFixReading
@@ -14,7 +15,8 @@ import javax.inject.Singleton
 /**
  * The latest fix [SensorService] received: the one copy (SIMP-NOV7.2-S1) its telemetry, sampling rate and Info read as
  * [location], and the HUD as [fix]. Both null while the service is not running or has no fix yet, so the HUD shows no
- * position values.
+ * position values. Each fix also feeds the one [MovementTracker] (ISSUE-NOV25.25-O162), read by the row clock as
+ * [isMoving] and by the HUD through [FixReading.isMoving].
  */
 @Singleton
 class SensorFixStore @Inject constructor() {
@@ -23,6 +25,12 @@ class SensorFixStore @Inject constructor() {
 
     /** Written on the service's main looper, read by its sensing loop and sensor threads. */
     @Volatile var location: Location? = null
+        private set
+
+    private var movement = MovementTracker()
+
+    /** The debounced movement up to [location] (ISSUE-NOV25.25-O162); false without a fix. */
+    @Volatile var isMoving = false
         private set
 
     /**
@@ -41,8 +49,11 @@ class SensorFixStore @Inject constructor() {
     val satelliteFixTimeMs: StateFlow<Long?> = satelliteFix.asStateFlow()
 
     fun publish(location: Location) {
+        val speed = if (location.hasSpeed()) location.speed else null
+        val accuracy = if (location.hasAccuracy()) location.accuracy else 0f
+        isMoving = movement.onFix(location.time, location.latitude, location.longitude, accuracy, speed)
         this.location = location
-        latest.value = location.toFixReading()
+        latest.value = location.toFixReading(isMoving)
     }
 
     /** A HUD reading without a [Location], for the HUD tests: [location] is cleared, so the two never disagree. */
@@ -56,6 +67,8 @@ class SensorFixStore @Inject constructor() {
     }
 
     fun clear() {
+        movement = MovementTracker()
+        isMoving = false
         location = null
         latest.value = null
         satelliteFix.value = null

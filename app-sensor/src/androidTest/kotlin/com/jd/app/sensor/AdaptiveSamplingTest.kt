@@ -34,22 +34,22 @@ class AdaptiveSamplingTest {
         }
 
         // 1. Stationary Baseline (0.1Hz / 10s)
-        currentInterval.set(SensingEngine.getOptimalIntervalMs(30f, false, 80, 0f))
+        currentInterval.set(SensingEngine.getOptimalIntervalMs(30f, false, 80, isMoving = false))
         assertEquals(10000L, currentInterval.get())
         orchestrator.preemptLoop("test_loop")
         
         // 2. Slow Movement (1Hz / 1s)
-        currentInterval.set(SensingEngine.getOptimalIntervalMs(30f, false, 80, 1.0f))
+        currentInterval.set(SensingEngine.getOptimalIntervalMs(30f, false, 80, isMoving = true)) // Moving by the tracker (ISSUE-NOV25.25-O162).
         assertEquals(1000L, currentInterval.get())
         orchestrator.preemptLoop("test_loop")
 
         // 3. Fast Movement: still one row a second, the fastest row clock (ISSUE-NOV22.5-O133)
-        currentInterval.set(SensingEngine.getOptimalIntervalMs(30f, false, 80, 10.0f))
+        currentInterval.set(SensingEngine.getOptimalIntervalMs(30f, false, 80, isMoving = true))
         assertEquals(1000L, currentInterval.get())
         orchestrator.preemptLoop("test_loop")
 
         // 4. Survival Mode (Battery < 15%)
-        currentInterval.set(SensingEngine.getOptimalIntervalMs(30f, false, 10, 10.0f))
+        currentInterval.set(SensingEngine.getOptimalIntervalMs(30f, false, 10, isMoving = true))
         assertEquals(10000L, currentInterval.get()) // Floor at 0.1Hz (Nov1.4 Throttling)
 
         job.cancel()

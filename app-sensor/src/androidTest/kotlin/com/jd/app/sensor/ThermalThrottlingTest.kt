@@ -20,7 +20,7 @@ class ThermalThrottlingTest {
             currentTemp = 30f,
             isCharging = false,
             batteryLevel = 80,
-            velocityMps = 10f
+            isMoving = true
         )
         assertEquals(1000L, nominal)
 
@@ -29,7 +29,7 @@ class ThermalThrottlingTest {
             currentTemp = 30f,
             isCharging = false,
             batteryLevel = 18,
-            velocityMps = 10f
+            isMoving = true
         )
         assertEquals(1000L, lowBattery)
 
@@ -38,7 +38,7 @@ class ThermalThrottlingTest {
             currentTemp = 41f,
             isCharging = false,
             batteryLevel = 80,
-            velocityMps = 10f
+            isMoving = true
         )
         assertEquals(1000L, thermalWarning)
 
@@ -47,7 +47,7 @@ class ThermalThrottlingTest {
             currentTemp = 30f,
             isCharging = false,
             batteryLevel = 10,
-            velocityMps = 0f
+            isMoving = false
         )
         assertEquals(10000L, criticalSurvival)
 
@@ -56,7 +56,7 @@ class ThermalThrottlingTest {
             currentTemp = 46f,
             isCharging = false,
             batteryLevel = 100,
-            velocityMps = 10f
+            isMoving = true
         )
         assertEquals(10000L, criticalThermal)
 
@@ -65,7 +65,7 @@ class ThermalThrottlingTest {
             currentTemp = 41f,
             isCharging = true,
             batteryLevel = 80,
-            velocityMps = 10f
+            isMoving = true
         )
         assertEquals(1000L, chargingWarm)
     }

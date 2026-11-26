@@ -26,7 +26,7 @@ class SensingEngineStressTest {
             currentTemp = 46f,
             isCharging = false,
             batteryLevel = 100,
-            velocityMps = 10f
+            isMoving = true
         )
         
         assertTrue(
@@ -44,7 +44,7 @@ class SensingEngineStressTest {
             currentTemp = 30f,
             isCharging = false,
             batteryLevel = 10, // Critical threshold
-            velocityMps = 5f
+            isMoving = true
         )
         
         assertTrue(

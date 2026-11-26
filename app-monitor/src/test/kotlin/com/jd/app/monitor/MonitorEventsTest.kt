@@ -136,7 +136,7 @@ class MonitorEventsTest {
         )
     }
 
-    /** Chapter 253 (ISSUE-NOV22.7-O134): a Monitor that takes the shared set says so in its list, not only with More. */
+    /** Chapter 253 (ISSUE-NOV22.7-O134): a Monitor that takes the shared set says so in its list, not only under All. */
     @Test
     fun `taking the shared Home Points is listed`() {
         val shared = GeofenceConfig(listOf(HomePoint(32.1, 34.8), HomePoint(32.2, 34.9)), radiusMeters = 150.0, revision = 9L)

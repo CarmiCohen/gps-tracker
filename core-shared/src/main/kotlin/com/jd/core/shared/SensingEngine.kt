@@ -18,7 +18,6 @@ object SensingEngine {
     /** The slow row clock: stationary, critical battery or critical heat. */
     const val SURVIVAL_INTERVAL_MS = 10_000L
     private const val SURVIVAL_BATTERY_PERCENT = 15
-    private const val MOVING_MPS = 0.5f
     /** How long after its last alarm a Sensor keeps one row a second (ISSUE-NOV22.8-O136, user decision 2026-11-22). */
     const val ALARM_WINDOW_MS = 5 * 60_000L
 
@@ -67,7 +66,8 @@ object SensingEngine {
      * The fastest rate is one row a second (ISSUE-NOV22.5-O133): a location fix comes at most once a second, so faster
      * rows repeated the same position and used up the relay's bandwidth. Motion, noise and light are detected on the
      * sensors' own events, and a queued alarm preempts the loop, so a slower row clock delays no alarm.
-     * Moving, on outside power, or within the alarm window ([isAlarmed], ISSUE-NOV22.8-O136): [ROW_INTERVAL_MS].
+     * Moving ([isMoving] by [MovementTracker], ISSUE-NOV25.25-O162: one fix over 0.5 m/s before), on outside power, or
+     * within the alarm window ([isAlarmed], ISSUE-NOV22.8-O136): [ROW_INTERVAL_MS].
      * Stationary, critical battery (< 15 %) or critical heat (with hysteresis, R133): [SURVIVAL_INTERVAL_MS]; heat and
      * battery override movement, outside power and an alarm (R-ID 83, user decision 2026-11-22).
      * A temperature or battery level not known (null) is neither critical (SIMP-NOV17.7-S1).
@@ -77,7 +77,7 @@ object SensingEngine {
         currentTemp: Float?,
         isCharging: Boolean,
         batteryLevel: Int?,
-        velocityMps: Float = 0f,
+        isMoving: Boolean = false,
         isAlarmed: Boolean = false
     ): Long {
         val isCriticalHeat = currentTemp != null && (currentTemp >= THERMAL_CRITICAL_CELSIUS ||
@@ -86,7 +86,7 @@ object SensingEngine {
         val isCriticalBattery = batteryLevel != null && batteryLevel < SURVIVAL_BATTERY_PERCENT
         return when {
             isCriticalHeat || isCriticalBattery -> SURVIVAL_INTERVAL_MS
-            isAlarmed || isCharging || velocityMps > MOVING_MPS -> ROW_INTERVAL_MS
+            isAlarmed || isCharging || isMoving -> ROW_INTERVAL_MS
             else -> SURVIVAL_INTERVAL_MS
         }
     }

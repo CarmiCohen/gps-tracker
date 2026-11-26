@@ -38,6 +38,7 @@ import com.jd.core.ui.remoteGpsLed
 import com.jd.core.ui.getAppVersionName
 import com.jd.core.ui.metersPerSecondToKmh
 import com.jd.core.ui.motionState
+import com.jd.core.shared.MovementTracker
 import com.jd.core.ui.isLocationProviderEnabled
 import com.jd.core.ui.isNetworkAvailable
 import com.jd.core.ui.readBattery
@@ -82,7 +83,7 @@ class MonitorViewModel @Inject constructor(
 
     /**
      * [savedTo] is the shown path when the file went straight to the GPS-Tracker folder (Nov19.3). The event is a
-     * DETAIL one, listed under More (ISSUE-NOV25.12-O142), like the trails saved.
+     * DETAIL one, listed under All (ISSUE-NOV25.12-O142), like the trails saved.
      */
     fun exportSettings(uri: Uri, savedTo: String? = null) {
         viewModelScope.launch {
@@ -396,6 +397,10 @@ class MonitorViewModel @Inject constructor(
         .atUiRate()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState(isSpeedDimmed = true))
 
+    // The paired Sensor's debounced movement from its rows (ISSUE-NOV25.25-O162), started over for a new target.
+    private var sensorMovement = MovementTracker()
+    private var sensorMovementTarget: String? = null
+
     val remoteHudState: StateFlow<HudState> = combine(
         identityManager.targetId.filterNotNull(),
         signalingClient.isConnected,
@@ -409,6 +414,14 @@ class MonitorViewModel @Inject constructor(
         val isGpsActive = latest != null && (latest.lat != 0.0 || latest.lng != 0.0)
         val speedMps = latest?.takeIf { isGpsActive && it.speed >= 0f }?.speed
         val speedKmh = speedMps?.let(::metersPerSecondToKmh)
+        if (target != sensorMovementTarget) {
+            sensorMovement = MovementTracker()
+            sensorMovementTarget = target
+        }
+        // The same row fed again on the next tick is ignored by its time. A row repeating the Sensor's last fix counts as
+        // a fix; the distance beyond the accuracy keeps a resting Sensor's repeated fast fix from making MOVING.
+        val isMoving = latest?.takeIf { isGpsActive }
+            ?.let { sensorMovement.onFix(it.timestamp, it.lat, it.lng, it.accuracy, speedMps) } ?: false
         val lastFixAgeMs = lastFix?.takeIf { it.first == target }?.let { (now - it.second).coerceAtLeast(0L) }
 
         HudState(
@@ -419,7 +432,7 @@ class MonitorViewModel @Inject constructor(
             leds = listOf(
                 HudLed("GPS", remoteGpsLed(isTrackerPresent, latest?.satsUsed ?: -1, lastFixAgeMs))
             ),
-            trackerState = motionState(speedKmh),
+            trackerState = motionState(speedKmh, isMoving),
             speedKmh = speedKmh,
             batteryLevel = latest?.batteryLevel,
             isCharging = latest?.isCharging ?: false,

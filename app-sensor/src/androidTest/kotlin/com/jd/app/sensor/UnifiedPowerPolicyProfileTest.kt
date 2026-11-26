@@ -22,7 +22,7 @@ class UnifiedPowerPolicyProfileTest {
             currentTemp = 30f,
             isCharging = false,
             batteryLevel = 90,
-            velocityMps = 10f
+            isMoving = true
         )
         assertEquals("Nominal state should request the fastest row clock (1 s, ISSUE-NOV22.5-O133)", 1000L, nominal)
 
@@ -31,7 +31,7 @@ class UnifiedPowerPolicyProfileTest {
             currentTemp = 30f,
             isCharging = false,
             batteryLevel = 18, // Below 20% threshold
-            velocityMps = 10f
+            isMoving = true
         )
         assertTrue("Low battery MUST force at least 1s interval. Got: $lowBattery", lowBattery >= 1000L)
 
@@ -40,7 +40,7 @@ class UnifiedPowerPolicyProfileTest {
             currentTemp = 30f,
             isCharging = false,
             batteryLevel = 10, // Critical threshold
-            velocityMps = 10f
+            isMoving = true
         )
         assertEquals("Critical battery MUST force 10s survival interval", 10000L, criticalBattery)
     }
@@ -53,7 +53,7 @@ class UnifiedPowerPolicyProfileTest {
             currentTemp = 41f,
             isCharging = true,
             batteryLevel = 15,
-            velocityMps = 5f
+            isMoving = true
         )
         // Thermal (41C) forces 1s backoff regardless of charging status
         assertEquals("Thermal limit MUST override charging benefits", 1000L, chargingWarm)
