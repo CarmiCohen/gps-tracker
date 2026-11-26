@@ -948,6 +948,15 @@ class SensorService : Service(), SensorEventListener {
                 sendSitExamples(book)
             }
             .launchIn(serviceScope)
+        // Sits are judged by the active placement's examples learned on this phone (ISSUE-NOV26.0-O163 part 3).
+        combine(sensorDataStore.sensorBehaviour.map { it.placement }.distinctUntilChanged(), sensorDataStore.sitExamples.distinctUntilChanged()) { placement, book ->
+            SitJudge.of(book, placement, Build.MODEL)
+        }
+            .onEach { judge ->
+                motionSentinel.sitJudge = judge
+                SystemLogger.i("SitLearning", judge.describe())
+            }
+            .launchIn(serviceScope)
     }
 
     private suspend fun sendSitExamples(book: SitExampleBook) {

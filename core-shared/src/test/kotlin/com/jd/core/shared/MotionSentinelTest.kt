@@ -893,6 +893,73 @@ class MotionSentinelTest {
         assertTrue("${seat.phone.alerts}", seat.phone.alerts.any { it.kind == MotionSentinel.Kind.VIBRATION })
     }
 
+    // Judging by learned examples (ISSUE-NOV26.0-O163 part 3).
+
+    private fun judgeOf(examples: List<SitExample> = emptyList(), occupied: OccupiedEnvelope? = null) =
+        SitJudge(DEFAULT_SEAT_PLACEMENT, PlacementExamples(DEFAULT_SEAT_PLACEMENT.id, "SM-A155F", false, examples, occupied))
+
+    /** The numbers of the sit check that [action] makes on a fresh armed phone. */
+    private fun featuresOf(action: Phone.() -> Unit): SitFeatures {
+        val checks = mutableListOf<SitCheck>()
+        Phone(MotionSentinel(onSitCheck = { checks += it })).apply { rest(MOTION_ARM_AFTER_STILL_MS + 1_000); action(); rest(SIT_WINDOW_MS) }
+        return checks.single().features
+    }
+
+    private val farBump = SitFeatures(joltG = 2.5, firstMoveMs2 = 1.5, tiltDeg = 6.0, settleMs = 4_000L)
+
+    @Test
+    fun aGentleSitLearnedAsASitAlerts() {
+        val gentle: Phone.() -> Unit = { sink(0.015, overMs = 200) } // 0.15 g, under the fixed rule's 0.25 g.
+        val learned = featuresOf(gentle)
+        val notes = mutableListOf<String>()
+        val phone = Phone(MotionSentinel(onNote = { notes += it })).apply { rest(MOTION_ARM_AFTER_STILL_MS + 1_000) }
+        phone.sentinel.sitJudge = judgeOf(listOf(SitExample(SitLabel.SIT, 1L, learned, SitVerdict.NONE), SitExample(SitLabel.BUMP, 2L, farBump, SitVerdict.NONE)))
+        phone.gentle()
+        phone.rest(SIT_WINDOW_MS)
+        val detail = phone.sits.single().detail
+        assertTrue(detail, detail.startsWith("Chair, close to a learned sit: "))
+        assertTrue("$notes", notes.any { it.startsWith("Sit by the learned examples (the fixed rule: jolt under 0.25 g)") })
+    }
+
+    /** A car door or a push on the seat may look like a sit to the fixed rule; learned as a bump, it does not alert. */
+    @Test
+    fun aSitLikeCheckLearnedAsABumpDoesNotAlert() {
+        val learned = featuresOf { cushion(0.0, 1.5) }
+        val farSit = learned.copy(joltG = learned.joltG + 0.6, firstMoveMs2 = -1.0)
+        val notes = mutableListOf<String>()
+        val phone = Phone(MotionSentinel(onNote = { notes += it })).apply { rest(MOTION_ARM_AFTER_STILL_MS + 1_000) }
+        phone.sentinel.sitJudge = judgeOf(listOf(SitExample(SitLabel.BUMP, 1L, learned, SitVerdict.SIT), SitExample(SitLabel.SIT, 2L, farSit, SitVerdict.SIT)))
+        phone.cushion(0.0, 1.5)
+        assertTrue("${phone.alerts}", phone.sits.isEmpty())
+        assertTrue("$notes", notes.any { it.startsWith("Sit not confirmed (the learned examples): Chair, close to a learned bump: ") })
+    }
+
+    @Test
+    fun withoutLearnedExamplesTheFixedRuleDecidesAsBefore() {
+        val phone = armedPhone()
+        phone.sentinel.sitJudge = judgeOf(occupied = OccupiedEnvelope(0L, emptyList()))
+        phone.cushion(0.0, 1.5)
+        assertTrue(phone.sits.single().detail, phone.sits.single().detail.startsWith("first move down "))
+    }
+
+    /** A sitter learned moving gently: hits of 0.5 g, under the fixed 1 g, count as vibration while seated. */
+    @Test
+    fun aLearnedSeatedStepTightensTheSeatedVibrationLimit() {
+        fun seatedJolts(judge: SitJudge?): List<MotionSentinel.Alert> {
+            val seat = SeatedPhone()
+            judge?.let { seat.phone.sentinel.sitJudge = it }
+            seat.phone.cushion(0.0, 0.0) // Flat, so the sideways jolts have no first move up or down.
+            seat.phone.rest(2_000)
+            seat.phone.jolts(5.0) // 0.51 g sideways.
+            seat.phone.rest(SIT_WINDOW_MS)
+            return seat.phone.alerts.filter { it.kind == MotionSentinel.Kind.VIBRATION }
+        }
+        assertTrue("Fixed limit 1 g", seatedJolts(null).isEmpty())
+        val window = StillnessMeter.Window(500, 5.0, 20, 6, peakMg = 100.0, slowSdMg = 1.0, slowTiltDeg = 0.5)
+        val vibration = seatedJolts(judgeOf(occupied = OccupiedEnvelope(0L, List(11) { window }))).single()
+        assertTrue(vibration.detail, vibration.detail.endsWith("(limit 0.30 g while seated)"))
+    }
+
     @Test
     fun insideThePeriodTheAccelerometerLiftIsOnlyNoted() {
         val seat = SeatedPhone()

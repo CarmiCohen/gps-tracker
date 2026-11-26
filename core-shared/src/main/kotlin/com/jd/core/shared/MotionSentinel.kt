@@ -60,6 +60,9 @@ import kotlin.math.sqrt
  *   or stand-up's own vibration alert is dropped (held while the sit check is open). What no seat explains still alarms:
  *   a tilt over the limit, the phone resting [SIT_PERIOD_NEW_REST_DEG] or more away from where it lay before the sit,
  *   and the barometer's lift.
+ * - **Learned placements** (ISSUE-NOV26.0-O163 part 3): with examples learned on this phone for the active placement,
+ *   [sitJudge] decides each sit check under the tilt limit (a sit, a stand-up, or neither) from the nearest examples,
+ *   the fixed rule only where none is close; the seated step sets the seated vibration limit.
  *
  * Times are monotonic milliseconds (sensor event time). Not thread-safe: one sensor thread owns it; [gravity],
  * [isArmed], and [isVibrationArmed] may be read from any thread. [onNote] gets two lines for each sit check with a
@@ -85,6 +88,12 @@ class MotionSentinel(
      * is not dropped, as no sit alert covers it (ISSUE-NOV25.23-O155).
      */
     @Volatile var isSitEnabled = true
+
+    /**
+     * Judges each sit check by the active placement's examples learned on this phone, and sets the seated vibration
+     * limit from its seated step (ISSUE-NOV26.0-O163 part 3); without examples the fixed rule alone, as before.
+     */
+    @Volatile var sitJudge: SitJudge = SitJudge(DEFAULT_SEAT_PLACEMENT, null)
 
     private var sitPeriod: SitPeriod? = null
 
@@ -365,48 +374,56 @@ class MotionSentinel(
         ).joinToString(", ")
         val isCandidate = isRested && hasJolt && !isKnock && !isOverTiltLimit && !isUpFirst
         val period = sitPeriod
-        if (isCandidate && (isDownFirst || isBaroDrop)) {
-            noteSitTrace(nowMs)
-            onSitCheck(SitCheck(features, SitVerdict.SIT))
-            sitStartMs = null
-            if (!isSitEnabled) return Alert(Kind.SIT, detail) // Not sent; no period (ISSUE-NOV25.23-O155).
+        val rule = when {
+            isCandidate && (isDownFirst || isBaroDrop) -> SitVerdict.SIT
+            period != null && isRested && hasJolt && !isKnock && !isOverTiltLimit && isUpFirst -> SitVerdict.STAND_UP
+            else -> SitVerdict.NONE
+        }
+        if (rule == SitVerdict.NONE) {
+            // No clear first move: a barometer, lagging its 2 s smoothing, may still show the drop later in the window.
+            if (isCandidate && !isOver && sitRefPressure != null && pressureSmoothed != null) return null
+            if (sitPeakJolt < SIT_NOTE_JOLT_MS2) {
+                sitStartMs = null
+                return null
+            }
+        }
+        noteSitTrace(nowMs)
+        onSitCheck(SitCheck(features, rule))
+        sitStartMs = null
+        // The placement's learned examples judge the check (ISSUE-NOV26.0-O163 part 3); a tilt over the limit is the tilt alarm's.
+        val judge = sitJudge
+        val judgement = if (isOverTiltLimit) SitJudgement(SitVerdict.NONE, SitMatch.RULE) else judge.judge(features, rule)
+        val judged = judgement.text?.let { "${judge.placement.label}, $it: $detail" } ?: detail
+        val ruleWhy = when {
+            !hasJolt -> "jolt under ${"%.2f".format(java.util.Locale.US, SIT_JOLT_MS2 / STANDARD_GRAVITY)} g"
+            !isRested -> "no rest within ${SIT_WINDOW_MS / 1000} s"
+            isKnock -> "too sharp: a knock or a blow"
+            isUpFirst -> "up first: standing up or a pickup"
+            isOverTiltLimit -> "tilted over the limit"
+            else -> "no clear first move"
+        }
+        if (judgement.verdict == SitVerdict.SIT) {
+            if (!isSitEnabled) return Alert(Kind.SIT, judged) // Not sent; no period (ISSUE-NOV25.23-O155).
+            if (rule != SitVerdict.SIT) onNote("Sit by the learned examples (the fixed rule: $ruleWhy): $judged")
             dropSitVibration("the jolts of a sit")
             if (period == null) {
                 // No disarm (ISSUE-NOV25.23-O155): tilt keeps the resting position from before the sit.
                 sitPeriod = SitPeriod(nowMs)
-                return Alert(Kind.SIT, detail)
+                return Alert(Kind.SIT, judged)
             }
-            onNote("Sit inside the sitting period, no new alert: $detail")
+            onNote("Sit inside the sitting period, no new alert: $judged")
             if (start >= period.startMs + SIT_SETTLE_MS) onSitterMovement(period, nowMs, "a sit")
             return null
         }
-        if (period != null && isRested && hasJolt && !isKnock && !isOverTiltLimit && isUpFirst) {
-            noteSitTrace(nowMs)
-            onSitCheck(SitCheck(features, SitVerdict.STAND_UP))
-            sitStartMs = null
+        if (judgement.verdict == SitVerdict.STAND_UP && period != null) {
             dropSitVibration("the jolts of a stand-up")
-            onNote("Stand-up in the sitting period: it ends after ${SIT_STOOD_UP_EMPTY_MS / 60_000} min without movement: $detail")
+            onNote("Stand-up in the sitting period: it ends after ${SIT_STOOD_UP_EMPTY_MS / 60_000} min without movement: $judged")
             period.standUpMs = start
             period.standUpEndMs = nowMs
             return null
         }
-        // No clear first move: a barometer, lagging its 2 s smoothing, may still show the drop later in the window.
-        if (isCandidate && !isOver && sitRefPressure != null && pressureSmoothed != null) return null
-        if (sitPeakJolt >= SIT_NOTE_JOLT_MS2) {
-            noteSitTrace(nowMs)
-            val why = when {
-                !hasJolt -> "jolt under ${"%.2f".format(java.util.Locale.US, SIT_JOLT_MS2 / STANDARD_GRAVITY)} g"
-                !isRested -> "no rest within ${SIT_WINDOW_MS / 1000} s"
-                isKnock -> "too sharp: a knock or a blow"
-                isUpFirst -> "up first: standing up or a pickup"
-                isOverTiltLimit -> "tilted over the limit"
-                else -> "no clear first move"
-            }
-            onNote("Sit not confirmed ($why): $detail")
-            onSitCheck(SitCheck(features, SitVerdict.NONE))
-            if (period != null && start >= period.startMs + SIT_SETTLE_MS) onSitterMovement(period, nowMs, "a jolt")
-        }
-        sitStartMs = null
+        onNote("Sit not confirmed (${if (judgement.match == SitMatch.CLOSE) "the learned examples" else ruleWhy}): $judged")
+        if (period != null && start >= period.startMs + SIT_SETTLE_MS) onSitterMovement(period, nowMs, "a jolt")
         return null
     }
 
@@ -424,8 +441,10 @@ class MotionSentinel(
      * phone's own motor runs (ISSUE-NOV9.2-O62).
      */
     private fun checkVibration(vibration: Double, nowMs: Long): Alert? {
-        // Inside a sitting period a sitter's movement is no hit; a blow is (ISSUE-NOV25.23-O155).
-        val limit = if (sitPeriod != null) maxOf(vibrationThreshold, SIT_JOLT_MAX_MS2) else vibrationThreshold
+        // Inside a sitting period a sitter's movement is no hit; a blow is (ISSUE-NOV25.23-O155); how hard, the seated
+        // step tells when learned (ISSUE-NOV26.0-O163 part 3).
+        val isSeated = sitPeriod != null
+        val limit = if (isSeated) sitJudge.seatedVibrationLimit(vibrationThreshold) else vibrationThreshold
         val isOverLimit = vibration >= limit
         val wasOverLimit = wasOverVibrationLimit
         wasOverVibrationLimit = isOverLimit
@@ -445,7 +464,8 @@ class MotionSentinel(
                 val spanS = (nowMs - vibrationHits.first().first) / 1000.0
                 heldVibration = Alert(
                     Kind.VIBRATION,
-                    "${vibrationHits.size} hits in ${"%.1f".format(java.util.Locale.US, spanS)} s, strongest ${"%.2f".format(java.util.Locale.US, strongest / STANDARD_GRAVITY)} g (limit ${"%.2f".format(java.util.Locale.US, vibrationThreshold / STANDARD_GRAVITY)} g)"
+                    "${vibrationHits.size} hits in ${"%.1f".format(java.util.Locale.US, spanS)} s, strongest ${"%.2f".format(java.util.Locale.US, strongest / STANDARD_GRAVITY)} g " +
+                        "(limit ${"%.2f".format(java.util.Locale.US, limit / STANDARD_GRAVITY)} g${if (isSeated) " while seated" else ""})"
                 )
                 heldVibrationSinceMs = nowMs
                 vibrationHits.clear()
