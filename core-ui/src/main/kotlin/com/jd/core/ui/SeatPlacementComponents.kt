@@ -17,8 +17,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.SIT_LEARN_STEPS
+import com.jd.core.shared.SIT_LEARN_STEP_MS
 import com.jd.core.shared.SeatPlacement
 import com.jd.core.shared.SeatType
+import com.jd.core.shared.SitExampleReport
+import com.jd.core.shared.SitLabel
+import com.jd.core.shared.SitLearnRequest
+import com.jd.core.shared.sitExamplesSummary
+import com.jd.core.shared.sitLearnInstruction
+import com.jd.core.shared.sitOverlapWarning
 import com.jd.core.shared.activePlacement
 import com.jd.core.shared.seatPlacementNameError
 import com.jd.core.shared.withActivePlacement
@@ -38,18 +46,24 @@ fun placementLinkText(settings: AlertSettings): String = "Placement: ${settings.
 
 /**
  * The Monitor's seat placements (ISSUE-NOV26.0-O163 part 1): tap one to make it active; add, edit or delete. The last
- * placement cannot be deleted. Learning examples per placement comes with O163 part 2. Back closes it (OverlayHeader).
+ * placement cannot be deleted. Back closes it (OverlayHeader). Part 2: each placement lists the examples the Sensor
+ * learned for it ([sitExamples], asked for on opening), and LEARN guides a learning round ([SitLearnDialog]).
  */
 @Composable
 fun SeatPlacementOverlay(
     settings: AlertSettings,
     onUpdateAlertSettings: (AlertSettings) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    sitExamples: SitExampleReport? = null,
+    onSitLearn: (SitLearnRequest) -> Unit = {}
 ) {
     // The placement being edited: null closed, id 0 a new one.
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
     var pendingDeleteId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var learningId by rememberSaveable { mutableStateOf<Long?>(null) }
     val active = settings.activePlacement()
+    // The Sensor answers with its examples (ISSUE-NOV26.0-O163 part 2).
+    LaunchedEffect(Unit) { onSitLearn(SitLearnRequest(placementId = active.id)) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = Slate900) {
         Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
@@ -62,7 +76,10 @@ fun SeatPlacementOverlay(
                     placement = placement,
                     isActive = placement.id == active.id,
                     canDelete = settings.seatPlacements.size > 1,
+                    examplesText = sitExamples?.let { sitExamplesSummary(it.book.of(placement.id), it.phoneModel) } ?: SIT_EXAMPLES_NOT_RECEIVED,
+                    overlapWarning = sitOverlapWarning(sitExamples?.book?.of(placement.id)),
                     onChoose = { onUpdateAlertSettings(settings.withActivePlacement(placement.id)) },
+                    onLearn = { learningId = placement.id },
                     onEdit = { editingId = placement.id },
                     onDelete = { pendingDeleteId = placement.id }
                 )
@@ -91,6 +108,17 @@ fun SeatPlacementOverlay(
                 )
             },
             onDismiss = { editingId = null }
+        )
+    }
+
+    learningId?.let { id ->
+        val placement = settings.seatPlacements.firstOrNull { it.id == id }
+        if (placement == null) SideEffect { learningId = null }
+        else SitLearnDialog(
+            placement = placement,
+            report = sitExamples,
+            onSitLearn = onSitLearn,
+            onClose = { learningId = null }
         )
     }
 
@@ -125,7 +153,10 @@ private fun PlacementRow(
     placement: SeatPlacement,
     isActive: Boolean,
     canDelete: Boolean,
+    examplesText: String,
+    overlapWarning: String?,
     onChoose: () -> Unit,
+    onLearn: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -152,10 +183,150 @@ private fun PlacementRow(
                 placement.type.label + if (isActive) ", in use" else "",
                 color = Slate500, fontSize = 11.sp
             )
+            Text(examplesText, color = Slate500, fontSize = 11.sp)
+            overlapWarning?.let { Text(it, color = BrandGold, fontSize = 11.sp) }
         }
-        TextButton(onClick = onEdit) { Text("EDIT", color = BrandGold, fontSize = 12.sp) }
-        if (canDelete) TextButton(onClick = onDelete) { Text("DELETE", color = StatusRed, fontSize = 12.sp) }
+        // One action per line: four in a row do not fit the S21FE's large font (ISSUE-NOV25.11-O141).
+        Column(horizontalAlignment = Alignment.End) {
+            TextButton(onClick = onLearn) { Text("LEARN", color = StatusGreen, fontSize = 12.sp) }
+            TextButton(onClick = onEdit) { Text("EDIT", color = BrandGold, fontSize = 12.sp) }
+            if (canDelete) TextButton(onClick = onDelete) { Text("DELETE", color = StatusRed, fontSize = 12.sp) }
+        }
     }
+}
+
+/** A placement's examples line before the Sensor answered: offline, or a Sensor before Nov26.25. */
+const val SIT_EXAMPLES_NOT_RECEIVED = "Examples: not received from the Sensor"
+
+/** The learning round's phases (ISSUE-NOV26.0-O163 part 2). */
+private enum class LearnPhase { START, STEP, DONE }
+
+/**
+ * The guided learning round of [placement] (ISSUE-NOV26.0-O163 part 2): each step of [SIT_LEARN_STEPS] asks the Sensor
+ * to record its next sit check as the step's label and waits up to [SIT_LEARN_STEP_MS] for the example to come back in
+ * [report]; then the next step starts. START OVER deletes the placement's examples first. Closing it ends the Sensor's
+ * waiting step, which holds its sit and vibration alerts meanwhile.
+ */
+@Composable
+fun SitLearnDialog(
+    placement: SeatPlacement,
+    report: SitExampleReport?,
+    onSitLearn: (SitLearnRequest) -> Unit,
+    onClose: () -> Unit
+) {
+    var phase by rememberSaveable { mutableStateOf(LearnPhase.START) }
+    var stepIndex by rememberSaveable { mutableIntStateOf(0) }
+    var stepAttempt by rememberSaveable { mutableIntStateOf(0) } // A new attempt restarts the step's wait.
+    var isTimedOut by rememberSaveable { mutableStateOf(false) }
+    var lastFelt by rememberSaveable { mutableStateOf<String?>(null) }
+    var secondsLeft by remember { mutableIntStateOf((SIT_LEARN_STEP_MS / 1000).toInt()) }
+    val examples = report?.book?.of(placement.id)
+    val label = SIT_LEARN_STEPS.getOrNull(stepIndex)
+    // The newest example of the step's label when the step began, set before the step's request; only a newer one is
+    // the step's (a deleted round's old examples stay in [report] until the Sensor's answer).
+    var newestAtStart by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    val beginStep: (Int) -> Unit = { index ->
+        newestAtStart = examples?.newest(SIT_LEARN_STEPS[index])?.atMs
+        stepIndex = index
+        stepAttempt++
+    }
+    val close: () -> Unit = {
+        if (phase == LearnPhase.STEP) onSitLearn(SitLearnRequest(placementId = placement.id)) // Ends the Sensor's wait.
+        onClose()
+    }
+    val start: (Boolean) -> Unit = { clear ->
+        if (clear) onSitLearn(SitLearnRequest(placementId = placement.id, clear = true))
+        lastFelt = null
+        beginStep(0)
+        phase = LearnPhase.STEP
+    }
+    val nextStep: () -> Unit = {
+        if (stepIndex + 1 >= SIT_LEARN_STEPS.size) {
+            phase = LearnPhase.DONE
+            onSitLearn(SitLearnRequest(placementId = placement.id)) // Ends the wait and brings the newest examples.
+        } else {
+            beginStep(stepIndex + 1)
+        }
+    }
+
+    if (phase == LearnPhase.STEP && label != null) {
+        LaunchedEffect(stepIndex, stepAttempt) {
+            isTimedOut = false
+            onSitLearn(SitLearnRequest(placementId = placement.id, label = label))
+            for (left in (SIT_LEARN_STEP_MS / 1000).toInt() downTo 1) {
+                secondsLeft = left
+                kotlinx.coroutines.delay(1_000L)
+            }
+            secondsLeft = 0
+            isTimedOut = true
+        }
+        // The step's example came back from the Sensor.
+        val newest = examples?.newest(label)
+        LaunchedEffect(newest?.atMs) {
+            if (newest != null && newest.atMs > (newestAtStart ?: Long.MIN_VALUE)) {
+                lastFelt = "${newest.label.singular.replaceFirstChar { it.uppercase() }} felt: ${newest.features.describe()}"
+                nextStep()
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Learn: ${placement.name}") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                when (phase) {
+                    LearnPhase.START -> {
+                        Text("Hide the Sensor phone where it stays, then follow ${SIT_LEARN_STEPS.size} steps here: sit down and stand up 3 times, then a bump. The Sensor sends no sit or vibration alert during the round.")
+                        Spacer(Modifier.height(8.dp))
+                        Text(sitExamplesSummary(examples, report?.phoneModel), color = Slate500, fontSize = 12.sp)
+                        if (report == null) Text(SIT_EXAMPLES_NOT_RECEIVED, color = BrandGold, fontSize = 12.sp)
+                    }
+                    LearnPhase.STEP -> {
+                        Text("Step ${stepIndex + 1} of ${SIT_LEARN_STEPS.size}", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(sitLearnInstruction(label ?: SitLabel.SIT, placement.type))
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            if (isTimedOut) "Nothing felt in ${SIT_LEARN_STEP_MS / 1000} s: TRY AGAIN, or SKIP the step."
+                            else "Waiting for the Sensor: $secondsLeft s",
+                            color = if (isTimedOut) BrandGold else Slate500, fontSize = 12.sp
+                        )
+                        lastFelt?.let { Text(it, color = StatusGreen, fontSize = 12.sp) }
+                    }
+                    LearnPhase.DONE -> {
+                        Text("Round finished.")
+                        lastFelt?.let { Text(it, color = StatusGreen, fontSize = 12.sp) }
+                        Spacer(Modifier.height(8.dp))
+                        Text(sitExamplesSummary(examples, report?.phoneModel), color = Slate500, fontSize = 12.sp)
+                        sitOverlapWarning(examples)?.let { Text(it, color = BrandGold, fontSize = 12.sp) }
+                        Text("The examples change no detection yet: the fixed rule still decides.", color = Slate500, fontSize = 12.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            when (phase) {
+                LearnPhase.START -> Button(onClick = { start(false) }) { Text("START") }
+                LearnPhase.STEP -> Row {
+                    if (isTimedOut) TextButton(onClick = { stepAttempt++ }) { Text("TRY AGAIN") }
+                    TextButton(onClick = nextStep) { Text("SKIP") }
+                }
+                LearnPhase.DONE -> Button(onClick = onClose) { Text("CLOSE") }
+            }
+        },
+        dismissButton = {
+            when (phase) {
+                LearnPhase.START -> Row {
+                    if (!examples?.examples.isNullOrEmpty()) TextButton(onClick = { start(true) }) { Text("START OVER", color = StatusRed) }
+                    TextButton(onClick = close) { Text("CANCEL") }
+                }
+                LearnPhase.STEP -> TextButton(onClick = close) { Text("STOP") }
+                LearnPhase.DONE -> Unit
+            }
+        }
+    )
 }
 
 /** Name and type of a new placement ([existing] null) or an existing one; Save stays off while the name is refused. */

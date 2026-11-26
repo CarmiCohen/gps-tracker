@@ -271,6 +271,10 @@ class FakeSignalingClient : SignalingClient {
     override val graphSamplesFlow: Flow<com.jd.core.shared.SensorGraphBatch> = MutableSharedFlow()
     override suspend fun sendGraphSamples(samples: List<com.jd.core.shared.GraphSample>, compressed: Boolean): Boolean = true
     override val monitorIdFlow: StateFlow<String?> = MutableStateFlow(null)
+    override val sitLearnRequestFlow: Flow<com.jd.core.shared.SitLearnRequest> = MutableSharedFlow()
+    override suspend fun requestSitLearning(targetId: String, request: com.jd.core.shared.SitLearnRequest): Boolean = true
+    override val sitExamplesFlow: StateFlow<Pair<String, com.jd.core.shared.SitExampleReport>?> = MutableStateFlow(null)
+    override suspend fun sendSitExamples(report: com.jd.core.shared.SitExampleReport): Boolean = true
 
     fun emitTelemetry(update: LocationUpdate) = deliver(_telemetryFlow, update)
 

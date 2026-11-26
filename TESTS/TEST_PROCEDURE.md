@@ -1334,8 +1334,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **259.2 Device (a Monitor, the S21FE's large font):** Setup, ALERTS: under `Sit / Seat Occupied Sensor` the gold `Placement: Chair ›` (hidden with sit off); it opens SEAT PLACEMENT; ADD PLACEMENT `Driver`, `Car seat`: it is listed, highlighted `in use`, and the link reads `Placement: Driver (car seat) ›`; tap Chair: active again; EDIT renames, a used name or an empty one keeps Save off; DELETE asks first and is not offered for the last placement; Back returns to ALERTS, and a rotation keeps an open dialog.
 *   **259.3 Two phones:** with the relay back and the Monitor paired to `T`: after a placement change the Sensor's DETECTION SETTINGS show `Sit: On, placement Driver (car seat)` and its Events `Detection settings applied (rev ...)` with that line.
 
+## Chapter 260 - Sit Learning (Nov26.25)
+**Status: A / P** - 260.1 passed (unit tests); 260.2 and 260.3 wait for the relay (O133) and a person on the seat (ISSUE-NOV26.0-O163 part 2)
+*   **260.1 Unit:** `SitLearningTest` (examples per placement with the phone, 10 newest per label, another phone starts over, the Monitor's ids decide what is kept, the overlap warning, a step takes one check within 60 s and holds alerts 15 s after, the texts, JSON); `MotionSentinelTest.eachSitCheckReportsItsNumbersAndVerdict`; `SettingsWireTest`, `SettingsSenderTest` (`sit_learn`, `sit_examples`); `SensorSettingsFileTest` (the examples in the file).
+*   **260.2 Two phones (Sensor A15 under the chair cushion, a person, the Monitor in hand):** ALERTS, `Placement: Chair ›`: each placement shows `No examples learned` (not `Examples: not received from the Sensor`); LEARN, START: 7 steps (sit, stand up 3 times, a bump), each advancing within a few seconds with `Sit felt: first move down ...`; no `Sit alert` and no `Vibration alert` reach the Monitor during the round; the Sensor's Events show `Sit learning: sit example recorded (...)`; at the end `3 sits, 3 stand-ups, 1 bump, learned on SM-A155F` and no overlap warning (if it warns, note the numbers). A step with nothing done shows `Nothing felt in 60 s` and TRY AGAIN. STOP mid-round: a sit 20 s later alerts again.
+*   **260.3 Keeping:** START OVER deletes the examples first; a deleted placement's examples are dropped by the Sensor at the next SEAT PLACEMENT opening; the Sensor's EXPORT file holds `sitExamples`, and after an import on another phone the list says `learned on another phone (SM-A155F): learn again`.
+
 ---
-**Active Testing Chapters: 248 of 259**
+**Active Testing Chapters: 249 of 260**
 *Since Nov23.6-docs a new chapter is written only for a check that needs a person, a device or two phones and is still pending (Rule 15); unit tests are named in the commit message.*
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 

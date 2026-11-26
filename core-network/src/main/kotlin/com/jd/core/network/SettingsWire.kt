@@ -36,6 +36,12 @@ sealed interface SettingsMessage {
 
     /** The Sensor's graph samples (ISSUE-NOV10.8-O84 part 3). */
     data class GraphSamples(val batch: SensorGraphBatch) : SettingsMessage
+
+    /** A Monitor asking about a placement's sit examples, or to learn one (ISSUE-NOV26.0-O163 part 2). */
+    data class SitLearn(val request: com.jd.core.shared.SitLearnRequest) : SettingsMessage
+
+    /** The Sensor [sensorId]'s sit examples (ISSUE-NOV26.0-O163 part 2). */
+    data class SitExamples(val sensorId: String, val report: com.jd.core.shared.SitExampleReport) : SettingsMessage
 }
 
 /**
@@ -55,6 +61,8 @@ object SettingsWire {
         InfoRequestWire.TYPE -> InfoRequestWire.decode(data)?.let(SettingsMessage::InfoRequest)
         GraphRequestWire.TYPE -> GraphRequestWire.decode(data)?.let(SettingsMessage::GraphRequest)
         GraphSamplesWire.TYPE -> GraphSamplesWire.decode(data)?.let(SettingsMessage::GraphSamples)
+        SitLearnWire.TYPE -> SitLearnWire.decode(data)?.let(SettingsMessage::SitLearn)
+        SitExamplesWire.TYPE -> SitExamplesWire.decode(data)?.let { (id, report) -> SettingsMessage.SitExamples(id, report) }
         else -> null
     }
 
@@ -70,7 +78,8 @@ object SettingsWire {
      */
     fun monitorIdOf(data: JSONObject, message: SettingsMessage?): String? = when (message) {
         is SettingsMessage.Geofence, is SettingsMessage.Behaviour, is SettingsMessage.EventsRequest,
-        is SettingsMessage.InfoRequest, is SettingsMessage.GraphRequest -> data.optString(FROM).takeIf { it.isNotBlank() }
+        is SettingsMessage.InfoRequest, is SettingsMessage.GraphRequest,
+        is SettingsMessage.SitLearn -> data.optString(FROM).takeIf { it.isNotBlank() }
         else -> null
     }
 }

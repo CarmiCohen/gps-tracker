@@ -13,6 +13,7 @@ import com.jd.core.shared.AlertSettings
 import com.jd.core.shared.BackupStoreFile
 import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.SensorBehaviour
+import com.jd.core.shared.SitExampleBook
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -63,6 +64,19 @@ class SensorDataStore(context: Context) {
         return stored
     }
 
+    /** The sit examples learned per seat placement (ISSUE-NOV26.0-O163 part 2); this phone's own, not the Monitor's. */
+    val sitExamples: Flow<SitExampleBook> = dataStore.data.map { prefs -> decodeSitExamples(prefs[SIT_EXAMPLES_KEY]) }
+
+    /** Stores [transform] of the stored examples, read and written in one edit; returns the stored book. */
+    suspend fun updateSitExamples(transform: (SitExampleBook) -> SitExampleBook): SitExampleBook {
+        var updated = SitExampleBook()
+        dataStore.edit { prefs ->
+            updated = transform(decodeSitExamples(prefs[SIT_EXAMPLES_KEY]))
+            prefs[SIT_EXAMPLES_KEY] = Json.encodeToString(updated)
+        }
+        return updated
+    }
+
     /** The geofence last received from the Monitor, kept across restarts so it is enforced offline (ISSUE-NOV8.13-O51). */
     val geofence: Flow<GeofenceConfig> = dataStore.data.map { prefs -> decodeGeofence(prefs[geofenceKey]) }
 
@@ -99,7 +113,8 @@ class SensorDataStore(context: Context) {
         return file.copy(
             relayUrl = prefs[relayUrlKey],
             behaviour = decodeSensorBehaviour(prefs[SENSOR_BEHAVIOUR_KEY]),
-            geofence = decodeGeofence(prefs[geofenceKey])
+            geofence = decodeGeofence(prefs[geofenceKey]),
+            sitExamples = decodeSitExamples(prefs[SIT_EXAMPLES_KEY])
         )
     }
 
@@ -112,6 +127,8 @@ class SensorDataStore(context: Context) {
             val relayUrl = file.relayUrl
             if (relayUrl == null) prefs.remove(relayUrlKey) else prefs[relayUrlKey] = relayUrl
             file.sequenceFloor(nowMs)?.let { floor -> prefs[SEQUENCE_FLOOR_KEY] = maxOf(floor, prefs[SEQUENCE_FLOOR_KEY] ?: 0L) }
+            // A file without examples (before Nov26.25, or none learned) keeps this phone's (ISSUE-NOV26.0-O163 part 2).
+            if (file.sitExamples.placements.isNotEmpty()) prefs[SIT_EXAMPLES_KEY] = Json.encodeToString(file.sitExamples)
         }
         saveSensorBehaviour(file.behaviour)
         saveGeofence(file.geofence)
@@ -123,6 +140,12 @@ internal val SEQUENCE_FLOOR_KEY = longPreferencesKey("sequence_floor")
 
 /** Where [SensorDataStore.sensorBehaviour] is stored. */
 internal val SENSOR_BEHAVIOUR_KEY = stringPreferencesKey("sensor_behaviour_json")
+
+/** Where [SensorDataStore.sitExamples] is stored (ISSUE-NOV26.0-O163 part 2). */
+internal val SIT_EXAMPLES_KEY = stringPreferencesKey("sit_examples_json")
+
+internal fun decodeSitExamples(json: String?): SitExampleBook =
+    json?.let { runCatching { Json.decodeFromString<SitExampleBook>(it) }.getOrNull() } ?: SitExampleBook()
 
 internal fun decodeSensorBehaviour(json: String?): SensorBehaviour =
     json?.let { runCatching { Json.decodeFromString<SensorBehaviour>(it) }.getOrNull() } ?: SensorBehaviour()

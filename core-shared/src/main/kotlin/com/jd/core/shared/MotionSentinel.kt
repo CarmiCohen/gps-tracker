@@ -64,12 +64,14 @@ import kotlin.math.sqrt
  * Times are monotonic milliseconds (sensor event time). Not thread-safe: one sensor thread owns it; [gravity],
  * [isArmed], and [isVibrationArmed] may be read from any thread. [onNote] gets two lines for each sit check with a
  * jolt, its 0.1 s trace and, unless it alerted, why not, and one line for a lift integration that rose
- * [LIFT_NOTE_HEIGHT_M] without a lift: for tuning on the phone.
+ * [LIFT_NOTE_HEIGHT_M] without a lift: for tuning on the phone. [onSitCheck] gets the same checks' numbers and the
+ * fixed rule's verdict, the examples of a learning round (ISSUE-NOV26.0-O163 part 2).
  */
 class MotionSentinel(
     private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_MS,
     private val onNote: (String) -> Unit = {},
-    private val onSitPeriod: (SitPeriodEvent) -> Unit = {}
+    private val onSitPeriod: (SitPeriodEvent) -> Unit = {},
+    private val onSitCheck: (SitCheck) -> Unit = {}
 ) {
 
     enum class Kind { TILT, LIFT, VIBRATION, SIT }
@@ -344,6 +346,14 @@ class MotionSentinel(
         val isOverTiltLimit = tilt >= tiltThresholdDegrees
         val baroDrop = sitBaroDrop()
         val isBaroDrop = baroDrop != null && baroDrop >= SIT_BARO_MIN_M && baroDrop <= SIT_BARO_MAX_M
+        // The check's numbers for a learning round (ISSUE-NOV26.0-O163 part 2), reported where its trace is noted.
+        val features = SitFeatures(
+            joltG = sitPeakJolt / STANDARD_GRAVITY,
+            firstMoveMs2 = firstMove,
+            tiltDeg = tilt,
+            settleMs = (if (isRested) sitQuietSinceMs ?: nowMs else nowMs) - start,
+            baroDropCm = baroDrop?.let { it * 100 }
+        )
         val detail = listOfNotNull(
             firstMove?.let { "first move ${if (it < 0) "down" else "up"} ${"%.2f".format(java.util.Locale.US, abs(it))} m/s²" },
             "jolt ${"%.2f".format(java.util.Locale.US, sitPeakJolt / STANDARD_GRAVITY)} g",
@@ -354,6 +364,7 @@ class MotionSentinel(
         val period = sitPeriod
         if (isCandidate && (isDownFirst || isBaroDrop)) {
             noteSitTrace(nowMs)
+            onSitCheck(SitCheck(features, SitVerdict.SIT))
             sitStartMs = null
             if (!isSitEnabled) return Alert(Kind.SIT, detail) // Not sent; no period (ISSUE-NOV25.23-O155).
             dropSitVibration("the jolts of a sit")
@@ -368,6 +379,7 @@ class MotionSentinel(
         }
         if (period != null && isRested && hasJolt && !isKnock && !isOverTiltLimit && isUpFirst) {
             noteSitTrace(nowMs)
+            onSitCheck(SitCheck(features, SitVerdict.STAND_UP))
             sitStartMs = null
             dropSitVibration("the jolts of a stand-up")
             onNote("Stand-up in the sitting period: it ends after ${SIT_STOOD_UP_EMPTY_MS / 60_000} min without movement: $detail")
@@ -388,6 +400,7 @@ class MotionSentinel(
                 else -> "no clear first move"
             }
             onNote("Sit not confirmed ($why): $detail")
+            onSitCheck(SitCheck(features, SitVerdict.NONE))
             if (period != null && start >= period.startMs + SIT_SETTLE_MS) onSitterMovement(period, nowMs, "a jolt")
         }
         sitStartMs = null

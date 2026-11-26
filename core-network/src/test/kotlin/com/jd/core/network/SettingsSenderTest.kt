@@ -6,6 +6,8 @@ import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.SensorInfo
 import com.jd.core.shared.SensorSetupReport
+import com.jd.core.shared.SitExampleReport
+import com.jd.core.shared.SitLearnRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -18,9 +20,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Chapter 242 (SIMP-NOV22.3-S1): the ten settings messages leave through one sender, so each one is sent only while
+ * Chapter 242 (SIMP-NOV22.3-S1): the twelve settings messages leave through one sender, so each one is sent only while
  * connected, as one `settings_update` counted in the data use, a Monitor's stamped with its own ID and a Sensor's
- * carrying the Sensor's ID. The Sensor's shared geofence came with ISSUE-NOV22.7-O134.
+ * carrying the Sensor's ID. The Sensor's shared geofence came with ISSUE-NOV22.7-O134, the sit learning pair with
+ * ISSUE-NOV26.0-O163 part 2.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsSenderTest {
@@ -28,20 +31,22 @@ class SettingsSenderTest {
     private fun TestScope.client(socket: FakeSocket) =
         SocketioSignalingClient(FakeSocketFactory(socket), StandardTestDispatcher(testScheduler))
 
-    /** The ten settings senders, each named by the wire type it must send; the Monitor's come first. */
+    /** The twelve settings senders, each named by the wire type it must send; the Monitor's come first. */
     private val senders: List<Pair<String, suspend SocketioSignalingClient.() -> Boolean>> = listOf(
         GeofenceWire.TYPE to { sendGeofence("T", GeofenceConfig()) },
         SensorBehaviourWire.TYPE to { sendSensorBehaviour("T", SensorBehaviour()) },
         EventsRequestWire.TYPE to { requestSensorEvents("T", 0L) },
         InfoRequestWire.TYPE to { requestSensorInfo("T", withSatellites = false) },
         GraphRequestWire.TYPE to { requestGraphSamples("T", 0L) },
+        SitLearnWire.TYPE to { requestSitLearning("T", SitLearnRequest(placementId = 1L)) },
         SensorSetupWire.TYPE to { sendSensorSetup(SensorSetupReport()) },
         SensorEventsWire.TYPE to { sendSensorEvents(emptyList(), null) },
         SensorInfoWire.TYPE to { sendSensorInfo(SensorInfo()) },
         GraphSamplesWire.TYPE to { sendGraphSamples(emptyList(), compressed = false) },
+        SitExamplesWire.TYPE to { sendSitExamples(SitExampleReport(phoneModel = "SM-A155F", hasBarometer = false)) },
         GeofenceWire.TYPE to { shareGeofence(GeofenceConfig()) }
     )
-    private val monitorSenderCount = 5
+    private val monitorSenderCount = 6
 
     @Test
     fun `nothing is sent or counted before a connection`() = runTest {

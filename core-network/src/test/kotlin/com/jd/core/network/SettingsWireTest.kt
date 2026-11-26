@@ -11,6 +11,14 @@ import com.jd.core.shared.SensorEventBatch
 import com.jd.core.shared.SensorGraphBatch
 import com.jd.core.shared.SensorInfo
 import com.jd.core.shared.SensorSetupReport
+import com.jd.core.shared.PlacementExamples
+import com.jd.core.shared.SitExample
+import com.jd.core.shared.SitExampleBook
+import com.jd.core.shared.SitExampleReport
+import com.jd.core.shared.SitFeatures
+import com.jd.core.shared.SitLabel
+import com.jd.core.shared.SitLearnRequest
+import com.jd.core.shared.SitVerdict
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -56,6 +64,13 @@ class SettingsWireTest {
             SettingsMessage.GraphSamples(SensorGraphBatch("T", emptyList())),
             SettingsWire.decode(relayed(GraphSamplesWire.encode("T", emptyList())))
         )
+
+        // ISSUE-NOV26.0-O163 part 2.
+        val learn = SitLearnRequest(placementId = 7L, label = SitLabel.STAND_UP, keepIds = listOf(1L, 7L))
+        assertEquals(SettingsMessage.SitLearn(learn), SettingsWire.decode(relayed(SitLearnWire.encode("T", learn))))
+        val example = SitExample(SitLabel.SIT, 1_000L, SitFeatures(joltG = 0.45, firstMoveMs2 = -0.15, tiltDeg = 0.8, settleMs = 600L), SitVerdict.SIT)
+        val examples = SitExampleReport("SM-A155F", hasBarometer = false, book = SitExampleBook(listOf(PlacementExamples(7L, "SM-A155F", false, listOf(example)))))
+        assertEquals(SettingsMessage.SitExamples("T", examples), SettingsWire.decode(relayed(SitExamplesWire.encode("T", examples))))
     }
 
     @Test
@@ -64,13 +79,16 @@ class SettingsWireTest {
         assertNull(SettingsWire.decode(JSONObject().put("id", "T")))
         assertNull("A malformed geofence", SettingsWire.decode(JSONObject().put("type", GeofenceWire.TYPE).put("rev", 1L)))
         assertNull("A malformed Info", SettingsWire.decode(JSONObject().put("type", SensorInfoWire.TYPE).put("info", "not json")))
+        assertNull("A malformed learn request", SettingsWire.decode(JSONObject().put("type", SitLearnWire.TYPE).put("req", "{}")))
+        assertNull("Examples without the Sensor's ID", SettingsWire.decode(JSONObject().put("type", SitExamplesWire.TYPE).put("report", "{}")))
     }
 
     @Test
     fun `the type names are distinct`() {
         val types = listOf(
             GeofenceWire.TYPE, SensorBehaviourWire.TYPE, SensorSetupWire.TYPE, SensorEventsWire.TYPE, EventsRequestWire.TYPE,
-            SensorInfoWire.TYPE, InfoRequestWire.TYPE, GraphRequestWire.TYPE, GraphSamplesWire.TYPE
+            SensorInfoWire.TYPE, InfoRequestWire.TYPE, GraphRequestWire.TYPE, GraphSamplesWire.TYPE,
+            SitLearnWire.TYPE, SitExamplesWire.TYPE
         )
         assertEquals(types.size, types.toSet().size)
     }

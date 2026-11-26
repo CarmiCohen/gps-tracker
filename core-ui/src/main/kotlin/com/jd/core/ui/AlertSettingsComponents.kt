@@ -32,12 +32,21 @@ const val SENSOR_SETTINGS_SENT_NOTE = "Sent to the Sensor: a switched-off sensor
 fun AlertManagementOverlay(
     draftAlertSettings: AlertSettings,
     onUpdateAlertSettings: (AlertSettings) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    /** The Sensor's learned sit examples and the requests about them (ISSUE-NOV26.0-O163 part 2). */
+    sitExamples: com.jd.core.shared.SitExampleReport? = null,
+    onSitLearn: (com.jd.core.shared.SitLearnRequest) -> Unit = {}
 ) {
     // The SEAT PLACEMENT screen opens over this page; its Back returns here (ISSUE-NOV26.0-O163).
     var showPlacements by rememberSaveable { mutableStateOf(false) }
     if (showPlacements) {
-        SeatPlacementOverlay(settings = draftAlertSettings, onUpdateAlertSettings = onUpdateAlertSettings, onClose = { showPlacements = false })
+        SeatPlacementOverlay(
+            settings = draftAlertSettings,
+            onUpdateAlertSettings = onUpdateAlertSettings,
+            onClose = { showPlacements = false },
+            sitExamples = sitExamples,
+            onSitLearn = onSitLearn
+        )
         return
     }
     Surface(

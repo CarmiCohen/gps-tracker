@@ -9,6 +9,7 @@ import com.jd.core.shared.SETTINGS_FILE_VERSION
 import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.SettingsFileException
 import com.jd.core.shared.SettingsFileJson
+import com.jd.core.shared.SitExampleBook
 import com.jd.core.shared.checkSettingsFile
 import com.jd.core.ui.getAppVersionName
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -52,7 +53,9 @@ data class SensorSettingsFile(
     val behaviour: SensorBehaviour = SensorBehaviour(),
     val geofence: GeofenceConfig = GeofenceConfig(),
     /** The number the next row would have had at the export; null when unknown (no service ran since the app started). */
-    val nextSequenceId: Long? = null
+    val nextSequenceId: Long? = null,
+    /** The learned sit examples (ISSUE-NOV26.0-O163 part 2); absent before Nov26.25. Each names the phone it was learned on. */
+    val sitExamples: SitExampleBook = SitExampleBook()
 ) {
     /**
      * The lowest sequence number the imported Sensor may use: the exported one, plus every number the old Sensor could

@@ -626,6 +626,28 @@ class MotionSentinelTest {
         assertEquals("The next sit alerts again", 2, phone.sits.size)
     }
 
+    /** ISSUE-NOV26.0-O163 part 2: each finished sit check gives its numbers and the fixed rule's verdict, the learning examples. */
+    @Test
+    fun eachSitCheckReportsItsNumbersAndVerdict() {
+        val checks = mutableListOf<SitCheck>()
+        val phone = Phone(MotionSentinel(onSitCheck = { checks += it })).apply { rest(MOTION_ARM_AFTER_STILL_MS + 1_000) }
+        phone.cushion(0.0, 2.0)
+        phone.rest(MOTION_ARM_AFTER_STILL_MS + 1_000, angleDeg = 2.0)
+        phone.cushion(2.0, 0.0, isDownFirst = false)
+        phone.rest(MOTION_ARM_AFTER_STILL_MS + 1_000)
+        phone.feed(200) { t -> doubleArrayOf(if (t < 40) 12.0 else 0.0, 0.0, g + if (t < 100) -1.0 else 1.0) } // A hard knock.
+        phone.rest(2_000)
+        assertEquals(listOf(SitVerdict.SIT, SitVerdict.STAND_UP, SitVerdict.NONE), checks.map { it.verdict })
+        val sit = checks[0].features
+        assertTrue("$sit", sit.firstMoveMs2!! < 0)
+        assertEquals(0.5, sit.joltG, 0.1)
+        assertTrue("$sit", sit.tiltDeg in 1.0..2.5) // The gravity estimate follows the 2 degrees within 0.3 s.
+        assertTrue("$sit", sit.settleMs in 100L..1_500L)
+        assertNull("No barometer", sit.baroDropCm)
+        assertTrue("${checks[1]}", checks[1].features.firstMoveMs2!! > 0)
+        assertTrue("${checks[2]}", checks[2].features.joltG > SIT_JOLT_MAX_MS2 / STANDARD_GRAVITY)
+    }
+
     /** A hard knock on the chair's frame jolted the A15 1.2 to 5.7 g (Nov25.23); a cushion damps a sit to about 0.5 g. */
     @Test
     fun aHardKnockMovingThePhoneDownFirstIsNoSit() {

@@ -209,4 +209,22 @@ interface SignalingClient {
      * Returns false when not connected.
      */
     suspend fun sendGraphSamples(samples: List<GraphSample>, compressed: Boolean): Boolean
+
+    /** Sensor: each request of a Monitor's SEAT PLACEMENT screen about the learned sit examples (ISSUE-NOV26.0-O163 part 2). */
+    val sitLearnRequestFlow: Flow<com.jd.core.shared.SitLearnRequest>
+
+    /**
+     * Monitor: asks the tracker [targetId] for a placement's sit examples, or to learn one (ISSUE-NOV26.0-O163 part 2).
+     * Returns false when not connected.
+     */
+    suspend fun requestSitLearning(targetId: String, request: com.jd.core.shared.SitLearnRequest): Boolean
+
+    /**
+     * Monitor: the newest sit examples received, with the sending Sensor's ID, or null when none arrived since [connect]
+     * (ISSUE-NOV26.0-O163 part 2). [disconnect] forgets them.
+     */
+    val sitExamplesFlow: StateFlow<Pair<String, com.jd.core.shared.SitExampleReport>?>
+
+    /** Sensor: sends its sit examples to the Monitors of its room (ISSUE-NOV26.0-O163 part 2). Returns false when not connected. */
+    suspend fun sendSitExamples(report: com.jd.core.shared.SitExampleReport): Boolean
 }

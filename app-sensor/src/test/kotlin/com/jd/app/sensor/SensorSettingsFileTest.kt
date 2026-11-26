@@ -4,6 +4,11 @@ import com.jd.core.shared.GeofenceConfig
 import com.jd.core.shared.HomePoint
 import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.SettingsFileException
+import com.jd.core.shared.SitExample
+import com.jd.core.shared.SitExampleBook
+import com.jd.core.shared.SitFeatures
+import com.jd.core.shared.SitLabel
+import com.jd.core.shared.SitVerdict
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.fail
@@ -24,7 +29,14 @@ class SensorSettingsFileTest {
         relayUrl = "wss://relay.example",
         behaviour = SensorBehaviour(noiseAlert = false, tiltSensitivity = 0.7f, revision = 12L),
         geofence = GeofenceConfig(listOf(HomePoint(32.1, 34.8)), radiusMeters = 150.0, revision = 11L),
-        nextSequenceId = 500_000L
+        nextSequenceId = 500_000L,
+        // ISSUE-NOV26.0-O163 part 2: the learned sit examples, with the phone they were learned on.
+        sitExamples = SitExampleBook().withExample(
+            placementId = 7L,
+            example = SitExample(SitLabel.SIT, 900_000L, SitFeatures(joltG = 0.45, firstMoveMs2 = -0.15, tiltDeg = 0.8, settleMs = 600L), SitVerdict.SIT),
+            phoneModel = "SM-A155F",
+            hasBarometer = false
+        )
     )
 
     @Test

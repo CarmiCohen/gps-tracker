@@ -73,6 +73,10 @@ class SignalingClientTest {
             override val graphSamplesFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.SensorGraphBatch>()
             override suspend fun sendGraphSamples(samples: List<com.jd.core.shared.GraphSample>, compressed: Boolean) = true
             override val monitorIdFlow = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+            override val sitLearnRequestFlow = kotlinx.coroutines.flow.emptyFlow<com.jd.core.shared.SitLearnRequest>()
+            override suspend fun requestSitLearning(targetId: String, request: com.jd.core.shared.SitLearnRequest) = true
+            override val sitExamplesFlow = kotlinx.coroutines.flow.MutableStateFlow<Pair<String, com.jd.core.shared.SitExampleReport>?>(null)
+            override suspend fun sendSitExamples(report: com.jd.core.shared.SitExampleReport) = true
         }
 
         assertFalse("Should start disconnected", mockClient.isConnected.first())

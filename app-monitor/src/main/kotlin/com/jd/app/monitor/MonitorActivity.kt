@@ -133,6 +133,7 @@ class MonitorActivity : ComponentActivity() {
                 val alarmBook by viewModel.alarms.collectAsStateWithLifecycle()
                 val geofence by viewModel.geofence.collectAsStateWithLifecycle()
                 val sensorSetup by viewModel.sensorSetup.collectAsStateWithLifecycle()
+                val sitExamples by viewModel.sitExamples.collectAsStateWithLifecycle()
                 val events by viewModel.events.collectAsStateWithLifecycle()
 
                 LaunchedEffect(pairing) {
@@ -174,6 +175,8 @@ class MonitorActivity : ComponentActivity() {
                         alertSettings = alertSettings,
                         isSirenPlaying = isSirenPlaying,
                         sensorSetup = sensorSetup,
+                        sitExamples = sitExamples,
+                        onSitLearn = viewModel::requestSitLearning,
                         events = events,
                         onClearEvents = viewModel::clearEvents,
                         infoOverlay = { onClose -> MonitorInfoScreen(viewModel, onClose) },
@@ -375,7 +378,10 @@ fun MonitorScreen(
     /** The Graphs screen (ISSUE-NOV10.8-O84 part 3), given its close action. */
     graphsOverlay: @Composable (onClose: () -> Unit) -> Unit = {},
     /** Sets the time the Graphs open around: an event's, or null for now (ISSUE-NOV15.6-O100 part 4). */
-    onShowGraphsAt: (timeMs: Long?) -> Unit = {}
+    onShowGraphsAt: (timeMs: Long?) -> Unit = {},
+    /** The Sensor's learned sit examples and the SEAT PLACEMENT screen's requests (ISSUE-NOV26.0-O163 part 2). */
+    sitExamples: com.jd.core.shared.SitExampleReport? = null,
+    onSitLearn: (com.jd.core.shared.SitLearnRequest) -> Unit = {}
 ) {
     val context = LocalContext.current
     var isMapButtonsVisible by rememberSaveable { mutableStateOf(true) }
@@ -520,7 +526,9 @@ fun MonitorScreen(
         com.jd.core.ui.AlertManagementOverlay(
             draftAlertSettings = alertSettings,
             onUpdateAlertSettings = onUpdateAlertSettings,
-            onClose = { showAlertsOverlay = false }
+            onClose = { showAlertsOverlay = false },
+            sitExamples = sitExamples,
+            onSitLearn = onSitLearn
         )
         return
     }

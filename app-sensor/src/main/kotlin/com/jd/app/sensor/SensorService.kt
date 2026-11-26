@@ -92,12 +92,14 @@ class SensorService : Service(), SensorEventListener {
     // replaces the gravity sensor that phones like the A15 lack, whose vibration value was always 0 before Nov9.0.
     // Sit checks with a force but no sign go to logcat only, for tuning on the phone (ISSUE-NOV25.22-O150).
     // A sitting period's confirmation and end are INFO events, no alarm (ISSUE-NOV25.23-O155).
-    private val motionSentinel = MotionSentinel(onNote = { SystemLogger.i("Motion", it) }, onSitPeriod = ::onSitPeriodEvent)
+    // A learning round's sit checks become the placement's examples (ISSUE-NOV26.0-O163 part 2).
+    private val motionSentinel = MotionSentinel(onNote = { SystemLogger.i("Motion", it) }, onSitPeriod = ::onSitPeriodEvent, onSitCheck = ::onSitCheck)
+    private val sitLearner = SitLearner()
     // The phone's own ringing shakes it like a knock (ISSUE-NOV9.2-O62): vibration alerts pause while it rings.
     private var ownVibrationWatch: OwnVibrationWatch? = null
     private var motionThread: HandlerThread? = null
     private var hasGravitySensor = false
-    private var hasBarometer = false
+    @Volatile private var hasBarometer = false // Written on the main thread, read with the sit examples.
     private var publishedMotionArmed: Boolean? = null // Motion sensor thread only.
     private var publishedVibrationArmed: Boolean? = null // Motion sensor thread only.
     
@@ -268,6 +270,7 @@ class SensorService : Service(), SensorEventListener {
         setupSetupReporting()
         setupEventReporting()
         setupInfoAnswering()
+        setupSitLearning()
         setupGraphs()
         registerSensors()
         startLocationUpdates()
@@ -887,12 +890,53 @@ class SensorService : Service(), SensorEventListener {
     }
 
     private fun onMotionAlert(alert: MotionSentinel.Alert) {
+        // A learning round's own sits and jolts, made on purpose with the Monitor in hand (ISSUE-NOV26.0-O163 part 2).
+        val isRoundOwn = alert.kind == MotionSentinel.Kind.SIT || alert.kind == MotionSentinel.Kind.VIBRATION
+        if (isRoundOwn && sitLearner.isHoldingAlerts(SystemClock.elapsedRealtime())) {
+            eventLog.record(EventLevel.DETAIL, "Sit learning: ${alert.kind.name.lowercase()} alert not sent: ${alert.detail}")
+            return
+        }
         when (alert.kind) {
             MotionSentinel.Kind.TILT -> queueAlert(TILT_ALERT_STATUS, "Tilt alert: ${alert.detail}")
             MotionSentinel.Kind.LIFT -> queueAlert(LIFT_ALERT_STATUS, "Lift alert: ${alert.detail}")
             MotionSentinel.Kind.VIBRATION -> queueAlert(VIBRATION_ALERT_STATUS, "Vibration alert: ${alert.detail}")
             MotionSentinel.Kind.SIT -> queueAlert(SIT_ALERT_STATUS, "Sit alert (checking): ${alert.detail}")
         }
+    }
+
+    /** A sit check of a learning step becomes its example (ISSUE-NOV26.0-O163 part 2). Motion sensor thread. */
+    private fun onSitCheck(check: SitCheck) {
+        val (placementId, example) = sitLearner.onSitCheck(check, SystemClock.elapsedRealtime(), System.currentTimeMillis()) ?: return
+        serviceScope.launch {
+            val book = sensorDataStore.updateSitExamples { it.withExample(placementId, example, Build.MODEL, hasBarometer) }
+            eventLog.record(EventLevel.INFO, "Sit learning: ${example.label.singular} example recorded (${example.features.describe()})")
+            sendSitExamples(book)
+        }
+    }
+
+    /**
+     * Answers the Monitor's SEAT PLACEMENT screen (ISSUE-NOV26.0-O163 part 2): each request drops the examples of
+     * placements the Monitor no longer lists (and the asked one's, to start over), may start a learning step, and is
+     * answered with the examples.
+     */
+    private fun setupSitLearning() {
+        signalingClient.sitLearnRequestFlow
+            .onEach { request ->
+                val book = sensorDataStore.updateSitExamples { stored ->
+                    (if (request.clear) stored.withoutPlacement(request.placementId) else stored).keeping(request.keepIds)
+                }
+                sitLearner.onRequest(request, SystemClock.elapsedRealtime())
+                if (request.clear) eventLog.record(EventLevel.INFO, "Sit learning: a placement's examples deleted, to learn again")
+                request.label?.let { SystemLogger.i("SitLearning", "Waiting ${SIT_LEARN_STEP_MS / 1000} s for a ${it.singular} on placement ${request.placementId}") }
+                sendSitExamples(book)
+            }
+            .launchIn(serviceScope)
+    }
+
+    private suspend fun sendSitExamples(book: SitExampleBook) {
+        val report = SitExampleReport(Build.MODEL, hasBarometer, book, sitLearner.waitingFor(SystemClock.elapsedRealtime()))
+        val sent = signalingClient.sendSitExamples(report)
+        SystemLogger.i("SitLearning", "Examples of ${book.placements.size} placements sent: $sent")
     }
 
     /** Records a sitting period's confirmation or end (ISSUE-NOV25.23-O155); sensor times are on the elapsed-realtime clock. */

@@ -103,6 +103,12 @@ class SocketioSignalingClient @Inject constructor(
     private val _graphSamplesFlow = MutableSharedFlow<SensorGraphBatch>(extraBufferCapacity = 32)
     override val graphSamplesFlow: SharedFlow<SensorGraphBatch> = _graphSamplesFlow.asSharedFlow()
 
+    private val _sitLearnRequestFlow = MutableSharedFlow<com.jd.core.shared.SitLearnRequest>(extraBufferCapacity = 4)
+    override val sitLearnRequestFlow: SharedFlow<com.jd.core.shared.SitLearnRequest> = _sitLearnRequestFlow.asSharedFlow()
+
+    private val _sitExamplesFlow = MutableStateFlow<Pair<String, com.jd.core.shared.SitExampleReport>?>(null) // ISSUE-NOV26.0-O163
+    override val sitExamplesFlow: StateFlow<Pair<String, com.jd.core.shared.SitExampleReport>?> = _sitExamplesFlow.asStateFlow()
+
     private val _monitorIdFlow = MutableStateFlow<String?>(null) // ISSUE-NOV22.7-O135; disconnect keeps it.
     override val monitorIdFlow: StateFlow<String?> = _monitorIdFlow.asStateFlow()
 
@@ -248,6 +254,8 @@ class SocketioSignalingClient @Inject constructor(
                     is SettingsMessage.InfoRequest -> _infoRequestFlow.tryEmit(message.withSatellites)
                     is SettingsMessage.GraphRequest -> _graphRequestFlow.tryEmit(message.request)
                     is SettingsMessage.GraphSamples -> _graphSamplesFlow.tryEmit(message.batch)
+                    is SettingsMessage.SitLearn -> _sitLearnRequestFlow.tryEmit(message.request)
+                    is SettingsMessage.SitExamples -> _sitExamplesFlow.value = message.sensorId to message.report
                     null -> Unit
                 }
             }
@@ -361,6 +369,7 @@ class SocketioSignalingClient @Inject constructor(
         _viewerStatusFlow.value = false
         _linkStats.update { it.afterLink(false, System.currentTimeMillis()) }
         _sensorSetupFlow.value = null // The next session may watch another Sensor.
+        _sitExamplesFlow.value = null
         _sensorInfoFlow.value = null
         currentDeviceId = null
         currentRoom = null
@@ -492,6 +501,12 @@ class SocketioSignalingClient @Inject constructor(
 
     override suspend fun sendGraphSamples(samples: List<GraphSample>, compressed: Boolean): Boolean =
         emitFromSensor { deviceId -> GraphSamplesWire.encode(deviceId, samples, compressed) }
+
+    override suspend fun requestSitLearning(targetId: String, request: com.jd.core.shared.SitLearnRequest): Boolean =
+        emitFromMonitor { SitLearnWire.encode(targetId, request) }
+
+    override suspend fun sendSitExamples(report: com.jd.core.shared.SitExampleReport): Boolean =
+        emitFromSensor { deviceId -> SitExamplesWire.encode(deviceId, report) }
 
     /**
      * The one sender of every data event (SIMP-NOV22.9-S1): the payload leaves and its size counts towards

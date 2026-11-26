@@ -190,6 +190,24 @@ class MonitorViewModel @Inject constructor(
         report?.takeIf { it.trackerId == target }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    /** The paired Sensor's learned sit examples, null until it sent them since the connection (ISSUE-NOV26.0-O163 part 2). */
+    val sitExamples: StateFlow<com.jd.core.shared.SitExampleReport?> =
+        combine(signalingClient.sitExamplesFlow, identityManager.targetId) { received, target ->
+            received?.takeIf { it.first == target }?.second
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /**
+     * Sends the SEAT PLACEMENT screen's [request] to the paired Sensor, naming every placement this Monitor lists, so the
+     * Sensor drops the examples of deleted ones (ISSUE-NOV26.0-O163 part 2). Nothing is sent while unpaired or offline.
+     */
+    fun requestSitLearning(request: com.jd.core.shared.SitLearnRequest) {
+        viewModelScope.launch {
+            val target = identityManager.targetId.first() ?: return@launch
+            val keepIds = dataStore.alertSettings.first().seatPlacements.map { it.id }
+            signalingClient.requestSitLearning(target, request.copy(keepIds = keepIds))
+        }
+    }
+
     fun acknowledgeAlarms() {
         alarmEngine.acknowledge()
     }
