@@ -17,15 +17,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.SIT_LEARN_OCCUPIED_MS
+import com.jd.core.shared.SIT_LEARN_OCCUPIED_WAIT_MS
 import com.jd.core.shared.SIT_LEARN_STEPS
+import com.jd.core.shared.SIT_LEARN_STEP_COUNT
 import com.jd.core.shared.SIT_LEARN_STEP_MS
 import com.jd.core.shared.SeatPlacement
 import com.jd.core.shared.SeatType
 import com.jd.core.shared.SitExampleReport
-import com.jd.core.shared.SitLabel
 import com.jd.core.shared.SitLearnRequest
 import com.jd.core.shared.sitExamplesSummary
 import com.jd.core.shared.sitLearnInstruction
+import com.jd.core.shared.sitLearnWaitText
+import com.jd.core.shared.sitOccupiedInstruction
 import com.jd.core.shared.sitOverlapWarning
 import com.jd.core.shared.activePlacement
 import com.jd.core.shared.seatPlacementNameError
@@ -204,8 +208,9 @@ private enum class LearnPhase { START, STEP, DONE }
 /**
  * The guided learning round of [placement] (ISSUE-NOV26.0-O163 part 2): each step of [SIT_LEARN_STEPS] asks the Sensor
  * to record its next sit check as the step's label and waits up to [SIT_LEARN_STEP_MS] for the example to come back in
- * [report]; then the next step starts. START OVER deletes the placement's examples first. Closing it ends the Sensor's
- * waiting step, which holds its sit and vibration alerts meanwhile.
+ * [report]; then the next step starts. The last step (Nov26.26) asks for [SIT_LEARN_OCCUPIED_MS] seated and waits up to
+ * [SIT_LEARN_OCCUPIED_WAIT_MS] for the placement's occupied envelope. START OVER deletes the placement's examples
+ * first. Closing it ends the Sensor's waiting step, which holds its sit and vibration alerts meanwhile.
  */
 @Composable
 fun SitLearnDialog(
@@ -221,13 +226,15 @@ fun SitLearnDialog(
     var lastFelt by rememberSaveable { mutableStateOf<String?>(null) }
     var secondsLeft by remember { mutableIntStateOf((SIT_LEARN_STEP_MS / 1000).toInt()) }
     val examples = report?.book?.of(placement.id)
-    val label = SIT_LEARN_STEPS.getOrNull(stepIndex)
-    // The newest example of the step's label when the step began, set before the step's request; only a newer one is
-    // the step's (a deleted round's old examples stay in [report] until the Sensor's answer).
+    val label = SIT_LEARN_STEPS.getOrNull(stepIndex) // Null in the seated step, the last.
+    val stepMs = if (label == null) SIT_LEARN_OCCUPIED_WAIT_MS else SIT_LEARN_STEP_MS
+    // The newest example of the step's label (or the occupied envelope) when the step began, set before the step's
+    // request; only a newer one is the step's (a deleted round's old examples stay in [report] until the Sensor's answer).
     var newestAtStart by rememberSaveable { mutableStateOf<Long?>(null) }
 
     val beginStep: (Int) -> Unit = { index ->
-        newestAtStart = examples?.newest(SIT_LEARN_STEPS[index])?.atMs
+        val stepLabel = SIT_LEARN_STEPS.getOrNull(index)
+        newestAtStart = if (stepLabel != null) examples?.newest(stepLabel)?.atMs else examples?.occupied?.atMs
         stepIndex = index
         stepAttempt++
     }
@@ -242,7 +249,7 @@ fun SitLearnDialog(
         phase = LearnPhase.STEP
     }
     val nextStep: () -> Unit = {
-        if (stepIndex + 1 >= SIT_LEARN_STEPS.size) {
+        if (stepIndex + 1 >= SIT_LEARN_STEP_COUNT) {
             phase = LearnPhase.DONE
             onSitLearn(SitLearnRequest(placementId = placement.id)) // Ends the wait and brings the newest examples.
         } else {
@@ -250,24 +257,26 @@ fun SitLearnDialog(
         }
     }
 
-    if (phase == LearnPhase.STEP && label != null) {
+    if (phase == LearnPhase.STEP) {
         LaunchedEffect(stepIndex, stepAttempt) {
             isTimedOut = false
-            onSitLearn(SitLearnRequest(placementId = placement.id, label = label))
-            for (left in (SIT_LEARN_STEP_MS / 1000).toInt() downTo 1) {
+            onSitLearn(SitLearnRequest(placementId = placement.id, label = label, occupied = label == null))
+            for (left in (stepMs / 1000).toInt() downTo 1) {
                 secondsLeft = left
                 kotlinx.coroutines.delay(1_000L)
             }
             secondsLeft = 0
             isTimedOut = true
         }
-        // The step's example came back from the Sensor.
-        val newest = examples?.newest(label)
-        LaunchedEffect(newest?.atMs) {
-            if (newest != null && newest.atMs > (newestAtStart ?: Long.MIN_VALUE)) {
-                lastFelt = "${newest.label.singular.replaceFirstChar { it.uppercase() }} felt: ${newest.features.describe()}"
-                nextStep()
-            }
+        // The step's example, or the seated step's envelope, came back from the Sensor.
+        val newest = label?.let { examples?.newest(it) }
+        val occupied = examples?.occupied?.takeIf { label == null }
+        LaunchedEffect(newest?.atMs, occupied?.atMs) {
+            val newAtMs = newest?.atMs ?: occupied?.atMs ?: return@LaunchedEffect
+            if (newAtMs <= (newestAtStart ?: Long.MIN_VALUE)) return@LaunchedEffect
+            lastFelt = if (newest != null) "${newest.label.singular.replaceFirstChar { it.uppercase() }} felt: ${newest.features.describe()}"
+            else "Seated ${SIT_LEARN_OCCUPIED_MS / 60_000} min: ${occupied!!.describe(placement.type)}"
+            nextStep()
         }
     }
 
@@ -278,19 +287,18 @@ fun SitLearnDialog(
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 when (phase) {
                     LearnPhase.START -> {
-                        Text("Hide the Sensor phone where it stays, then follow ${SIT_LEARN_STEPS.size} steps here: sit down and stand up 3 times, then a bump. The Sensor sends no sit or vibration alert during the round.")
+                        Text("Hide the Sensor phone where it stays, then follow $SIT_LEARN_STEP_COUNT steps here: sit down and stand up 3 times, a bump, then ${SIT_LEARN_OCCUPIED_MS / 60_000} min seated. The Sensor sends no sit or vibration alert during the round.")
                         Spacer(Modifier.height(8.dp))
                         Text(sitExamplesSummary(examples, report?.phoneModel), color = Slate500, fontSize = 12.sp)
                         if (report == null) Text(SIT_EXAMPLES_NOT_RECEIVED, color = BrandGold, fontSize = 12.sp)
                     }
                     LearnPhase.STEP -> {
-                        Text("Step ${stepIndex + 1} of ${SIT_LEARN_STEPS.size}", fontWeight = FontWeight.Bold)
+                        Text("Step ${stepIndex + 1} of $SIT_LEARN_STEP_COUNT", fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(4.dp))
-                        Text(sitLearnInstruction(label ?: SitLabel.SIT, placement.type))
+                        Text(label?.let { sitLearnInstruction(it, placement.type) } ?: sitOccupiedInstruction(placement.type))
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            if (isTimedOut) "Nothing felt in ${SIT_LEARN_STEP_MS / 1000} s: TRY AGAIN, or SKIP the step."
-                            else "Waiting for the Sensor: $secondsLeft s",
+                            sitLearnWaitText(label == null, isTimedOut, secondsLeft),
                             color = if (isTimedOut) BrandGold else Slate500, fontSize = 12.sp
                         )
                         lastFelt?.let { Text(it, color = StatusGreen, fontSize = 12.sp) }

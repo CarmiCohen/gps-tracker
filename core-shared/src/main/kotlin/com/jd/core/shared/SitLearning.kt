@@ -8,8 +8,9 @@ import kotlin.math.sqrt
 /*
  * Learning sits per seat placement (ISSUE-NOV26.0-O163 part 2). The fixed sit rule comes from one chair (row 83);
  * chairs, people and cars differ, so the Monitor guides a learning round (sit, stand up, a bump) and the Sensor keeps
- * what each sit check measured as labelled examples per placement, in its settings file. Judging an event by the
- * examples is part 3: until then the examples change no detection.
+ * what each sit check measured as labelled examples per placement, in its settings file. The round's last step
+ * (Nov26.26) keeps 2 min of a seated person moving naturally as the placement's occupied envelope ([OccupiedEnvelope],
+ * ISSUE-NOV25.23-O155 decision (b)). Judging an event by the examples is part 3: until then they change no detection.
  */
 
 /** What one sit check measured (ISSUE-NOV26.0-O163 part 2), the numbers a learned placement is judged by. */
@@ -65,9 +66,13 @@ data class PlacementExamples(
     val placementId: Long,
     val phoneModel: String,
     val hasBarometer: Boolean,
-    val examples: List<SitExample> = emptyList()
+    val examples: List<SitExample> = emptyList(),
+    /** The round's seated step (Nov26.26); null before it ran, and in a file or report before Nov26.26. */
+    val occupied: OccupiedEnvelope? = null
 ) {
     fun isLearnedOn(model: String): Boolean = phoneModel == model
+
+    val isEmpty: Boolean get() = examples.isEmpty() && occupied == null
 
     fun count(label: SitLabel): Int = examples.count { it.label == label }
 
@@ -101,7 +106,14 @@ data class SitExampleBook(val placements: List<PlacementExamples> = emptyList())
         val current = of(placementId)?.takeIf { it.isLearnedOn(phoneModel) }
         val kept = current?.examples.orEmpty() + example
         val trimmed = kept.filter { it.label != example.label } + kept.filter { it.label == example.label }.takeLast(SIT_EXAMPLES_PER_LABEL_MAX)
-        val updated = PlacementExamples(placementId, phoneModel, hasBarometer, trimmed.sortedBy { it.atMs })
+        val updated = PlacementExamples(placementId, phoneModel, hasBarometer, trimmed.sortedBy { it.atMs }, current?.occupied)
+        return copy(placements = placements.filterNot { it.placementId == placementId } + updated)
+    }
+
+    /** This book with [envelope] as the occupied envelope of [placementId], replacing an older one; another phone's examples go first. */
+    fun withOccupied(placementId: Long, envelope: OccupiedEnvelope, phoneModel: String, hasBarometer: Boolean): SitExampleBook {
+        val current = of(placementId)?.takeIf { it.isLearnedOn(phoneModel) } ?: PlacementExamples(placementId, phoneModel, hasBarometer)
+        val updated = current.copy(hasBarometer = hasBarometer, occupied = envelope)
         return copy(placements = placements.filterNot { it.placementId == placementId } + updated)
     }
 
@@ -110,6 +122,33 @@ data class SitExampleBook(val placements: List<PlacementExamples> = emptyList())
     /** Only the placements the Monitor still lists; an empty [ids] keeps all (a request that names none). */
     fun keeping(ids: Collection<Long>): SitExampleBook =
         if (ids.isEmpty()) this else copy(placements = placements.filter { it.placementId in ids })
+}
+
+/**
+ * A seated person, or a car seat with its engine running, over the round's seated step (ISSUE-NOV26.0-O163 part 2,
+ * Nov26.26): the [StillnessMeter] windows of [SIT_LEARN_OCCUPIED_MS], dated [atMs] on the Sensor's wall clock. It is
+ * the placement's occupied movement (ISSUE-NOV25.23-O155 decision (b)): how much a sitter moves the phone there, and in
+ * a car the engine's shake and the body's roll; part 3 judges a sitting period's movement against it in place of the
+ * fixed [SIT_MOVEMENT_TILT_DEG], [SIT_MOVEMENT_OVER_20MG] and [SIT_JOLT_MAX_MS2].
+ */
+@Serializable
+data class OccupiedEnvelope(val atMs: Long, val windows: List<StillnessMeter.Window>) {
+    /** The windows the fixed rule takes for a sitter's movement; 0 means a sitter is not measurable at this placement. */
+    val movingWindows: Int get() = windows.count { it.isMovement }
+
+    /**
+     * `movement in 9 of 11 windows of 10 s; peak 0.18 g, slow tilt up to 0.42 deg, rms up to 6.1 mg`, the slow tilt
+     * named roll for a car seat; with no movement window it says that a sitter is not measurable there.
+     */
+    fun describe(type: SeatType): String {
+        if (windows.isEmpty()) return "nothing measured"
+        val tiltName = if (type == SeatType.CAR_SEAT) "roll" else "slow tilt"
+        val numbers = "peak ${"%.2f".format(java.util.Locale.US, windows.maxOf { it.peakMg } / 1000.0)} g, " +
+            "$tiltName up to ${"%.2f".format(java.util.Locale.US, windows.maxOf { it.slowTiltDeg })} deg, " +
+            "rms up to ${"%.1f".format(java.util.Locale.US, windows.maxOf { it.rmsMg })} mg"
+        val note = if (movingWindows == 0) "; no movement measurable: here a still sitter looks like an empty seat" else ""
+        return "movement in $movingWindows of ${windows.size} windows of ${STILLNESS_WINDOW_MS / 1000} s; $numbers$note"
+    }
 }
 
 /** A placement keeps at most this many examples of each label; a new one replaces the oldest. */
@@ -135,14 +174,16 @@ fun sitDistance(a: SitFeatures, b: SitFeatures): Double {
 /**
  * The Monitor asking its Sensor about the examples of [placementId] (ISSUE-NOV26.0-O163 part 2): [label] records the
  * next sit check as that label's example, null only asks for the examples; [clear] deletes the placement's examples
- * first. [keepIds] are all the placements the Monitor lists: the Sensor drops the examples of any other.
+ * first. [keepIds] are all the placements the Monitor lists: the Sensor drops the examples of any other. [occupied]
+ * (Nov26.26, without a [label]) records the seated step's [OccupiedEnvelope]; a Sensor before Nov26.26 ignores it.
  */
 @Serializable
 data class SitLearnRequest(
     val placementId: Long,
     val label: SitLabel? = null,
     val clear: Boolean = false,
-    val keepIds: List<Long> = emptyList()
+    val keepIds: List<Long> = emptyList(),
+    val occupied: Boolean = false
 )
 
 /** The Sensor's examples for its Monitors, with its own phone, so a Monitor can tell examples of another phone. */
@@ -161,14 +202,27 @@ const val SIT_LEARN_STEP_MS = 60_000L
 /** After an example, sit and vibration alerts stay held this long, for the next step's request to arrive. */
 const val SIT_LEARN_TAIL_MS = 15_000L
 
+/** The seated step lasts this long (ISSUE-NOV26.0-O163 part 2, Nov26.26): about 11 whole stillness windows. */
+const val SIT_LEARN_OCCUPIED_MS = 2 * 60_000L
+
+/**
+ * The seated step ends on the first window closing [SIT_LEARN_OCCUPIED_MS] after its start, up to one window later, and
+ * gives up after this (samples paused); the Monitor waits as long.
+ */
+const val SIT_LEARN_OCCUPIED_WAIT_MS = SIT_LEARN_OCCUPIED_MS + 2 * STILLNESS_WINDOW_MS
+
 /**
  * The Sensor's side of a learning round (ISSUE-NOV26.0-O163 part 2): holds the step the Monitor asked for, and turns
- * the next sit check into its example. While a step waits, and [SIT_LEARN_TAIL_MS] after it, the round's own sits and
- * jolts must not alarm ([isHoldingAlerts]): the user sits on purpose with the Monitor in hand. Times are monotonic.
- * Thread-safe: requests come from the network, checks from the motion sensor thread.
+ * the next sit check into its example, or the stillness windows of the seated step into the placement's
+ * [OccupiedEnvelope]. While a step waits, and [SIT_LEARN_TAIL_MS] after it, the round's own sits and jolts must not
+ * alarm ([isHoldingAlerts]): the user sits on purpose with the Monitor in hand. Times are monotonic.
+ * Thread-safe: requests come from the network, checks and windows from the motion sensor thread.
  */
 class SitLearner {
-    private data class Step(val placementId: Long, val label: SitLabel, val untilMs: Long)
+    /** A labelled step, or the seated step when [label] is null. */
+    private class Step(val placementId: Long, val label: SitLabel?, val startMs: Long, val untilMs: Long) {
+        val windows = ArrayList<StillnessMeter.Window>()
+    }
 
     private var step: Step? = null
     private var holdUntilMs = Long.MIN_VALUE
@@ -177,11 +231,15 @@ class SitLearner {
     @Synchronized
     fun onRequest(request: SitLearnRequest, nowMs: Long) {
         val label = request.label
-        step = label?.let { Step(request.placementId, it, nowMs + SIT_LEARN_STEP_MS) }
-        holdUntilMs = if (label != null) nowMs + SIT_LEARN_STEP_MS else minOf(holdUntilMs, nowMs + SIT_LEARN_TAIL_MS)
+        step = when {
+            label != null -> Step(request.placementId, label, nowMs, nowMs + SIT_LEARN_STEP_MS)
+            request.occupied -> Step(request.placementId, null, nowMs, nowMs + SIT_LEARN_OCCUPIED_WAIT_MS)
+            else -> null
+        }
+        holdUntilMs = step?.untilMs ?: minOf(holdUntilMs, nowMs + SIT_LEARN_TAIL_MS)
     }
 
-    /** The label waited for now, or null. */
+    /** The label waited for now, or null (also during the seated step). */
     @Synchronized
     fun waitingFor(nowMs: Long): SitLabel? = step?.takeIf { nowMs < it.untilMs }?.label
 
@@ -192,15 +250,63 @@ class SitLearner {
     @Synchronized
     fun onSitCheck(check: SitCheck, nowMs: Long, wallMs: Long): Pair<Long, SitExample>? {
         val current = step?.takeIf { nowMs < it.untilMs } ?: return null
+        val label = current.label ?: return null // The seated step's sits and shifts are part of its windows.
         step = null
         holdUntilMs = nowMs + SIT_LEARN_TAIL_MS
-        return current.placementId to SitExample(current.label, wallMs, check.features, check.verdict)
+        return current.placementId to SitExample(label, wallMs, check.features, check.verdict)
+    }
+
+    /**
+     * Adds a stillness [window] closing at [nowMs] to the seated step; a window begun before the step is left out.
+     * Returns the placement and its envelope on the first window closing [SIT_LEARN_OCCUPIED_MS] after the start; it
+     * ends the step. [wallMs] dates the envelope.
+     */
+    @Synchronized
+    fun onWindow(window: StillnessMeter.Window, nowMs: Long, wallMs: Long): Pair<Long, OccupiedEnvelope>? {
+        val current = step?.takeIf { nowMs < it.untilMs && it.label == null } ?: return null
+        if (nowMs - STILLNESS_WINDOW_MS < current.startMs) return null
+        current.windows.add(window)
+        if (nowMs - current.startMs < SIT_LEARN_OCCUPIED_MS) return null
+        step = null
+        holdUntilMs = nowMs + SIT_LEARN_TAIL_MS
+        return current.placementId to OccupiedEnvelope(wallMs, current.windows.toList())
     }
 }
 
-/** The steps of the Monitor's learning round (ISSUE-NOV26.0-O163 part 2): three sits and stand-ups, then a bump. */
+/**
+ * The labelled steps of the Monitor's learning round (ISSUE-NOV26.0-O163 part 2): three sits and stand-ups, then a
+ * bump; the seated step follows them as the last one ([SIT_LEARN_STEP_COUNT]).
+ */
 val SIT_LEARN_STEPS: List<SitLabel> =
     listOf(SitLabel.SIT, SitLabel.STAND_UP, SitLabel.SIT, SitLabel.STAND_UP, SitLabel.SIT, SitLabel.STAND_UP, SitLabel.BUMP)
+
+/** All steps of the round: [SIT_LEARN_STEPS] and the seated step (Nov26.26). */
+val SIT_LEARN_STEP_COUNT: Int = SIT_LEARN_STEPS.size + 1
+
+/**
+ * What the Monitor asks the user to do in the seated step (Nov26.26). A car seat is learned parked with the engine
+ * running, not driving: the round holds only sit and vibration alerts, so a drive's turns and hills would raise tilt.
+ */
+fun sitOccupiedInstruction(type: SeatType): String {
+    val minutes = SIT_LEARN_OCCUPIED_MS / 60_000
+    return if (type == SeatType.CAR_SEAT) "Sit in the seat for $minutes min with the engine running and move as on a ride: shift, turn the wheel, reach for something. Do not get out."
+    else "Sit on the seat for $minutes min and move as you naturally would: shift, lean, reach for something. Do not get up."
+}
+
+/**
+ * The Monitor's line under a step with [secondsLeft] of its wait: a labelled step waits for the Sensor; the seated
+ * step ([isSeated]) counts down its [SIT_LEARN_OCCUPIED_MS] first, then the Sensor's last window.
+ */
+fun sitLearnWaitText(isSeated: Boolean, isTimedOut: Boolean, secondsLeft: Int): String {
+    val finishS = ((SIT_LEARN_OCCUPIED_WAIT_MS - SIT_LEARN_OCCUPIED_MS) / 1000).toInt()
+    return when {
+        isTimedOut && isSeated -> "Nothing received in ${SIT_LEARN_OCCUPIED_WAIT_MS / 1000} s: TRY AGAIN, or SKIP the step."
+        isTimedOut -> "Nothing felt in ${SIT_LEARN_STEP_MS / 1000} s: TRY AGAIN, or SKIP the step."
+        isSeated && secondsLeft > finishS -> "Keep going: ${secondsLeft - finishS} s"
+        isSeated -> "Finishing on the Sensor: $secondsLeft s"
+        else -> "Waiting for the Sensor: $secondsLeft s"
+    }
+}
 
 /** What the Monitor asks the user to do for [label]. */
 fun sitLearnInstruction(label: SitLabel, type: SeatType): String = when (label) {
@@ -214,10 +320,10 @@ fun sitLearnInstruction(label: SitLabel, type: SeatType): String = when (label) 
  * `3 sits, 3 stand-ups, 1 bump, learned on Galaxy A15 (barometer)`; examples of another phone than [sensorModel] say so.
  */
 fun sitExamplesSummary(examples: PlacementExamples?, sensorModel: String?): String {
-    if (examples == null || examples.examples.isEmpty()) return "No examples learned"
-    val counts = SitLabel.entries.mapNotNull { label ->
+    if (examples == null || examples.isEmpty) return "No examples learned"
+    val counts = (SitLabel.entries.mapNotNull { label ->
         examples.count(label).takeIf { it > 0 }?.let { "$it ${if (it == 1) label.singular else label.plural}" }
-    }.joinToString(", ")
+    } + listOfNotNull(examples.occupied?.let { "${SIT_LEARN_OCCUPIED_MS / 60_000} min seated" })).joinToString(", ")
     val phone = examples.phoneModel + if (examples.hasBarometer) " (barometer)" else ""
     return if (sensorModel != null && !examples.isLearnedOn(sensorModel)) "$counts, learned on another phone ($phone): learn again"
     else "$counts, learned on $phone"

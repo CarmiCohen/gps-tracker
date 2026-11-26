@@ -65,13 +65,15 @@ import kotlin.math.sqrt
  * [isArmed], and [isVibrationArmed] may be read from any thread. [onNote] gets two lines for each sit check with a
  * jolt, its 0.1 s trace and, unless it alerted, why not, and one line for a lift integration that rose
  * [LIFT_NOTE_HEIGHT_M] without a lift: for tuning on the phone. [onSitCheck] gets the same checks' numbers and the
- * fixed rule's verdict, the examples of a learning round (ISSUE-NOV26.0-O163 part 2).
+ * fixed rule's verdict, the examples of a learning round (ISSUE-NOV26.0-O163 part 2). [onWindow] gets every
+ * [StillnessMeter] window, the seated step of a learning round (ISSUE-NOV26.0-O163 part 2, Nov26.26).
  */
 class MotionSentinel(
     private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_MS,
     private val onNote: (String) -> Unit = {},
     private val onSitPeriod: (SitPeriodEvent) -> Unit = {},
-    private val onSitCheck: (SitCheck) -> Unit = {}
+    private val onSitCheck: (SitCheck) -> Unit = {},
+    private val onWindow: (StillnessMeter.Window) -> Unit = {}
 ) {
 
     enum class Kind { TILT, LIFT, VIBRATION, SIT }
@@ -216,6 +218,7 @@ class MotionSentinel(
         stillness.onSample(x, y, z, vibration, nowMs)?.let { window ->
             if (sitPeriod != null) onNote("Stillness 10 s: ${window.describe()}") // For tuning, only while seated.
             onStillnessWindow(window, nowMs)
+            onWindow(window)
         }
         val alpha = dt / (GRAVITY_TIME_CONSTANT_S + dt)
         gx += alpha * (x - gx)
@@ -238,7 +241,7 @@ class MotionSentinel(
     /** A movement window of the open period, after the sit and after a stand-up's own window (ISSUE-NOV25.23-O155). */
     private fun onStillnessWindow(window: StillnessMeter.Window, nowMs: Long) {
         val period = sitPeriod ?: return
-        if (window.slowTiltDeg < SIT_MOVEMENT_TILT_DEG && window.over20Mg < SIT_MOVEMENT_OVER_20MG) return
+        if (!window.isMovement) return
         val windowStartMs = nowMs - STILLNESS_WINDOW_MS
         if (windowStartMs < period.startMs) return // The sit's own settling.
         if (period.standUpMs != null && windowStartMs < period.standUpEndMs) return // The stand-up's own window.

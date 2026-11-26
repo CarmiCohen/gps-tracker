@@ -148,6 +148,125 @@ class SitLearningTest {
         assertEquals(listOf(3, 3, 1), SitLabel.entries.map { label -> SIT_LEARN_STEPS.count { it == label } })
     }
 
+    // ---- Nov26.26: the seated step and the occupied envelope ----
+
+    private val stillWindow = StillnessMeter.Window(500, 3.0, 2, 0, 15.0, 0.1, 0.05)
+    private val movingWindow = StillnessMeter.Window(500, 6.1, 40, 12, 180.0, 0.9, 0.42)
+
+    @Test
+    fun aWindowIsMovementByTheFixedRule() {
+        assertFalse(stillWindow.isMovement)
+        assertTrue(movingWindow.isMovement)
+        assertTrue("Slow tilt alone", stillWindow.copy(slowTiltDeg = SIT_MOVEMENT_TILT_DEG).isMovement)
+        assertTrue("Samples over 20 mg alone", stillWindow.copy(over20Mg = SIT_MOVEMENT_OVER_20MG).isMovement)
+    }
+
+    @Test
+    fun theSeatedStepKeepsTheWindowsOfItsTwoMinutes() {
+        val learner = SitLearner()
+        assertNull("No step asked", learner.onWindow(movingWindow, 10_000L, 1L))
+        learner.onRequest(SitLearnRequest(placementId = 7L, occupied = true), nowMs = 1_000L)
+        assertNull("Not a labelled step", learner.waitingFor(1_000L))
+        assertTrue("The sitter's own sits and jolts do not alarm", learner.isHoldingAlerts(100_000L))
+        assertNull("Begun before the step", learner.onWindow(stillWindow, 5_000L, 1L))
+        assertNull("A sit check during the step is part of its windows", learner.onSitCheck(SitCheck(sitFeatures, SitVerdict.SIT), 6_000L, 1L))
+        var result: Pair<Long, OccupiedEnvelope>? = null
+        var t = 15_000L
+        while (result == null) {
+            result = learner.onWindow(if (t % 20_000L == 15_000L) movingWindow else stillWindow, t, 9_000L)
+            t += STILLNESS_WINDOW_MS
+        }
+        val (placementId, envelope) = result
+        assertEquals(7L, placementId)
+        assertEquals(9_000L, envelope.atMs)
+        assertEquals("The windows closing at 15 to 125 s", 12, envelope.windows.size)
+        assertEquals(6, envelope.movingWindows)
+        assertNull("The step ended", learner.onWindow(movingWindow, t, 1L))
+        val endMs = t - STILLNESS_WINDOW_MS
+        assertTrue(learner.isHoldingAlerts(endMs + SIT_LEARN_TAIL_MS - 1))
+        assertFalse(learner.isHoldingAlerts(endMs + SIT_LEARN_TAIL_MS))
+    }
+
+    @Test
+    fun theSeatedStepGivesUpWithoutWindowsOrWhenTheMonitorStops() {
+        val learner = SitLearner()
+        learner.onRequest(SitLearnRequest(placementId = 7L, occupied = true), nowMs = 0L)
+        assertNull("Too late", learner.onWindow(movingWindow, SIT_LEARN_OCCUPIED_WAIT_MS, 1L))
+        assertFalse(learner.isHoldingAlerts(SIT_LEARN_OCCUPIED_WAIT_MS))
+
+        learner.onRequest(SitLearnRequest(placementId = 7L, occupied = true), nowMs = 200_000L)
+        learner.onRequest(SitLearnRequest(placementId = 7L), nowMs = 210_000L) // STOP.
+        assertNull(learner.onWindow(movingWindow, 330_000L, 1L))
+        assertFalse(learner.isHoldingAlerts(210_000L + SIT_LEARN_TAIL_MS))
+
+        learner.onRequest(SitLearnRequest(placementId = 7L, label = SitLabel.SIT, occupied = true), nowMs = 400_000L)
+        assertEquals("A label makes it a labelled step", SitLabel.SIT, learner.waitingFor(400_000L))
+    }
+
+    @Test
+    fun theEnvelopeLivesBesideTheExamples() {
+        val envelope = OccupiedEnvelope(5L, listOf(stillWindow, movingWindow))
+        val book = SitExampleBook().add(SitLabel.SIT, 1L).withOccupied(7L, envelope, "SM-A155F", hasBarometer = false)
+        assertEquals(envelope, book.of(7L)!!.occupied)
+        assertEquals("The examples are kept", 1, book.of(7L)!!.count(SitLabel.SIT))
+        assertEquals("A new example keeps the envelope", envelope, book.add(SitLabel.BUMP, 6L, bumpFeatures).of(7L)!!.occupied)
+        assertNull("Another phone starts over", book.add(SitLabel.SIT, 7L, model = "Redmi Note 9").of(7L)!!.occupied)
+        val other = book.withOccupied(7L, envelope.copy(atMs = 8L), "Redmi Note 9", hasBarometer = true).of(7L)!!
+        assertTrue("Another phone's envelope drops this phone's examples", other.examples.isEmpty())
+        assertTrue(other.hasBarometer)
+        assertEquals("1 sit, 2 min seated, learned on SM-A155F", sitExamplesSummary(book.of(7L), "SM-A155F"))
+        assertEquals(
+            "2 min seated, learned on SM-A155F",
+            sitExamplesSummary(SitExampleBook().withOccupied(7L, envelope, "SM-A155F", false).of(7L), "SM-A155F")
+        )
+    }
+
+    @Test
+    fun theEnvelopesTexts() {
+        val envelope = OccupiedEnvelope(5L, listOf(stillWindow, movingWindow))
+        assertEquals(
+            "movement in 1 of 2 windows of 10 s; peak 0.18 g, slow tilt up to 0.42 deg, rms up to 6.1 mg",
+            envelope.describe(SeatType.CHAIR)
+        )
+        assertTrue(envelope.describe(SeatType.CAR_SEAT).contains("roll up to 0.42 deg"))
+        assertTrue(OccupiedEnvelope(5L, listOf(stillWindow)).describe(SeatType.SOFA).endsWith("a still sitter looks like an empty seat"))
+        assertEquals("nothing measured", OccupiedEnvelope(5L, emptyList()).describe(SeatType.CHAIR))
+        assertTrue(sitOccupiedInstruction(SeatType.CAR_SEAT).contains("engine running"))
+        assertTrue(sitOccupiedInstruction(SeatType.CHAIR).startsWith("Sit on the seat for 2 min"))
+        assertEquals(SIT_LEARN_STEPS.size + 1, SIT_LEARN_STEP_COUNT)
+        assertEquals("Keep going: 120 s", sitLearnWaitText(isSeated = true, isTimedOut = false, secondsLeft = 140))
+        assertEquals("Finishing on the Sensor: 20 s", sitLearnWaitText(isSeated = true, isTimedOut = false, secondsLeft = 20))
+        assertEquals("Nothing received in 140 s: TRY AGAIN, or SKIP the step.", sitLearnWaitText(isSeated = true, isTimedOut = true, secondsLeft = 0))
+        assertEquals("Waiting for the Sensor: 42 s", sitLearnWaitText(isSeated = false, isTimedOut = false, secondsLeft = 42))
+        assertEquals("Nothing felt in 60 s: TRY AGAIN, or SKIP the step.", sitLearnWaitText(isSeated = false, isTimedOut = true, secondsLeft = 0))
+    }
+
+    /** The sentinel hands every stillness window to its owner, the seated step's source. */
+    @Test
+    fun theSentinelReportsEachStillnessWindow() {
+        val windows = mutableListOf<StillnessMeter.Window>()
+        val sentinel = MotionSentinel(onWindow = { windows += it })
+        var t = 0L
+        while (t <= 2 * STILLNESS_WINDOW_MS + 100L) { // The first sample only starts the gravity estimate.
+            sentinel.onAccelerometer(0.0, 0.0, STANDARD_GRAVITY, t)
+            t += 20L
+        }
+        assertEquals(2, windows.size)
+        assertFalse(windows.first().isMovement)
+    }
+
+    /** A file or report before Nov26.26 has no envelope; one after it keeps it. */
+    @Test
+    fun theEnvelopeSurvivesJson() {
+        val book = SitExampleBook().add(SitLabel.SIT, 1L).withOccupied(7L, OccupiedEnvelope(5L, listOf(movingWindow)), "SM-A155F", false)
+        assertEquals(book, Json.decodeFromString<SitExampleBook>(Json.encodeToString(book)))
+        val before = Json.decodeFromString<SitExampleBook>(Json.encodeToString(SitExampleBook().add(SitLabel.SIT, 1L)))
+        assertNull(before.of(7L)!!.occupied)
+        val request = SitLearnRequest(7L, occupied = true)
+        assertEquals(request, Json.decodeFromString<SitLearnRequest>(Json.encodeToString(request)))
+        assertFalse("isMovement is derived, not stored", Json.encodeToString(movingWindow).contains("isMovement"))
+    }
+
     /** The settings file and the wire carry the book as JSON; a file before Nov26.25 has none. */
     @Test
     fun theBookSurvivesJson() {

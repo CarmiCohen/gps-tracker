@@ -1,5 +1,6 @@
 package com.jd.core.shared
 
+import kotlinx.serialization.Serializable
 import kotlin.math.acos
 import kotlin.math.sqrt
 
@@ -15,6 +16,8 @@ import kotlin.math.sqrt
  */
 class StillnessMeter(private val windowMs: Long = STILLNESS_WINDOW_MS) {
 
+    /** Serializable: a learning round's seated step keeps its windows as the placement's occupied envelope (ISSUE-NOV26.0-O163). */
+    @Serializable
     data class Window(
         val samples: Int,
         val rmsMg: Double,
@@ -24,6 +27,9 @@ class StillnessMeter(private val windowMs: Long = STILLNESS_WINDOW_MS) {
         val slowSdMg: Double,
         val slowTiltDeg: Double
     ) {
+        /** A sitter's movement, not the resting seat's noise (ISSUE-NOV25.23-O155: [SIT_MOVEMENT_TILT_DEG], [SIT_MOVEMENT_OVER_20MG]). */
+        val isMovement: Boolean get() = slowTiltDeg >= SIT_MOVEMENT_TILT_DEG || over20Mg >= SIT_MOVEMENT_OVER_20MG
+
         fun describe(): String = "n $samples, rms ${f1(rmsMg)} mg, over 10/20 mg $over10Mg/$over20Mg, peak ${peakMg.toInt()} mg, " +
             "slow sd ${f2(slowSdMg)} mg, slow tilt ${"%.3f".format(java.util.Locale.US, slowTiltDeg)} deg"
 

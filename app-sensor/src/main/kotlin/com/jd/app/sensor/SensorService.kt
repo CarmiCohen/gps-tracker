@@ -92,8 +92,11 @@ class SensorService : Service(), SensorEventListener {
     // replaces the gravity sensor that phones like the A15 lack, whose vibration value was always 0 before Nov9.0.
     // Sit checks with a force but no sign go to logcat only, for tuning on the phone (ISSUE-NOV25.22-O150).
     // A sitting period's confirmation and end are INFO events, no alarm (ISSUE-NOV25.23-O155).
-    // A learning round's sit checks become the placement's examples (ISSUE-NOV26.0-O163 part 2).
-    private val motionSentinel = MotionSentinel(onNote = { SystemLogger.i("Motion", it) }, onSitPeriod = ::onSitPeriodEvent, onSitCheck = ::onSitCheck)
+    // A learning round's sit checks become the placement's examples, its seated step's stillness windows the
+    // placement's occupied envelope (ISSUE-NOV26.0-O163 part 2).
+    private val motionSentinel = MotionSentinel(
+        onNote = { SystemLogger.i("Motion", it) }, onSitPeriod = ::onSitPeriodEvent, onSitCheck = ::onSitCheck, onWindow = ::onStillnessWindow
+    )
     private val sitLearner = SitLearner()
     // The phone's own ringing shakes it like a knock (ISSUE-NOV9.2-O62): vibration alerts pause while it rings.
     private var ownVibrationWatch: OwnVibrationWatch? = null
@@ -914,6 +917,16 @@ class SensorService : Service(), SensorEventListener {
         }
     }
 
+    /** The seated step's stillness windows become the placement's occupied envelope (ISSUE-NOV26.0-O163 part 2). Motion sensor thread. */
+    private fun onStillnessWindow(window: StillnessMeter.Window) {
+        val (placementId, envelope) = sitLearner.onWindow(window, SystemClock.elapsedRealtime(), System.currentTimeMillis()) ?: return
+        serviceScope.launch {
+            val book = sensorDataStore.updateSitExamples { it.withOccupied(placementId, envelope, Build.MODEL, hasBarometer) }
+            eventLog.record(EventLevel.INFO, "Sit learning: ${SIT_LEARN_OCCUPIED_MS / 60_000} min seated recorded (${envelope.describe(sensorBehaviour.placement.type)})")
+            sendSitExamples(book)
+        }
+    }
+
     /**
      * Answers the Monitor's SEAT PLACEMENT screen (ISSUE-NOV26.0-O163 part 2): each request drops the examples of
      * placements the Monitor no longer lists (and the asked one's, to start over), may start a learning step, and is
@@ -927,7 +940,11 @@ class SensorService : Service(), SensorEventListener {
                 }
                 sitLearner.onRequest(request, SystemClock.elapsedRealtime())
                 if (request.clear) eventLog.record(EventLevel.INFO, "Sit learning: a placement's examples deleted, to learn again")
-                request.label?.let { SystemLogger.i("SitLearning", "Waiting ${SIT_LEARN_STEP_MS / 1000} s for a ${it.singular} on placement ${request.placementId}") }
+                val label = request.label
+                when {
+                    label != null -> SystemLogger.i("SitLearning", "Waiting ${SIT_LEARN_STEP_MS / 1000} s for a ${label.singular} on placement ${request.placementId}")
+                    request.occupied -> SystemLogger.i("SitLearning", "Recording ${SIT_LEARN_OCCUPIED_MS / 1000} s seated on placement ${request.placementId}")
+                }
                 sendSitExamples(book)
             }
             .launchIn(serviceScope)
