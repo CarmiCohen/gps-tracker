@@ -47,6 +47,19 @@ import kotlin.math.sqrt
  *   (its speed never returned to zero: 7 and 18 cm of false drop) tells them apart; the first 0.1 s did (down 0.15 and
  *   0.67 m/s² sitting, up 0.07 and 0.15 standing). Knocks on the chair and moving while seated: 0.11 to 0.18 g; hard
  *   knocks on its frame 1.2 g and more, over [SIT_JOLT_MAX_MS2].
+ * - **Sitting period** (ISSUE-NOV25.23-O155, user decisions 2026-11-26): the first sit alerts (`Sit alert (checking)`)
+ *   and opens a period, without disarming; inside it sits raise no alert (shifting, sitting down again). On a seat the
+ *   accelerometer sees a still sitter as an empty seat (A15, Nov26.3: the 10 s [StillnessMeter] windows of a still
+ *   sitter matched the empty chair's), so only movement tells: a window over [SIT_MOVEMENT_TILT_DEG] or
+ *   [SIT_MOVEMENT_OVER_20MG], or a sit check with a jolt. A movement in the first [SIT_CONFIRM_MS] confirms the sit,
+ *   none leaves it unconfirmed ([onSitPeriod]); the period stays open either way. A stand-up (up first) followed by
+ *   [SIT_STOOD_UP_EMPTY_MS] without movement ends it, dated to the stand-up; a movement in between means still seated.
+ *   Without a stand-up, [SIT_QUIET_END_MS] without movement ends it, dated to the last movement. Inside the period the
+ *   occupied movement stays within a fixed envelope: vibration counts only hits over [SIT_JOLT_MAX_MS2], the
+ *   accelerometer lift (weak evidence under a cushion: 146 and 48 cm of false lift, Nov26.1) is only noted, and a sit's
+ *   or stand-up's own vibration alert is dropped (held while the sit check is open). What no seat explains still alarms:
+ *   a tilt over the limit, the phone resting [SIT_PERIOD_NEW_REST_DEG] or more away from where it lay before the sit,
+ *   and the barometer's lift.
  *
  * Times are monotonic milliseconds (sensor event time). Not thread-safe: one sensor thread owns it; [gravity],
  * [isArmed], and [isVibrationArmed] may be read from any thread. [onNote] gets two lines for each sit check with a
@@ -55,12 +68,29 @@ import kotlin.math.sqrt
  */
 class MotionSentinel(
     private val armAfterStillMs: Long = MOTION_ARM_AFTER_STILL_MS,
-    private val onNote: (String) -> Unit = {}
+    private val onNote: (String) -> Unit = {},
+    private val onSitPeriod: (SitPeriodEvent) -> Unit = {}
 ) {
 
     enum class Kind { TILT, LIFT, VIBRATION, SIT }
 
     data class Alert(val kind: Kind, val detail: String)
+
+    /**
+     * False while the Monitor has `Sit / Seat Occupied Sensor` switched off: no sitting period, and a sit's vibration
+     * is not dropped, as no sit alert covers it (ISSUE-NOV25.23-O155).
+     */
+    @Volatile var isSitEnabled = true
+
+    private var sitPeriod: SitPeriod? = null
+
+    /** The open sitting period (ISSUE-NOV25.23-O155); times are this sentinel's. */
+    private class SitPeriod(val startMs: Long) {
+        var lastMovementMs = startMs
+        var isResolved = false // Confirmed or unconfirmed already reported.
+        var standUpMs: Long? = null // The stand-up that may end the period, while no movement follows.
+        var standUpEndMs = 0L
+    }
 
     /** The tilt that alerts, from the Monitor's `Tilt Sensitivity Threshold` slider (ISSUE-NOV10.8-O83). */
     @Volatile var tiltThresholdDegrees: Double = tiltThresholdForSensitivity(DEFAULT_TILT_SENSITIVITY)
@@ -137,6 +167,8 @@ class MotionSentinel(
     private var sitFirstMove: Double? = null // The first 0.1 s mean of the upward acceleration of [SIT_FIRST_MOVE_MS2] or more.
     private var sitQuietSinceMs: Long? = null
 
+    private val stillness = StillnessMeter() // ISSUE-NOV25.23-O155: a seated person against an empty seat.
+
     /** The estimated gravity vector in m/s², or null before the first sample. */
     fun gravity(): DoubleArray? = gravitySnapshot
 
@@ -162,6 +194,7 @@ class MotionSentinel(
             liftStartMs = null
             recentUpward.fill(0.0)
             sitStartMs = null
+            stillness.reset()
             lastMotionMs = nowMs
             return emptyList()
         }
@@ -177,6 +210,11 @@ class MotionSentinel(
             vibrationPeak = vibration
             vibrationPeakMs = nowMs
         }
+        if (!isSitEnabled) sitPeriod = null
+        stillness.onSample(x, y, z, vibration, nowMs)?.let { window ->
+            if (sitPeriod != null) onNote("Stillness 10 s: ${window.describe()}") // For tuning, only while seated.
+            onStillnessWindow(window, nowMs)
+        }
         val alpha = dt / (GRAVITY_TIME_CONSTANT_S + dt)
         gx += alpha * (x - gx)
         gy += alpha * (y - gy)
@@ -191,7 +229,54 @@ class MotionSentinel(
         if (hasRested) isVibrationArmed = true
         if (sitStartMs == null && isArmed && isMoving && !isOwnVibrationRecent(nowMs)) openSit(nowMs, previousGx, previousGy, previousGz)
         val sitAlert = checkSit(x, y, z, nowMs, dt, vibration, isMoving)
+        followSitPeriod(nowMs)
         return listOfNotNull(vibrationAlert, sitAlert, tiltOrLift(x, y, z, nowMs, dt, vibration, isMoving, hasRested))
+    }
+
+    /** A movement window of the open period, after the sit and after a stand-up's own window (ISSUE-NOV25.23-O155). */
+    private fun onStillnessWindow(window: StillnessMeter.Window, nowMs: Long) {
+        val period = sitPeriod ?: return
+        if (window.slowTiltDeg < SIT_MOVEMENT_TILT_DEG && window.over20Mg < SIT_MOVEMENT_OVER_20MG) return
+        val windowStartMs = nowMs - STILLNESS_WINDOW_MS
+        if (windowStartMs < period.startMs) return // The sit's own settling.
+        if (period.standUpMs != null && windowStartMs < period.standUpEndMs) return // The stand-up's own window.
+        onSitterMovement(period, nowMs, "a movement window (${window.describe()})")
+    }
+
+    private fun onSitterMovement(period: SitPeriod, nowMs: Long, what: String) {
+        period.lastMovementMs = nowMs
+        if (period.standUpMs != null) {
+            period.standUpMs = null
+            onNote("Sitting period: $what after the stand-up, still seated")
+        }
+        if (!period.isResolved) {
+            period.isResolved = true
+            onSitPeriod(SitPeriodEvent(SitPeriodEvent.Kind.CONFIRMED, period.startMs, nowMs))
+        }
+    }
+
+    /** Reports an unconfirmed sit and ends the period when its time has come (ISSUE-NOV25.23-O155). */
+    private fun followSitPeriod(nowMs: Long) {
+        val period = sitPeriod ?: return
+        if (!period.isResolved && nowMs - period.startMs >= SIT_CONFIRM_MS) {
+            period.isResolved = true
+            onSitPeriod(SitPeriodEvent(SitPeriodEvent.Kind.UNCONFIRMED, period.startMs, nowMs))
+        }
+        val standUpMs = period.standUpMs
+        val end = when {
+            standUpMs != null -> if (nowMs - period.standUpEndMs >= SIT_STOOD_UP_EMPTY_MS) SitPeriodEvent(SitPeriodEvent.Kind.ENDED_STOOD_UP, period.startMs, standUpMs) else null
+            nowMs - period.lastMovementMs >= SIT_QUIET_END_MS -> SitPeriodEvent(SitPeriodEvent.Kind.ENDED_QUIET, period.startMs, period.lastMovementMs)
+            else -> null
+        } ?: return
+        sitPeriod = null
+        onSitPeriod(end)
+    }
+
+    /** Drops a vibration alert held during a sit check that was a sit or a stand-up: the seat's own jolts (ISSUE-NOV25.23-O155). */
+    private fun dropSitVibration(why: String) {
+        if (heldVibration != null) onNote("Vibration alert dropped: $why")
+        heldVibration = null
+        vibrationHits.clear()
     }
 
     private fun isOwnVibrationRecent(nowMs: Long): Boolean = ownVibrationSeenMs?.let { nowMs - it <= OWN_VIBRATION_TAIL_MS } == true
@@ -266,16 +351,36 @@ class MotionSentinel(
             baroDrop?.let { "barometer ${if (it >= 0) "drop" else "rise"} ${(abs(it) * 100).toInt()} cm" }
         ).joinToString(", ")
         val isCandidate = isRested && hasJolt && !isKnock && !isOverTiltLimit && !isUpFirst
+        val period = sitPeriod
         if (isCandidate && (isDownFirst || isBaroDrop)) {
             noteSitTrace(nowMs)
             sitStartMs = null
-            return disarm(nowMs, Alert(Kind.SIT, detail))
+            if (!isSitEnabled) return Alert(Kind.SIT, detail) // Not sent; no period (ISSUE-NOV25.23-O155).
+            dropSitVibration("the jolts of a sit")
+            if (period == null) {
+                // No disarm (ISSUE-NOV25.23-O155): tilt keeps the resting position from before the sit.
+                sitPeriod = SitPeriod(nowMs)
+                return Alert(Kind.SIT, detail)
+            }
+            onNote("Sit inside the sitting period, no new alert: $detail")
+            if (start >= period.startMs + SIT_SETTLE_MS) onSitterMovement(period, nowMs, "a sit")
+            return null
+        }
+        if (period != null && isRested && hasJolt && !isKnock && !isOverTiltLimit && isUpFirst) {
+            noteSitTrace(nowMs)
+            sitStartMs = null
+            dropSitVibration("the jolts of a stand-up")
+            onNote("Stand-up in the sitting period: it ends after ${SIT_STOOD_UP_EMPTY_MS / 60_000} min without movement: $detail")
+            period.standUpMs = start
+            period.standUpEndMs = nowMs
+            return null
         }
         // No clear first move: a barometer, lagging its 2 s smoothing, may still show the drop later in the window.
         if (isCandidate && !isOver && sitRefPressure != null && pressureSmoothed != null) return null
-        if (hasJolt) {
+        if (sitPeakJolt >= SIT_NOTE_JOLT_MS2) {
             noteSitTrace(nowMs)
             val why = when {
+                !hasJolt -> "jolt under ${"%.2f".format(java.util.Locale.US, SIT_JOLT_MS2 / STANDARD_GRAVITY)} g"
                 !isRested -> "no rest within ${SIT_WINDOW_MS / 1000} s"
                 isKnock -> "too sharp: a knock or a blow"
                 isUpFirst -> "up first: standing up or a pickup"
@@ -283,6 +388,7 @@ class MotionSentinel(
                 else -> "no clear first move"
             }
             onNote("Sit not confirmed ($why): $detail")
+            if (period != null && start >= period.startMs + SIT_SETTLE_MS) onSitterMovement(period, nowMs, "a jolt")
         }
         sitStartMs = null
         return null
@@ -302,7 +408,9 @@ class MotionSentinel(
      * phone's own motor runs (ISSUE-NOV9.2-O62).
      */
     private fun checkVibration(vibration: Double, nowMs: Long): Alert? {
-        val isOverLimit = vibration >= vibrationThreshold
+        // Inside a sitting period a sitter's movement is no hit; a blow is (ISSUE-NOV25.23-O155).
+        val limit = if (sitPeriod != null) maxOf(vibrationThreshold, SIT_JOLT_MAX_MS2) else vibrationThreshold
+        val isOverLimit = vibration >= limit
         val wasOverLimit = wasOverVibrationLimit
         wasOverVibrationLimit = isOverLimit
         if (isOwnVibrationActive) ownVibrationSeenMs = nowMs
@@ -329,6 +437,8 @@ class MotionSentinel(
         }
         val held = heldVibration ?: return null
         if (nowMs - heldVibrationSinceMs < VIBRATION_HOLD_MS) return null
+        // A sit or a stand-up jolts as much: held until the open sit check decides (ISSUE-NOV25.23-O155).
+        if (sitStartMs != null && isSitEnabled) return null
         heldVibration = null
         isVibrationArmed = false
         return held
@@ -342,6 +452,10 @@ class MotionSentinel(
 
         val angle = angleDegrees(gx, gy, gz, refX, refY, refZ)
         tiltDegrees = angle
+        if (sitPeriod != null && hasRested && angle >= SIT_PERIOD_NEW_REST_DEG) {
+            // Sitting moves the phone a few degrees at most; resting further away it was found and moved (ISSUE-NOV25.23-O155).
+            return disarm(nowMs, Alert(Kind.TILT, "new resting position, ${"%.1f".format(java.util.Locale.US, angle)} deg from before the sit (limit ${SIT_PERIOD_NEW_REST_DEG.toInt()} deg while seated)"))
+        }
         if (angle >= tiltThresholdDegrees) {
             val since = tiltSinceMs ?: nowMs.also { tiltSinceMs = it }
             if (nowMs - since >= TILT_CONFIRM_MS) {
@@ -395,6 +509,12 @@ class MotionSentinel(
                 return null
             }
             val heldSince = liftHeldSinceMs ?: nowMs.also { liftHeldSinceMs = it }
+            if (nowMs - heldSince >= LIFT_HOLD_MS && sitPeriod != null) {
+                onNote("Lift not alarmed inside the sitting period (weak evidence under a seat): about ${(liftHeight * 100).toInt()} cm")
+                liftStartMs = null
+                liftHeldSinceMs = null
+                return null
+            }
             if (nowMs - heldSince >= LIFT_HOLD_MS) {
                 return disarm(nowMs, Alert(Kind.LIFT, "accelerometer, about ${(liftHeight * 100).toInt()} cm up for ${LIFT_HOLD_MS / 1000.0} s"))
             }
@@ -587,6 +707,9 @@ fun vibrationThresholdForSensitivity(sensitivity: Float): Double {
 /** A sit check lasts at most this long from the first motion (the old `CHAIR_PLUNGE_PHASE_TIMEOUT_MS`, ISSUE-NOV25.22-O150). */
 const val SIT_WINDOW_MS = 5_000L
 
+/** A sit check with a jolt this strong (m/s², 0.1 g) logs its trace, for tuning (ISSUE-NOV25.23-O155: gentle sits under [SIT_JOLT_MS2]). */
+const val SIT_NOTE_JOLT_MS2 = 0.1 * STANDARD_GRAVITY
+
 /** The seat has taken the weight once the phone has rested this long. */
 const val SIT_REST_MS = 500L
 
@@ -606,6 +729,54 @@ const val SIT_FIRST_MOVE_MS2 = 0.05
 /** A barometric height drop in this range (m) is a sign of a sit (the old spec's 0.08 m); more is no seat. */
 const val SIT_BARO_MIN_M = 0.08
 const val SIT_BARO_MAX_M = 0.5
+
+/**
+ * A 10 s stillness window with this slow tilt (degrees) or [SIT_MOVEMENT_OVER_20MG] samples over 20 mg is a sitter's
+ * movement (ISSUE-NOV25.23-O155). A15 under the cushion, Nov26.3: the empty chair and a still sitter at most 0.21 deg
+ * and 2 samples; sitting naturally, half the windows 0.39 to 0.91 deg or 5 to 117 samples, quiet gaps up to 50 s.
+ */
+const val SIT_MOVEMENT_TILT_DEG = 0.3
+const val SIT_MOVEMENT_OVER_20MG = 5
+
+/** A sit is confirmed by a movement within this long, or reported unconfirmed (ISSUE-NOV25.23-O155, user decision 2026-11-26). */
+const val SIT_CONFIRM_MS = 60_000L
+
+/** A sit check of a sitter counts as movement only this long after the period's sit, past its settling (ISSUE-NOV25.23-O155). */
+const val SIT_SETTLE_MS = 2_000L
+
+/** A stand-up followed by this long without movement ends the sitting period (ISSUE-NOV25.23-O155, user decision 2026-11-26). */
+const val SIT_STOOD_UP_EMPTY_MS = 2 * 60_000L
+
+/** With no stand-up seen, this long without movement ends the sitting period (ISSUE-NOV25.23-O155, user decision 2026-11-26). */
+const val SIT_QUIET_END_MS = 15 * 60_000L
+
+/**
+ * Inside a sitting period the phone resting this far (degrees) from where it lay before the sit alarms as a tilt
+ * (ISSUE-NOV25.23-O155): sits and stand-ups tipped the A15 under a cushion 0.1 to 2.8 degrees (Nov25.23, Nov26.3).
+ */
+const val SIT_PERIOD_NEW_REST_DEG = 5.0
+
+/**
+ * An event of a sitting period (ISSUE-NOV25.23-O155), with the sentinel's times: [startMs] is the sit; [atMs] is the
+ * confirming movement, the unconfirmed report, the stand-up, or the last movement.
+ */
+data class SitPeriodEvent(val kind: Kind, val startMs: Long, val atMs: Long) {
+    enum class Kind { CONFIRMED, UNCONFIRMED, ENDED_STOOD_UP, ENDED_QUIET }
+
+    /** The event's text; [wallTime] turns a sentinel time into `HH:mm` (ISSUE-NOV25.23-O155). */
+    fun message(wallTime: (Long) -> String): String = when (kind) {
+        Kind.CONFIRMED -> "Sit confirmed: the sitter moved ${(atMs - startMs) / 1000} s after sitting down"
+        Kind.UNCONFIRMED -> "Sit unconfirmed: no movement within ${SIT_CONFIRM_MS / 60_000} min (an empty seat or a still sitter)"
+        Kind.ENDED_STOOD_UP -> "Sit ended: seated ${seatedMinutes()} (${wallTime(startMs)} to ${wallTime(atMs)})"
+        Kind.ENDED_QUIET ->
+            "Sit ended: no movement for ${SIT_QUIET_END_MS / 60_000} min; seated ${seatedMinutes()} (${wallTime(startMs)} to ${wallTime(atMs)}, the last movement)"
+    }
+
+    private fun seatedMinutes(): String {
+        val minutes = (atMs - startMs + 30_000L) / 60_000L
+        return if (minutes < 1) "under 1 min" else "$minutes min"
+    }
+}
 
 /** The barometric height change that counts as a lift (the old spec's 0.8 m). */
 const val LIFT_BARO_MIN_M = 0.8

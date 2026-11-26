@@ -598,7 +598,8 @@ class MotionSentinelTest {
         val detail = phone.sits.single().detail
         assertTrue(detail, detail.startsWith("first move down 0."))
         assertTrue(detail, detail.contains("jolt 0.5"))
-        assertFalse("One disturbance, one alert", phone.sentinel.isArmed)
+        // ISSUE-NOV25.23-O155: a sit opens a sitting period instead of disarming; tilt keeps the position before it.
+        assertTrue("A sit does not disarm", phone.sentinel.isArmed)
     }
 
     /** The A15's sit at 23:24:02 tipped it only 0.1 degrees. */
@@ -618,9 +619,9 @@ class MotionSentinelTest {
         phone.rest(MOTION_ARM_AFTER_STILL_MS + 1_000, angleDeg = 2.0) // Re-armed under the sitter.
         phone.cushion(2.0, 0.0, isDownFirst = false)
         assertEquals("Only the sit", 1, phone.sits.size)
-        assertTrue("$notes", notes.any { it.startsWith("Sit not confirmed (up first") })
+        assertTrue("$notes", notes.any { it.startsWith("Stand-up in the sitting period") }) // ISSUE-NOV25.23-O155
         assertTrue("Standing up does not disarm", phone.sentinel.isArmed)
-        phone.rest(5_000)
+        phone.rest(SIT_STOOD_UP_EMPTY_MS + 5_000) // The empty seat ends the sitting period (ISSUE-NOV25.23-O155).
         phone.cushion(0.0, 2.0)
         assertEquals("The next sit alerts again", 2, phone.sits.size)
     }
@@ -636,13 +637,16 @@ class MotionSentinelTest {
         assertTrue("$notes", notes.any { it.startsWith("Sit not confirmed (too sharp") })
     }
 
+    /** ISSUE-NOV25.23-O155 (user decision 2026-11-26): until then a second sit alerted again; now it is inside the period. */
     @Test
-    fun aSecondPersonSittingDownIsASitToo() {
-        val phone = armedPhone()
+    fun aSecondSitInsideTheSittingPeriodRaisesNoNewAlert() {
+        val notes = mutableListOf<String>()
+        val phone = Phone(MotionSentinel(onNote = { notes += it })).apply { rest(MOTION_ARM_AFTER_STILL_MS + 1_000) }
         phone.cushion(0.0, 2.0)
         phone.rest(MOTION_ARM_AFTER_STILL_MS + 1_000, angleDeg = 2.0)
         phone.cushion(2.0, 4.0)
-        assertEquals(2, phone.sits.size)
+        assertEquals(1, phone.sits.size)
+        assertTrue("$notes", notes.any { it.startsWith("Sit inside the sitting period, no new alert") })
     }
 
     @Test
@@ -737,6 +741,156 @@ class MotionSentinelTest {
         phone.sentinel.feedPressure(phone, 1013.25, 1013.25, 5_000)
         phone.sentinel.feedPressure(phone, 1013.268, 1013.268, SIT_WINDOW_MS)
         assertTrue("${phone.alerts}", phone.alerts.isEmpty())
+    }
+
+    // Sitting period (ISSUE-NOV25.23-O155, user decisions 2026-11-26).
+
+    private class SeatedPhone {
+        val notes = mutableListOf<String>()
+        val events = mutableListOf<SitPeriodEvent>()
+        val phone = Phone(MotionSentinel(onNote = { notes += it }, onSitPeriod = { events += it })).apply {
+            rest(MOTION_ARM_AFTER_STILL_MS + 1_000)
+        }
+        val kinds get() = events.map { it.kind }
+    }
+
+    /** A sitter shifting: the phone rocks [amplitudeDeg] around [baseDeg] every 4 s, too slowly to open a sit check. */
+    private fun Phone.fidget(durationMs: Long, baseDeg: Double = 2.0, amplitudeDeg: Double = 0.5) =
+        feed(durationMs) { t -> tilted(baseDeg + amplitudeDeg * sin(2 * Math.PI * t / 4_000.0)) }
+
+    @Test
+    fun aSitterMovingWithinAMinuteConfirmsTheSit() {
+        val seat = SeatedPhone()
+        seat.phone.cushion(0.0, 2.0)
+        assertEquals(1, seat.phone.sits.size)
+        seat.phone.rest(15_000, angleDeg = 2.0)
+        seat.phone.fidget(25_000)
+        assertEquals(listOf(SitPeriodEvent.Kind.CONFIRMED), seat.kinds)
+        assertTrue(seat.events.single().message { "" }, seat.events.single().message { "" }.startsWith("Sit confirmed: the sitter moved "))
+    }
+
+    @Test
+    fun aStillSitterLeavesTheSitUnconfirmedAndThePeriodOpen() {
+        val seat = SeatedPhone()
+        seat.phone.cushion(0.0, 2.0)
+        seat.phone.rest(SIT_CONFIRM_MS + 1_000, angleDeg = 2.0)
+        assertEquals(listOf(SitPeriodEvent.Kind.UNCONFIRMED), seat.kinds)
+        assertEquals("Sit unconfirmed: no movement within 1 min (an empty seat or a still sitter)", seat.events.single().message { "" })
+        seat.phone.cushion(2.0, 3.0) // Shifting, or sitting down again: still the same period.
+        assertEquals(1, seat.phone.sits.size)
+    }
+
+    @Test
+    fun aStandUpFollowedByTwoQuietMinutesEndsThePeriodAtTheStandUp() {
+        val seat = SeatedPhone()
+        seat.phone.cushion(0.0, 2.0)
+        val sitMs = seat.phone.nowMs
+        seat.phone.fidget(40_000)
+        seat.phone.rest(5_000, angleDeg = 2.0)
+        val standUpMs = seat.phone.nowMs
+        seat.phone.cushion(2.0, 0.0, isDownFirst = false)
+        assertTrue("${seat.notes}", seat.notes.any { it.startsWith("Stand-up in the sitting period") })
+        seat.phone.rest(SIT_STOOD_UP_EMPTY_MS - 10_000)
+        assertEquals("Not yet", listOf(SitPeriodEvent.Kind.CONFIRMED), seat.kinds)
+        seat.phone.rest(15_000)
+        val end = seat.events.last()
+        assertEquals(SitPeriodEvent.Kind.ENDED_STOOD_UP, end.kind)
+        assertEquals("Dated to the stand-up", standUpMs, end.atMs)
+        assertTrue("From the sit", end.startMs in sitMs - 2_000..sitMs)
+        assertEquals("Sit ended: seated 1 min (A to B)", end.message { if (it == end.startMs) "A" else "B" })
+        seat.phone.cushion(0.0, 2.0)
+        assertEquals("After the end the next sit alerts again", 2, seat.phone.sits.size)
+    }
+
+    @Test
+    fun aMovementAfterTheStandUpMeansStillSeated() {
+        val seat = SeatedPhone()
+        seat.phone.cushion(0.0, 2.0)
+        seat.phone.rest(5_000, angleDeg = 2.0)
+        seat.phone.cushion(2.0, 1.0, isDownFirst = false) // Leaning forward, moving up first.
+        seat.phone.rest(15_000, angleDeg = 1.0)
+        seat.phone.fidget(25_000, baseDeg = 1.0)
+        seat.phone.rest(SIT_STOOD_UP_EMPTY_MS, angleDeg = 1.0)
+        assertTrue("${seat.notes}", seat.notes.any { it.contains("after the stand-up, still seated") })
+        assertFalse("${seat.kinds}", seat.kinds.any { it == SitPeriodEvent.Kind.ENDED_STOOD_UP || it == SitPeriodEvent.Kind.ENDED_QUIET })
+    }
+
+    @Test
+    fun fifteenMinutesWithoutMovementEndThePeriodAtTheLastMovement() {
+        val seat = SeatedPhone()
+        seat.phone.cushion(0.0, 2.0)
+        seat.phone.rest(15_000, angleDeg = 2.0)
+        seat.phone.fidget(25_000)
+        val movedBy = seat.phone.nowMs
+        seat.phone.rest(SIT_QUIET_END_MS + 11_000, angleDeg = 2.0)
+        val end = seat.events.last()
+        assertEquals(SitPeriodEvent.Kind.ENDED_QUIET, end.kind)
+        assertTrue("Dated to the last movement window", end.atMs in movedBy - 10_000..movedBy + 10_000)
+        assertTrue(end.message { "" }, end.message { "" }.startsWith("Sit ended: no movement for 15 min; seated "))
+    }
+
+    /** Nov26.3 on the A15: a sit raised a vibration alert too (4 hits in 2.1 s, 0.16 g). */
+    @Test
+    fun aSitsOwnVibrationIsDropped() {
+        val seat = SeatedPhone()
+        seat.phone.feed(1_200) { t ->
+            seat.phone.tilted(1.5 * minOf(t, 300L) / 300).also {
+                it[2] += if (t < 100) -0.3 else if (t < 200) 0.3 else 0.0
+                if (t % 350 < 40) it[1] += 3.0 // 0.31 g sideways, four hits.
+            }
+        }
+        seat.phone.rest(SIT_REST_MS + 800, angleDeg = 1.5)
+        assertEquals(listOf(MotionSentinel.Kind.SIT), seat.phone.alerts.map { it.kind })
+        assertTrue("${seat.notes}", seat.notes.any { it == "Vibration alert dropped: the jolts of a sit" })
+    }
+
+    @Test
+    fun withSitSwitchedOffASitsVibrationStillAlertsAndNoPeriodOpens() {
+        val seat = SeatedPhone()
+        seat.phone.sentinel.isSitEnabled = false
+        seat.phone.feed(1_200) { t ->
+            seat.phone.tilted(1.5 * minOf(t, 300L) / 300).also {
+                it[2] += if (t < 100) -0.3 else if (t < 200) 0.3 else 0.0
+                if (t % 350 < 40) it[1] += 3.0
+            }
+        }
+        seat.phone.rest(SIT_CONFIRM_MS + 1_000, angleDeg = 1.5)
+        assertEquals(setOf(MotionSentinel.Kind.SIT, MotionSentinel.Kind.VIBRATION), seat.phone.alerts.map { it.kind }.toSet())
+        assertTrue("No period events", seat.events.isEmpty())
+    }
+
+    @Test
+    fun insideThePeriodOnlyBlowsCountAsVibration() {
+        val seat = SeatedPhone()
+        seat.phone.cushion(0.0, 2.0)
+        seat.phone.rest(2_000, angleDeg = 2.0)
+        seat.phone.knocks() // 0.6 g: a sitter's movement.
+        assertTrue("${seat.phone.alerts}", seat.phone.alerts.none { it.kind == MotionSentinel.Kind.VIBRATION })
+        seat.phone.jolts(12.0) // 1.2 g: a blow.
+        seat.phone.rest(SIT_WINDOW_MS) // Held while the sit check the blows opened is undecided.
+        assertTrue("${seat.phone.alerts}", seat.phone.alerts.any { it.kind == MotionSentinel.Kind.VIBRATION })
+    }
+
+    @Test
+    fun insideThePeriodTheAccelerometerLiftIsOnlyNoted() {
+        val seat = SeatedPhone()
+        seat.phone.cushion(0.0, 0.0)
+        seat.phone.rest(5_000)
+        seat.phone.feed(800) { t -> doubleArrayOf(0.0, 0.0, g + if (t < 400) 2.0 else -2.0) } // 32 cm up, held.
+        seat.phone.rest(LIFT_HOLD_MS + 500)
+        assertEquals(listOf(MotionSentinel.Kind.SIT), seat.phone.tiltOrLift.map { it.kind })
+        assertTrue("${seat.notes}", seat.notes.any { it.startsWith("Lift not alarmed inside the sitting period") })
+    }
+
+    @Test
+    fun insideThePeriodANewRestingPositionAlarms() {
+        val seat = SeatedPhone()
+        seat.phone.cushion(0.0, 2.0)
+        seat.phone.rest(5_000, angleDeg = 2.0)
+        seat.phone.tiltSlowly(7.0) // Under the 15 degree limit, but no seat tips it so far.
+        seat.phone.rest(MOTION_ARM_AFTER_STILL_MS, angleDeg = 7.0)
+        val tilt = seat.phone.alerts.single { it.kind == MotionSentinel.Kind.TILT }
+        assertTrue(tilt.detail, tilt.detail.startsWith("new resting position, 7.0 deg"))
     }
 
     /** Chapter 191 (ISSUE-NOV10.8-O84 part 2): the values the Info screens show. */

@@ -1,0 +1,639 @@
+--------- beginning of main
+11-26 13:42:55.298 I/REV_Motion(25303): Stillness 10 s: n 500, rms 29.3 mg, over 10/20 mg 109/34, slow sd 2.14 mg, slow tilt 0.404 deg
+11-26 13:43:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 56/0, slow sd 0.59 mg, slow tilt 0.079 deg
+11-26 13:43:15.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 46.2 mg, over 10/20 mg 277/177, slow sd 3.19 mg, slow tilt 1.532 deg
+11-26 13:43:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 8.4 mg, over 10/20 mg 84/14, slow sd 0.63 mg, slow tilt 0.151 deg
+11-26 13:43:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 46/0, slow sd 0.38 mg, slow tilt 0.096 deg
+11-26 13:43:45.282 I/REV_Event(25303): Tilt, lift and sit armed
+11-26 13:43:45.285 I/REV_Event(25303): Vibration armed
+11-26 13:43:45.292 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 59/0, slow sd 0.66 mg, slow tilt 0.101 deg
+11-26 13:43:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.50 mg, slow tilt 0.087 deg
+11-26 13:44:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 20.2 mg, over 10/20 mg 81/25, slow sd 1.37 mg, slow tilt 0.162 deg
+11-26 13:44:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 15.4 mg, over 10/20 mg 117/45, slow sd 0.56 mg, slow tilt 0.314 deg
+11-26 13:44:25.292 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 44/0, slow sd 0.47 mg, slow tilt 0.091 deg
+11-26 13:44:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 54/0, slow sd 0.46 mg, slow tilt 0.094 deg
+11-26 13:44:38.919 I/REV_Motion(25303): Sit trace over 1240 ms, end speed -0.02 m/s; up cm/s2: 20 56 -72 -33 -4 17 -8 -9 7 -5 5 1; tilt 0.1 deg: 8 11 7 14 18 19 23 23 23 22 22 21
+11-26 13:44:38.920 I/REV_Motion(25303): Sit not confirmed (up first: standing up or a pickup): first move up 0.20 m/s², jolt 0.58 g, tilt 2.1 deg
+11-26 13:44:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 46.6 mg, over 10/20 mg 146/58, slow sd 0.54 mg, slow tilt 1.875 deg
+11-26 13:44:55.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.44 mg, slow tilt 0.083 deg
+11-26 13:45:05.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 50/0, slow sd 0.39 mg, slow tilt 0.099 deg
+11-26 13:45:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 46/0, slow sd 0.54 mg, slow tilt 0.113 deg
+11-26 13:45:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 56/0, slow sd 0.33 mg, slow tilt 0.146 deg
+11-26 13:45:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 59/0, slow sd 0.60 mg, slow tilt 0.118 deg
+11-26 13:45:45.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 47/0, slow sd 0.48 mg, slow tilt 0.116 deg
+11-26 13:45:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 46/0, slow sd 0.53 mg, slow tilt 0.118 deg
+11-26 13:46:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 47/0, slow sd 0.33 mg, slow tilt 0.121 deg
+11-26 13:46:15.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 47/0, slow sd 0.50 mg, slow tilt 0.083 deg
+11-26 13:46:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 50/0, slow sd 0.32 mg, slow tilt 0.086 deg
+11-26 13:46:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 40/0, slow sd 0.71 mg, slow tilt 0.077 deg
+11-26 13:46:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 57/0, slow sd 0.61 mg, slow tilt 0.134 deg
+11-26 13:46:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.57 mg, slow tilt 0.082 deg
+11-26 13:47:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 55/0, slow sd 0.50 mg, slow tilt 0.124 deg
+11-26 13:47:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 50/0, slow sd 0.66 mg, slow tilt 0.120 deg
+11-26 13:47:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 53/0, slow sd 0.63 mg, slow tilt 0.109 deg
+11-26 13:47:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 59/0, slow sd 0.42 mg, slow tilt 0.071 deg
+11-26 13:47:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 51/0, slow sd 0.78 mg, slow tilt 0.059 deg
+11-26 13:47:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 62/0, slow sd 0.53 mg, slow tilt 0.104 deg
+11-26 13:48:05.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 53/0, slow sd 0.45 mg, slow tilt 0.089 deg
+11-26 13:48:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 52/0, slow sd 0.57 mg, slow tilt 0.115 deg
+11-26 13:48:25.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 49/0, slow sd 0.92 mg, slow tilt 0.102 deg
+11-26 13:48:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 52/0, slow sd 0.42 mg, slow tilt 0.131 deg
+11-26 13:48:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 51/0, slow sd 0.75 mg, slow tilt 0.122 deg
+11-26 13:48:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 54/0, slow sd 0.61 mg, slow tilt 0.103 deg
+11-26 13:49:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.5 mg, over 10/20 mg 37/0, slow sd 0.37 mg, slow tilt 0.091 deg
+11-26 13:49:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.69 mg, slow tilt 0.100 deg
+11-26 13:49:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 54/0, slow sd 0.44 mg, slow tilt 0.078 deg
+11-26 13:49:35.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 59/0, slow sd 0.76 mg, slow tilt 0.094 deg
+11-26 13:49:45.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 43/0, slow sd 0.67 mg, slow tilt 0.087 deg
+11-26 13:49:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 59/0, slow sd 0.54 mg, slow tilt 0.073 deg
+11-26 13:50:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 8.1 mg, over 10/20 mg 83/5, slow sd 0.44 mg, slow tilt 0.182 deg
+11-26 13:50:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 10.8 mg, over 10/20 mg 95/22, slow sd 0.59 mg, slow tilt 0.080 deg
+11-26 13:50:25.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 56/0, slow sd 0.43 mg, slow tilt 0.121 deg
+11-26 13:50:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 72/0, slow sd 0.25 mg, slow tilt 0.101 deg
+11-26 13:50:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 48/0, slow sd 0.46 mg, slow tilt 0.082 deg
+11-26 13:50:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 59/0, slow sd 0.68 mg, slow tilt 0.121 deg
+11-26 13:51:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 52/0, slow sd 0.43 mg, slow tilt 0.091 deg
+11-26 13:51:15.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 58/0, slow sd 0.52 mg, slow tilt 0.153 deg
+11-26 13:51:25.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 46/0, slow sd 0.40 mg, slow tilt 0.102 deg
+11-26 13:51:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 53/0, slow sd 0.37 mg, slow tilt 0.086 deg
+11-26 13:51:45.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 57/0, slow sd 0.57 mg, slow tilt 0.070 deg
+11-26 13:51:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 47/0, slow sd 0.54 mg, slow tilt 0.110 deg
+11-26 13:52:05.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 54/0, slow sd 0.27 mg, slow tilt 0.070 deg
+11-26 13:52:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 53/0, slow sd 0.45 mg, slow tilt 0.095 deg
+11-26 13:52:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 50/0, slow sd 0.63 mg, slow tilt 0.163 deg
+11-26 13:52:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 46/0, slow sd 0.51 mg, slow tilt 0.116 deg
+11-26 13:52:45.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 41/0, slow sd 0.42 mg, slow tilt 0.142 deg
+11-26 13:52:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 50/0, slow sd 0.47 mg, slow tilt 0.121 deg
+11-26 13:53:05.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.48 mg, slow tilt 0.158 deg
+11-26 13:53:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 63/0, slow sd 0.40 mg, slow tilt 0.144 deg
+11-26 13:53:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 54/0, slow sd 0.42 mg, slow tilt 0.098 deg
+11-26 13:53:35.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 47/0, slow sd 0.64 mg, slow tilt 0.143 deg
+11-26 13:53:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.45 mg, slow tilt 0.150 deg
+11-26 13:53:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 41/0, slow sd 0.45 mg, slow tilt 0.095 deg
+11-26 13:54:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 48/0, slow sd 0.59 mg, slow tilt 0.080 deg
+11-26 13:54:15.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 63/0, slow sd 0.33 mg, slow tilt 0.103 deg
+11-26 13:54:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 59/0, slow sd 0.79 mg, slow tilt 0.118 deg
+11-26 13:54:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 19.7 mg, over 10/20 mg 152/52, slow sd 1.12 mg, slow tilt 1.704 deg
+11-26 13:54:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 11.2 mg, over 10/20 mg 156/33, slow sd 0.96 mg, slow tilt 0.451 deg
+11-26 13:54:54.597 I/REV_Motion(25303): Sit trace over 1580 ms, end speed -0.05 m/s; up cm/s2: 16 60 -36 -13 -12 -7 3 17 -97 17 -9 6 -7 5 4; tilt 0.1 deg: 9 14 17 15 15 15 11 11 6 10 6 7 7 6 6
+11-26 13:54:54.597 I/REV_Motion(25303): Sit not confirmed (up first: standing up or a pickup): first move up 0.16 m/s², jolt 0.32 g, tilt 0.5 deg
+11-26 13:54:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 27.0 mg, over 10/20 mg 211/96, slow sd 5.19 mg, slow tilt 0.921 deg
+11-26 13:55:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 68/0, slow sd 0.38 mg, slow tilt 0.109 deg
+11-26 13:55:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 36/0, slow sd 0.62 mg, slow tilt 0.091 deg
+11-26 13:55:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 51/0, slow sd 0.44 mg, slow tilt 0.121 deg
+11-26 13:55:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 43/0, slow sd 0.64 mg, slow tilt 0.077 deg
+11-26 13:55:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 51/0, slow sd 0.43 mg, slow tilt 0.124 deg
+11-26 13:55:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 54/0, slow sd 0.72 mg, slow tilt 0.062 deg
+11-26 13:56:05.299 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 48/0, slow sd 0.55 mg, slow tilt 0.127 deg
+11-26 13:56:15.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 50/0, slow sd 0.45 mg, slow tilt 0.203 deg
+11-26 13:56:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 51/0, slow sd 0.48 mg, slow tilt 0.092 deg
+11-26 13:56:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 66/0, slow sd 0.39 mg, slow tilt 0.107 deg
+11-26 13:56:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 62/0, slow sd 0.45 mg, slow tilt 0.074 deg
+11-26 13:56:55.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 54/0, slow sd 0.41 mg, slow tilt 0.109 deg
+11-26 13:57:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 58/1, slow sd 0.58 mg, slow tilt 0.098 deg
+11-26 13:57:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 60/0, slow sd 0.57 mg, slow tilt 0.101 deg
+11-26 13:57:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 46/0, slow sd 0.49 mg, slow tilt 0.119 deg
+11-26 13:57:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 53/0, slow sd 0.65 mg, slow tilt 0.075 deg
+11-26 13:57:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 63/0, slow sd 0.67 mg, slow tilt 0.096 deg
+11-26 13:57:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 58/0, slow sd 0.58 mg, slow tilt 0.119 deg
+11-26 13:58:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 52/0, slow sd 0.48 mg, slow tilt 0.147 deg
+11-26 13:58:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 37/0, slow sd 0.53 mg, slow tilt 0.139 deg
+11-26 13:58:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 50/0, slow sd 0.56 mg, slow tilt 0.152 deg
+11-26 13:58:35.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 59/0, slow sd 0.68 mg, slow tilt 0.098 deg
+11-26 13:58:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 39/0, slow sd 0.38 mg, slow tilt 0.120 deg
+11-26 13:58:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 49/0, slow sd 0.35 mg, slow tilt 0.106 deg
+11-26 13:59:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 55/0, slow sd 0.66 mg, slow tilt 0.120 deg
+11-26 13:59:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 47/0, slow sd 0.34 mg, slow tilt 0.091 deg
+11-26 13:59:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 57/0, slow sd 0.52 mg, slow tilt 0.095 deg
+11-26 13:59:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 49/0, slow sd 0.31 mg, slow tilt 0.074 deg
+11-26 13:59:45.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 59/0, slow sd 0.35 mg, slow tilt 0.106 deg
+11-26 13:59:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 48/0, slow sd 0.85 mg, slow tilt 0.145 deg
+11-26 14:00:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 47/0, slow sd 0.72 mg, slow tilt 0.081 deg
+11-26 14:00:15.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 56/0, slow sd 0.59 mg, slow tilt 0.073 deg
+11-26 14:00:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 47/0, slow sd 0.45 mg, slow tilt 0.126 deg
+11-26 14:00:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 53/0, slow sd 0.40 mg, slow tilt 0.159 deg
+11-26 14:00:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 51/0, slow sd 0.64 mg, slow tilt 0.104 deg
+11-26 14:00:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 50/0, slow sd 0.51 mg, slow tilt 0.156 deg
+11-26 14:01:05.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 43/0, slow sd 0.69 mg, slow tilt 0.066 deg
+11-26 14:01:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 59/0, slow sd 0.63 mg, slow tilt 0.128 deg
+11-26 14:01:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 55/0, slow sd 0.62 mg, slow tilt 0.091 deg
+11-26 14:01:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 53/0, slow sd 0.52 mg, slow tilt 0.124 deg
+11-26 14:01:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 54/0, slow sd 0.34 mg, slow tilt 0.108 deg
+11-26 14:01:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 53/0, slow sd 0.55 mg, slow tilt 0.073 deg
+11-26 14:02:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 43/0, slow sd 0.71 mg, slow tilt 0.099 deg
+11-26 14:02:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 54/0, slow sd 0.59 mg, slow tilt 0.116 deg
+11-26 14:02:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 56/0, slow sd 0.57 mg, slow tilt 0.073 deg
+11-26 14:02:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 48/0, slow sd 0.38 mg, slow tilt 0.127 deg
+11-26 14:02:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 39/0, slow sd 0.39 mg, slow tilt 0.102 deg
+11-26 14:02:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 46/0, slow sd 0.67 mg, slow tilt 0.113 deg
+11-26 14:03:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 57/0, slow sd 0.49 mg, slow tilt 0.081 deg
+11-26 14:03:15.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 52/0, slow sd 0.70 mg, slow tilt 0.102 deg
+11-26 14:03:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.55 mg, slow tilt 0.074 deg
+11-26 14:03:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 49/0, slow sd 0.66 mg, slow tilt 0.076 deg
+11-26 14:03:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 51/0, slow sd 0.82 mg, slow tilt 0.085 deg
+11-26 14:03:55.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 56/0, slow sd 0.56 mg, slow tilt 0.127 deg
+11-26 14:04:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 59/0, slow sd 0.43 mg, slow tilt 0.110 deg
+11-26 14:04:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 36/0, slow sd 0.52 mg, slow tilt 0.119 deg
+11-26 14:04:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.67 mg, slow tilt 0.091 deg
+11-26 14:04:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 58/0, slow sd 0.36 mg, slow tilt 0.091 deg
+11-26 14:04:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 45/0, slow sd 0.60 mg, slow tilt 0.106 deg
+11-26 14:04:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.51 mg, slow tilt 0.093 deg
+11-26 14:05:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 46/0, slow sd 0.43 mg, slow tilt 0.094 deg
+11-26 14:05:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 53/0, slow sd 0.43 mg, slow tilt 0.067 deg
+11-26 14:05:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 53/0, slow sd 0.43 mg, slow tilt 0.138 deg
+11-26 14:05:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 50/0, slow sd 0.48 mg, slow tilt 0.112 deg
+11-26 14:05:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 51/0, slow sd 0.52 mg, slow tilt 0.079 deg
+11-26 14:05:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.34 mg, slow tilt 0.103 deg
+11-26 14:06:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 57/0, slow sd 0.40 mg, slow tilt 0.085 deg
+11-26 14:06:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 57/0, slow sd 0.52 mg, slow tilt 0.093 deg
+11-26 14:06:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 37/0, slow sd 0.46 mg, slow tilt 0.078 deg
+11-26 14:06:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 66/0, slow sd 0.55 mg, slow tilt 0.101 deg
+11-26 14:06:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 50/0, slow sd 0.53 mg, slow tilt 0.044 deg
+11-26 14:06:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.61 mg, slow tilt 0.072 deg
+11-26 14:07:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 54/0, slow sd 0.50 mg, slow tilt 0.138 deg
+11-26 14:07:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 56/0, slow sd 0.52 mg, slow tilt 0.098 deg
+11-26 14:07:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 46/0, slow sd 0.45 mg, slow tilt 0.091 deg
+11-26 14:07:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 41/0, slow sd 0.55 mg, slow tilt 0.086 deg
+11-26 14:07:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 54/0, slow sd 0.60 mg, slow tilt 0.094 deg
+11-26 14:07:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 44/0, slow sd 0.36 mg, slow tilt 0.088 deg
+11-26 14:08:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 65/0, slow sd 0.58 mg, slow tilt 0.176 deg
+11-26 14:08:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 68/0, slow sd 0.40 mg, slow tilt 0.103 deg
+11-26 14:08:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 41/0, slow sd 0.63 mg, slow tilt 0.109 deg
+11-26 14:08:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 53/0, slow sd 0.63 mg, slow tilt 0.107 deg
+11-26 14:08:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 55/0, slow sd 0.41 mg, slow tilt 0.085 deg
+11-26 14:08:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 51/0, slow sd 0.50 mg, slow tilt 0.112 deg
+11-26 14:09:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 47/0, slow sd 0.60 mg, slow tilt 0.073 deg
+11-26 14:09:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 63/0, slow sd 0.73 mg, slow tilt 0.061 deg
+11-26 14:09:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 44/0, slow sd 0.51 mg, slow tilt 0.101 deg
+11-26 14:09:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.91 mg, slow tilt 0.098 deg
+11-26 14:09:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 43/0, slow sd 0.43 mg, slow tilt 0.082 deg
+11-26 14:09:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 63/0, slow sd 0.44 mg, slow tilt 0.090 deg
+11-26 14:10:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 36/0, slow sd 0.70 mg, slow tilt 0.098 deg
+11-26 14:10:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 52/0, slow sd 0.26 mg, slow tilt 0.119 deg
+11-26 14:10:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 57/0, slow sd 0.55 mg, slow tilt 0.117 deg
+11-26 14:10:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 50/0, slow sd 0.46 mg, slow tilt 0.108 deg
+11-26 14:10:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 52/0, slow sd 0.53 mg, slow tilt 0.085 deg
+11-26 14:10:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 58/0, slow sd 0.65 mg, slow tilt 0.088 deg
+11-26 14:11:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 58/0, slow sd 0.46 mg, slow tilt 0.143 deg
+11-26 14:11:15.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.58 mg, slow tilt 0.058 deg
+11-26 14:11:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 54/0, slow sd 0.45 mg, slow tilt 0.088 deg
+11-26 14:11:35.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 46/0, slow sd 0.42 mg, slow tilt 0.103 deg
+11-26 14:11:45.293 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 47/0, slow sd 0.29 mg, slow tilt 0.157 deg
+11-26 14:11:55.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 57/0, slow sd 0.70 mg, slow tilt 0.164 deg
+11-26 14:12:05.293 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 57/0, slow sd 0.76 mg, slow tilt 0.126 deg
+11-26 14:12:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 54/0, slow sd 0.41 mg, slow tilt 0.121 deg
+11-26 14:12:25.292 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 72/0, slow sd 0.59 mg, slow tilt 0.066 deg
+11-26 14:12:35.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 64/0, slow sd 0.40 mg, slow tilt 0.115 deg
+11-26 14:12:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 48/0, slow sd 0.59 mg, slow tilt 0.083 deg
+11-26 14:12:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 50/0, slow sd 0.49 mg, slow tilt 0.113 deg
+11-26 14:13:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 42/0, slow sd 0.74 mg, slow tilt 0.100 deg
+11-26 14:13:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 48/0, slow sd 0.53 mg, slow tilt 0.067 deg
+11-26 14:13:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.60 mg, slow tilt 0.105 deg
+11-26 14:13:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 55/0, slow sd 0.36 mg, slow tilt 0.063 deg
+11-26 14:13:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 48/0, slow sd 0.53 mg, slow tilt 0.096 deg
+11-26 14:13:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 69/0, slow sd 0.48 mg, slow tilt 0.136 deg
+11-26 14:14:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 52/0, slow sd 0.72 mg, slow tilt 0.107 deg
+11-26 14:14:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 48/0, slow sd 0.39 mg, slow tilt 0.123 deg
+11-26 14:14:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 58/0, slow sd 0.32 mg, slow tilt 0.101 deg
+11-26 14:14:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 62/0, slow sd 0.60 mg, slow tilt 0.109 deg
+11-26 14:14:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 35/0, slow sd 0.70 mg, slow tilt 0.105 deg
+11-26 14:14:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 48/0, slow sd 0.94 mg, slow tilt 0.134 deg
+11-26 14:15:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.55 mg, slow tilt 0.149 deg
+11-26 14:15:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 37/0, slow sd 0.41 mg, slow tilt 0.106 deg
+11-26 14:15:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 62/0, slow sd 0.43 mg, slow tilt 0.124 deg
+11-26 14:15:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 59/0, slow sd 0.76 mg, slow tilt 0.068 deg
+11-26 14:15:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 61/0, slow sd 0.40 mg, slow tilt 0.078 deg
+11-26 14:15:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 46/0, slow sd 0.72 mg, slow tilt 0.168 deg
+11-26 14:16:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.67 mg, slow tilt 0.066 deg
+11-26 14:16:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 52/0, slow sd 0.56 mg, slow tilt 0.083 deg
+11-26 14:16:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 55/0, slow sd 0.51 mg, slow tilt 0.157 deg
+11-26 14:16:35.298 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 55/0, slow sd 0.45 mg, slow tilt 0.115 deg
+11-26 14:16:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 49/0, slow sd 0.44 mg, slow tilt 0.079 deg
+11-26 14:16:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 54/0, slow sd 0.37 mg, slow tilt 0.111 deg
+11-26 14:17:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 60/0, slow sd 0.27 mg, slow tilt 0.097 deg
+11-26 14:17:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 58/0, slow sd 0.57 mg, slow tilt 0.075 deg
+11-26 14:17:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 47/0, slow sd 0.72 mg, slow tilt 0.107 deg
+11-26 14:17:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 53/0, slow sd 0.62 mg, slow tilt 0.106 deg
+11-26 14:17:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 41/0, slow sd 0.65 mg, slow tilt 0.072 deg
+11-26 14:17:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 48/0, slow sd 0.39 mg, slow tilt 0.111 deg
+11-26 14:18:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 51/0, slow sd 0.45 mg, slow tilt 0.102 deg
+11-26 14:18:15.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.40 mg, slow tilt 0.106 deg
+11-26 14:18:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 49/0, slow sd 0.45 mg, slow tilt 0.083 deg
+11-26 14:18:35.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 54/0, slow sd 0.44 mg, slow tilt 0.085 deg
+11-26 14:18:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 51/0, slow sd 0.52 mg, slow tilt 0.097 deg
+11-26 14:18:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 51/0, slow sd 0.45 mg, slow tilt 0.098 deg
+11-26 14:19:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 43/0, slow sd 0.76 mg, slow tilt 0.122 deg
+11-26 14:19:15.293 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 61/0, slow sd 0.44 mg, slow tilt 0.070 deg
+11-26 14:19:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 62/0, slow sd 0.63 mg, slow tilt 0.160 deg
+11-26 14:19:35.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 40/0, slow sd 0.62 mg, slow tilt 0.076 deg
+11-26 14:19:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 49/0, slow sd 0.65 mg, slow tilt 0.079 deg
+11-26 14:19:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 60/0, slow sd 0.43 mg, slow tilt 0.102 deg
+11-26 14:20:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 50/0, slow sd 0.47 mg, slow tilt 0.095 deg
+11-26 14:20:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 47/0, slow sd 0.48 mg, slow tilt 0.095 deg
+11-26 14:20:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 54/0, slow sd 0.56 mg, slow tilt 0.136 deg
+11-26 14:20:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 59/0, slow sd 0.55 mg, slow tilt 0.095 deg
+11-26 14:20:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 48/0, slow sd 0.55 mg, slow tilt 0.114 deg
+11-26 14:20:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 50/0, slow sd 0.44 mg, slow tilt 0.161 deg
+11-26 14:21:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 50/0, slow sd 0.53 mg, slow tilt 0.104 deg
+11-26 14:21:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 51/0, slow sd 0.42 mg, slow tilt 0.062 deg
+11-26 14:21:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 49/0, slow sd 0.37 mg, slow tilt 0.162 deg
+11-26 14:21:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 56/0, slow sd 0.47 mg, slow tilt 0.085 deg
+11-26 14:21:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 40/0, slow sd 0.64 mg, slow tilt 0.105 deg
+11-26 14:21:55.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 59/0, slow sd 0.29 mg, slow tilt 0.113 deg
+11-26 14:22:05.293 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 52/0, slow sd 0.43 mg, slow tilt 0.058 deg
+11-26 14:22:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 45/0, slow sd 0.63 mg, slow tilt 0.104 deg
+11-26 14:22:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 61/0, slow sd 0.46 mg, slow tilt 0.075 deg
+11-26 14:22:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 46/0, slow sd 0.42 mg, slow tilt 0.126 deg
+11-26 14:22:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 54/0, slow sd 0.66 mg, slow tilt 0.080 deg
+11-26 14:22:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 46/0, slow sd 0.68 mg, slow tilt 0.111 deg
+11-26 14:23:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 47/0, slow sd 0.65 mg, slow tilt 0.111 deg
+11-26 14:23:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 46/0, slow sd 0.62 mg, slow tilt 0.135 deg
+11-26 14:23:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.49 mg, slow tilt 0.133 deg
+11-26 14:23:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 53/0, slow sd 0.59 mg, slow tilt 0.120 deg
+11-26 14:23:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 52/0, slow sd 0.66 mg, slow tilt 0.094 deg
+11-26 14:23:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 55/0, slow sd 0.49 mg, slow tilt 0.081 deg
+11-26 14:24:05.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.76 mg, slow tilt 0.106 deg
+11-26 14:24:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 42/0, slow sd 0.46 mg, slow tilt 0.105 deg
+11-26 14:24:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 52/0, slow sd 0.58 mg, slow tilt 0.128 deg
+11-26 14:24:35.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 42/0, slow sd 0.71 mg, slow tilt 0.164 deg
+11-26 14:24:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 64/0, slow sd 0.50 mg, slow tilt 0.060 deg
+11-26 14:24:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 45/0, slow sd 0.57 mg, slow tilt 0.114 deg
+11-26 14:25:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 59/0, slow sd 0.56 mg, slow tilt 0.111 deg
+11-26 14:25:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 55/0, slow sd 0.35 mg, slow tilt 0.083 deg
+11-26 14:25:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 46/0, slow sd 0.45 mg, slow tilt 0.106 deg
+11-26 14:25:35.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 53/0, slow sd 0.48 mg, slow tilt 0.060 deg
+11-26 14:25:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 41/0, slow sd 0.52 mg, slow tilt 0.142 deg
+11-26 14:25:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 54/0, slow sd 0.52 mg, slow tilt 0.101 deg
+11-26 14:26:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 66/0, slow sd 0.54 mg, slow tilt 0.108 deg
+11-26 14:26:15.293 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.36 mg, slow tilt 0.063 deg
+11-26 14:26:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 55/0, slow sd 0.52 mg, slow tilt 0.107 deg
+11-26 14:26:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 46/0, slow sd 0.57 mg, slow tilt 0.122 deg
+11-26 14:26:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 61/0, slow sd 0.51 mg, slow tilt 0.091 deg
+11-26 14:26:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 50/0, slow sd 0.45 mg, slow tilt 0.146 deg
+11-26 14:27:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.43 mg, slow tilt 0.102 deg
+11-26 14:27:15.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 57/0, slow sd 0.52 mg, slow tilt 0.058 deg
+11-26 14:27:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 60/0, slow sd 0.56 mg, slow tilt 0.102 deg
+11-26 14:27:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 45/0, slow sd 0.67 mg, slow tilt 0.073 deg
+11-26 14:27:45.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 60/0, slow sd 0.31 mg, slow tilt 0.143 deg
+11-26 14:27:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.39 mg, slow tilt 0.118 deg
+11-26 14:28:05.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 42/0, slow sd 0.35 mg, slow tilt 0.123 deg
+11-26 14:28:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 48/0, slow sd 0.50 mg, slow tilt 0.084 deg
+11-26 14:28:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.7 mg, over 10/20 mg 70/2, slow sd 0.47 mg, slow tilt 0.128 deg
+11-26 14:28:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 38/0, slow sd 0.57 mg, slow tilt 0.105 deg
+11-26 14:28:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 56/0, slow sd 0.42 mg, slow tilt 0.111 deg
+11-26 14:28:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 57/0, slow sd 0.48 mg, slow tilt 0.064 deg
+11-26 14:29:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 46/0, slow sd 0.43 mg, slow tilt 0.122 deg
+11-26 14:29:15.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 43/0, slow sd 0.46 mg, slow tilt 0.082 deg
+11-26 14:29:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 49/0, slow sd 0.43 mg, slow tilt 0.143 deg
+11-26 14:29:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 55/0, slow sd 0.44 mg, slow tilt 0.104 deg
+11-26 14:29:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 52/0, slow sd 0.60 mg, slow tilt 0.131 deg
+11-26 14:29:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 57/0, slow sd 0.56 mg, slow tilt 0.118 deg
+11-26 14:30:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 60/0, slow sd 0.52 mg, slow tilt 0.072 deg
+11-26 14:30:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 39/0, slow sd 0.63 mg, slow tilt 0.121 deg
+11-26 14:30:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 51/0, slow sd 0.53 mg, slow tilt 0.159 deg
+11-26 14:30:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 48/0, slow sd 0.61 mg, slow tilt 0.124 deg
+11-26 14:30:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 54/0, slow sd 0.32 mg, slow tilt 0.060 deg
+11-26 14:30:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 53/0, slow sd 0.55 mg, slow tilt 0.082 deg
+11-26 14:31:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 60/0, slow sd 0.57 mg, slow tilt 0.070 deg
+11-26 14:31:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 55/0, slow sd 0.26 mg, slow tilt 0.104 deg
+11-26 14:31:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 51/0, slow sd 0.69 mg, slow tilt 0.124 deg
+11-26 14:31:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 49/0, slow sd 0.49 mg, slow tilt 0.104 deg
+11-26 14:31:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 54/0, slow sd 0.71 mg, slow tilt 0.136 deg
+11-26 14:31:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 45/0, slow sd 0.67 mg, slow tilt 0.083 deg
+11-26 14:32:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 56/0, slow sd 0.49 mg, slow tilt 0.079 deg
+11-26 14:32:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 47/0, slow sd 0.47 mg, slow tilt 0.125 deg
+11-26 14:32:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 31.8 mg, over 10/20 mg 203/66, slow sd 1.96 mg, slow tilt 0.999 deg
+11-26 14:32:35.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 44/0, slow sd 0.55 mg, slow tilt 0.130 deg
+11-26 14:32:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 49/0, slow sd 0.34 mg, slow tilt 0.127 deg
+11-26 14:32:55.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 59/0, slow sd 0.52 mg, slow tilt 0.105 deg
+11-26 14:33:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.6 mg, over 10/20 mg 85/0, slow sd 0.57 mg, slow tilt 0.115 deg
+11-26 14:33:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 42/0, slow sd 0.51 mg, slow tilt 0.105 deg
+11-26 14:33:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 48/0, slow sd 0.45 mg, slow tilt 0.104 deg
+11-26 14:33:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 44/0, slow sd 0.63 mg, slow tilt 0.115 deg
+11-26 14:33:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 65/0, slow sd 0.48 mg, slow tilt 0.166 deg
+11-26 14:33:55.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 70/0, slow sd 0.52 mg, slow tilt 0.148 deg
+11-26 14:34:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 48/0, slow sd 0.47 mg, slow tilt 0.121 deg
+11-26 14:34:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 50/0, slow sd 0.40 mg, slow tilt 0.099 deg
+11-26 14:34:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 55/0, slow sd 0.81 mg, slow tilt 0.148 deg
+11-26 14:34:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 56/0, slow sd 0.57 mg, slow tilt 0.212 deg
+11-26 14:34:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 51/0, slow sd 0.63 mg, slow tilt 0.111 deg
+11-26 14:34:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 53/0, slow sd 0.55 mg, slow tilt 0.104 deg
+11-26 14:35:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 56/0, slow sd 0.53 mg, slow tilt 0.153 deg
+11-26 14:35:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 63/0, slow sd 0.34 mg, slow tilt 0.078 deg
+11-26 14:35:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 44/0, slow sd 0.44 mg, slow tilt 0.108 deg
+11-26 14:35:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 11.2 mg, over 10/20 mg 191/27, slow sd 0.55 mg, slow tilt 0.880 deg
+11-26 14:35:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 9.8 mg, over 10/20 mg 159/13, slow sd 0.61 mg, slow tilt 0.676 deg
+11-26 14:35:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 50/0, slow sd 0.57 mg, slow tilt 0.145 deg
+11-26 14:36:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 55/0, slow sd 0.62 mg, slow tilt 0.112 deg
+11-26 14:36:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 51/0, slow sd 0.78 mg, slow tilt 0.119 deg
+11-26 14:36:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 52/0, slow sd 0.43 mg, slow tilt 0.121 deg
+11-26 14:36:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.9 mg, over 10/20 mg 93/0, slow sd 0.55 mg, slow tilt 0.659 deg
+11-26 14:36:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.6 mg, over 10/20 mg 79/0, slow sd 0.63 mg, slow tilt 0.187 deg
+11-26 14:36:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.9 mg, over 10/20 mg 104/0, slow sd 0.57 mg, slow tilt 0.246 deg
+11-26 14:37:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 10.2 mg, over 10/20 mg 60/5, slow sd 0.65 mg, slow tilt 0.191 deg
+11-26 14:37:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 39/0, slow sd 0.38 mg, slow tilt 0.179 deg
+11-26 14:37:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 52/0, slow sd 0.62 mg, slow tilt 0.149 deg
+11-26 14:37:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 54/0, slow sd 0.54 mg, slow tilt 0.142 deg
+11-26 14:37:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, slow sd 0.28 mg, slow tilt 0.082 deg
+11-26 14:37:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 17.9 mg, over 10/20 mg 287/117, slow sd 0.57 mg, slow tilt 0.876 deg
+11-26 14:38:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 19.1 mg, over 10/20 mg 212/87, slow sd 0.56 mg, slow tilt 0.906 deg
+11-26 14:38:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 15.4 mg, over 10/20 mg 231/71, slow sd 0.67 mg, slow tilt 0.793 deg
+11-26 14:38:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.8 mg, over 10/20 mg 88/1, slow sd 0.57 mg, slow tilt 0.387 deg
+11-26 14:38:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 9.0 mg, over 10/20 mg 137/5, slow sd 0.38 mg, slow tilt 0.738 deg
+11-26 14:38:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 10.3 mg, over 10/20 mg 170/19, slow sd 0.49 mg, slow tilt 0.660 deg
+11-26 14:38:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 10.0 mg, over 10/20 mg 135/22, slow sd 0.84 mg, slow tilt 0.491 deg
+11-26 14:39:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.7 mg, over 10/20 mg 82/0, slow sd 0.70 mg, slow tilt 0.428 deg
+11-26 14:39:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.4 mg, over 10/20 mg 67/0, slow sd 0.31 mg, slow tilt 0.215 deg
+11-26 14:39:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.7 mg, over 10/20 mg 85/0, slow sd 0.61 mg, slow tilt 0.358 deg
+11-26 14:39:35.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 51/0, slow sd 0.74 mg, slow tilt 0.083 deg
+11-26 14:39:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 9.0 mg, over 10/20 mg 119/9, slow sd 0.53 mg, slow tilt 0.251 deg
+11-26 14:39:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 54/0, slow sd 0.80 mg, slow tilt 0.130 deg
+11-26 14:40:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 54/0, slow sd 0.59 mg, slow tilt 0.128 deg
+11-26 14:40:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 56/0, slow sd 0.87 mg, slow tilt 0.146 deg
+11-26 14:40:21.158 I/REV_Motion(25303): Sit trace over 1140 ms, end speed -0.00 m/s; up cm/s2: 47 36 -110 52 -12 -6 -4 -6 0 -3 -4; tilt 0.1 deg: 1 4 4 12 12 12 12 11 12 12 12
+11-26 14:40:21.159 I/REV_Motion(25303): Sit not confirmed (up first: standing up or a pickup): first move up 0.47 m/s², jolt 0.36 g, tilt 1.2 deg
+11-26 14:40:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 35.3 mg, over 10/20 mg 166/71, slow sd 2.98 mg, slow tilt 0.930 deg
+11-26 14:40:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 51/0, slow sd 0.37 mg, slow tilt 0.116 deg
+11-26 14:40:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 56/0, slow sd 0.60 mg, slow tilt 0.104 deg
+11-26 14:40:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 57/0, slow sd 0.73 mg, slow tilt 0.092 deg
+11-26 14:41:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 45/0, slow sd 0.74 mg, slow tilt 0.169 deg
+11-26 14:41:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 56/0, slow sd 0.33 mg, slow tilt 0.077 deg
+11-26 14:41:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 59/0, slow sd 0.56 mg, slow tilt 0.116 deg
+11-26 14:41:35.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 56/0, slow sd 0.69 mg, slow tilt 0.087 deg
+11-26 14:41:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 55/0, slow sd 0.57 mg, slow tilt 0.141 deg
+11-26 14:41:55.298 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.22 mg, slow tilt 0.083 deg
+11-26 14:42:05.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 54/0, slow sd 0.41 mg, slow tilt 0.085 deg
+11-26 14:42:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 49/0, slow sd 0.55 mg, slow tilt 0.110 deg
+11-26 14:42:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 51/0, slow sd 0.64 mg, slow tilt 0.120 deg
+11-26 14:42:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 48/0, slow sd 0.54 mg, slow tilt 0.120 deg
+11-26 14:42:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, slow sd 0.47 mg, slow tilt 0.118 deg
+11-26 14:42:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 57/0, slow sd 0.48 mg, slow tilt 0.091 deg
+11-26 14:43:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 52/0, slow sd 0.25 mg, slow tilt 0.123 deg
+11-26 14:43:15.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 45/0, slow sd 0.69 mg, slow tilt 0.112 deg
+11-26 14:43:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 50/0, slow sd 0.54 mg, slow tilt 0.107 deg
+11-26 14:43:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 51/0, slow sd 0.63 mg, slow tilt 0.107 deg
+11-26 14:43:45.292 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 52/0, slow sd 0.62 mg, slow tilt 0.125 deg
+11-26 14:43:55.295 I/REV_Motion(25303): Stillness 10 s: n 500, rms 31.1 mg, over 10/20 mg 108/53, slow sd 0.91 mg, slow tilt 1.805 deg
+11-26 14:44:05.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 21.3 mg, over 10/20 mg 148/52, slow sd 1.03 mg, slow tilt 1.497 deg
+11-26 14:44:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.5 mg, over 10/20 mg 78/0, slow sd 0.57 mg, slow tilt 0.101 deg
+11-26 14:44:25.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.5 mg, over 10/20 mg 74/0, slow sd 0.55 mg, slow tilt 0.234 deg
+11-26 14:44:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 9.8 mg, over 10/20 mg 101/7, slow sd 1.13 mg, slow tilt 1.109 deg
+11-26 14:44:45.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 65/0, slow sd 0.52 mg, slow tilt 0.088 deg
+11-26 14:44:55.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 67/0, slow sd 0.74 mg, slow tilt 0.264 deg
+11-26 14:45:05.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 62/0, slow sd 0.76 mg, slow tilt 0.248 deg
+11-26 14:45:15.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 8.1 mg, over 10/20 mg 70/2, slow sd 0.57 mg, slow tilt 0.124 deg
+11-26 14:45:25.296 I/REV_Motion(25303): Stillness 10 s: n 500, rms 9.2 mg, over 10/20 mg 93/7, slow sd 0.57 mg, slow tilt 0.176 deg
+11-26 14:45:35.297 I/REV_Motion(25303): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 59/0, slow sd 0.37 mg, slow tilt 0.099 deg
+11-26 14:45:45.294 I/REV_Motion(25303): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 56/0, slow sd 0.77 mg, slow tilt 0.112 deg
+11-26 14:45:49.752 I/REV_Event(31559): Phone setup complete
+11-26 14:45:49.753 I/REV_Motion(31559): Notification access granted: silent notifications are the phone's own vibration
+11-26 14:45:49.754 I/REV_Motion(31559): Accelerometer: true, gravity sensor: false, barometer: false. Tilt, lift and sit arm after 30 s of rest
+11-26 14:45:49.763 I/REV_Event(31559): Tilt, lift and sit waiting for the phone to rest
+11-26 14:45:49.764 I/REV_Event(31559): Vibration waiting for the phone to rest
+11-26 14:45:49.772 I/REV_Event(31559): Sensor service started (version Nov26.1)
+11-26 14:45:49.776 W/REV_Event(31559): Phone setup needs attention: The microphone is off since the Sensor phone restarted: tap its notification or open the Sensor app
+11-26 14:45:49.821 I/REV_Event(31559): Thermal status changed: 0
+11-26 14:45:51.527 W/REV_Event(31559): Sensor service stopped: app updated
+11-26 14:45:59.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 30.2 mg, over 10/20 mg 96/30, peak 303 mg, slow sd 2.76 mg, slow tilt 0.207 deg
+11-26 14:46:09.773 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 73/0, peak 19 mg, slow sd 0.38 mg, slow tilt 0.195 deg
+11-26 14:46:19.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.6 mg, over 10/20 mg 83/1, peak 21 mg, slow sd 0.58 mg, slow tilt 0.080 deg
+11-26 14:46:21.478 I/REV_Event(31559): Tilt, lift and sit armed
+11-26 14:46:21.481 I/REV_Event(31559): Vibration armed
+11-26 14:46:29.776 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 58/2, peak 20 mg, slow sd 0.61 mg, slow tilt 0.069 deg
+11-26 14:46:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 8.3 mg, over 10/20 mg 75/4, peak 50 mg, slow sd 0.44 mg, slow tilt 0.148 deg
+11-26 14:46:49.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.5 mg, over 10/20 mg 67/3, peak 26 mg, slow sd 0.32 mg, slow tilt 0.083 deg
+11-26 14:46:52.255 I/REV_Motion(31559): Sit trace over 560 ms, end speed -0.01 m/s; up cm/s2: -6 -3 0 -1 -1; tilt 0.1 deg: 6 4 3 3 3
+11-26 14:46:52.256 I/REV_Motion(31559): Sit not confirmed (jolt under 0.25 g): first move down 0.06 m/s², jolt 0.14 g, tilt 0.2 deg
+11-26 14:46:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 11.4 mg, over 10/20 mg 64/4, peak 136 mg, slow sd 0.48 mg, slow tilt 0.134 deg
+11-26 14:47:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 64/0, peak 17 mg, slow sd 0.55 mg, slow tilt 0.097 deg
+11-26 14:47:19.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.4 mg, over 10/20 mg 63/2, peak 31 mg, slow sd 0.53 mg, slow tilt 0.113 deg
+11-26 14:47:29.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 42/0, peak 18 mg, slow sd 0.51 mg, slow tilt 0.130 deg
+11-26 14:47:39.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 50/0, peak 15 mg, slow sd 0.39 mg, slow tilt 0.086 deg
+11-26 14:47:49.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.7 mg, over 10/20 mg 79/1, peak 29 mg, slow sd 0.62 mg, slow tilt 0.268 deg
+11-26 14:47:59.776 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 53/0, peak 17 mg, slow sd 0.34 mg, slow tilt 0.107 deg
+11-26 14:48:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 63/0, peak 15 mg, slow sd 0.53 mg, slow tilt 0.115 deg
+11-26 14:48:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.7 mg, over 10/20 mg 77/2, peak 25 mg, slow sd 0.38 mg, slow tilt 0.212 deg
+11-26 14:48:29.773 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 53/0, peak 16 mg, slow sd 0.69 mg, slow tilt 0.156 deg
+11-26 14:48:38.004 I/REV_Motion(31559): Sit trace over 560 ms, end speed -0.07 m/s; up cm/s2: -41 -11 -3 -2 -5; tilt 0.1 deg: 4 3 2 1 1
+11-26 14:48:38.005 I/REV_Motion(31559): Sit not confirmed (jolt under 0.25 g): first move down 0.41 m/s², jolt 0.21 g, tilt 0.1 deg
+11-26 14:48:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 12.7 mg, over 10/20 mg 70/9, peak 211 mg, slow sd 1.41 mg, slow tilt 0.290 deg
+11-26 14:48:49.776 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 68/0, peak 16 mg, slow sd 0.22 mg, slow tilt 0.364 deg
+11-26 14:48:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 69/0, peak 17 mg, slow sd 0.69 mg, slow tilt 0.096 deg
+11-26 14:49:04.276 I/REV_Motion(31559): Sit trace over 1060 ms, end speed -0.02 m/s; up cm/s2: 74 -50 -62 18 4 -14 6 -8 -3 -2; tilt 0.1 deg: 7 5 7 6 8 9 11 10 11 12
+11-26 14:49:04.276 I/REV_Motion(31559): Sit not confirmed (up first: standing up or a pickup): first move up 0.74 m/s², jolt 0.30 g, tilt 1.2 deg
+11-26 14:49:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 31.7 mg, over 10/20 mg 177/69, peak 303 mg, slow sd 0.87 mg, slow tilt 1.888 deg
+11-26 14:49:19.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 51/0, peak 14 mg, slow sd 0.56 mg, slow tilt 0.098 deg
+11-26 14:49:29.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 47/0, peak 16 mg, slow sd 0.46 mg, slow tilt 0.166 deg
+11-26 14:49:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 49/0, peak 15 mg, slow sd 0.43 mg, slow tilt 0.118 deg
+11-26 14:49:49.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 44/0, peak 15 mg, slow sd 0.69 mg, slow tilt 0.068 deg
+11-26 14:49:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 51/0, peak 16 mg, slow sd 0.44 mg, slow tilt 0.117 deg
+11-26 14:50:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 51/0, peak 15 mg, slow sd 0.54 mg, slow tilt 0.083 deg
+11-26 14:50:18.796 I/REV_Event(31559): Vibration waiting for the phone to rest
+11-26 14:50:18.799 W/REV_Event(31559): Vibration alert: 4 hits in 2.1 s, strongest 0.16 g (limit 0.13 g)
+11-26 14:50:19.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 55.6 mg, over 10/20 mg 197/133, peak 310 mg, slow sd 2.24 mg, slow tilt 2.088 deg
+11-26 14:50:19.844 I/REV_Motion(31559): Sit trace over 3480 ms, end speed 0.01 m/s; up cm/s2: 3 -61 82 -29 11 9 -13 -20 -40 -23 16 4 5 4 0 0 5 7 6 2 -2 -7 -1 16 -2 4 13 -6 3 8 4 2 3 4; tilt 0.1 deg: 18 20 34 37 17 17 19 14 11 4 1 3 3 4 5 6 4 11 14 13 8 7 2 11 20 30 33 28 19 12 9 8 8 7
+11-26 14:50:19.846 I/REV_Event(31559): Tilt, lift and sit waiting for the phone to rest
+11-26 14:50:19.849 W/REV_Event(31559): Sit alert: first move down 0.61 m/s², jolt 0.31 g, tilt 0.7 deg
+11-26 14:50:29.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 22.5 mg, over 10/20 mg 115/44, peak 225 mg, slow sd 0.60 mg, slow tilt 0.882 deg
+11-26 14:50:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 51/0, peak 15 mg, slow sd 0.33 mg, slow tilt 0.098 deg
+11-26 14:50:49.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 58/0, peak 16 mg, slow sd 0.52 mg, slow tilt 0.098 deg
+11-26 14:50:50.816 I/REV_Event(31559): Tilt, lift and sit armed
+11-26 14:50:50.819 I/REV_Event(31559): Vibration armed
+11-26 14:50:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 69/0, peak 14 mg, slow sd 0.45 mg, slow tilt 0.151 deg
+11-26 14:51:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.6 mg, over 10/20 mg 76/1, peak 20 mg, slow sd 0.35 mg, slow tilt 0.249 deg
+11-26 14:51:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.6 mg, over 10/20 mg 78/0, peak 17 mg, slow sd 0.56 mg, slow tilt 0.122 deg
+11-26 14:51:23.719 I/REV_Motion(31559): Sit trace over 1860 ms, end speed 0.01 m/s; up cm/s2: -5 8 1 -2 3 -2 3 6 103 -74 -31 -7 21 -8 1 -5 1 -4; tilt 0.1 deg: 4 5 9 9 6 5 3 9 1 17 13 2 8 12 12 12 12 12
+11-26 14:51:23.720 I/REV_Motion(31559): Sit not confirmed (up first: standing up or a pickup): first move up 0.08 m/s², jolt 0.37 g, tilt 1.2 deg
+11-26 14:51:29.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 35.6 mg, over 10/20 mg 133/61, peak 370 mg, slow sd 5.38 mg, slow tilt 1.379 deg
+11-26 14:51:39.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 57/0, peak 17 mg, slow sd 0.65 mg, slow tilt 0.097 deg
+11-26 14:51:49.776 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 60/0, peak 14 mg, slow sd 0.54 mg, slow tilt 0.091 deg
+11-26 14:51:59.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, peak 14 mg, slow sd 0.51 mg, slow tilt 0.087 deg
+11-26 14:52:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 61/0, peak 15 mg, slow sd 0.48 mg, slow tilt 0.137 deg
+11-26 14:52:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.4 mg, over 10/20 mg 64/3, peak 27 mg, slow sd 0.39 mg, slow tilt 0.120 deg
+11-26 14:52:22.096 I/REV_Motion(31559): Sit trace over 2000 ms, end speed 0.08 m/s; up cm/s2: -35 99 47 -35 -20 26 -8 7 -1 3 4 3 3 -3 3 -7 3 -3 0 2; tilt 0.1 deg: 19 21 34 18 14 20 25 21 19 17 19 20 21 25 24 22 25 27 26 26
+11-26 14:52:22.112 I/REV_Event(31559): Tilt, lift and sit waiting for the phone to rest
+11-26 14:52:22.115 W/REV_Event(31559): Sit alert: first move down 0.35 m/s², jolt 0.46 g, tilt 2.6 deg
+11-26 14:52:29.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 40.1 mg, over 10/20 mg 152/70, peak 456 mg, slow sd 2.38 mg, slow tilt 0.651 deg
+11-26 14:52:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.4 mg, over 10/20 mg 72/0, peak 17 mg, slow sd 0.53 mg, slow tilt 0.372 deg
+11-26 14:52:49.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 62/0, peak 19 mg, slow sd 0.56 mg, slow tilt 0.132 deg
+11-26 14:52:58.964 I/REV_Event(31559): Tilt, lift and sit armed
+11-26 14:52:59.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 8.1 mg, over 10/20 mg 100/2, peak 22 mg, slow sd 0.51 mg, slow tilt 1.015 deg
+11-26 14:53:09.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.9 mg, over 10/20 mg 85/4, peak 22 mg, slow sd 0.59 mg, slow tilt 0.685 deg
+11-26 14:53:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.9 mg, over 10/20 mg 96/2, peak 20 mg, slow sd 0.48 mg, slow tilt 0.321 deg
+11-26 14:53:24.083 I/REV_Motion(31559): Sit trace over 1420 ms, end speed -0.06 m/s; up cm/s2: 0 18 6 10 -59 -28 16 -12 -3 -2 2 -8 -1 1; tilt 0.1 deg: 2 3 15 20 6 7 10 9 13 14 15 16 17 17
+11-26 14:53:24.083 I/REV_Motion(31559): Sit not confirmed (up first: standing up or a pickup): first move up 0.18 m/s², jolt 0.37 g, tilt 1.7 deg
+11-26 14:53:29.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 42.5 mg, over 10/20 mg 147/63, peak 367 mg, slow sd 1.07 mg, slow tilt 1.895 deg
+11-26 14:53:39.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 41/0, peak 14 mg, slow sd 0.63 mg, slow tilt 0.161 deg
+11-26 14:53:49.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 53/0, peak 14 mg, slow sd 0.83 mg, slow tilt 0.126 deg
+11-26 14:53:59.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 49/0, peak 16 mg, slow sd 0.77 mg, slow tilt 0.075 deg
+11-26 14:54:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 38/0, peak 13 mg, slow sd 0.58 mg, slow tilt 0.119 deg
+11-26 14:54:19.776 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 52/0, peak 18 mg, slow sd 0.77 mg, slow tilt 0.077 deg
+11-26 14:54:26.759 I/REV_Motion(31559): Sit trace over 1100 ms, end speed -0.02 m/s; up cm/s2: -38 -67 81 -14 2 14 2 2 2 0 2; tilt 0.1 deg: 16 23 28 11 12 22 21 17 18 18 20
+11-26 14:54:26.774 I/REV_Event(31559): Tilt, lift and sit waiting for the phone to rest
+11-26 14:54:26.776 W/REV_Event(31559): Sit alert: first move down 0.38 m/s², jolt 0.28 g, tilt 2.0 deg
+11-26 14:54:29.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 30.1 mg, over 10/20 mg 117/39, peak 282 mg, slow sd 2.16 mg, slow tilt 2.797 deg
+11-26 14:54:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 8.0 mg, over 10/20 mg 93/0, peak 17 mg, slow sd 0.40 mg, slow tilt 0.140 deg
+11-26 14:54:49.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 62/0, peak 15 mg, slow sd 0.56 mg, slow tilt 0.175 deg
+11-26 14:54:56.758 I/REV_Event(31559): Tilt, lift and sit armed
+11-26 14:54:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 53/0, peak 19 mg, slow sd 0.45 mg, slow tilt 0.197 deg
+11-26 14:55:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 8.3 mg, over 10/20 mg 98/6, peak 31 mg, slow sd 0.79 mg, slow tilt 1.120 deg
+11-26 14:55:19.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.9 mg, over 10/20 mg 99/0, peak 16 mg, slow sd 0.57 mg, slow tilt 0.930 deg
+11-26 14:55:28.244 I/REV_Motion(31559): Sit trace over 1980 ms, end speed 0.06 m/s; up cm/s2: 7 -3 -6 8 25 11 95 -134 95 14 -28 -6 -5 1 -2 1 -5 -2 2; tilt 0.1 deg: 6 8 7 9 14 4 9 10 12 10 9 10 13 14 15 16 16 17 17
+11-26 14:55:28.245 I/REV_Motion(31559): Sit not confirmed (up first: standing up or a pickup): first move up 0.07 m/s², jolt 0.47 g, tilt 1.7 deg
+11-26 14:55:29.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 49.0 mg, over 10/20 mg 173/69, peak 465 mg, slow sd 1.81 mg, slow tilt 2.197 deg
+11-26 14:55:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 55/0, peak 15 mg, slow sd 0.43 mg, slow tilt 0.080 deg
+11-26 14:55:49.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 59/0, peak 16 mg, slow sd 0.48 mg, slow tilt 0.075 deg
+11-26 14:55:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 52/0, peak 14 mg, slow sd 0.44 mg, slow tilt 0.139 deg
+11-26 14:56:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 50/0, peak 15 mg, slow sd 0.38 mg, slow tilt 0.104 deg
+11-26 14:56:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 55/0, peak 15 mg, slow sd 0.41 mg, slow tilt 0.109 deg
+11-26 14:56:29.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 54/0, peak 17 mg, slow sd 0.38 mg, slow tilt 0.106 deg
+11-26 14:56:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 46/0, peak 14 mg, slow sd 0.44 mg, slow tilt 0.110 deg
+11-26 14:56:44.297 I/REV_Motion(31559): Sit trace over 920 ms, end speed 0.01 m/s; up cm/s2: -16 -40 44 4 -2 12 5 2 5; tilt 0.1 deg: 9 12 24 16 15 17 18 18 18
+11-26 14:56:44.298 I/REV_Motion(31559): Sit not confirmed (jolt under 0.25 g): first move down 0.16 m/s², jolt 0.14 g, tilt 1.8 deg
+11-26 14:56:46.484 I/REV_Motion(31559): Sit trace over 620 ms, end speed 0.01 m/s; up cm/s2: 14 0 -1 0 -2 -3; tilt 0.1 deg: 0 2 1 1 1 2
+11-26 14:56:46.485 I/REV_Motion(31559): Sit not confirmed (up first: standing up or a pickup): first move up 0.14 m/s², jolt 0.28 g, tilt 0.2 deg
+11-26 14:56:49.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 28.0 mg, over 10/20 mg 131/38, peak 282 mg, slow sd 1.05 mg, slow tilt 1.743 deg
+11-26 14:56:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 63/0, peak 17 mg, slow sd 0.41 mg, slow tilt 0.077 deg
+11-26 14:57:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.4 mg, over 10/20 mg 72/0, peak 16 mg, slow sd 0.64 mg, slow tilt 0.102 deg
+11-26 14:57:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 57/1, peak 20 mg, slow sd 0.63 mg, slow tilt 0.129 deg
+11-26 14:57:29.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 63/0, peak 16 mg, slow sd 0.71 mg, slow tilt 0.169 deg
+11-26 14:57:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.4 mg, over 10/20 mg 75/0, peak 16 mg, slow sd 0.65 mg, slow tilt 0.299 deg
+11-26 14:57:49.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 51/0, peak 15 mg, slow sd 0.54 mg, slow tilt 0.200 deg
+11-26 14:57:59.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 55/0, peak 15 mg, slow sd 0.61 mg, slow tilt 0.082 deg
+11-26 14:58:09.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 62/0, peak 18 mg, slow sd 0.56 mg, slow tilt 0.242 deg
+11-26 14:58:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 54/0, peak 17 mg, slow sd 0.64 mg, slow tilt 0.095 deg
+11-26 14:58:29.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 57/0, peak 17 mg, slow sd 0.71 mg, slow tilt 0.102 deg
+11-26 14:58:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.8 mg, over 10/20 mg 74/2, peak 42 mg, slow sd 0.38 mg, slow tilt 0.131 deg
+11-26 14:58:49.773 I/REV_Motion(31559): Stillness 10 s: n 500, rms 28.7 mg, over 10/20 mg 174/87, peak 306 mg, slow sd 0.88 mg, slow tilt 1.032 deg
+11-26 14:58:50.642 I/REV_Motion(31559): Sit trace over 2360 ms, end speed 0.02 m/s; up cm/s2: 3 3 2 -2 4 -5 61 9 -31 2 -4 -11 17 -19 -19 11 -14 10 -11 7 -6 5 0; tilt 0.1 deg: 2 5 4 10 11 7 9 9 9 12 9 8 9 21 13 13 9 13 10 13 11 12 12
+11-26 14:58:50.642 I/REV_Motion(31559): Sit not confirmed (up first: standing up or a pickup): first move up 0.61 m/s², jolt 0.31 g, tilt 1.3 deg
+11-26 14:58:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 11.8 mg, over 10/20 mg 87/24, peak 72 mg, slow sd 0.39 mg, slow tilt 0.215 deg
+11-26 14:59:09.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 49/0, peak 13 mg, slow sd 0.51 mg, slow tilt 0.111 deg
+11-26 14:59:19.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 52/0, peak 17 mg, slow sd 0.46 mg, slow tilt 0.104 deg
+11-26 14:59:29.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 45/0, peak 14 mg, slow sd 0.44 mg, slow tilt 0.093 deg
+11-26 14:59:39.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 68/0, peak 18 mg, slow sd 0.50 mg, slow tilt 0.082 deg
+11-26 14:59:49.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 60/0, peak 16 mg, slow sd 0.44 mg, slow tilt 0.101 deg
+11-26 14:59:59.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 50/0, peak 14 mg, slow sd 0.61 mg, slow tilt 0.083 deg
+11-26 15:00:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 55/0, peak 16 mg, slow sd 0.51 mg, slow tilt 0.081 deg
+11-26 15:00:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.7 mg, over 10/20 mg 36/0, peak 13 mg, slow sd 0.58 mg, slow tilt 0.096 deg
+11-26 15:00:29.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 51/0, peak 15 mg, slow sd 0.41 mg, slow tilt 0.059 deg
+11-26 15:00:39.776 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 47/0, peak 14 mg, slow sd 0.44 mg, slow tilt 0.091 deg
+11-26 15:00:49.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 60/0, peak 17 mg, slow sd 0.38 mg, slow tilt 0.095 deg
+11-26 15:00:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 53/0, peak 16 mg, slow sd 0.40 mg, slow tilt 0.174 deg
+11-26 15:01:09.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 53/0, peak 14 mg, slow sd 0.66 mg, slow tilt 0.106 deg
+11-26 15:01:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 48/0, peak 16 mg, slow sd 0.64 mg, slow tilt 0.128 deg
+11-26 15:01:27.160 I/REV_Event(31559): Vibration waiting for the phone to rest
+11-26 15:01:27.162 W/REV_Event(31559): Vibration alert: 4 hits in 1.8 s, strongest 0.33 g (limit 0.13 g)
+11-26 15:01:29.441 I/REV_Motion(31559): Sit trace over 4360 ms, end speed -0.39 m/s; up cm/s2: -26 -9 31 -45 -2 19 6 14 -2 -67 -6 13 4 14 4 0 3 6 71 -90 -120 -26 21 -80 -12 38 6 8 4 12 -3 -14 -100 -64 3 1 -31 -3 11 5 8 3 3; tilt 0.1 deg: 6 14 23 18 25 22 3 7 12 23 28 19 22 25 23 23 17 12 8 9 18 21 8 15 18 20 24 22 19 17 17 15 24 22 20 20 29 25 22 19 19 18 18
+11-26 15:01:29.444 I/REV_Event(31559): Tilt, lift and sit waiting for the phone to rest
+11-26 15:01:29.444 W/REV_Event(31559): Sit alert: first move down 0.26 m/s², jolt 0.61 g, tilt 1.8 deg
+11-26 15:01:29.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 97.2 mg, over 10/20 mg 238/178, peak 614 mg, slow sd 9.45 mg, slow tilt 2.185 deg
+11-26 15:01:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 21.2 mg, over 10/20 mg 197/74, peak 140 mg, slow sd 0.53 mg, slow tilt 1.782 deg
+11-26 15:01:49.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.6 mg, over 10/20 mg 63/1, peak 23 mg, slow sd 0.44 mg, slow tilt 0.379 deg
+11-26 15:01:59.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 8.9 mg, over 10/20 mg 100/7, peak 39 mg, slow sd 0.55 mg, slow tilt 0.401 deg
+11-26 15:02:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.5 mg, over 10/20 mg 78/0, peak 18 mg, slow sd 0.49 mg, slow tilt 0.145 deg
+11-26 15:02:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.4 mg, over 10/20 mg 68/1, peak 21 mg, slow sd 0.52 mg, slow tilt 0.148 deg
+11-26 15:02:28.643 I/REV_Event(31559): Tilt, lift and sit armed
+11-26 15:02:28.645 I/REV_Event(31559): Vibration armed
+11-26 15:02:29.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 65/0, peak 16 mg, slow sd 0.65 mg, slow tilt 0.132 deg
+11-26 15:02:39.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 70/0, peak 15 mg, slow sd 0.61 mg, slow tilt 0.121 deg
+11-26 15:02:49.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 71/0, peak 17 mg, slow sd 0.62 mg, slow tilt 0.079 deg
+11-26 15:02:59.773 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 57/0, peak 15 mg, slow sd 0.66 mg, slow tilt 0.113 deg
+11-26 15:03:09.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.9 mg, over 10/20 mg 83/2, peak 37 mg, slow sd 0.36 mg, slow tilt 0.130 deg
+11-26 15:03:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 9.2 mg, over 10/20 mg 151/7, peak 28 mg, slow sd 0.42 mg, slow tilt 0.332 deg
+11-26 15:03:29.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 70/0, peak 16 mg, slow sd 0.40 mg, slow tilt 0.105 deg
+11-26 15:03:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 64/0, peak 19 mg, slow sd 0.40 mg, slow tilt 0.096 deg
+11-26 15:03:49.776 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 63/0, peak 17 mg, slow sd 0.52 mg, slow tilt 0.122 deg
+11-26 15:03:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 8.8 mg, over 10/20 mg 72/6, peak 88 mg, slow sd 0.66 mg, slow tilt 0.112 deg
+11-26 15:04:09.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 11.1 mg, over 10/20 mg 152/14, peak 79 mg, slow sd 0.70 mg, slow tilt 0.608 deg
+11-26 15:04:11.318 I/REV_Motion(31559): Sit trace over 540 ms, end speed 0.00 m/s; up cm/s2: 8 0 -7 2 -4; tilt 0.1 deg: 1 1 0 1 1
+11-26 15:04:11.319 I/REV_Motion(31559): Sit not confirmed (jolt under 0.25 g): first move up 0.08 m/s², jolt 0.10 g, tilt 0.1 deg
+11-26 15:04:19.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 15.2 mg, over 10/20 mg 133/24, peak 173 mg, slow sd 0.94 mg, slow tilt 0.502 deg
+11-26 15:04:20.214 I/REV_Motion(31559): Sit trace over 640 ms, end speed 0.02 m/s; up cm/s2: 19 -1 -4 1 4 3; tilt 0.1 deg: 9 5 5 3 3 4
+11-26 15:04:20.215 I/REV_Motion(31559): Sit not confirmed (jolt under 0.25 g): first move up 0.19 m/s², jolt 0.17 g, tilt 0.3 deg
+11-26 15:04:29.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 9.6 mg, over 10/20 mg 159/7, peak 30 mg, slow sd 0.60 mg, slow tilt 1.049 deg
+11-26 15:04:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 65/1, peak 21 mg, slow sd 0.40 mg, slow tilt 0.098 deg
+11-26 15:04:49.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 61/0, peak 15 mg, slow sd 0.56 mg, slow tilt 0.115 deg
+11-26 15:04:59.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 49/0, peak 15 mg, slow sd 0.43 mg, slow tilt 0.117 deg
+11-26 15:05:09.776 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 64/0, peak 14 mg, slow sd 0.48 mg, slow tilt 0.128 deg
+11-26 15:05:19.776 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.5 mg, over 10/20 mg 78/0, peak 18 mg, slow sd 0.59 mg, slow tilt 0.099 deg
+11-26 15:05:29.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 63/0, peak 16 mg, slow sd 0.69 mg, slow tilt 0.099 deg
+11-26 15:05:36.242 I/REV_Motion(31559): Sit trace over 560 ms, end speed -0.05 m/s; up cm/s2: -33 -5 0 2 -3; tilt 0.1 deg: 1 3 3 2 2
+11-26 15:05:36.244 I/REV_Motion(31559): Sit not confirmed (jolt under 0.25 g): first move down 0.33 m/s², jolt 0.20 g, tilt 0.3 deg
+11-26 15:05:39.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 13.2 mg, over 10/20 mg 119/8, peak 201 mg, slow sd 0.82 mg, slow tilt 0.593 deg
+11-26 15:05:49.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.9 mg, over 10/20 mg 74/2, peak 53 mg, slow sd 0.61 mg, slow tilt 0.290 deg
+11-26 15:05:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 49/1, peak 37 mg, slow sd 0.55 mg, slow tilt 0.141 deg
+11-26 15:06:09.775 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 59/1, peak 22 mg, slow sd 0.58 mg, slow tilt 0.102 deg
+11-26 15:06:19.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 47/0, peak 15 mg, slow sd 0.64 mg, slow tilt 0.087 deg
+11-26 15:06:29.774 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 61/0, peak 18 mg, slow sd 0.56 mg, slow tilt 0.075 deg
+11-26 15:06:39.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 9.2 mg, over 10/20 mg 88/4, peak 86 mg, slow sd 0.56 mg, slow tilt 0.465 deg
+11-26 15:06:49.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 57/0, peak 17 mg, slow sd 0.33 mg, slow tilt 0.284 deg
+11-26 15:06:59.777 I/REV_Motion(31559): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 52/0, peak 15 mg, slow sd 0.51 mg, slow tilt 0.124 deg
+11-26 15:07:11.315 I/REV_Motion( 2766): Notification access granted: silent notifications are the phone's own vibration
+11-26 15:07:11.315 I/REV_Motion( 2766): Accelerometer: true, gravity sensor: false, barometer: false. Tilt, lift and sit arm after 30 s of rest
+11-26 15:07:11.316 I/REV_Event( 2766): Tilt, lift and sit waiting for the phone to rest
+11-26 15:07:11.331 I/REV_Event( 2766): Vibration waiting for the phone to rest
+11-26 15:07:11.345 I/REV_Event( 2766): Phone setup complete
+11-26 15:07:11.368 I/REV_Event( 2766): Sensor service started (version Nov26.1)
+11-26 15:07:11.401 W/REV_Event( 2766): Phone setup needs attention: The microphone is off since the Sensor phone restarted: tap its notification or open the Sensor app
+11-26 15:07:11.449 I/REV_Event( 2766): Thermal status changed: 0
+11-26 15:07:13.836 W/REV_Event( 2766): Sensor service stopped: app updated
+11-26 15:07:43.173 I/REV_Event( 2766): Tilt, lift and sit armed
+11-26 15:07:43.175 I/REV_Event( 2766): Vibration armed
+11-26 15:09:09.686 I/REV_Motion( 2766): Sit trace over 1340 ms, end speed -0.09 m/s; up cm/s2: 20 86 -72 -73 -11 -3 -13 4 -9 -7 -7 -1 -8; tilt 0.1 deg: 3 5 12 13 8 8 7 9 8 10 9 9 10
+11-26 15:09:09.688 I/REV_Motion( 2766): Sit not confirmed (up first: standing up or a pickup): first move up 0.20 m/s², jolt 0.48 g, tilt 1.0 deg
+11-26 15:11:49.337 I/REV_Motion( 2766): Sit trace over 1380 ms, end speed 0.07 m/s; up cm/s2: -40 6 64 -3 -12 19 2 5 18 4 3 1 5; tilt 0.1 deg: 18 12 24 17 15 18 11 11 9 7 6 4 3
+11-26 15:11:49.363 W/REV_Event( 2766): Sit alert (checking): first move down 0.40 m/s², jolt 0.27 g, tilt 0.2 deg
+11-26 15:11:51.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 33.3 mg, over 10/20 mg 124/50, peak 274 mg, slow sd 0.67 mg, slow tilt 1.050 deg
+11-26 15:12:01.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 8.7 mg, over 10/20 mg 107/5, peak 29 mg, slow sd 0.55 mg, slow tilt 0.445 deg
+11-26 15:12:01.390 I/REV_Event( 2766): Sit confirmed: the sitter moved 12 s after sitting down
+11-26 15:12:11.336 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 54/0, peak 15 mg, slow sd 0.48 mg, slow tilt 0.172 deg
+11-26 15:12:21.333 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 58/0, peak 16 mg, slow sd 0.55 mg, slow tilt 0.100 deg
+11-26 15:12:31.334 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 56/0, peak 16 mg, slow sd 0.23 mg, slow tilt 0.127 deg
+11-26 15:12:41.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.5 mg, over 10/20 mg 70/0, peak 17 mg, slow sd 0.56 mg, slow tilt 0.172 deg
+11-26 15:12:51.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.5 mg, over 10/20 mg 72/1, peak 25 mg, slow sd 0.66 mg, slow tilt 0.104 deg
+11-26 15:13:01.335 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 54/0, peak 16 mg, slow sd 0.66 mg, slow tilt 0.124 deg
+11-26 15:13:02.537 I/REV_Motion( 2766): Sit trace over 560 ms, end speed 0.01 m/s; up cm/s2: 6 -1 2 -1 -2; tilt 0.1 deg: 3 2 2 2 1
+11-26 15:13:02.538 I/REV_Motion( 2766): Sit not confirmed (jolt under 0.25 g): first move up 0.06 m/s², jolt 0.14 g, tilt 0.1 deg
+11-26 15:13:11.336 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 11.5 mg, over 10/20 mg 91/10, peak 144 mg, slow sd 0.33 mg, slow tilt 0.117 deg
+11-26 15:13:21.334 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 11.9 mg, over 10/20 mg 176/34, peak 58 mg, slow sd 0.58 mg, slow tilt 0.372 deg
+11-26 15:13:31.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 46.8 mg, over 10/20 mg 142/80, peak 554 mg, slow sd 1.32 mg, slow tilt 0.638 deg
+11-26 15:13:31.615 I/REV_Motion( 2766): Sit trace over 1300 ms, end speed -0.06 m/s; up cm/s2: 50 33 -173 58 0 -19 -13 3 -1 0 0 -5 -2; tilt 0.1 deg: 7 10 19 15 7 7 8 11 10 11 11 12 13
+11-26 15:13:31.616 I/REV_Motion( 2766): Stand-up in the sitting period: it ends after 2 min without movement: first move up 0.50 m/s², jolt 0.55 g, tilt 1.3 deg
+11-26 15:13:41.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 8.0 mg, over 10/20 mg 84/6, peak 24 mg, slow sd 0.45 mg, slow tilt 0.113 deg
+11-26 15:13:51.336 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 67/0, peak 15 mg, slow sd 0.64 mg, slow tilt 0.101 deg
+11-26 15:14:01.334 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 48/0, peak 15 mg, slow sd 0.39 mg, slow tilt 0.134 deg
+11-26 15:14:11.334 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 44/0, peak 17 mg, slow sd 0.70 mg, slow tilt 0.122 deg
+11-26 15:14:21.336 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 45/0, peak 15 mg, slow sd 0.55 mg, slow tilt 0.092 deg
+11-26 15:14:31.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 55/0, peak 15 mg, slow sd 0.51 mg, slow tilt 0.114 deg
+11-26 15:14:41.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 44/0, peak 14 mg, slow sd 0.69 mg, slow tilt 0.085 deg
+11-26 15:14:51.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 60/0, peak 15 mg, slow sd 0.33 mg, slow tilt 0.106 deg
+11-26 15:15:01.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 56/0, peak 16 mg, slow sd 0.56 mg, slow tilt 0.127 deg
+11-26 15:15:11.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 50/0, peak 15 mg, slow sd 0.43 mg, slow tilt 0.092 deg
+11-26 15:15:21.336 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.2 mg, over 10/20 mg 52/0, peak 17 mg, slow sd 0.50 mg, slow tilt 0.055 deg
+11-26 15:15:31.333 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.0 mg, over 10/20 mg 56/0, peak 15 mg, slow sd 0.57 mg, slow tilt 0.106 deg
+11-26 15:15:31.617 I/REV_Event( 2766): Sit ended: seated 2 min (15:11 to 15:13)
+11-26 15:16:11.041 I/REV_Motion( 2766): Sit trace over 2320 ms, end speed -0.19 m/s; up cm/s2: -16 -186 141 -73 -85 -33 36 21 1 -17 10 -3 -2 7 4 -3 -5 -6 14 3 3 3 2; tilt 0.1 deg: 14 16 31 24 16 15 15 10 7 1 4 7 4 4 4 3 4 8 11 12 12 12 12
+11-26 15:16:11.064 W/REV_Event( 2766): Sit alert (checking): first move down 0.16 m/s², jolt 0.48 g, tilt 1.2 deg
+11-26 15:16:11.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 44.6 mg, over 10/20 mg 156/77, peak 481 mg, slow sd 8.94 mg, slow tilt 1.604 deg
+11-26 15:16:21.336 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 8.5 mg, over 10/20 mg 116/4, peak 25 mg, slow sd 0.37 mg, slow tilt 0.731 deg
+11-26 15:16:21.339 I/REV_Event( 2766): Sit confirmed: the sitter moved 10 s after sitting down
+11-26 15:16:31.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 55/0, peak 16 mg, slow sd 0.54 mg, slow tilt 0.116 deg
+11-26 15:16:41.334 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 6.8 mg, over 10/20 mg 46/0, peak 15 mg, slow sd 0.67 mg, slow tilt 0.067 deg
+11-26 15:16:51.334 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 63/0, peak 16 mg, slow sd 0.62 mg, slow tilt 0.057 deg
+11-26 15:17:01.334 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 8.6 mg, over 10/20 mg 100/4, peak 68 mg, slow sd 0.69 mg, slow tilt 0.736 deg
+11-26 15:17:11.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 6.9 mg, over 10/20 mg 50/0, peak 16 mg, slow sd 0.60 mg, slow tilt 0.185 deg
+11-26 15:17:21.335 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 63/0, peak 17 mg, slow sd 0.58 mg, slow tilt 0.142 deg
+11-26 15:17:22.440 I/REV_Motion( 2766): Sit trace over 640 ms, end speed -0.00 m/s; up cm/s2: 10 3 -6 -6 -1 -3; tilt 0.1 deg: 6 4 1 3 4 6
+11-26 15:17:22.442 I/REV_Motion( 2766): Sit not confirmed (jolt under 0.25 g): first move up 0.10 m/s², jolt 0.11 g, tilt 0.6 deg
+11-26 15:17:31.335 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 12.2 mg, over 10/20 mg 114/12, peak 110 mg, slow sd 0.87 mg, slow tilt 0.862 deg
+11-26 15:17:41.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 50/0, peak 15 mg, slow sd 0.73 mg, slow tilt 0.118 deg
+11-26 15:17:51.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.1 mg, over 10/20 mg 60/0, peak 14 mg, slow sd 0.65 mg, slow tilt 0.087 deg
+11-26 15:18:01.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.4 mg, over 10/20 mg 65/0, peak 18 mg, slow sd 0.50 mg, slow tilt 0.229 deg
+11-26 15:18:08.359 I/REV_Motion( 2766): Sit trace over 1840 ms, end speed 0.09 m/s; up cm/s2: -4 6 29 27 20 -42 42 38 -20 5 26 -20 0 -9 -2 -3 1 -2; tilt 0.1 deg: 14 12 4 16 14 18 11 4 7 9 12 15 12 13 8 5 5 4
+11-26 15:18:08.360 I/REV_Motion( 2766): Stand-up in the sitting period: it ends after 2 min without movement: first move up 0.06 m/s², jolt 0.28 g, tilt 0.3 deg
+11-26 15:18:10.083 I/REV_Motion( 2766): Sit trace over 620 ms, end speed -0.01 m/s; up cm/s2: -5 2 3 -4 -2 -3; tilt 0.1 deg: 2 4 5 4 3 5
+11-26 15:18:10.083 I/REV_Motion( 2766): Sit not confirmed (jolt under 0.25 g): jolt 0.10 g, tilt 0.5 deg
+11-26 15:18:10.084 I/REV_Motion( 2766): Sitting period: a jolt after the stand-up, still seated
+11-26 15:18:11.335 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 53.1 mg, over 10/20 mg 328/139, peak 277 mg, slow sd 4.49 mg, slow tilt 1.123 deg
+11-26 15:18:21.337 I/REV_Motion( 2766): Stillness 10 s: n 500, rms 7.3 mg, over 10/20 mg 61/2, peak 38 mg, slow sd 0.79 mg, slow tilt 0.327 deg

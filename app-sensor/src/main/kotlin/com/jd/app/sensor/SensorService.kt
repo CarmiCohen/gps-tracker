@@ -91,7 +91,8 @@ class SensorService : Service(), SensorEventListener {
     // Tilt, lift (ISSUE-NOV5.2-O11 Group 5), and vibration (Group 7) of the resting tracker; its gravity estimate also
     // replaces the gravity sensor that phones like the A15 lack, whose vibration value was always 0 before Nov9.0.
     // Sit checks with a force but no sign go to logcat only, for tuning on the phone (ISSUE-NOV25.22-O150).
-    private val motionSentinel = MotionSentinel(onNote = { SystemLogger.i("Motion", it) })
+    // A sitting period's confirmation and end are INFO events, no alarm (ISSUE-NOV25.23-O155).
+    private val motionSentinel = MotionSentinel(onNote = { SystemLogger.i("Motion", it) }, onSitPeriod = ::onSitPeriodEvent)
     // The phone's own ringing shakes it like a knock (ISSUE-NOV9.2-O62): vibration alerts pause while it rings.
     private var ownVibrationWatch: OwnVibrationWatch? = null
     private var motionThread: HandlerThread? = null
@@ -542,6 +543,7 @@ class SensorService : Service(), SensorEventListener {
                 isBehaviourRead = true
                 motionSentinel.tiltThresholdDegrees = tiltThresholdForSensitivity(behaviour.tiltSensitivity)
                 motionSentinel.vibrationThreshold = vibrationThresholdForSensitivity(behaviour.vibrationSensitivity)
+                motionSentinel.isSitEnabled = behaviour.sitAlert // No sitting period while sit is off (ISSUE-NOV25.23-O155).
                 acousticMonitor.jumpDb = noiseJumpForSensitivity(behaviour.noiseSensitivity)
                 lightMonitor.riseRatio = lightRatioForSensitivity(behaviour.lightSensitivity)
                 // Logged when the settings change, not on every start with the stored ones (ISSUE-NOV18.9-O121).
@@ -889,8 +891,16 @@ class SensorService : Service(), SensorEventListener {
             MotionSentinel.Kind.TILT -> queueAlert(TILT_ALERT_STATUS, "Tilt alert: ${alert.detail}")
             MotionSentinel.Kind.LIFT -> queueAlert(LIFT_ALERT_STATUS, "Lift alert: ${alert.detail}")
             MotionSentinel.Kind.VIBRATION -> queueAlert(VIBRATION_ALERT_STATUS, "Vibration alert: ${alert.detail}")
-            MotionSentinel.Kind.SIT -> queueAlert(SIT_ALERT_STATUS, "Sit alert: ${alert.detail}")
+            MotionSentinel.Kind.SIT -> queueAlert(SIT_ALERT_STATUS, "Sit alert (checking): ${alert.detail}")
         }
+    }
+
+    /** Records a sitting period's confirmation or end (ISSUE-NOV25.23-O155); sensor times are on the elapsed-realtime clock. */
+    private fun onSitPeriodEvent(event: SitPeriodEvent) {
+        if (!sensorBehaviour.allows(SIT_ALERT_STATUS)) return
+        val wallOffsetMs = System.currentTimeMillis() - SystemClock.elapsedRealtime()
+        val format = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+        eventLog.record(EventLevel.INFO, event.message { format.format(java.util.Date(it + wallOffsetMs)) })
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
