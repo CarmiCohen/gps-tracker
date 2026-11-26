@@ -3,6 +3,8 @@ package com.jd.app.sensor
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.jd.core.shared.AlertSettings
+import com.jd.core.shared.SeatPlacement
+import com.jd.core.shared.SeatType
 import com.jd.core.shared.SensorBehaviour
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -60,7 +62,7 @@ class SensorBehaviourStoreTest {
         val lines = sensorBehaviourLines(SensorBehaviour(tiltAlert = false, noiseSensitivity = 1.0f))
         assertEquals(
             listOf(
-                "Sit: On", // ISSUE-NOV25.22-O150
+                "Sit: On, placement Chair", // ISSUE-NOV25.22-O150, ISSUE-NOV26.0-O163
                 "Vibration: On, alert above 0.13 g",
                 "Tilt: Off",
                 "Noise: On, alert above 15 dB over the background",
@@ -69,6 +71,15 @@ class SensorBehaviourStoreTest {
             ),
             lines
         )
+    }
+
+    /** ISSUE-NOV26.0-O163: the page names the placement chosen on the Monitor, not while sit is off. */
+    @Test
+    fun theReadOnlyPageNamesTheSeatPlacement() {
+        val car = SensorBehaviour(placement = SeatPlacement(id = 2L, name = "Driver", type = SeatType.CAR_SEAT))
+        assertEquals("Sit: On, placement Driver (car seat)", sensorBehaviourLines(car).first())
+        assertEquals("Sit: Off", sensorBehaviourLines(car.copy(sitAlert = false)).first())
+        assertEquals("A placement survives the store", car, decodeSensorBehaviour(Json.encodeToString(car)))
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.jd.core.network
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.DEFAULT_LIGHT_SENSITIVITY
+import com.jd.core.shared.DEFAULT_SEAT_PLACEMENT
 import com.jd.core.shared.EventEntry
 import com.jd.core.shared.GraphRequest
 import com.jd.core.shared.GraphSample
@@ -15,6 +16,8 @@ import com.jd.core.shared.LinkStats
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.ReceivedSensorInfo
 import com.jd.core.shared.SensorInfo
+import com.jd.core.shared.SeatPlacement
+import com.jd.core.shared.SeatType
 import com.jd.core.shared.SensorBehaviour
 import com.jd.core.shared.SensorSetupReport
 import com.jd.core.shared.SystemLogger
@@ -655,6 +658,10 @@ internal object SensorBehaviourWire {
         put("light", behaviour.lightAlert)
         put("lightSens", behaviour.lightSensitivity.toDouble())
         put("sit", behaviour.sitAlert)
+        // The active seat placement (ISSUE-NOV26.0-O163).
+        put("placeId", behaviour.placement.id)
+        put("placeName", behaviour.placement.name)
+        put("placeType", behaviour.placement.type.name)
     }
 
     /** Returns null for another settings type or a malformed payload. */
@@ -674,11 +681,20 @@ internal object SensorBehaviourWire {
                 lightSensitivity = data.optDouble("lightSens", DEFAULT_LIGHT_SENSITIVITY.toDouble()).toFloat(),
                 // Absent from Monitors before Nov25.23 (ISSUE-NOV25.22-O150): sit detection on.
                 sitAlert = data.optBoolean("sit", true),
+                placement = decodePlacement(data),
                 revision = data.getLong("rev")
             )
         } catch (e: Exception) {
             Timber.e(e, "Failed to parse sensor_behaviour settings_relay")
             null
         }
+    }
+
+    /** Absent from Monitors before Nov26.4 (ISSUE-NOV26.0-O163), or a type this Sensor does not know: the default chair. */
+    private fun decodePlacement(data: JSONObject): SeatPlacement {
+        if (!data.has("placeId")) return DEFAULT_SEAT_PLACEMENT
+        val type = SeatType.entries.firstOrNull { it.name == data.optString("placeType") } ?: return DEFAULT_SEAT_PLACEMENT
+        val name = data.optString("placeName").takeIf { it.isNotBlank() } ?: type.label
+        return SeatPlacement(id = data.getLong("placeId"), name = name, type = type)
     }
 }

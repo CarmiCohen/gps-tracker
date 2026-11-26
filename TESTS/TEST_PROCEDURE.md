@@ -1328,8 +1328,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **258.3 Inside the period (a person):** seated, shift, lean, stand up and sit again within a minute: no new `Sit alert` and no `Vibration alert` (`Sit inside the sitting period, no new alert` notes); a still sitter for 15 min ends it with `Sit ended: no movement for 15 min`.
 *   **258.4 Two phones:** with the relay back and a Monitor paired to `T`: the Monitor's Events list the Sensor's `Sit confirmed` or `Sit unconfirmed` and `Sit ended` lines (INFO, no siren) after `Tracker sit detected`.
 
+## Chapter 259 - Seat Placements (Nov26.4)
+**Status: A / P** - 259.1 passed (unit tests); 259.2 pending: at the S21FE Monitor's next install (Nov26.4 or later); 259.3 waits for the relay (O133) (ISSUE-NOV26.0-O163 part 1)
+*   **259.1 Unit:** `SeatPlacementTest` (one chair by default and from older settings, an added placement becomes active and is the Sensor's, a changed active placement is a new Sensor revision, names trimmed, at most 24 characters and unique, the last one stays, ids never reused); `SensorBehaviourWireTest` (no or an unknown placement from an older Monitor: the default chair); `SensorBehaviourStoreTest` (`Sit: On, placement Driver (car seat)`).
+*   **259.2 Device (a Monitor, the S21FE's large font):** Setup, ALERTS: under `Sit / Seat Occupied Sensor` the gold `Placement: Chair ›` (hidden with sit off); it opens SEAT PLACEMENT; ADD PLACEMENT `Driver`, `Car seat`: it is listed, highlighted `in use`, and the link reads `Placement: Driver (car seat) ›`; tap Chair: active again; EDIT renames, a used name or an empty one keeps Save off; DELETE asks first and is not offered for the last placement; Back returns to ALERTS, and a rotation keeps an open dialog.
+*   **259.3 Two phones:** with the relay back and the Monitor paired to `T`: after a placement change the Sensor's DETECTION SETTINGS show `Sit: On, placement Driver (car seat)` and its Events `Detection settings applied (rev ...)` with that line.
+
 ---
-**Active Testing Chapters: 247 of 258**
+**Active Testing Chapters: 248 of 259**
 *Since Nov23.6-docs a new chapter is written only for a check that needs a person, a device or two phones and is still pending (Rule 15); unit tests are named in the commit message.*
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 

@@ -207,6 +207,9 @@ data class AlertSettings(
     val lightSensitivity: Float = DEFAULT_LIGHT_SENSITIVITY,
     /** The Sensor's sit detection (ISSUE-NOV25.22-O150); absent from files before Nov25.23: on. */
     val sitAlert: Boolean = true,
+    /** Where the Sensor phone may be hidden, and the one in use (ISSUE-NOV26.0-O163); absent before Nov26.4: one chair. */
+    val seatPlacements: List<SeatPlacement> = listOf(DEFAULT_SEAT_PLACEMENT),
+    val activePlacementId: Long = DEFAULT_SEAT_PLACEMENT.id,
     /** The revision of the Sensor's part ([sensorBehaviour]), stamped by the Monitor's store on each change (ISSUE-NOV10.8-O83). */
     val sensorRevision: Long = 0L,
     val sirenType: String = "Siren"
@@ -223,6 +226,7 @@ data class AlertSettings(
         lightAlert = lightAlert,
         lightSensitivity = lightSensitivity,
         sitAlert = sitAlert,
+        placement = activePlacement(),
         revision = sensorRevision
     )
 
@@ -251,6 +255,8 @@ data class SensorBehaviour(
     val lightSensitivity: Float = DEFAULT_LIGHT_SENSITIVITY,
     /** Sit came with ISSUE-NOV25.22-O150; a Monitor before Nov25.23 sends none: on. */
     val sitAlert: Boolean = true,
+    /** The active seat placement (ISSUE-NOV26.0-O163); a Monitor before Nov26.4 sends none: the default chair. */
+    val placement: SeatPlacement = DEFAULT_SEAT_PLACEMENT,
     val revision: Long = 0L
 ) {
     /** False for an alert [status] whose kind is switched off. */

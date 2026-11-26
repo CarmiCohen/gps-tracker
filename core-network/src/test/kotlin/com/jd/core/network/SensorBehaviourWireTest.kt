@@ -1,5 +1,8 @@
 package com.jd.core.network
 
+import com.jd.core.shared.DEFAULT_SEAT_PLACEMENT
+import com.jd.core.shared.SeatPlacement
+import com.jd.core.shared.SeatType
 import com.jd.core.shared.SensorBehaviour
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -23,6 +26,7 @@ class SensorBehaviourWireTest {
         lightAlert = false,
         lightSensitivity = 0.8f,
         sitAlert = false,
+        placement = SeatPlacement(id = 3L, name = "Driver", type = SeatType.CAR_SEAT),
         revision = 1_794_000_000_000L
     )
 
@@ -56,6 +60,17 @@ class SensorBehaviourWireTest {
         val wire = JSONObject(SensorBehaviourWire.encode("TRK-1", behaviour).toString())
         wire.remove("sit")
         assertEquals(behaviour.copy(sitAlert = true), SensorBehaviourWire.decode(wire))
+    }
+
+    /** ISSUE-NOV26.0-O163: the active seat placement travels with the settings; an old Monitor's or an unknown type reads as the default chair. */
+    @Test
+    fun `a Monitor before Nov26 4 sends no placement, and the Sensor uses the default chair`() {
+        val wire = JSONObject(SensorBehaviourWire.encode("TRK-1", behaviour).toString())
+        assertEquals("CAR_SEAT", wire.getString("placeType"))
+        val unknownType = JSONObject(wire.toString()).put("placeType", "BICYCLE")
+        assertEquals(behaviour.copy(placement = DEFAULT_SEAT_PLACEMENT), SensorBehaviourWire.decode(unknownType))
+        listOf("placeId", "placeName", "placeType").forEach { wire.remove(it) }
+        assertEquals(behaviour.copy(placement = DEFAULT_SEAT_PLACEMENT), SensorBehaviourWire.decode(wire))
     }
 
     @Test

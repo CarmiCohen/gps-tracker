@@ -1,10 +1,12 @@
 package com.jd.core.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,6 +34,12 @@ fun AlertManagementOverlay(
     onUpdateAlertSettings: (AlertSettings) -> Unit,
     onClose: () -> Unit
 ) {
+    // The SEAT PLACEMENT screen opens over this page; its Back returns here (ISSUE-NOV26.0-O163).
+    var showPlacements by rememberSaveable { mutableStateOf(false) }
+    if (showPlacements) {
+        SeatPlacementOverlay(settings = draftAlertSettings, onUpdateAlertSettings = onUpdateAlertSettings, onClose = { showPlacements = false })
+        return
+    }
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Slate900
@@ -173,6 +181,13 @@ fun AlertManagementOverlay(
             // First: the most important Sensor alarm (ISSUE-NOV25.22-O150).
             AlarmToggle("Sit / Seat Occupied Sensor", draftAlertSettings.sitAlert) {
                 onUpdateAlertSettings(draftAlertSettings.copy(sitAlert = it))
+            }
+            if (draftAlertSettings.sitAlert) {
+                Text(
+                    placementLinkText(draftAlertSettings),
+                    color = BrandGold, fontSize = 13.sp,
+                    modifier = Modifier.fillMaxWidth().clickable { showPlacements = true }.padding(start = 12.dp, top = 4.dp, bottom = 10.dp)
+                )
             }
             AlarmToggle("Tamper / Vibration Sensor", draftAlertSettings.tamperAlert) {
                 onUpdateAlertSettings(draftAlertSettings.copy(tamperAlert = it))

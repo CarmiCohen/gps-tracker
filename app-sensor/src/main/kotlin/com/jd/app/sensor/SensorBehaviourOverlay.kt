@@ -29,7 +29,8 @@ const val SENSOR_BEHAVIOUR_NOT_RECEIVED_NOTE = "Not received from the Monitor ye
 
 /** One line of the read-only page, for example `Tilt: On, alert above 15°` or `Noise: Off`. */
 fun sensorBehaviourLines(behaviour: SensorBehaviour): List<String> = listOf(
-    "Sit: " + if (behaviour.sitAlert) "On" else "Off", // ISSUE-NOV25.22-O150
+    // ISSUE-NOV25.22-O150; the placement chosen on the Monitor (ISSUE-NOV26.0-O163).
+    "Sit: " + if (behaviour.sitAlert) "On, placement ${behaviour.placement.label}" else "Off",
     behaviourLine("Vibration", behaviour.vibrationAlert, vibrationLimitLabel(behaviour.vibrationSensitivity)),
     behaviourLine("Tilt", behaviour.tiltAlert, tiltLimitLabel(behaviour.tiltSensitivity)),
     behaviourLine("Noise", behaviour.noiseAlert, noiseLimitLabel(behaviour.noiseSensitivity) + " over the background"),
