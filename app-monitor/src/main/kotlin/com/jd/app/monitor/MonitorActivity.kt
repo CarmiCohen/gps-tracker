@@ -138,7 +138,9 @@ class MonitorActivity : ComponentActivity() {
                 val driveQuestion by viewModel.driveQuestionShown.collectAsStateWithLifecycle()
                 val events by viewModel.events.collectAsStateWithLifecycle()
 
-                LaunchedEffect(pairing) {
+                // A location grant starts the running session again from the screen, so it gains the location type (ISSUE-NOV27.2-O170).
+                val hasLocationPermission by viewModel.hasLocationPermission.collectAsStateWithLifecycle()
+                LaunchedEffect(pairing, hasLocationPermission) {
                     val serviceIntent = Intent(context, MonitorSessionService::class.java)
                     when (sessionCommandFor(pairing)) {
                         SessionCommand.START ->

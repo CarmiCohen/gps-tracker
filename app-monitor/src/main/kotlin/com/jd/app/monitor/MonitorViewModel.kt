@@ -339,7 +339,9 @@ class MonitorViewModel @Inject constructor(
         .atUiRate()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val hasLocationPermission = MutableStateFlow(locationSource.hasPermission())
+    private val _hasLocationPermission = MutableStateFlow(locationSource.hasPermission())
+    /** A new grant restarts the session with the location type, for the own trail (ISSUE-NOV27.2-O170). */
+    val hasLocationPermission: StateFlow<Boolean> = _hasLocationPermission
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val localFix: StateFlow<LocalFix?> = hasLocationPermission
@@ -359,7 +361,7 @@ class MonitorViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun refreshLocationPermission() {
-        hasLocationPermission.value = locationSource.hasPermission()
+        _hasLocationPermission.value = locationSource.hasPermission()
     }
 
     private val _latestTelemetry = MutableStateFlow<LocationUpdate?>(null)
@@ -379,18 +381,7 @@ class MonitorViewModel @Inject constructor(
                 }
             }
             .launchIn(viewModelScope)
-
-        @OptIn(ExperimentalCoroutinesApi::class)
-        viewModelScope.launch {
-            selfId
-                .filter { it != "LOADING..." && it.isNotBlank() }
-                .flatMapLatest { id ->
-                    localFix.filterNotNull().map { fix -> Pair(id, fix) }
-                }
-                .collect { (id, fix) ->
-                    repository.insertLocalTrail(id, fix)
-                }
-        }
+        // This phone's own fixes are stored by OwnTrailRecorder in the session service (ISSUE-NOV27.2-O170).
     }
 
     private val _ticker = flow {

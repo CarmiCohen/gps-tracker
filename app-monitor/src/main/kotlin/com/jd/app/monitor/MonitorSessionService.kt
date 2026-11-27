@@ -43,9 +43,13 @@ class MonitorSessionService : Service() {
     @Inject lateinit var graphs: MonitorGraphs
     @Inject lateinit var setupReports: SensorSetupReports
     @Inject lateinit var driveQuestion: DriveQuestion
+    @Inject lateinit var ownTrail: OwnTrailRecorder
+    @Inject lateinit var locationSource: MonitorLocationSource
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var signalingJob: Job? = null
+    /** The service types this service runs with now, null before its first startForeground. */
+    private var foregroundType: Int? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -54,19 +58,41 @@ class MonitorSessionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val notification = buildSessionNotification(this)
-
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            startForeground(1001, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        } else {
-            startForeground(1001, notification)
-        }
+        startForegroundTyped()
         
         startSignaling()
         alarmEngine.watch(serviceScope)
         driveQuestion.watch(serviceScope) // ISSUE-NOV26.0-O163 part 1: the after-drive question
+        ownTrail.watch(serviceScope) // ISSUE-NOV27.2-O170: the Monitor's own trail, also in the background
         
         return START_STICKY
+    }
+
+    /**
+     * Starts or raises the foreground state (ISSUE-NOV27.2-O170): with the location type, so this phone's own fixes keep
+     * coming in the background, when the app holds a location permission and Android allows it now (a start from the
+     * screen; a push start from the background is refused it on Android 14). An already foreground service keeps its
+     * type when a later start cannot get location, and needs no new call.
+     */
+    private fun startForegroundTyped() {
+        val notification = buildSessionNotification(this)
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+            if (foregroundType == null) startForeground(1001, notification)
+            foregroundType = 0
+            return
+        }
+        val current = foregroundType
+        if (current != null && (current and LOCATION_TYPE) != 0) return
+        for (type in sessionForegroundTypes(locationSource.hasPermission(), isForeground = current != null)) {
+            try {
+                startForeground(1001, notification, type)
+                foregroundType = type
+                SystemLogger.i("MonitorService", "Foreground, location type: ${(type and LOCATION_TYPE) != 0}")
+                return
+            } catch (e: Exception) {
+                SystemLogger.w("MonitorService", "Foreground service type 0x${type.toString(16)} refused: ${e.message}")
+            }
+        }
     }
 
     /** Runs once per service; a repeated start command must not add another relay collector (ISSUE-NOV8.5-O50). */
@@ -170,4 +196,18 @@ class MonitorSessionService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    companion object {
+        private const val DATA_SYNC_TYPE = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        private const val LOCATION_TYPE = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+
+        /**
+         * The service types to try in order (ISSUE-NOV27.2-O170): with location first when the app holds a location
+         * permission, then data sync alone, which an already foreground service does not need again.
+         */
+        internal fun sessionForegroundTypes(hasLocationPermission: Boolean, isForeground: Boolean): List<Int> = buildList {
+            if (hasLocationPermission) add(DATA_SYNC_TYPE or LOCATION_TYPE)
+            if (!isForeground) add(DATA_SYNC_TYPE)
+        }
+    }
 }
