@@ -17,33 +17,37 @@ import kotlin.test.assertTrue
  * Nov8.101-Tooling: it must hold every version up to then and nothing newer. Since Nov23.6-docs (lean workflow, user
  * decision 2026-11-23) the archive, the SOT and the dashboard are frozen at Nov23.4, the commit message is a version's
  * record, `issues.md` holds open work only without a dashboard, and `Handover.md` has at most 30 lines; the history
- * checks below still guard the frozen files. The documents are declared as inputs of `:core-shared:test`, so editing
- * one re-runs it.
+ * checks below still guard the frozen files. Since Nov27.5-docs (ISSUE-NOV27.5-O171) `issues.md` is a short index that
+ * holds the former Handover, with the item texts in `issue_details.md` and the device notes in `operational_notes.md`.
+ * The documents are declared as inputs of `:core-shared:test`, so editing one re-runs it.
  */
 class TrackingDocumentIntegrityTest {
 
     private val issues by lazy { document("DOCS/issues.md") }
     private val archive by lazy { document("STATUS/RESOLUTION_ARCHIVE.md") }
     private val sot by lazy { document("STATUS/SOT_MASTER_REQUIREMENTS.md") }
-    private val handover by lazy { document("Handover.md") }
+    private val details by lazy { document("DOCS/issue_details.md") }
+    private val notes by lazy { document("DOCS/operational_notes.md") }
 
     @Test
     fun issuesIsALeanWorkingFileOfOpenWork() {
         val headings = sectionHeadings(issues)
-        listOf("Next Resumption Focus", "Work Queue", "Open Gaps", "Operational Notes", "Strategic Simplification Ideas")
+        listOf("Resumption State", "Status: PASSED", "Next Resumption Focus", "Work Queue", "Open Gaps", "Strategic Simplification Ideas")
             .forEach { required -> assertTrue(headings.any { required in it }, "issues.md lost its '$required' section") }
         assertTrue(headings.none { "Dashboard" in it }, "issues.md holds no dashboard since Nov23.6-docs (D2)")
         assertTrue(headings.none { "Resolved Gaps" in it }, "issues.md must not hold Resolved Gaps (D2)")
         assertTrue(issues.length <= MAX_ISSUES_CHARS, "issues.md has ${issues.length} characters, more than $MAX_ISSUES_CHARS (D2)")
     }
 
+    /** Was `handoverFollowsTheShortTemplate`: the Handover now lives in the index (D3, O171). */
     @Test
-    fun handoverFollowsTheShortTemplate() {
-        val lines = handover.lines()
-        assertTrue(lines.size <= MAX_HANDOVER_LINES, "Handover.md has ${lines.size} lines, more than $MAX_HANDOVER_LINES (D3)")
-        assertTrue("```" !in handover, "Handover.md holds no copy of the commit message since Nov23.6-docs (D3)")
-        listOf("Resumption State", "Status: PASSED", "Next Resumption Focus")
-            .forEach { part -> assertTrue(part in handover, "Handover.md lost its '$part' part") }
+    fun theIndexHoldsTheHandoverAndPointsToItsDetails() {
+        assertTrue(!File("../Handover.md").exists(), "Handover.md was merged into issues.md (D3, O171)")
+        assertTrue("```" !in issues, "issues.md holds no copy of the commit message (D3)")
+        val queueIds = Regex("""^\| \d+ \| (ISSUE-[A-Z0-9.]+-O\d+) \|""", RegexOption.MULTILINE).findAll(issues).map { it.groupValues[1] }.toList()
+        assertTrue(queueIds.isNotEmpty(), "issues.md lost its Work Queue rows")
+        assertEquals(emptyList(), queueIds.filterNot { "### $it " in details }, "queue items without a section in issue_details.md (D2)")
+        assertTrue("Two-phone test" in notes, "operational_notes.md lost its Two-phone test note")
     }
 
     @Test
@@ -134,8 +138,7 @@ class TrackingDocumentIntegrityTest {
     }
 
     private companion object {
-        const val MAX_ISSUES_CHARS = 40_000
-        const val MAX_HANDOVER_LINES = 30
+        const val MAX_ISSUES_CHARS = 12_000
         val ARCHIVE_FROZEN_AT = Version(23, 4)
         /** Rules 1.1 to 1.303 predate this repository; the SOT records where they live (ISSUE-NOV8.14-O58). */
         const val FIRST_REPOSITORY_RULE = 304
