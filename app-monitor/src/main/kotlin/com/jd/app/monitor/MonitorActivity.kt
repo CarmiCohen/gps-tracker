@@ -211,6 +211,7 @@ class MonitorActivity : ComponentActivity() {
                         onImportSettings = importSettings,
                         onSaveTrails = saveTrails,
                         onLoadTrails = { loadTrailsLauncher.launch(arrayOf("*/*")) }, // The content is checked on reading.
+                        countTrailClear = viewModel::countTrailClear,
                         onClearTrails = viewModel::clearTrails
                     )
                 }
@@ -372,10 +373,11 @@ fun MonitorScreen(
     /** The settings file's file pickers (ISSUE-NOV10.8-O80). */
     onExportSettings: () -> Unit = {},
     onImportSettings: () -> Unit = {},
-    /** The map's trail file pickers and clear (ISSUE-NOV17.7-O107). */
+    /** The map's trail file pickers and clear (ISSUE-NOV17.7-O107), the clear with a kept span (ISSUE-NOV27.1-O167). */
     onSaveTrails: () -> Unit = {},
     onLoadTrails: () -> Unit = {},
-    onClearTrails: () -> Unit = {},
+    countTrailClear: suspend (TrailClearChoice) -> TrailClearCount = { TrailClearCount(0, 0) },
+    onClearTrails: (TrailClearChoice) -> Unit = {},
     sensorSetup: SensorSetupReport? = null,
     events: List<EventEntry> = emptyList(),
     onClearEvents: () -> Unit = {},
@@ -436,20 +438,13 @@ fun MonitorScreen(
     var isClearTrailsPending by rememberSaveable { mutableStateOf(false) }
 
     if (isClearTrailsPending) {
-        AlertDialog(
-            onDismissRequest = { isClearTrailsPending = false },
-            title = { Text("Clear the trails?") },
-            text = { Text("The Sensor's and this phone's trails are deleted from this phone. SAVE them first to keep a copy.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        isClearTrailsPending = false
-                        onClearTrails()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = com.jd.core.ui.StatusRed)
-                ) { Text("Clear") }
+        TrailClearDialog(
+            countRows = countTrailClear,
+            onClear = { choice ->
+                isClearTrailsPending = false
+                onClearTrails(choice)
             },
-            dismissButton = { TextButton(onClick = { isClearTrailsPending = false }) { Text("Cancel") } }
+            onDismiss = { isClearTrailsPending = false }
         )
     }
 

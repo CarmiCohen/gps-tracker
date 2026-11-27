@@ -149,10 +149,18 @@ class MonitorViewModel @Inject constructor(
         }
     }
 
-    /** The map's CLEAR: the stored trails go, and the Sensor's older rows stay away (ISSUE-NOV17.7-O107). */
-    fun clearTrails() {
-        viewModelScope.launch { repository.clearTrail(pairing.value?.trackerId) }
-        eventLog.record(EventLevel.INFO, "Trails cleared")
+    /** What the map CLEAR dialog's [choice] would delete (ISSUE-NOV27.1-O167). */
+    suspend fun countTrailClear(choice: TrailClearChoice): TrailClearCount = repository.countTrailClear(choice)
+
+    /**
+     * The map's CLEAR: the stored rows of [choice] go, and the Sensor's older rows stay away (ISSUE-NOV17.7-O107,
+     * ISSUE-NOV27.1-O167); Events names the kept span and the rows deleted.
+     */
+    fun clearTrails(choice: TrailClearChoice) {
+        viewModelScope.launch {
+            val deleted = repository.clearTrail(pairing.value?.trackerId, choice)
+            eventLog.record(EventLevel.INFO, choice.eventText(deleted))
+        }
     }
 
     private fun Exception.userMessage(): String =

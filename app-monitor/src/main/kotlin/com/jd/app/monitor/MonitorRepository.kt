@@ -59,14 +59,32 @@ class MonitorRepository @Inject constructor(
      */
     fun takeRowCounts(): RowCounts = RowCounts(liveRows.getAndSet(0), backfilledRows.getAndSet(0), missingRows)
 
+    /** The rows [clearTrail] would delete for [choice], and the rows of its scope (ISSUE-NOV27.1-O167). */
+    suspend fun countTrailClear(choice: TrailClearChoice, nowMs: Long = System.currentTimeMillis()): TrailClearCount {
+        val sensor = choice.scope.sensor
+        val own = choice.scope.own
+        return TrailClearCount(
+            deleted = trailDao.countRowsBefore(sensor, own, choice.deleteBeforeMs(nowMs)),
+            total = trailDao.countRowsBefore(sensor, own, Long.MAX_VALUE)
+        )
+    }
+
     /**
-     * Clears all stored trail entries (ISSUE-NOV7.1-O35). With [trackerId] the clear is kept: that Sensor's older rows
-     * are not asked for or stored again (ISSUE-NOV17.7-O107); without it the next pairing gets the whole history.
+     * Deletes the stored trail rows of [choice]'s scope older than its kept span, every one by default (ISSUE-NOV7.1-O35,
+     * ISSUE-NOV27.1-O167), and returns their number. With [trackerId] a clear of the Sensor's rows is kept: its rows
+     * older than the cutoff are not asked for or stored again (ISSUE-NOV17.7-O107); without it the next pairing gets
+     * the whole history. This phone's own rows are never backfilled, so clearing them alone leaves the mark as it is.
      */
-    suspend fun clearTrail(trackerId: String?, nowMs: Long = System.currentTimeMillis()) {
-        dataStore.saveTrailClear(trackerId?.let { TrailClear(it, nowMs) })
-        trailDao.deleteAll()
-        missingRows = 0L
+    suspend fun clearTrail(
+        trackerId: String?,
+        choice: TrailClearChoice = TrailClearChoice.EVERYTHING,
+        nowMs: Long = System.currentTimeMillis()
+    ): Int {
+        val sensor = choice.scope.sensor
+        if (sensor) dataStore.saveTrailClear(trackerId?.let { dataStore.trailClear.first().raisedTo(it, choice.clearAtMs(nowMs)) })
+        val deleted = trailDao.deleteRowsBefore(sensor, choice.scope.own, choice.deleteBeforeMs(nowMs))
+        if (sensor) missingRows = 0L
+        return deleted
     }
 
     /**

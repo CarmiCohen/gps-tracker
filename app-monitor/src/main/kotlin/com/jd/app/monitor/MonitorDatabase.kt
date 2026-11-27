@@ -96,10 +96,15 @@ interface TrailDao {
     suspend fun moveLocalTrail(from: String, to: String)
 
     /**
-     * Deletes all trail records across all trackers. Used during clean setup maintenance.
+     * The rows older than [beforeMs] of the Sensor's trails ([sensor]) and this phone's own ([own]), of every tracker
+     * (ISSUE-NOV27.1-O167); [beforeMs] `Long.MAX_VALUE` counts them all.
      */
-    @Query("DELETE FROM trails")
-    suspend fun deleteAll()
+    @Query("SELECT COUNT(*) FROM trails WHERE ((:sensor AND isLocalUser = 0) OR (:own AND isLocalUser = 1)) AND timestamp < :beforeMs")
+    suspend fun countRowsBefore(sensor: Boolean, own: Boolean, beforeMs: Long): Int
+
+    /** Deletes the rows [countRowsBefore] counts and returns their number: the map CLEAR's kept span (ISSUE-NOV27.1-O167). */
+    @Query("DELETE FROM trails WHERE ((:sensor AND isLocalUser = 0) OR (:own AND isLocalUser = 1)) AND timestamp < :beforeMs")
+    suspend fun deleteRowsBefore(sensor: Boolean, own: Boolean, beforeMs: Long): Int
 
     /** Every stored row, for the settings file (ISSUE-NOV10.8-O80). */
     @Query("SELECT * FROM trails")
