@@ -42,6 +42,7 @@ Take one item at a time and display it before fixing it (Rule 1); read its secti
 | 94 | ISSUE-NOV25.25-O161 | Graphs in landscape with a side column | core-ui |
 | 96 | ISSUE-NOV26.0-O163 | Sit for many seats: part 4, Feedback, left | `/effort high`; after 254.3 |
 | 99 | ISSUE-NOV27.1-O166 | Relay traffic meter (Sensor keeps the month) | Relay, wire; `/effort medium`; after O133 |
+| 100 | ISSUE-NOV27.30-O172 | Monitor: restart after a reboot while paired | Very low; the S21FE |
 
 ## Open Gaps
 One line each; the full text is in `DOCS/issue_details.md`. Active warning: Compose `SnapshotStateList` lock verification (monitored).
