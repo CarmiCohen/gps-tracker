@@ -45,6 +45,19 @@ class MapCenterResolverTest {
     }
 
     @Test
+    fun monitorPhoneTrailDrawsNoSpikes() {
+        // The S21FE's own rows (ISSUE-NOV26.29-O164): a 1200 m cell fix 1.4 km off between two home fixes, and a
+        // visit 0.6 km away 3 hours after the last home fix and 5 hours before the next.
+        fun local(minute: Long, lat: Double, accuracy: Float) =
+            TrailEntity("T", minute * 60_000L, minute, lat, 35.30, accuracy, "VALID", isLocalUser = true)
+        val trail = listOf(
+            local(600, 32.6532, 12f), local(300, 32.6583, 32f), local(299, 32.6583, 83f),
+            local(120, 32.6531, 64f), local(119, 32.6658, 1200f), local(118, 32.6531, 12f)
+        )
+        assertEquals(listOf(1, 2, 2), trailSegments(trail).map { it.size })
+    }
+
+    @Test
     fun knownPositionsKeepsEquatorAndMeridianPoints() {
         val trail = listOf(trailPoint(2, 0.0, 34.78), trailPoint(1, 32.08, 0.0))
 

@@ -667,7 +667,8 @@ fun MonitorScreen(
     }
     val sensorTrail = remember(trail) { knownPositions(trail) }
     val sensorPosition = sensorTrail.firstOrNull()
-    val localPath = remember(localTrail) { knownPositions(localTrail) }
+    // The Monitor phone's own trail in pieces too: its 1200 m cell fixes and fixes hours apart drew spikes (ISSUE-NOV26.29-O164).
+    val localSegments = remember(localTrail) { trailSegments(localTrail) }
     val breaches = remember(trail) { geofenceBreaches(trail) }
     val jumps = remember(trail) { gpsJumps(trail) }
     val sensorSegments = remember(trail) { trailSegments(trail) }
@@ -747,14 +748,12 @@ fun MonitorScreen(
             })
         }
 
-        if (localPath.isNotEmpty()) {
-            val localPoints = localPath.map { GeoPoint(it.lat, it.lng) }
-            val localPolyline = Polyline().apply {
-                setPoints(localPoints)
+        localSegments.forEach { segment ->
+            mapView.overlays.add(Polyline().apply {
+                setPoints(segment.map { GeoPoint(it.lat, it.lng) })
                 outlinePaint.color = MONITOR_MARKER_COLOR
                 outlinePaint.strokeWidth = 4f
-            }
-            mapView.overlays.add(localPolyline)
+            })
         }
 
         localPosition?.let { pos ->
