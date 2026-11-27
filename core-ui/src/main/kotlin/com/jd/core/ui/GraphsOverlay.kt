@@ -167,7 +167,10 @@ private fun GraphPanelView(panel: GraphPanel, stoppedSpans: List<GraphSpan>, foc
     }
 }
 
-/** Each tick's label centred under it, kept inside the graph; a label that would overlap the previous one is left out. */
+/**
+ * Each tick's label centred under it, kept inside the graph; a label closer than [TICK_LABEL_GAP] to the previous one
+ * is left out (ISSUE-NOV26.29-O165: 4 px let `21:10` and `21:20` touch at the right edge with the S21FE's large font).
+ */
 @Composable
 private fun TickLabels(labels: List<Pair<Float, String>>) {
     Layout(
@@ -177,15 +180,27 @@ private fun TickLabels(labels: List<Pair<Float, String>>) {
         val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
         val width = constraints.maxWidth
         val height = placeables.maxOfOrNull { it.height } ?: 0
+        val positions = tickLabelPositions(labels.map { it.first }, placeables.map { it.width }, width, TICK_LABEL_GAP.roundToPx())
         layout(width, height) {
-            var nextFreeX = 0
-            placeables.forEachIndexed { index, placeable ->
-                val x = (labels[index].first * width - placeable.width / 2f).toInt().coerceIn(0, maxOf(0, width - placeable.width))
-                if (x >= nextFreeX) {
-                    placeable.place(x, 0)
-                    nextFreeX = x + placeable.width + 4
-                }
-            }
+            placeables.forEachIndexed { index, placeable -> positions[index]?.let { placeable.place(it, 0) } }
+        }
+    }
+}
+
+/**
+ * The x of each tick label of [widths], centred at its fraction of [width] and kept inside it, or null for a label
+ * that would come closer than [gap] to the previous one shown (ISSUE-NOV26.29-O165).
+ */
+internal fun tickLabelPositions(fractions: List<Float>, widths: List<Int>, width: Int, gap: Int): List<Int?> {
+    var nextFreeX = 0
+    return fractions.indices.map { index ->
+        val labelWidth = widths[index]
+        val x = (fractions[index] * width - labelWidth / 2f).toInt().coerceIn(0, maxOf(0, width - labelWidth))
+        if (x >= nextFreeX) {
+            nextFreeX = x + labelWidth + gap
+            x
+        } else {
+            null
         }
     }
 }
@@ -300,6 +315,9 @@ val GraphsIcon: ImageVector = materialIcon(name = "Filled.ShowChart") {
 }
 
 private val GRAPH_HEIGHT = 80.dp
+
+/** The least room between two tick labels (ISSUE-NOV26.29-O165). */
+private val TICK_LABEL_GAP = 8.dp
 private val BAND_COLOR = StatusGreen
 private val STOPPED_COLOR = Slate500
 private const val MAX_STOPS_LISTED = 3

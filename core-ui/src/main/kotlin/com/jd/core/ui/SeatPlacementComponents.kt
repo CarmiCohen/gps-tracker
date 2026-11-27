@@ -355,7 +355,8 @@ private fun PlacementEditDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (existing == null) "Add placement" else "Edit placement") },
         text = {
-            Column {
+            // Scrolls: in landscape the S21FE's large font cut the type list after Bed (ISSUE-NOV26.29-O165).
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },

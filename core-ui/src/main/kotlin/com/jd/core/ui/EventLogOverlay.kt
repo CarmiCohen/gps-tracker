@@ -23,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -179,13 +180,21 @@ fun EventLogOverlay(
                 Column(modifier = Modifier.fillMaxSize()) {
                     header(actions)
                     // Seven chips: 4 dp apart, so they fit one line on the narrow S21FE with its large font (ISSUE-NOV25.12-O142).
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ViewPeriod.entries.forEach { option ->
-                            EventChip(option.label, isOn = option == period, onClick = { period = option })
+                    // The filters follow on the same line when they fit, else on the next, at the right (ISSUE-NOV26.29-O165).
+                    PeriodsAndFilters(
+                        periods = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                ViewPeriod.entries.forEach { option ->
+                                    EventChip(option.label, isOn = option == period, onClick = { period = option })
+                                }
+                            }
+                        },
+                        filters = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                EventFilter.entries.forEach { option -> FilterChoice(option, filter, onChoose = { filter = it }) }
+                            }
                         }
-                        Spacer(Modifier.weight(1f))
-                        EventFilter.entries.forEach { option -> FilterChoice(option, filter, onChoose = { filter = it }) }
-                    }
+                    )
                     Spacer(Modifier.height(6.dp))
                     list(Modifier.weight(1f).fillMaxWidth())
                     detail()
@@ -195,6 +204,33 @@ fun EventLogOverlay(
     }
     }
 }
+
+/**
+ * The portrait list's [periods] and [filters]: one line when both fit with [FILTER_GAP] between them, the filters at the
+ * right; else the filters on a second line, at the right (ISSUE-NOV26.29-O165: `All` was cut off by the S21FE's large
+ * font).
+ */
+@Composable
+private fun PeriodsAndFilters(periods: @Composable () -> Unit, filters: @Composable () -> Unit) {
+    Layout(contents = listOf(periods, filters)) { (periodMeasurables, filterMeasurables), constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val periodsPlaceable = periodMeasurables.first().measure(loose)
+        val filtersPlaceable = filterMeasurables.first().measure(loose)
+        val width = constraints.maxWidth
+        val gap = FILTER_GAP.roundToPx()
+        val isOneLine = fitsOneLine(periodsPlaceable.width, filtersPlaceable.width, gap, width)
+        val filtersY = if (isOneLine) 0 else periodsPlaceable.height + ROW_GAP.roundToPx()
+        val height = if (isOneLine) maxOf(periodsPlaceable.height, filtersPlaceable.height) else filtersY + filtersPlaceable.height
+        layout(width, height) {
+            periodsPlaceable.place(0, 0)
+            filtersPlaceable.place(maxOf(0, width - filtersPlaceable.width), filtersY)
+        }
+    }
+}
+
+/** True when the periods and the filters, [gap] apart, fit one line of [width] (ISSUE-NOV26.29-O165). */
+internal fun fitsOneLine(periodsWidth: Int, filtersWidth: Int, gap: Int, width: Int): Boolean =
+    periodsWidth + gap + filtersWidth <= width
 
 /** One of the three filters, highlighted when chosen like the periods; Alarms is red (ISSUE-NOV25.25-O156). */
 @Composable
@@ -341,6 +377,10 @@ private const val NOW_REFRESH_MS = 30_000L
 
 /** The landscape side column's width (ISSUE-NOV25.25-O156): two period chips a row, the S21FE's large font included. */
 private val SIDE_COLUMN_WIDTH = 150.dp
+
+/** The least room between the periods and the filters on one line, and between the two lines when they wrap. */
+private val FILTER_GAP = 8.dp
+private val ROW_GAP = 4.dp
 private const val DAY_MS = 24 * 3_600_000L
 private const val EXPORT_DIRECTORY = "event_exports"
 
