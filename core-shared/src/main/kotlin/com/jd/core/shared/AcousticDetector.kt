@@ -31,7 +31,7 @@ class AcousticDetector(
     warmUpMs: Long = BACKGROUND_WARM_UP_MS
 ) {
     private val rise = RiseDetector(ACOUSTIC_CONFIRM_MS, ACOUSTIC_CONFIRM_WINDOW_MS, warmUpMs) { level, reference ->
-        level - reference >= jumpDb && level >= minAlertDbfs
+        level >= noiseAlertLimitDbfs(reference, jumpDb, minAlertDbfs)
     }
 
     /** The learned background level, or null before the first frame. */
@@ -75,6 +75,10 @@ fun acousticAlertText(levelDbfs: Double, referenceDbfs: Double): String =
 
 /** A jump that stays quieter than this is ignored, so a microphone near digital silence cannot alert on a whisper. */
 const val ACOUSTIC_MIN_ALERT_DBFS = -50.0
+
+/** The level that alerts over [backgroundDbfs]: [jumpDb] above it, and never quieter than [minAlertDbfs] (ISSUE-NOV25.22-O144). */
+fun noiseAlertLimitDbfs(backgroundDbfs: Double, jumpDb: Double, minAlertDbfs: Double = ACOUSTIC_MIN_ALERT_DBFS): Double =
+    max(backgroundDbfs + jumpDb, minAlertDbfs)
 
 /**
  * How long a noise must be loud to alert (ISSUE-NOV17.10-O111); its loud frames may have gaps, like speech. 2 s since

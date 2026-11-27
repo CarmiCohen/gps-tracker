@@ -12,6 +12,7 @@ import com.jd.core.shared.LIGHT_TICK_MS
 import com.jd.core.shared.LightDetector
 import com.jd.core.shared.PeakTracker
 import com.jd.core.shared.SystemLogger
+import com.jd.core.shared.lightAlertLimitLux
 
 /**
  * Reads the Sensor's ambient light sensor on its own thread and reports each sudden rise found by [LightDetector]
@@ -45,6 +46,9 @@ class LightMonitor(
         private set
     @Volatile var floorLux: Double? = null
         private set
+
+    /** The light that alerts now, null while not measuring (ISSUE-NOV25.22-O144). */
+    val limitLux: Double? get() = floorLux?.let { lightAlertLimitLux(it, riseRatio) }
 
     /** Every reading and tick, so the Graphs keep the brightest light of each minute. */
     val luxPeaks = PeakTracker()

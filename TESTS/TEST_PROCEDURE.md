@@ -1342,8 +1342,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **265.1 Automated:** `TrailThinningTest` (last day whole; 1 to 7 days a row a minute or 20 m; 7 to 31 days 10 min or 50 m; older deleted but the newest row; alarm and jump rows and their minute, NO_FIX run ends and line-break ends kept; idempotent; same line pieces); `TrailThinMarkTest` (the mark, its guard, `isBackfilling`, the Monitor's `trailSegments` after thinning); `TrailThinningDeviceTest` (thinned holes not requested, a new hole is; an outage hole stops the mark; no contact, no mark; late backfill kept, then thinned; the gap query; the own trail).
 *   **265.2 Two phones (relay back, the S21FE Monitor paired to `T` for 2 days or more):** `adb logcat -s REV_Pruning:* REV_Backfill:*` shows `Trail cleanup finished. Rows removed: N` every 15 min with N above 0 once rows are a day old, and no `Requested` line for rows older than a day after a Monitor restart; the map's trail of 2 days ago draws without new breaks. After a relay outage longer than a day, its hole is still requested (`Requested a to b`) before the mark moves on.
 
+## Chapter 266 - Noise And Light Limit Lines (Nov27.8)
+**Status: A / P** - 266.1 passed (unit tests); 266.2 waits for a Sensor running Nov27.8 for an hour or more (ISSUE-NOV25.22-O144)
+*   **266.1 Unit tests:** `GraphsTest`, `AcousticDetectorTest`, `LightDetectorTest`, `SensorGraphsTest`.
+*   **266.2 A15 (Sensor Nov27.8, noise and light on):** after an hour, the Sensor's Graphs (Hour) show a dashed `Limit` line in Noise (about 30 dB above the background peaks at the middle slider) and in Light (4 times the background, at least 20 lx more); switching noise off on the Monitor ends the Noise limit line from the next minute. Every panel's scale shows three values: top, middle (at the middle grid line) and bottom; with the S21FE's large font the three labels do not overlap.
+
 ---
-**Active Testing Chapters: 251 of 265**
+**Active Testing Chapters: 252 of 266**
 *Since Nov23.6-docs a new chapter is written only for a check that needs a person, a device or two phones and is still pending (Rule 15); unit tests are named in the commit message.*
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117, 150, 158, 160 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 

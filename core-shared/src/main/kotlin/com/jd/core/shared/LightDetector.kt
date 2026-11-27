@@ -24,7 +24,7 @@ class LightDetector(
     warmUpMs: Long = BACKGROUND_WARM_UP_MS
 ) {
     private val rise = RiseDetector(LIGHT_CONFIRM_MS, LIGHT_CONFIRM_WINDOW_MS, warmUpMs) { lux, reference ->
-        lux - reference >= minRiseLux && lux >= reference * riseRatio
+        lux >= lightAlertLimitLux(reference, riseRatio, minRiseLux)
     }
 
     /** The learned background light, or null before the first reading. */
@@ -53,6 +53,10 @@ const val DEFAULT_LIGHT_SENSITIVITY = 0.5f
 
 /** A rise smaller than this never alerts, so a dark room's sensor flicker of a few lux is no light switched on. */
 const val LIGHT_MIN_RISE_LUX = 20.0
+
+/** The light that alerts over [backgroundLux]: [riseRatio] times it, and at least [minRiseLux] more (ISSUE-NOV25.22-O144). */
+fun lightAlertLimitLux(backgroundLux: Double, riseRatio: Double, minRiseLux: Double = LIGHT_MIN_RISE_LUX): Double =
+    maxOf(backgroundLux * riseRatio, backgroundLux + minRiseLux)
 
 /** How long a rise must stay bright to alert: the 2 s of the noise detection (user decision 2026-11-22). */
 const val LIGHT_CONFIRM_MS = 2_000L

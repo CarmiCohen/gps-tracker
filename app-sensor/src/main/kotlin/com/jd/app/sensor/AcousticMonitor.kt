@@ -15,6 +15,7 @@ import com.jd.core.shared.AcousticDetector
 import com.jd.core.shared.PeakTracker
 import com.jd.core.shared.SystemLogger
 import com.jd.core.shared.acousticLevelDbfs
+import com.jd.core.shared.noiseAlertLimitDbfs
 import kotlin.math.max
 
 /**
@@ -45,6 +46,9 @@ class AcousticMonitor(
         private set
     @Volatile var floorDbfs: Double? = null
         private set
+
+    /** The level that alerts now, null while not listening (ISSUE-NOV25.22-O144). */
+    val limitDbfs: Double? get() = floorDbfs?.let { noiseAlertLimitDbfs(it, jumpDb) }
 
     /** Every frame's level, so the Graphs keep the loudest of each minute (ISSUE-NOV10.8-O84 part 3). */
     val levelPeaks = PeakTracker()

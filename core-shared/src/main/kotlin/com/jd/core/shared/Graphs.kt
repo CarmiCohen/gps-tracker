@@ -47,6 +47,9 @@ data class GraphPanel(
     val summary: String
 ) {
     val hasData: Boolean get() = lines.any { line -> line.points.any { it != null } }
+
+    /** The scale's middle value, at the middle grid line (ISSUE-NOV25.22-O144). */
+    val midY: Float get() = (minY + maxY) / 2f
 }
 
 /** A part of the period as shares of its width, from 0 (the start) to 1 (the end). */
@@ -170,8 +173,8 @@ fun sensorGraphSections(titlePrefix: String = ""): List<GraphSectionSpec> = list
         listOf(
             GraphPanelSpec("Vibration", "g", listOf(GraphLineSpec(GraphField.VIBRATION_G, "Peak"), GraphLineSpec(GraphField.VIBRATION_LIMIT_G, "Limit", GraphTone.LIMIT)), floor = 0f),
             GraphPanelSpec("Tilt", "°", listOf(GraphLineSpec(GraphField.TILT_DEG, "Peak"), GraphLineSpec(GraphField.TILT_LIMIT_DEG, "Limit", GraphTone.LIMIT)), floor = 0f),
-            GraphPanelSpec("Noise", "dBFS", listOf(GraphLineSpec(GraphField.NOISE_DBFS, "Peak"))),
-            GraphPanelSpec("Light", "lx", listOf(GraphLineSpec(GraphField.LIGHT_LUX, "Peak")), floor = 0f)
+            GraphPanelSpec("Noise", "dBFS", listOf(GraphLineSpec(GraphField.NOISE_DBFS, "Peak"), GraphLineSpec(GraphField.NOISE_LIMIT_DBFS, "Limit", GraphTone.LIMIT))),
+            GraphPanelSpec("Light", "lx", listOf(GraphLineSpec(GraphField.LIGHT_LUX, "Peak"), GraphLineSpec(GraphField.LIGHT_LIMIT_LUX, "Limit", GraphTone.LIMIT)), floor = 0f)
         )
     ),
     GraphSectionSpec(

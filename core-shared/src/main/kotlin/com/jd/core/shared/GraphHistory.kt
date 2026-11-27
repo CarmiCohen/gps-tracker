@@ -73,7 +73,11 @@ enum class GraphField(val decimals: Int, val aggregate: GraphAggregate) {
     /** Monitor: the Sensor's rows known to be missing at the minute's end. */
     ROWS_MISSING(0, GraphAggregate.MAX),
     /** The brightest light of the minute, in lux; unknown while light detection is off (ISSUE-NOV22.4-O130). */
-    LIGHT_LUX(0, GraphAggregate.MAX)
+    LIGHT_LUX(0, GraphAggregate.MAX),
+    /** The noise level that alerts: the background plus the slider's jump; unknown while not listening (ISSUE-NOV25.22-O144). */
+    NOISE_LIMIT_DBFS(1, GraphAggregate.MAX),
+    /** The light that alerts: the background times the slider's factor; unknown while not measuring (ISSUE-NOV25.22-O144). */
+    LIGHT_LIMIT_LUX(0, GraphAggregate.MAX)
 }
 
 /** One minute of a phone's history; [timeMs] is the minute's end on that phone's clock. Unknown values are absent. */

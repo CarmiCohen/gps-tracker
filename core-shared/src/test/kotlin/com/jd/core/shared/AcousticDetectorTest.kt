@@ -22,6 +22,15 @@ class AcousticDetectorTest {
     private fun confirmedAt(fromMs: Long) = fromMs + ACOUSTIC_CONFIRM_MS - ACOUSTIC_FRAME_MS
 
     @Test
+    fun theGraphsLimitIsTheLevelThatAlerts() { // ISSUE-NOV25.22-O144
+        assertEquals(-40.0, noiseAlertLimitDbfs(-70.0, 30.0), 0.0)
+        assertEquals("Never quieter than the minimum", ACOUSTIC_MIN_ALERT_DBFS, noiseAlertLimitDbfs(-90.0, 15.0), 0.0)
+        val limit = noiseAlertLimitDbfs(quietRoom().floorDbfs!!, ACOUSTIC_JUMP_DB)
+        assertTrue("Just below the limit", quietRoom().feed(limit - 0.5, 5_000, ACOUSTIC_CONFIRM_MS).isEmpty())
+        assertEquals("At the limit", 1, quietRoom().feed(limit, 5_000, ACOUSTIC_CONFIRM_MS).size)
+    }
+
+    @Test
     fun aJumpOf30DbAboveTheBackgroundForTwoSecondsAlerts() {
         val detector = quietRoom()
         assertEquals(listOf(confirmedAt(5_000)), detector.feed(-40.0, 5_000, ACOUSTIC_CONFIRM_MS))

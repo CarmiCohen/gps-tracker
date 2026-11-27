@@ -73,12 +73,39 @@ class GraphsTest {
     }
 
     @Test
-    fun `vibration and tilt are drawn with their limits`() {
+    fun `vibration, tilt, noise and light are drawn with their limits`() {
         val motion = sensorGraphSections().single { it.title == "MOTION" }
         assertEquals(listOf("Vibration", "Tilt", "Noise", "Light"), motion.panels.map { it.title }) // Light: ISSUE-NOV22.4-O130
-        assertEquals(GraphField.LIGHT_LUX, motion.panels[3].lines.single().field)
+        assertEquals(GraphField.LIGHT_LUX, motion.panels[3].lines.first().field)
         assertEquals(GraphField.VIBRATION_LIMIT_G, motion.panels[0].lines.single { it.tone == GraphTone.LIMIT }.field)
         assertEquals(GraphField.TILT_LIMIT_DEG, motion.panels[1].lines.single { it.tone == GraphTone.LIMIT }.field)
+        // ISSUE-NOV25.22-O144
+        assertEquals(GraphField.NOISE_LIMIT_DBFS, motion.panels[2].lines.single { it.tone == GraphTone.LIMIT }.field)
+        assertEquals(GraphField.LIGHT_LIMIT_LUX, motion.panels[3].lines.single { it.tone == GraphTone.LIMIT }.field)
+    }
+
+    @Test
+    fun `an older Sensor's samples without a limit draw no limit line, and the scale holds a limit above the peaks`() {
+        val noise = sensorGraphSections().single { it.title == "MOTION" }.panels.single { it.title == "Noise" }
+        val old = graphPanel(noise, listOf(sample(1, GraphField.NOISE_DBFS to -70)), nowMs - 3_600_000L, nowMs, 60)
+        assertTrue(old.lines.single { it.label == "Limit" }.points.all { it == null })
+        val new = graphPanel(
+            noise, listOf(sample(1, GraphField.NOISE_DBFS to -70, GraphField.NOISE_LIMIT_DBFS to -42)), nowMs - 3_600_000L, nowMs, 60
+        )
+        assertEquals(listOf(-42f), new.lines.single { it.label == "Limit" }.points.filterNotNull())
+        assertEquals(-42f, new.maxY)
+        assertEquals("Newest -70.0 dBFS · range -70.0 dBFS", new.summary)
+    }
+
+    @Test
+    fun `the scale's middle value is halfway between its bottom and top`() {
+        val battery = sensorGraphSections().single { it.title == "PHONE HEALTH" }.panels.first()
+        assertEquals(50f, graphPanel(battery, listOf(sample(1, GraphField.BATTERY_PERCENT to 64)), nowMs - 3_600_000L, nowMs, 60).midY)
+        val noise = sensorGraphSections().single { it.title == "MOTION" }.panels.single { it.title == "Noise" }
+        val panel = graphPanel(
+            noise, listOf(sample(2, GraphField.NOISE_DBFS to -70), sample(1, GraphField.NOISE_DBFS to -40)), nowMs - 3_600_000L, nowMs, 60
+        )
+        assertEquals(-55f, panel.midY)
     }
 
     @Test

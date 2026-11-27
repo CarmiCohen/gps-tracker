@@ -20,6 +20,10 @@ fun sensorGraphSample(
     behaviour: SensorBehaviour,
     vibrationLimitMps2: Double,
     tiltLimitDeg: Double,
+    /** The level that alerts at the minute's end; null while not listening (ISSUE-NOV25.22-O144). */
+    noiseLimitDbfs: Double?,
+    /** The light that alerts at the minute's end; null while not measuring (ISSUE-NOV25.22-O144). */
+    lightLimitLux: Double?,
     fixAccuracyM: Float?,
     gnss: GnssSummary?,
     linkUpPercent: Float,
@@ -46,6 +50,8 @@ fun sensorGraphSample(
         GraphField.BATTERY_PERCENT to batteryPercent, // Null when not known, as in the rows (SIMP-NOV17.7-S1).
         GraphField.CHARGING to batteryPercent?.let { if (isCharging) 1 else 0 },
         GraphField.TEMPERATURE_C to temperatureC,
-        GraphField.LIGHT_LUX to lightPeakLux
+        GraphField.LIGHT_LUX to lightPeakLux,
+        GraphField.NOISE_LIMIT_DBFS to noiseLimitDbfs?.takeIf { behaviour.noiseAlert },
+        GraphField.LIGHT_LIMIT_LUX to lightLimitLux?.takeIf { behaviour.lightAlert }
     )
 )

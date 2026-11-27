@@ -17,7 +17,9 @@ class SensorGraphsTest {
         gnss: GnssSummary? = GnssSummary(26, 55, 23.94f),
         battery: Int? = 87,
         temperature: Float? = 31.5f,
-        lightPeak: Double? = 312.4
+        lightPeak: Double? = 312.4,
+        noiseLimit: Double? = -42.04,
+        lightLimit: Double? = 1_248.6
     ) = sensorGraphSample(
         timeMs = 1_800_000_000_000L,
         vibrationPeakMps2 = vibrationPeak,
@@ -27,6 +29,8 @@ class SensorGraphsTest {
         behaviour = behaviour,
         vibrationLimitMps2 = 0.8 * STANDARD_GRAVITY,
         tiltLimitDeg = 15.0,
+        noiseLimitDbfs = noiseLimit,
+        lightLimitLux = lightLimit,
         fixAccuracyM = 14f,
         gnss = gnss,
         linkUpPercent = 75f,
@@ -56,13 +60,15 @@ class SensorGraphsTest {
         assertEquals(1f, sample[GraphField.CHARGING])
         assertEquals(31.5f, sample[GraphField.TEMPERATURE_C])
         assertEquals("Light in whole lux (ISSUE-NOV22.4-O130)", 312f, sample[GraphField.LIGHT_LUX])
+        assertEquals("ISSUE-NOV25.22-O144", -42f, sample[GraphField.NOISE_LIMIT_DBFS])
+        assertEquals("ISSUE-NOV25.22-O144", 1_249f, sample[GraphField.LIGHT_LIMIT_LUX])
         assertNull("The Monitor's own fields", sample[GraphField.ROWS_LIVE])
     }
 
     @Test
     fun `a switched-off kind has no limit, and an unknown reading stays unknown`() {
         val sample = sample(
-            behaviour = SensorBehaviour(vibrationAlert = false, tiltAlert = false),
+            behaviour = SensorBehaviour(vibrationAlert = false, tiltAlert = false, noiseAlert = false, lightAlert = false),
             vibrationPeak = null,
             gnss = null,
             battery = null,
@@ -71,6 +77,8 @@ class SensorGraphsTest {
         )
         assertNull(sample[GraphField.VIBRATION_LIMIT_G])
         assertNull(sample[GraphField.TILT_LIMIT_DEG])
+        assertNull(sample[GraphField.NOISE_LIMIT_DBFS])
+        assertNull(sample[GraphField.LIGHT_LIMIT_LUX])
         assertNull(sample[GraphField.VIBRATION_G])
         assertNull(sample[GraphField.SATS_USED])
         assertNull(sample[GraphField.SIGNAL_DBHZ])
@@ -78,5 +86,12 @@ class SensorGraphsTest {
         assertNull(sample[GraphField.CHARGING])
         assertNull(sample[GraphField.TEMPERATURE_C])
         assertNull("Light detection off or no light sensor", sample[GraphField.LIGHT_LUX])
+    }
+
+    @Test
+    fun `no limit is stored while the microphone or the light sensor does not measure`() {
+        val sample = sample(noiseLimit = null, lightLimit = null)
+        assertNull(sample[GraphField.NOISE_LIMIT_DBFS])
+        assertNull(sample[GraphField.LIGHT_LIMIT_LUX])
     }
 }

@@ -18,6 +18,15 @@ class LightDetectorTest {
     private fun darkRoom(lux: Double = 2.0): LightDetector = LightDetector().apply { feed(lux, 0, 5_000) }
 
     @Test
+    fun theGraphsLimitIsTheLightThatAlerts() { // ISSUE-NOV25.22-O144
+        assertEquals("4 times the background", 400.0, lightAlertLimitLux(100.0, 4.0), 0.0)
+        assertEquals("At least the minimum rise more", 22.0, lightAlertLimitLux(2.0, 4.0), 0.0)
+        val limit = lightAlertLimitLux(darkRoom(50.0).floorLux!!, LIGHT_RISE_RATIO)
+        assertTrue("Just below the limit", darkRoom(50.0).feed(limit - 1.0, 5_000, 5_000).isEmpty())
+        assertEquals("At the limit", 1, darkRoom(50.0).feed(limit, 5_000, 5_000).size)
+    }
+
+    @Test
     fun aLampSwitchedOnInADarkRoomAlertsAfterTwoSeconds() {
         val detector = darkRoom()
         assertEquals("The tick that completes 2 s of bright light", listOf(5_000 + LIGHT_CONFIRM_MS), detector.feed(300.0, 5_000, 5_000))

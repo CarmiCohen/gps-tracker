@@ -145,7 +145,9 @@ private fun GraphPanelView(panel: GraphPanel, stoppedSpans: List<GraphSpan>, foc
         }
         Row {
             Column(modifier = Modifier.height(GRAPH_HEIGHT), verticalArrangement = Arrangement.SpaceBetween) {
+                // Three equal labels spaced between: the middle one sits at the middle grid line (ISSUE-NOV25.22-O144).
                 Text(axisText(panel.maxY), color = Slate500, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                Text(axisText(panel.midY), color = Slate500, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                 Text(axisText(panel.minY), color = Slate500, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
             }
             Spacer(Modifier.width(4.dp))

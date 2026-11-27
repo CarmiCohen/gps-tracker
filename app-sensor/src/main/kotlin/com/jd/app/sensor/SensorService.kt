@@ -733,6 +733,8 @@ class SensorService : Service(), SensorEventListener {
                         behaviour = sensorBehaviour,
                         vibrationLimitMps2 = motionSentinel.vibrationThreshold,
                         tiltLimitDeg = motionSentinel.tiltThresholdDegrees,
+                        noiseLimitDbfs = acousticMonitor.limitDbfs,
+                        lightLimitLux = lightMonitor.limitLux,
                         fixAccuracyM = fixStore.currentLocation()?.accuracy,
                         gnss = if (isGnssRegistered) gnssSummary(satellites) else null,
                         linkUpPercent = linkUpPercent(previousLink, previousMs, link, timeMs),
