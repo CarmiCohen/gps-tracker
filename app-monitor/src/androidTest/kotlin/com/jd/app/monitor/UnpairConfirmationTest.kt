@@ -1,6 +1,10 @@
 package com.jd.app.monitor
 
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -30,6 +34,7 @@ class UnpairConfirmationTest {
     private var resetCount = 0
     private var fullInitCount = 0
     private val maintenanceCalls = mutableListOf<String>()
+    private val savedRelayUrls = mutableListOf<String>()
 
     private fun showMonitorScreen() {
         composeRule.setContent {
@@ -49,7 +54,7 @@ class UnpairConfirmationTest {
                     onUpdateAlarmVolume = {},
                     onTestSiren = {},
                     onReset = { resetCount++ },
-                    onUpdateRelayUrl = {},
+                    onUpdateRelayUrl = { savedRelayUrls += it },
                     onClearHomePoints = { maintenanceCalls += "clear" },
                     onResetStats = { maintenanceCalls += "stats" },
                     onFullInit = { fullInitCount++ },
@@ -79,7 +84,7 @@ class UnpairConfirmationTest {
         composeRule.onNodeWithText(label).performScrollTo().performClick()
     }
 
-    /** One setup icon (ISSUE-NOV17.7-O109): unpairing is the Setup dialog's UNPAIR button, the menu has no gear. */
+    /** One setup icon (ISSUE-NOV17.7-O109): unpairing is the UNPAIR on the Setup dialog's Sensor line (ISSUE-NOV25.25-O157). */
     private fun tapUnpair() {
         composeRule.onNodeWithContentDescription("Setup").performClick()
         composeRule.onNodeWithText("UNPAIR").performClick()
@@ -197,6 +202,50 @@ class UnpairConfirmationTest {
         assertEquals(listOf("clear", "stats"), maintenanceCalls)
         assertEquals(0, resetCount)
         assertEquals(0, fullInitCount)
+    }
+
+    /** ISSUE-NOV25.25-O157: no Close button; Back closes the Setup dialog. */
+    @Test
+    fun setupDialogHasNoCloseButtonAndBackCloses() {
+        showMonitorScreen()
+        composeRule.onNodeWithContentDescription("Setup").performClick()
+        composeRule.onNodeWithText("Monitor Setup").assertExists()
+        composeRule.onNodeWithText("Close").assertDoesNotExist()
+        Espresso.pressBack()
+        composeRule.onNodeWithText("Monitor Setup").assertDoesNotExist()
+        assertEquals(0, resetCount)
+    }
+
+    /** ISSUE-NOV25.25-O157: Monitor ID, Sensor and Relay URL in one group, each with its own action; no dialog-level relay button. */
+    @Test
+    fun identityGroupHasOneActionPerLine() {
+        showMonitorScreen()
+        composeRule.onNodeWithContentDescription("Setup").performClick()
+        composeRule.onNodeWithText("Monitor ID: M").assertExists()
+        composeRule.onNodeWithText("Sensor ID: T").assertExists()
+        composeRule.onNodeWithText("Relay URL: https://relay.example").assertExists()
+        composeRule.onAllNodesWithText("EDIT").assertCountEquals(2)
+        composeRule.onAllNodesWithText("UNPAIR").assertCountEquals(1)
+        composeRule.onNodeWithText("Edit Relay URL").assertDoesNotExist()
+        composeRule.onNodeWithText("Tracker ID: T").assertDoesNotExist()
+    }
+
+    /** The Relay URL line's EDIT edits in place; Cancel keeps the URL, Save hands the new one over (ISSUE-NOV25.25-O157). */
+    @Test
+    fun relayUrlEditsInPlace() {
+        showMonitorScreen()
+        composeRule.onNodeWithContentDescription("Setup").performClick()
+        composeRule.onAllNodesWithText("EDIT")[1].performClick()
+        composeRule.onNodeWithText("Edit Relay URL").assertExists()
+        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.onNodeWithText("Relay URL: https://relay.example").assertExists()
+        assertEquals(emptyList<String>(), savedRelayUrls)
+
+        composeRule.onAllNodesWithText("EDIT")[1].performClick()
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("https://other.example")
+        composeRule.onNodeWithText("Save").performClick()
+        assertEquals(listOf("https://other.example"), savedRelayUrls)
+        composeRule.onNodeWithText("Edit Relay URL").assertDoesNotExist()
     }
 
     @Test

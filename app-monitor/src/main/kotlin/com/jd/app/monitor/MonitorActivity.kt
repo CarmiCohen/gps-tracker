@@ -932,10 +932,13 @@ fun MonitorScreen(
 
     if (showSetupDialog) {
         AlertDialog(
-            onDismissRequest = { 
-                showSetupDialog = false 
+            // No Close button: Back and a tap outside close it, as the overlays (ISSUE-NOV25.25-O157).
+            onDismissRequest = {
+                showSetupDialog = false
                 isEditingRelayUrl = false
                 isEditingMonitorId = false
+                relayUrlInput = relayUrl
+                monitorIdInput = monitorId
             },
             title = { Text("Monitor Setup") }, // The detailed Info has its own screen (ISSUE-NOV10.8-O84 part 2).
             text = {
@@ -945,48 +948,60 @@ fun MonitorScreen(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Tracker ID: $trackerId")
-                    // The Monitor's own ID is set here; the Sensor shows the one it heard last (ISSUE-NOV22.7-O135).
-                    if (isEditingMonitorId) {
-                        val problem = ForensicIdentity.monitorIdProblem(monitorIdInput, trackerId)
-                        TextField(
-                            value = monitorIdInput,
-                            onValueChange = { monitorIdInput = it },
-                            label = { Text("Edit Monitor ID") },
-                            isError = problem != null,
-                            supportingText = { problem?.let { Text(it) } },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = {
-                                monitorIdInput = monitorId
-                                isEditingMonitorId = false
-                            }) {
-                                Text("Cancel")
-                            }
-                            Button(
-                                onClick = {
-                                    onUpdateMonitorId(monitorIdInput.trim())
+                    // The pairing identities in one framed group, each with its own action (ISSUE-NOV25.25-O157).
+                    SetupIdentityGroup {
+                        // The Monitor's own ID is set here; the Sensor shows the one it heard last (ISSUE-NOV22.7-O135).
+                        if (isEditingMonitorId) {
+                            val problem = ForensicIdentity.monitorIdProblem(monitorIdInput, trackerId)
+                            SetupEditField(
+                                value = monitorIdInput,
+                                onValueChange = { monitorIdInput = it },
+                                label = "Edit Monitor ID",
+                                problem = problem,
+                                saveLabel = "Save ID",
+                                onCancel = {
+                                    monitorIdInput = monitorId
                                     isEditingMonitorId = false
                                 },
-                                enabled = problem == null
-                            ) {
-                                Text("Save ID")
-                            }
-                        }
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Monitor ID: $monitorId", modifier = Modifier.weight(1f))
-                            TextButton(onClick = {
+                                onSave = {
+                                    onUpdateMonitorId(monitorIdInput.trim())
+                                    isEditingMonitorId = false
+                                }
+                            )
+                        } else {
+                            SetupIdentityRow("Monitor ID: $monitorId", "EDIT") {
                                 monitorIdInput = monitorId
                                 isEditingMonitorId = true
-                            }) {
-                                Text("EDIT", fontSize = 10.sp)
+                            }
+                        }
+                        // Unpairing asks first (ISSUE-NOV5.2-O15).
+                        SetupIdentityRow("Sensor ID: $trackerId", "UNPAIR", actionColor = com.jd.core.ui.StatusRed) {
+                            showSetupDialog = false
+                            requestUnpair()
+                        }
+                        if (isEditingRelayUrl) {
+                            SetupEditField(
+                                value = relayUrlInput,
+                                onValueChange = { relayUrlInput = it },
+                                label = "Edit Relay URL",
+                                problem = if (RelayConfig.isValid(relayUrlInput)) null else "Not a valid relay URL",
+                                saveLabel = "Save",
+                                onCancel = {
+                                    relayUrlInput = relayUrl
+                                    isEditingRelayUrl = false
+                                },
+                                onSave = {
+                                    onUpdateRelayUrl(relayUrlInput.trim())
+                                    isEditingRelayUrl = false
+                                }
+                            )
+                        } else {
+                            SetupIdentityRow("Relay URL: $relayUrl", "EDIT") {
+                                relayUrlInput = relayUrl
+                                isEditingRelayUrl = true
                             }
                         }
                     }
-                    Text("Relay URL: $relayUrl")
                     Text("App Version: ${getAppVersionName(LocalContext.current)}")
                     // The relay state is on the Info screen and the SRV LED only (SIMP-NOV15.5-S1).
                     Text(sensorSetupStatusText(sensorSetup, setupWarnings.size))
@@ -1040,53 +1055,76 @@ fun MonitorScreen(
                             Text("CLEAN", fontSize = 10.sp)
                         }
                     }
-                    // Unpairing moved here from the menu's gear (ISSUE-NOV17.7-O109); it still asks first (ISSUE-NOV5.2-O15).
-                    Button(
-                        onClick = {
-                            showSetupDialog = false
-                            requestUnpair()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = com.jd.core.ui.StatusRed)
-                    ) {
-                        Text("UNPAIR", fontSize = 10.sp)
-                    }
-
-                    if (isEditingRelayUrl) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TextField(
-                            value = relayUrlInput,
-                            onValueChange = { relayUrlInput = it },
-                            label = { Text("Edit Relay URL") },
-                            isError = !RelayConfig.isValid(relayUrlInput),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
                 }
             },
-            confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (isEditingRelayUrl) {
-                        Button(
-                            onClick = {
-                                onUpdateRelayUrl(relayUrlInput.trim())
-                                isEditingRelayUrl = false
-                            },
-                            enabled = RelayConfig.isValid(relayUrlInput)
-                        ) {
-                            Text("Save")
-                        }
-                    } else {
-                        TextButton(onClick = { isEditingRelayUrl = true }) {
-                            Text("Edit Relay URL")
-                        }
-                        Button(onClick = { showSetupDialog = false }) {
-                            Text("Close")
-                        }
-                    }
-                }
-            }
+            confirmButton = {}
         )
+    }
+}
+
+/** A framed group with a background for the Setup dialog's identities (ISSUE-NOV25.25-O157). */
+@Composable
+private fun SetupIdentityGroup(content: @Composable ColumnScope.() -> Unit) {
+    val shape = RoundedCornerShape(8.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, shape)
+            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        content = content
+    )
+}
+
+/** One identity line with its action button at the end; a long value wraps beside the button. */
+@Composable
+private fun SetupIdentityRow(
+    text: String,
+    action: String,
+    actionColor: Color? = null,
+    onAction: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(text, modifier = Modifier.weight(1f))
+        Button(
+            onClick = onAction,
+            colors = if (actionColor != null) ButtonDefaults.buttonColors(containerColor = actionColor)
+            else ButtonDefaults.buttonColors(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+        ) {
+            Text(action, fontSize = 10.sp)
+        }
+    }
+}
+
+/** An identity being edited in place: the field, then Cancel and Save (Save only while [problem] is null). */
+@Composable
+private fun SetupEditField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    problem: String?,
+    saveLabel: String,
+    onCancel: () -> Unit,
+    onSave: () -> Unit
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        isError = problem != null,
+        supportingText = { problem?.let { Text(it) } },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick = onCancel) { Text("Cancel") }
+        Button(onClick = onSave, enabled = problem == null) { Text(saveLabel) }
     }
 }
 

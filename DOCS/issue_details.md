@@ -35,9 +35,6 @@ Sit detection, done in Nov25.23 for the phone under a chair cushion (A15, chapte
 ### ISSUE-NOV25.22-O152 (row 85)
 English or Hebrew (with RTL). Found 2026-11-25: no `strings.xml` in the split apps; every text is a Kotlin literal, many in `core-shared` (pure JVM) and the event messages are stored and sent across the wire in English. Needs: all texts moved to resources (`values/` and `values-iw/`), event messages translated at display time (by `kind`), the forced-LTR screens (Graphs, Events) reviewed. A settings switch is the Android 13+ per-app language (`LocaleManager`, also in Android's app settings); a compile flag saves nothing, as the extraction is the cost. Recommended 2026-11-25 (asked: a separate Hebrew Monitor app sharing files?): no second app (a second package, pairing, install and test run for the same code; it needs the same extraction anyway); one Monitor with `values-iw/` and the per-app language, the Monitor and `core-ui` first, the Sensor stays English. **Needs**: large; decide whether worth it.
 
-### ISSUE-NOV25.25-O157 (row 90)
-Monitor Setup dialog (user request 2026-11-25): (1) drop its `Close` button (Back and a tap outside close it, as O151); (2) the Monitor ID, the paired Sensor and the Relay URL in one framed group with a background, each with its action (Monitor ID: EDIT; Sensor: UNPAIR; Relay URL: EDIT), instead of the small `EDIT` text, the separate `UNPAIR` button and the dialog's `Edit Relay URL` text button. **Needs**: Monitor `MonitorActivity.kt` Setup dialog; `UnpairConfirmationTest`.
-
 ### ISSUE-NOV25.25-O158 (row 91)
 HUD: the Monitor and Sensor lines as aligned columns: battery %, and every other field, at the same horizontal position in both lines, also when the Sensor's line is white or shows `--` (fixed cell widths per field rather than one fitted text per line, `HudStatusBar.kt`). **Needs**: core-ui; both apps' HUD; the S21FE's large font.
 

@@ -3,7 +3,7 @@
 *The one file read at a session's start. One line per item; the full text is in `DOCS/issue_details.md` under the item's ID (read only that section), device procedures in `DOCS/operational_notes.md`. What each version did is in its commit message (`git log`); the long texts before Nov27.5-docs are in tag Nov27.4.*
 
 ## ▶️ Resumption State
-- **Git**: Nov27.9 committed, tagged and pushed by Claude (Graphs connection strip, O146); relay v6.050 (`c460e25`) pushed earlier.
+- **Git**: Nov27.30 committed, tagged and pushed by Claude (Monitor Setup identity group, O157); relay v6.050 (`c460e25`) pushed earlier.
 - **Relay**: SUSPENDED (O133): after Render's reset (probably 2026-12-01) the user deploys relay v6.050; then the live checks of focus item 3.
 - **PC**: `Daemon compilation failed: null`: `gradlew --stop`, `gradlew clean`. Trust Gradle over the IDE's live analysis. `run_tests.ps1` takes about 100 s: run it in the background. `install_release.ps1 -NoBuild` after a version bump fails as a downgrade: build again.
 - **User decisions**: Rule 17; `//` = continue; O112 waits for the user's false-alarm notes; O122 last; O140 very low; vibration 4 hits in 10 s; noise 2 s within 3 s; MOVING by GPS only; device tests one step at a time, answered by `//`.
@@ -11,15 +11,15 @@
 - **Phones**: A15 (`R58X40GV2AR`, `adb shell wm dismiss-keyguard`): debug Sensor (Nov27.6 code) as `T`, under the chair cushion; no Monitor. S21FE (`R5CRC14PG4F`): release Monitor Nov27.2, `V`, `Tracker ID: T2` (do not re-pair), placement `Chair`, in personal use: check its foreground app before every tap. With both connected install pinned (`adb -s <serial> install -r`).
 - **Tests on a phone**: never `connectedDebugAndroidTest`; `am instrument` with `HiltTestRunner` (`DOCS/operational_notes.md`). Sit data: stream `adb logcat -v time -s REV_Motion:* REV_Event:* REV_SitLearning:*` to a PC file.
 
-## 🟢 Status: PASSED (Nov27.9)
-- ISSUE-NOV25.22-O146: the Monitor's Graphs show a `Monitor - Sensor connection` strip (green: both relay links up, no rows missing; red: not or partly; empty: not known yet) from existing fields; `GraphsTest`; suite 1338 passed; chapter 267.2 after O133.
+## 🟢 Status: PASSED (Nov27.30)
+- ISSUE-NOV25.25-O157: the Monitor's Setup dialog has no Close button (Back or a tap outside); Monitor ID [EDIT], Sensor ID [UNPAIR] and Relay URL [EDIT] in one framed group, edits in place; `UnpairConfirmationTest`, `SetupNavigationTest`, `TextFitTest` on the A15; chapter 268.2 on the S21FE.
 
 ## 🎯 Next Resumption Focus
-1. Row 90 O157 (next in queue order without the relay or the user); with the user at hand instead: chapter 266.2 on the A15, O163 part 4 after 254.3's car recording, chapter 258.3, 257.3.
+1. Row 91 O158 (next in queue order without the relay or the user); with the user at hand instead: chapter 266.2 on the A15, O163 part 4 after 254.3's car recording, chapter 258.3, 257.3.
 2. SIMP-NOV25.0-S1's look on the S21FE waits for O133 (an alarm both ended and acknowledged).
 3. O133: after the reset, deploy relay v6.050, then the live checks 182.2, 226.3, 227.4, 237.3, 237.4, 238.2, 240.3, 241.3, 244.3, 249.3, 250.3, 251.3, 253.2, 254.5, 258.4, 259.3, 263.2, 265.2; then O166 unless the relay leaves Render's free plan.
 4. Right after item 3, before new features: O72 in one dedicated version (`/effort high`, plan in its Open Gap).
-5. With the S21FE: O112 once the user has noted false alarms.
+5. With the S21FE: chapter 268.2 (Setup dialog look, large font); O112 once the user has noted false alarms.
 
 ## Work Queue
 Take one item at a time and display it before fixing it (Rule 1); read its section in `DOCS/issue_details.md` first.
@@ -36,7 +36,6 @@ Take one item at a time and display it before fixing it (Rule 1); read its secti
 | 81 | ISSUE-NOV25.22-O148 | Live audio or video, playback | Very low; discussion only |
 | 83 | ISSUE-NOV25.22-O150 | Sit detection: car seat 254.3, barometer 254.4, relay 254.5 | The user in a parked car |
 | 85 | ISSUE-NOV25.22-O152 | English or Hebrew (RTL) | Large; decide whether worth it |
-| 90 | ISSUE-NOV25.25-O157 | Monitor Setup dialog: no Close, one framed group | Monitor |
 | 91 | ISSUE-NOV25.25-O158 | HUD lines as aligned columns | core-ui; S21FE large font |
 | 92 | ISSUE-NOV25.25-O159 | Monitor Phone Setup: title, buttons, steps, test button | core-ui; the S21FE |
 | 93 | ISSUE-NOV25.25-O160 | Info: `Distance to Sensor` on one line | core-ui |

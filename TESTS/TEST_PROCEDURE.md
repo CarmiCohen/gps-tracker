@@ -1352,8 +1352,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **267.1 Unit tests:** `GraphsTest` (connected only with both links up all the point and no rows missing; unknown without the Monitor's sample or after the newest Sensor sample; a missing Sensor sample before it is not connected; summary; none on the Sensor's screen).
 *   **267.2 Two phones (relay back, both on Nov27.9):** the Monitor's Graphs (Hour) show `Monitor - Sensor connection` above the sections: green while both are online; the Sensor in airplane mode for 3 minutes turns those minutes red once it is back and its samples arrive; the newest minutes stay empty until the Sensor's sample of them arrives. The Sensor's own Graphs show no strip.
 
+## Chapter 268 - Monitor Setup Identity Group (Nov27.30)
+**Status: A / P** - 268.1 passed (3 instrumented classes on the A15); 268.2 waits for the S21FE (ISSUE-NOV25.25-O157)
+*   **268.1 Automated:** `UnpairConfirmationTest` (no Close, Back closes; Monitor ID, Sensor ID and Relay URL each with one action, two EDIT and one UNPAIR; the relay URL edits in place, Cancel keeps it, Save hands it over; UNPAIR still asks), `SetupNavigationTest`, `TextFitTest` (UNPAIR reachable at font scale 2).
+*   **268.2 S21FE (Monitor Nov27.30, its large font):** the Setup dialog shows no Close button; the three lines sit in one framed group with a background, each action button at the line's end; the Relay URL wraps beside its EDIT without pushing it out; a tap outside and Back both close the dialog.
+
 ---
-**Active Testing Chapters: 253 of 267**
+**Active Testing Chapters: 254 of 268**
 *Since Nov23.6-docs a new chapter is written only for a check that needs a person, a device or two phones and is still pending (Rule 15); unit tests are named in the commit message.*
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117, 150, 158, 160 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 
