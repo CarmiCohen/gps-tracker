@@ -250,4 +250,45 @@ class GraphsTest {
         assertEquals(listOf(50L to 40L, 30L to 20L), stops.map { (nowMs - it.startMs) / minute to (nowMs - it.endMs) / minute })
         assertEquals(listOf(50L, 40L, 30L, 20L), events.serviceLifecycleSince(0L).map { (nowMs - it.timestampMs) / minute })
     }
+
+    // ISSUE-NOV25.22-O146: the connection strip.
+
+    @Test
+    fun `the strip is connected only with both links up and no rows missing, unknown without the Monitor's sample or after the newest Sensor's`() {
+        val own = listOf(
+            sample(5, GraphField.LINK_UP_PERCENT to 100, GraphField.ROWS_MISSING to 0),
+            sample(4, GraphField.LINK_UP_PERCENT to 100, GraphField.ROWS_MISSING to 0),
+            sample(3, GraphField.LINK_UP_PERCENT to 100, GraphField.ROWS_MISSING to 2),
+            sample(2, GraphField.LINK_UP_PERCENT to 100, GraphField.ROWS_MISSING to 0),
+            sample(1, GraphField.LINK_UP_PERCENT to 100, GraphField.ROWS_MISSING to 0)
+        )
+        val sensor = listOf(
+            sample(5, GraphField.LINK_UP_PERCENT to 100),
+            sample(3, GraphField.LINK_UP_PERCENT to 100),
+            sample(2, GraphField.LINK_UP_PERCENT to 60)
+        )
+        val strip = connectionStrip(sensor, own, nowMs - 6 * minute, nowMs, 6)
+        assertEquals(
+            listOf(
+                LinkPoint.CONNECTED,
+                LinkPoint.NOT_CONNECTED, // The Sensor sent no sample.
+                LinkPoint.NOT_CONNECTED, // Rows missing.
+                LinkPoint.NOT_CONNECTED, // The Sensor's link partly down.
+                null, // After the newest Sensor sample: may still come.
+                null // No Monitor sample.
+            ),
+            strip.points
+        )
+        assertEquals("Connected 25% of the known time", strip.summary)
+    }
+
+    @Test
+    fun `the Monitor's own link partly down breaks the strip, and the Sensor's screen has none`() {
+        val own = listOf(sample(1, GraphField.LINK_UP_PERCENT to 80))
+        val sensor = listOf(sample(1, GraphField.LINK_UP_PERCENT to 100))
+        assertEquals(listOf(LinkPoint.NOT_CONNECTED), connectionStrip(sensor, own, nowMs - 2 * minute, nowMs - minute, 1).points)
+        assertEquals("No data in this period", connectionStrip(emptyList(), emptyList(), nowMs - minute, nowMs, 1).summary)
+        assertNull(sensorGraphScreen(sensor, ViewPeriod.HOUR, nowMs).connectionStrip)
+        assertEquals(60, monitorGraphScreen(sensor, own, ViewPeriod.HOUR, nowMs).connectionStrip!!.points.size)
+    }
 }

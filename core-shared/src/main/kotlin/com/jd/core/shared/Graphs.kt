@@ -79,11 +79,50 @@ data class GraphScreenState(
     val sections: List<GraphSection> = emptyList(),
     val note: String? = null,
     val focusMs: Long? = null,
-    val serviceStops: List<ServiceStop> = emptyList()
+    val serviceStops: List<ServiceStop> = emptyList(),
+    /** The Monitor's link to the Sensor at each point; null on the Sensor's own screen (ISSUE-NOV25.22-O146). */
+    val connectionStrip: ConnectionStrip? = null
 ) {
     /** Where [focusMs] falls in the period, as a share of its width; null without one or outside the period. */
     val focusFraction: Float?
         get() = focusMs?.takeIf { endMs > startMs && it in startMs..endMs }?.let { (it - startMs).toFloat() / (endMs - startMs) }
+}
+
+/** One point of the [ConnectionStrip]: both links up and no rows missing, or not (ISSUE-NOV25.22-O146). */
+enum class LinkPoint { CONNECTED, NOT_CONNECTED }
+
+/** The Monitor-to-Sensor connection over the period, one entry per point, null where it is not known. */
+data class ConnectionStrip(val points: List<LinkPoint?>, val summary: String)
+
+/**
+ * The connection strip (ISSUE-NOV25.22-O146): a point is [LinkPoint.CONNECTED] when the Monitor's own relay link and
+ * the Sensor's were up all of it and no Sensor rows were missing, otherwise [LinkPoint.NOT_CONNECTED]. A point without
+ * the Monitor's sample is unknown; so is one without a Sensor sample after the newest received, since those samples
+ * may still come. Before it, a point without a Sensor sample means the Sensor sent none, so it was not connected.
+ */
+fun connectionStrip(sensorSamples: List<GraphSample>, ownSamples: List<GraphSample>, startMs: Long, endMs: Long, count: Int): ConnectionStrip {
+    val own = graphPoints(ownSamples, GraphField.LINK_UP_PERCENT, startMs, endMs, count)
+    val missing = graphPoints(ownSamples, GraphField.ROWS_MISSING, startMs, endMs, count)
+    val sensor = graphPoints(sensorSamples, GraphField.LINK_UP_PERCENT, startMs, endMs, count)
+    val newestSensorMs = sensorSamples.maxOfOrNull { it.timeMs } ?: Long.MIN_VALUE
+    val width = if (count > 0) (endMs - startMs).toDouble() / count else 0.0
+    val points = own.indices.map { i ->
+        val ownUp = own[i] ?: return@map null
+        val sensorUp = sensor[i]
+        when {
+            sensorUp == null && startMs + (i * width).toLong() >= newestSensorMs -> null
+            ownUp >= 100f && sensorUp != null && sensorUp >= 100f && (missing[i] ?: 0f) == 0f -> LinkPoint.CONNECTED
+            else -> LinkPoint.NOT_CONNECTED
+        }
+    }
+    val known = points.filterNotNull()
+    val summary = if (known.isEmpty()) {
+        "No data in this period"
+    } else {
+        val percent = 100 * known.count { it == LinkPoint.CONNECTED } / known.size
+        "Connected $percent% of the known time"
+    }
+    return ConnectionStrip(points, summary)
 }
 
 /**
@@ -317,7 +356,8 @@ fun monitorGraphScreen(
             else -> null
         },
         focusMs = focusMs,
-        serviceStops = stops
+        serviceStops = stops,
+        connectionStrip = connectionStrip(sensorSamples, ownSamples, startMs, endMs, count)
     )
 }
 

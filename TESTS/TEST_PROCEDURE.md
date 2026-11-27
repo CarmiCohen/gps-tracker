@@ -1347,8 +1347,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **266.1 Unit tests:** `GraphsTest`, `AcousticDetectorTest`, `LightDetectorTest`, `SensorGraphsTest`.
 *   **266.2 A15 (Sensor Nov27.8, noise and light on):** after an hour, the Sensor's Graphs (Hour) show a dashed `Limit` line in Noise (about 30 dB above the background peaks at the middle slider) and in Light (4 times the background, at least 20 lx more); switching noise off on the Monitor ends the Noise limit line from the next minute. Every panel's scale shows three values: top, middle (at the middle grid line) and bottom; with the S21FE's large font the three labels do not overlap.
 
+## Chapter 267 - Connection Strip (Nov27.9)
+**Status: A / P** - 267.1 passed (unit tests); 267.2 waits for the relay (O133) (ISSUE-NOV25.22-O146)
+*   **267.1 Unit tests:** `GraphsTest` (connected only with both links up all the point and no rows missing; unknown without the Monitor's sample or after the newest Sensor sample; a missing Sensor sample before it is not connected; summary; none on the Sensor's screen).
+*   **267.2 Two phones (relay back, both on Nov27.9):** the Monitor's Graphs (Hour) show `Monitor - Sensor connection` above the sections: green while both are online; the Sensor in airplane mode for 3 minutes turns those minutes red once it is back and its samples arrive; the newest minutes stay empty until the Sensor's sample of them arrives. The Sensor's own Graphs show no strip.
+
 ---
-**Active Testing Chapters: 252 of 266**
+**Active Testing Chapters: 253 of 267**
 *Since Nov23.6-docs a new chapter is written only for a check that needs a person, a device or two phones and is still pending (Rule 15); unit tests are named in the commit message.*
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117, 150, 158, 160 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 

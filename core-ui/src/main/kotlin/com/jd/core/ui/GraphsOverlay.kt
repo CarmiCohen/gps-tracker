@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jd.core.shared.ViewPeriod
+import com.jd.core.shared.ConnectionStrip
+import com.jd.core.shared.LinkPoint
 import com.jd.core.shared.GraphLine
 import com.jd.core.shared.GraphPanel
 import com.jd.core.shared.GraphScreenState
@@ -89,6 +91,9 @@ fun GraphsOverlay(
                 val tickLabels = remember(ticks, tickFormat) { ticks.map { it.fraction to tickFormat.format(Date(it.timeMs)) } }
                 ServiceStopList(state.serviceStops) { timeFormat.format(Date(it)) }
                 LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    state.connectionStrip?.let { strip ->
+                        item(key = "connection-strip") { ConnectionStripView(strip, state.focusFraction, tickLabels) }
+                    }
                     state.sections.forEach { section ->
                         item(key = "section-${section.title}") {
                             Text(
@@ -120,6 +125,47 @@ private fun ServiceStopList(stops: List<ServiceStop>, timeText: (Long) -> String
         stops.takeLast(MAX_STOPS_LISTED).reversed().forEach {
             Text(it.describe(timeText), color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp, modifier = Modifier.padding(start = 11.dp))
         }
+    }
+}
+
+/**
+ * The Monitor-to-Sensor connection (ISSUE-NOV25.22-O146): one bar, green where both were connected, red where not or
+ * only partly, empty where not known; with the graphs' time ticks.
+ */
+@Composable
+private fun ConnectionStripView(strip: ConnectionStrip, focusFraction: Float?, tickLabels: List<Pair<Float, String>>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp, bottom = 3.dp)
+            .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(6.dp))
+            .padding(6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Monitor - Sensor connection", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(8.dp))
+            Text(strip.summary, color = Slate500, fontSize = 11.sp, modifier = Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(vertical = 2.dp)) {
+            Legend("Connected", StatusGreen)
+            Legend("Not or partly", Rose500)
+        }
+        Canvas(modifier = Modifier.fillMaxWidth().height(STRIP_HEIGHT)) {
+            drawRect(Color.White.copy(alpha = 0.06f))
+            val step = if (strip.points.isEmpty()) 0f else size.width / strip.points.size
+            strip.points.forEachIndexed { index, point ->
+                val color = when (point) {
+                    LinkPoint.CONNECTED -> StatusGreen
+                    LinkPoint.NOT_CONNECTED -> Rose500
+                    null -> return@forEachIndexed
+                }
+                // A hair wider than a point, so neighbours join without seams.
+                drawRect(color, topLeft = Offset(index * step, 0f), size = Size(step + 0.5f, size.height))
+            }
+            drawTicks(tickLabels)
+            focusFraction?.let { drawFocus(it) }
+        }
+        TickLabels(tickLabels)
     }
 }
 
@@ -317,6 +363,7 @@ val GraphsIcon: ImageVector = materialIcon(name = "Filled.ShowChart") {
 }
 
 private val GRAPH_HEIGHT = 80.dp
+private val STRIP_HEIGHT = 10.dp
 
 /** The least room between two tick labels (ISSUE-NOV26.29-O165). */
 private val TICK_LABEL_GAP = 8.dp
