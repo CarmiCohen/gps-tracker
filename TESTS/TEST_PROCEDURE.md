@@ -548,9 +548,9 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ## Chapter 123 - Monitor Trail Storage Bound (Nov6.2)
 **Status: L / A** - 123.1 to 123.4 automated; 123.4 and 123.5 verified on the A15: 9,799 of 59,799 rows pruned by the installed app
-*   **123.1 Row Cap:** Verify that each tracker keeps only its newest 50,000 trail rows, that one row over the limit removes only the oldest row, and that a tracker at or under the limit loses nothing, even when another tracker is over it. Automated by `TrailStorageBoundTest.workerKeepsTheNewestRowsOfEachTrackerAtTheRealLimit`, `rowCountAtTheLimitIsLeftAlone`, and `oneRowOverTheLimitRemovesOnlyTheOldest`.
+*   **123.1 Row Cap:** Verify that each tracker keeps only its newest 100,000 trail rows (the safety cap above the thinning, Nov27.7), that one row over the limit removes only the oldest row, and that a tracker at or under the limit loses nothing, even when another tracker is over it. Automated by `TrailStorageBoundTest.workerKeepsTheNewestRowsOfEachTrackerAtTheRealLimit`, `rowCountAtTheLimitIsLeftAlone`, and `oneRowOverTheLimitRemovesOnlyTheOldest`.
 *   **123.2 Sequence Safety:** Verify that pruning does not change the last sequence number, and that an idle tracker keeps old rows under the limit, so the next update requests no false backfill. Automated by `pruningDoesNotMoveTheLastSequence` and `oldRemoteRowsSurviveWhenUnderTheLimit`.
-*   **123.3 Local Rows:** Verify that local user rows older than 48 hours are deleted and newer ones stay. Automated by `localRowsExpireAfter48Hours`. No code writes local rows yet (ISSUE-NOV6.2-O29).
+*   **123.3 Local Rows:** Verify that local user rows older than 31 days are deleted and older days are thinned like the Sensor's (Chapter 265). Automated by `localRowsOlderThan31DaysExpireAndOlderDaysAreThinned`.
 *   **123.4 Scheduling:** Verify that starting the Monitor registers one periodic job, and that repeated starts do not add another. Automated by `schedulingTwiceKeepsOnePeriodicJob`. On hardware, confirm the job in `dumpsys jobscheduler` and `Worker result SUCCESS` in logcat, which also proves that `HiltWorkerFactory` creates the worker.
 *   **123.5 Pruning On Hardware:** Load more than 50,000 rows into the installed Monitor through a private relay, never the production relay. Wait for the periodic run and verify `Trail cleanup finished. Rows removed: N` in logcat, then verify that live telemetry continues and requests no new backfill.
 
@@ -1337,8 +1337,13 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Status: P** - pending (ISSUE-NOV27.2-O170): no automated test can see Android's background location limit, which an instrumented run (a foreground process) never meets
 *   **264.1 Device (the S21FE Monitor, paired, location `Allow all the time` or `While using`):** open the Monitor, then press Home and turn the screen off for 15 min, carrying the phone on a walk of 200 m or more (a resting phone gets few fixes: they wait for 10 m of movement). Pass: `adb shell dumpsys location` lists `com.jd.app.monitor` with an interval of 10 s while in the background (Nov27.2 saw `@+10m0s` before the fix), `dumpsys activity services com.jd.app.monitor` shows the session's `types=0x9` (dataSync and location), and the map's SAVE file holds own rows (`isLocalUser: true`) about every 10 s of walking across the 15 min, not one per 10 min; the map draws the walk. Run after any change to `MonitorSessionService`, `OwnTrailRecorder` or the location permissions, and after an Android update of the S21FE.
 
+## Chapter 265 - Trail Thinning (Nov27.7)
+**Status: A / P** - 265.1 passed (unit tests, 6 + 5 instrumented classes on the A15); 265.2 waits for the relay (O133): without contact the Sensor's mark does not move (ISSUE-NOV27.1-O168)
+*   **265.1 Automated:** `TrailThinningTest` (last day whole; 1 to 7 days a row a minute or 20 m; 7 to 31 days 10 min or 50 m; older deleted but the newest row; alarm and jump rows and their minute, NO_FIX run ends and line-break ends kept; idempotent; same line pieces); `TrailThinMarkTest` (the mark, its guard, `isBackfilling`, the Monitor's `trailSegments` after thinning); `TrailThinningDeviceTest` (thinned holes not requested, a new hole is; an outage hole stops the mark; no contact, no mark; late backfill kept, then thinned; the gap query; the own trail).
+*   **265.2 Two phones (relay back, the S21FE Monitor paired to `T` for 2 days or more):** `adb logcat -s REV_Pruning:* REV_Backfill:*` shows `Trail cleanup finished. Rows removed: N` every 15 min with N above 0 once rows are a day old, and no `Requested` line for rows older than a day after a Monitor restart; the map's trail of 2 days ago draws without new breaks. After a relay outage longer than a day, its hole is still requested (`Requested a to b`) before the mark moves on.
+
 ---
-**Active Testing Chapters: 250 of 264**
+**Active Testing Chapters: 251 of 265**
 *Since Nov23.6-docs a new chapter is written only for a check that needs a person, a device or two phones and is still pending (Rule 15); unit tests are named in the commit message.*
 *Chapters 10, 47, 71, 78, 80, 84, 89, 92, 94, 117, 150, 158, 160 and items 2.1, 2.2, 8.3, 26.2, 26.3 are retired; see [RETIRED_CHAPTERS.md](RETIRED_CHAPTERS.md). Chapter numbers are not reused.*
 

@@ -93,7 +93,7 @@ class BackfillGapRecoveryTest {
         val gaps = trailDao.getSequenceGaps("T")
         val elapsed = System.currentTimeMillis() - started
 
-        assertEquals(50, gaps.size)
+        assertEquals((MAX_STORED_TRAIL_POINTS + 100) / 1000, gaps.size)
         assertTrue("Took ${elapsed}ms", elapsed < 1_000)
     }
 

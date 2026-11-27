@@ -116,16 +116,20 @@ class TrailStorageBoundTest {
         assertEquals("An idle tracker keeps its position and sequence", 7L, trailDao.getLastSequenceId("T"))
     }
 
+    /** The own trail is thinned like the Sensor's instead of cut at 48 h (ISSUE-NOV27.1-O168). */
     @Test
-    fun localRowsExpireAfter48Hours() = runBlocking {
+    fun localRowsOlderThan31DaysExpireAndOlderDaysAreThinned() = runBlocking {
         val now = System.currentTimeMillis()
         val hour = 3_600_000L
-        trailDao.insert(TrailEntity("L", now - 49 * hour, 1L, 32.0, 35.0, 5f, "VALID", isLocalUser = true))
-        trailDao.insert(TrailEntity("L", now - 47 * hour, 2L, 32.0, 35.0, 5f, "VALID", isLocalUser = true))
+        trailDao.insert(TrailEntity("L", now - 32 * 24 * hour, 1L, 32.0, 35.0, 5f, "VALID", isLocalUser = true))
+        // Two rows 10 s apart 49 h ago: the second is thinned, a row a minute is kept there.
+        trailDao.insert(TrailEntity("L", now - 49 * hour, 2L, 32.0, 35.0, 5f, "VALID", isLocalUser = true))
+        trailDao.insert(TrailEntity("L", now - 49 * hour + 10_000L, 3L, 32.0, 35.0, 5f, "VALID", isLocalUser = true))
+        trailDao.insert(TrailEntity("L", now - 47 * hour, 4L, 32.0, 35.0, 5f, "VALID", isLocalUser = true))
 
         runWorker()
 
-        assertEquals(1L, rowCount("L"))
+        assertEquals(2L, rowCount("L"))
         assertEquals(2L, oldestSequence("L"))
     }
 

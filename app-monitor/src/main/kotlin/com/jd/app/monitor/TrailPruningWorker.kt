@@ -13,23 +13,19 @@ import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
 
 /**
- * TrailPruningWorker: Bounds Monitor trail storage (ISSUE-NOV5.2-O14).
- * Keeps the newest [MAX_STORED_TRAIL_POINTS] rows of each tracker and deletes
- * local user rows older than 48 hours (Point 5).
+ * TrailPruningWorker: Bounds Monitor trail storage (ISSUE-NOV5.2-O14): thins the Sensor's and this phone's own trail
+ * by age and keeps each under [MAX_STORED_TRAIL_POINTS] ([MonitorRepository.thinTrails], ISSUE-NOV27.1-O168).
  */
 @HiltWorker
 class TrailPruningWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
-    private val trailDao: TrailDao
+    private val repository: MonitorRepository
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         return try {
-            trailDao.pruneLocalTrail(System.currentTimeMillis() - LOCAL_TRAIL_TTL_MS)
-            val removed = trailDao.getTrackerIds().sumOf { trackerId ->
-                trailDao.pruneOldestRows(trackerId, MAX_STORED_TRAIL_POINTS)
-            }
+            val removed = repository.thinTrails()
             SystemLogger.i("Pruning", "Trail cleanup finished. Rows removed: $removed")
             Result.success()
         } catch (e: Exception) {
@@ -40,7 +36,6 @@ class TrailPruningWorker @AssistedInject constructor(
 
     companion object {
         private const val WORK_NAME = "trail_pruning"
-        private const val LOCAL_TRAIL_TTL_MS = 48 * 3600 * 1000L
         private const val INTERVAL_MINUTES = 15L
 
         /** Safe on every app start: an existing schedule is kept, so the interval does not restart. */

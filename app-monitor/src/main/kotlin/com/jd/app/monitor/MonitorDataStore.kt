@@ -56,6 +56,8 @@ class MonitorDataStore(private val context: Context) {
     private val geofenceKey = stringPreferencesKey("geofence_json")
     private val trailClearTrackerKey = stringPreferencesKey("trail_clear_tracker")
     private val trailClearAtKey = longPreferencesKey("trail_clear_at_ms")
+    private val trailThinnedTrackerKey = stringPreferencesKey("trail_thinned_tracker")
+    private val trailThinnedUpToKey = longPreferencesKey("trail_thinned_up_to_ms")
     private val notifiedSetupWarningsKey = stringSetPreferencesKey("notified_setup_warnings")
 
     /**
@@ -84,6 +86,25 @@ class MonitorDataStore(private val context: Context) {
             } else {
                 prefs[trailClearTrackerKey] = clear.trackerId
                 prefs[trailClearAtKey] = clear.atMs
+            }
+        }
+    }
+
+    /** How far the Sensor's stored trail was thinned, or null (ISSUE-NOV27.1-O168). */
+    val trailThinned: Flow<TrailThinned?> = context.monitorDataStore.data.map { prefs ->
+        val trackerId = prefs[trailThinnedTrackerKey]
+        val upToMs = prefs[trailThinnedUpToKey]
+        if (trackerId != null && upToMs != null) TrailThinned(trackerId, upToMs) else null
+    }
+
+    suspend fun saveTrailThinned(mark: TrailThinned?) {
+        context.monitorDataStore.edit { prefs ->
+            if (mark == null) {
+                prefs.remove(trailThinnedTrackerKey)
+                prefs.remove(trailThinnedUpToKey)
+            } else {
+                prefs[trailThinnedTrackerKey] = mark.trackerId
+                prefs[trailThinnedUpToKey] = mark.upToMs
             }
         }
     }

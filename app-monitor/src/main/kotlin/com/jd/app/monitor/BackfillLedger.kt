@@ -40,6 +40,10 @@ class BackfillLedger(
         return open.take(maxActive - active.size)
     }
 
+    /** Whether a request for [deviceId] is still waiting for its answer (ISSUE-NOV27.1-O168). */
+    fun isBackfilling(deviceId: String, nowMs: Long): Boolean =
+        active.values.any { it.request.deviceId == deviceId && nowMs - it.lastActivityMs < timeoutMs }
+
     fun onRequestSent(request: BackfillRequest, nowMs: Long) {
         active[request.requestId] = ActiveRequest(request, nowMs)
     }

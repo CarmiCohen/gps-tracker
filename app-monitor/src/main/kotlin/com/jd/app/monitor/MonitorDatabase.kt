@@ -10,8 +10,11 @@ import kotlinx.serialization.Serializable
  */
 const val MAX_TRAIL_POINTS = 1000
 
-/** Rows stored per tracker. About 14 hours at one row a second (moving or alarmed), or 5.8 days at the still rate of one in 10 s. */
-const val MAX_STORED_TRAIL_POINTS = 50_000
+/**
+ * The safety cap of rows per trail, above the 31 days the thinning keeps (ISSUE-NOV27.1-O168): a full day at one row a
+ * second plus the thinned older days.
+ */
+const val MAX_STORED_TRAIL_POINTS = 100_000
 
 /** Also a row of the settings file (ISSUE-NOV10.8-O80). */
 @Serializable
@@ -61,32 +64,44 @@ interface TrailDao {
     /**
      * Returns every hole between stored rows, newest first. The table is the only record of
      * what is missing, so a hole stays findable until it is filled (ISSUE-NOV6.3-O32).
+     * A hole with both sides older than [thinnedUpToMs] was made by thinning and is left out (ISSUE-NOV27.1-O168).
      * Uses the unique index. Window functions are avoided: they need API 30 and minSdk is 26.
      */
     @Query(
         """
-        SELECT stored.sequenceId + 1 AS firstMissing,
-            (SELECT MIN(later.sequenceId) FROM trails later
-             WHERE later.trackerId = :id AND later.isLocalUser = 0
-             AND later.sequenceId > stored.sequenceId) - 1 AS lastMissing
-        FROM trails stored
-        WHERE stored.trackerId = :id AND stored.isLocalUser = 0
-        AND stored.sequenceId < (SELECT MAX(sequenceId) FROM trails WHERE trackerId = :id AND isLocalUser = 0)
-        AND NOT EXISTS (
-            SELECT 1 FROM trails adjacent
-            WHERE adjacent.trackerId = :id AND adjacent.isLocalUser = 0
-            AND adjacent.sequenceId = stored.sequenceId + 1
-        )
-        ORDER BY stored.sequenceId DESC
+        SELECT firstMissing, lastMissing FROM (
+            SELECT stored.sequenceId + 1 AS firstMissing, stored.timestamp AS lowerMs,
+                (SELECT MIN(later.sequenceId) FROM trails later
+                 WHERE later.trackerId = :id AND later.isLocalUser = 0
+                 AND later.sequenceId > stored.sequenceId) - 1 AS lastMissing
+            FROM trails stored
+            WHERE stored.trackerId = :id AND stored.isLocalUser = 0
+            AND stored.sequenceId < (SELECT MAX(sequenceId) FROM trails WHERE trackerId = :id AND isLocalUser = 0)
+            AND NOT EXISTS (
+                SELECT 1 FROM trails adjacent
+                WHERE adjacent.trackerId = :id AND adjacent.isLocalUser = 0
+                AND adjacent.sequenceId = stored.sequenceId + 1
+            )
+        ) hole
+        WHERE hole.lowerMs >= :thinnedUpToMs OR (
+            SELECT above.timestamp FROM trails above
+            WHERE above.trackerId = :id AND above.isLocalUser = 0 AND above.sequenceId = hole.lastMissing + 1
+        ) >= :thinnedUpToMs
+        ORDER BY firstMissing DESC
         """
     )
-    suspend fun getSequenceGaps(id: String): List<SequenceGap>
+    suspend fun getSequenceGaps(id: String, thinnedUpToMs: Long = Long.MIN_VALUE): List<SequenceGap>
 
-    /**
-     * Prunes local user trails faster than remote sensor trails.
-     */
-    @Query("DELETE FROM trails WHERE isLocalUser = 1 AND timestamp < :threshold")
-    suspend fun pruneLocalTrail(threshold: Long)
+    /** The time of the row with the lowest sequence, the upper side of a missing start (ISSUE-NOV27.1-O168). */
+    @Query("SELECT timestamp FROM trails WHERE trackerId = :id AND isLocalUser = 0 ORDER BY sequenceId ASC LIMIT 1")
+    suspend fun getFirstSequenceTime(id: String): Long?
+
+    /** The rows of one trail, the Sensor's or this phone's own, older than [beforeMs]: the rows thinning looks at. */
+    @Query("SELECT * FROM trails WHERE trackerId = :id AND isLocalUser = :isLocalUser AND timestamp < :beforeMs")
+    suspend fun getRowsBefore(id: String, isLocalUser: Boolean, beforeMs: Long): List<TrailEntity>
+
+    @Delete
+    suspend fun deleteRows(rows: List<TrailEntity>): Int
 
     /**
      * Files this Monitor's own rows of ID [from] under its new ID [to] (ISSUE-NOV22.7-O135); a row [to] already holds at

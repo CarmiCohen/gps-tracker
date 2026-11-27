@@ -4,6 +4,8 @@ import com.jd.core.network.SignalingClient
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.SystemLogger
+import com.jd.core.shared.TRAIL_KEEP_ALL_MS
+import com.jd.core.shared.thinTrail
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,6 +47,10 @@ class MonitorRepository @Inject constructor(
     private val liveRows = AtomicInteger()
     private val backfilledRows = AtomicInteger()
     @Volatile private var missingRows = 0L
+
+    // Per Sensor, for the thinning guard (ISSUE-NOV27.1-O168): the newest live row's arrival, the open rows of the last scan.
+    private val lastLiveMs = ConcurrentHashMap<String, Long>()
+    private val openRowsByDevice = ConcurrentHashMap<String, Long>()
 
     init {
         observeTelemetry()
@@ -82,9 +89,50 @@ class MonitorRepository @Inject constructor(
     ): Int {
         val sensor = choice.scope.sensor
         if (sensor) dataStore.saveTrailClear(trackerId?.let { dataStore.trailClear.first().raisedTo(it, choice.clearAtMs(nowMs)) })
+        if (sensor && trackerId == null) dataStore.saveTrailThinned(null)
         val deleted = trailDao.deleteRowsBefore(sensor, choice.scope.own, choice.deleteBeforeMs(nowMs))
         if (sensor) missingRows = 0L
         return deleted
+    }
+
+    /**
+     * Thins every stored trail by age and bounds it by [MAX_STORED_TRAIL_POINTS] (ISSUE-NOV27.1-O168); returns the rows
+     * deleted. A Sensor's rows are thinned only before its [TrailThinned] mark, which moves to a day ago only while
+     * [mayAdvanceThinning]; the mark is stored before any row goes, so a gap scan never asks for a thinned row. This
+     * phone's own rows have no holes to ask for and are thinned up to a day ago.
+     */
+    suspend fun thinTrails(nowMs: Long = System.currentTimeMillis()): Int {
+        var deleted = 0
+        for (trackerId in trailDao.getTrackerIds()) {
+            deleted += thinRows(trackerId, isLocalUser = true, thinBeforeMs = nowMs - TRAIL_KEEP_ALL_MS, nowMs)
+            sensorThinBefore(trackerId, nowMs)?.let { deleted += thinRows(trackerId, isLocalUser = false, it, nowMs) }
+            deleted += trailDao.pruneOldestRows(trackerId, MAX_STORED_TRAIL_POINTS)
+        }
+        return deleted
+    }
+
+    private suspend fun sensorThinBefore(trackerId: String, nowMs: Long): Long? {
+        val mark = dataStore.trailThinned.first()
+        val mayAdvance = ledgerMutex.withLock {
+            mayAdvanceThinning(lastLiveMs[trackerId], nowMs, ledger.isBackfilling(trackerId, nowMs), openRowsByDevice[trackerId])
+        }
+        if (!mayAdvance) return mark.upToMsOf(trackerId)
+        val raised = mark.thinnedTo(trackerId, nowMs - TRAIL_KEEP_ALL_MS)
+        if (raised != mark) dataStore.saveTrailThinned(raised)
+        return raised.upToMs
+    }
+
+    private suspend fun thinRows(trackerId: String, isLocalUser: Boolean, thinBeforeMs: Long, nowMs: Long): Int {
+        val rows = trailDao.getRowsBefore(trackerId, isLocalUser, thinBeforeMs)
+        if (rows.isEmpty()) return 0
+        val kept = thinTrail(rows, nowMs, thinBeforeMs) { it.toTrailPoint() }.toHashSet()
+        val dropped = rows.filterNot { it in kept }
+        return if (dropped.isEmpty()) 0 else trailDao.deleteRows(dropped)
+    }
+
+    /** Marks [deviceId] as in contact now, as a live row does; for tests (ISSUE-NOV27.1-O168). */
+    internal fun markLiveForTest(deviceId: String, nowMs: Long) {
+        lastLiveMs[deviceId] = nowMs
     }
 
     /**
@@ -155,6 +203,7 @@ class MonitorRepository @Inject constructor(
     }
 
     private suspend fun processIncomingUpdate(update: LocationUpdate) {
+        lastLiveMs[update.deviceId] = System.currentTimeMillis()
         val lastSeq = trailDao.getLastSequenceId(update.deviceId) ?: 0L
 
         val entity = update.toEntity()
@@ -184,11 +233,14 @@ class MonitorRepository @Inject constructor(
     /**
      * The holes worth requesting. A table at the cap has been pruned by time, so neither its missing start nor a
      * hole ending at its oldest row by time is a gap: after a Sensor counter reset the run above the low rows is the
-     * oldest, and each prune widens that hole past the range already answered (ISSUE-NOV15.6-O100 part 6).
+     * oldest, and each prune widens that hole past the range already answered (ISSUE-NOV15.6-O100 part 6). Holes,
+     * and a missing start, older than the thinned-up-to mark were made by thinning (ISSUE-NOV27.1-O168).
      */
     private suspend fun findGaps(deviceId: String): List<SequenceGap> {
-        val gaps = trailDao.getSequenceGaps(deviceId)
+        val thinnedUpToMs = dataStore.trailThinned.first().upToMsOf(deviceId) ?: Long.MIN_VALUE
+        val gaps = trailDao.getSequenceGaps(deviceId, thinnedUpToMs)
         val first = trailDao.getFirstSequenceId(deviceId) ?: return gaps
+        if ((trailDao.getFirstSequenceTime(deviceId) ?: Long.MAX_VALUE) < thinnedUpToMs) return gaps
 
         if (trailDao.countRows(deviceId) >= MAX_STORED_TRAIL_POINTS) {
             val oldest = trailDao.getOldestSequenceId(deviceId)
@@ -207,6 +259,7 @@ class MonitorRepository @Inject constructor(
             val now = System.currentTimeMillis()
             val toRequest = ledger.gapsToRequest(deviceId, gaps, now)
             missingRows = ledger.openRows(deviceId, gaps)
+            openRowsByDevice[deviceId] = missingRows
             if (toRequest.isNotEmpty()) {
                 SystemLogger.w("Backfill", "${gaps.size} gaps stored. Requesting ${toRequest.size}.")
             }

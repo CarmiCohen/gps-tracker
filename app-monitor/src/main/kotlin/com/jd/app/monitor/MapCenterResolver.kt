@@ -1,5 +1,10 @@
 package com.jd.app.monitor
 
+import com.jd.core.shared.TrailPoint
+import com.jd.core.shared.breaksTrailLine
+import com.jd.core.shared.isJump
+import com.jd.core.shared.isLinePoint
+
 data class MapPosition(val lat: Double, val lng: Double)
 
 /** The three centering modes the Monitor can reach: AUTO at start, TRACKER or VIEWER from the HUD (SIMP-NOV22.5-S1). */
@@ -9,49 +14,31 @@ enum class MapFollowMode { TRACKER, VIEWER, AUTO }
 fun knownPositions(trail: List<TrailEntity>): List<MapPosition> =
     trail.filter { it.lat != 0.0 || it.lng != 0.0 }.map { MapPosition(it.lat, it.lng) }
 
-/** Coarser fixes than this are left out of the trail line (ISSUE-NOV25.22-O153). */
-const val TRAIL_MAX_ACCURACY_M = 100f
-
-/** A pause longer than this between two kept fixes ... */
-const val TRAIL_GAP_MS = 5 * 60_000L
-
-/** ... breaks the line when the fixes are also farther apart than this, so no straight line crosses an outage. */
-const val TRAIL_GAP_DISTANCE_M = 200.0
-
-private fun isJumpRow(row: TrailEntity) = row.status == "JUMP" || row.status == "OUTLIER"
+/** The row as the shared trail rules see it (ISSUE-NOV27.1-O168). */
+fun TrailEntity.toTrailPoint() = TrailPoint(timestamp, lat, lng, accuracy, status)
 
 /**
- * The trail line as separate pieces (ISSUE-NOV25.22-O153): without (0,0) rows, JUMP and OUTLIER rows (shown as
- * jump markers instead, O149) and fixes coarser than [TRAIL_MAX_ACCURACY_M]; a new piece starts where a pause longer
- * than [TRAIL_GAP_MS] also moved the tracker more than [TRAIL_GAP_DISTANCE_M]. Works on either time order.
+ * The trail line as separate pieces (ISSUE-NOV25.22-O153): only [isLinePoint] rows, so no (0,0) rows, no JUMP or
+ * OUTLIER rows (shown as jump markers instead, O149) and no coarse fixes; a new piece starts where [breaksTrailLine].
+ * The thinning of older rows keeps both ends of every break (ISSUE-NOV27.1-O168). Works on either time order.
  */
 fun trailSegments(trail: List<TrailEntity>): List<List<MapPosition>> {
     val segments = mutableListOf<MutableList<MapPosition>>()
-    var previous: TrailEntity? = null
+    var previous: TrailPoint? = null
     for (row in trail) {
-        if ((row.lat == 0.0 && row.lng == 0.0) || isJumpRow(row) || row.accuracy > TRAIL_MAX_ACCURACY_M) continue
+        val point = row.toTrailPoint()
+        if (!point.isLinePoint()) continue
         val last = previous
-        val isBreak = last == null || (kotlin.math.abs(row.timestamp - last.timestamp) > TRAIL_GAP_MS &&
-            distanceMeters(last.lat, last.lng, row.lat, row.lng) > TRAIL_GAP_DISTANCE_M)
-        if (isBreak) segments.add(mutableListOf())
+        if (last == null || breaksTrailLine(last, point)) segments.add(mutableListOf())
         segments.last().add(MapPosition(row.lat, row.lng))
-        previous = row
+        previous = point
     }
     return segments
 }
 
 /** Trail rows the tracker marked as GPS jumps (JUMP, OUTLIER), shown as jump markers (ISSUE-NOV25.22-O149). */
 fun gpsJumps(trail: List<TrailEntity>): List<TrailEntity> =
-    trail.filter { isJumpRow(it) && (it.lat != 0.0 || it.lng != 0.0) }
-
-/** Great-circle distance in meters (haversine). */
-internal fun distanceMeters(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-    val dLat = Math.toRadians(lat2 - lat1)
-    val dLng = Math.toRadians(lng2 - lng1)
-    val a = kotlin.math.sin(dLat / 2).let { it * it } + kotlin.math.cos(Math.toRadians(lat1)) *
-        kotlin.math.cos(Math.toRadians(lat2)) * kotlin.math.sin(dLng / 2).let { it * it }
-    return 2 * 6_371_000.0 * kotlin.math.asin(kotlin.math.sqrt(a))
-}
+    trail.filter { it.toTrailPoint().isJump() && (it.lat != 0.0 || it.lng != 0.0) }
 
 /** Trail rows where the tracker reported leaving every Home Point, shown as OUT markers (ISSUE-NOV8.13-O51). */
 fun geofenceBreaches(trail: List<TrailEntity>): List<TrailEntity> =
