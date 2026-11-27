@@ -6,14 +6,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Chapter 150 (ISSUE-NOV8.2-O46) and chapter 158 (Nov8.100-Documentation): the tracking documents keep their
+ * ISSUE-NOV8.2-O46 and Nov8.100-Documentation (chapters 150 and 158, retired in Nov27.5-docs): the tracking documents keep their
  * history and stay lean.
  *
  * Whole-file rewrites once cut the tail off `issues.md` and `RESOLUTION_ARCHIVE.md` unnoticed (ISSUE-NOV8.2-O46),
  * so each resolved version must still be recorded in the archive, the SOT baseline, and a dashboard row, and the
  * oldest entries must survive. Since Nov8.100-Documentation the archive is the single home of resolved issues
  * (Documentation Rule D1), `issues.md` is a working file (D2), and `Handover.md` is short (D3); this test holds
- * those limits. Since Nov8.102-Documentation (SIMP-NOV8.100-S2, chapter 160) the SOT baseline is frozen at
+ * those limits. Since Nov8.102-Documentation (SIMP-NOV8.100-S2) the SOT baseline is frozen at
  * Nov8.101-Tooling: it must hold every version up to then and nothing newer. Since Nov23.6-docs (lean workflow, user
  * decision 2026-11-23) the archive, the SOT and the dashboard are frozen at Nov23.4, the commit message is a version's
  * record, `issues.md` holds open work only without a dashboard, and `Handover.md` has at most 30 lines; the history

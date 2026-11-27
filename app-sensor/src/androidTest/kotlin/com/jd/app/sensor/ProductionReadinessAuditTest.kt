@@ -47,7 +47,6 @@ class ProductionReadinessAuditTest {
     fun verifyThermalScalingLogic() {
         val criticalTempInterval = SensingEngine.getOptimalIntervalMs(
             currentTemp = 46f,
-            isCharging = false,
             batteryLevel = 50,
             isMoving = true
         )

@@ -20,7 +20,6 @@ class UnifiedPowerPolicyProfileTest {
         // 1. Nominal State: High Battery, Moving
         val nominal = SensingEngine.getOptimalIntervalMs(
             currentTemp = 30f,
-            isCharging = false,
             batteryLevel = 90,
             isMoving = true
         )
@@ -29,7 +28,6 @@ class UnifiedPowerPolicyProfileTest {
         // 2. Low Battery State: Throttling engaged (R497)
         val lowBattery = SensingEngine.getOptimalIntervalMs(
             currentTemp = 30f,
-            isCharging = false,
             batteryLevel = 18, // Below 20% threshold
             isMoving = true
         )
@@ -38,24 +36,26 @@ class UnifiedPowerPolicyProfileTest {
         // 3. Critical Power State: Survival mode
         val criticalBattery = SensingEngine.getOptimalIntervalMs(
             currentTemp = 30f,
-            isCharging = false,
             batteryLevel = 10, // Critical threshold
             isMoving = true
         )
         assertEquals("Critical battery MUST force 10s survival interval", 10000L, criticalBattery)
     }
 
+    /** ISSUE-NOV27.1-O169: outside power no longer raises the rate; a still Sensor gets 10 s, a warm moving one 1 s. */
     @Test
-    fun verifyChargingOverride() {
-        // Charging should allow higher frequency even at lower battery, 
-        // but thermal limits still apply.
-        val chargingWarm = SensingEngine.getOptimalIntervalMs(
+    fun verifyOutsidePowerGivesNoFastRows() {
+        val stillWarm = SensingEngine.getOptimalIntervalMs(
             currentTemp = 41f,
-            isCharging = true,
+            batteryLevel = 15,
+            isMoving = false
+        )
+        assertEquals("A still Sensor sends one row in 10 s, charging or not", 10000L, stillWarm)
+        val movingWarm = SensingEngine.getOptimalIntervalMs(
+            currentTemp = 41f,
             batteryLevel = 15,
             isMoving = true
         )
-        // Thermal (41C) forces 1s backoff regardless of charging status
-        assertEquals("Thermal limit MUST override charging benefits", 1000L, chargingWarm)
+        assertEquals("41C is below the critical heat: a moving Sensor keeps 1 s", 1000L, movingWarm)
     }
 }

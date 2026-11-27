@@ -24,7 +24,6 @@ class SensingEngineStressTest {
         // But Critical Thermal (46C) must force 10,000ms (0.1Hz)
         val interval = SensingEngine.getOptimalIntervalMs(
             currentTemp = 46f,
-            isCharging = false,
             batteryLevel = 100,
             isMoving = true
         )
@@ -42,7 +41,6 @@ class SensingEngineStressTest {
     fun verifyBatterySurvivalMode() {
         val interval = SensingEngine.getOptimalIntervalMs(
             currentTemp = 30f,
-            isCharging = false,
             batteryLevel = 10, // Critical threshold
             isMoving = true
         )

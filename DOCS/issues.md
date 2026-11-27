@@ -3,19 +3,19 @@
 *The one file read at a session's start. One line per item; the full text is in `DOCS/issue_details.md` under the item's ID (read only that section), device procedures in `DOCS/operational_notes.md`. What each version did is in its commit message (`git log`); the long texts before Nov27.5-docs are in tag Nov27.4.*
 
 ## ▶️ Resumption State
-- **Git**: Nov27.5-docs committed, tagged and pushed by Claude (lean token workflow, O171); relay v6.050 (`c460e25`) pushed earlier.
+- **Git**: Nov27.6 committed, tagged and pushed by Claude (charging no longer raises the row rate, O169); relay v6.050 (`c460e25`) pushed earlier.
 - **Relay**: SUSPENDED (O133): after Render's reset (probably 2026-12-01) the user deploys relay v6.050; then the live checks of focus item 3.
 - **PC**: `Daemon compilation failed: null`: `gradlew --stop`, `gradlew clean`. Trust Gradle over the IDE's live analysis. `run_tests.ps1` takes about 100 s: run it in the background. `install_release.ps1 -NoBuild` after a version bump fails as a downgrade: build again.
 - **User decisions**: Rule 17; `//` = continue; O112 waits for the user's false-alarm notes; O122 last; O140 very low; vibration 4 hits in 10 s; noise 2 s within 3 s; MOVING by GPS only; device tests one step at a time, answered by `//`.
 - **Wire**: install both apps at Nov23.4 or later together; newer fields (`placeId`, `sit_learn`, `sit_examples`, `occupied`) are ignored by older apps.
-- **Phones**: A15 (`R58X40GV2AR`, `adb shell wm dismiss-keyguard`): debug Sensor (Nov26.3 code) as `T`, under the chair cushion; no Monitor. S21FE (`R5CRC14PG4F`): release Monitor Nov27.2, `V`, `Tracker ID: T2` (do not re-pair), placement `Chair`, in personal use: check its foreground app before every tap. With both connected install pinned (`adb -s <serial> install -r`).
+- **Phones**: A15 (`R58X40GV2AR`, `adb shell wm dismiss-keyguard`): debug Sensor (Nov27.6 code) as `T`, under the chair cushion; no Monitor. S21FE (`R5CRC14PG4F`): release Monitor Nov27.2, `V`, `Tracker ID: T2` (do not re-pair), placement `Chair`, in personal use: check its foreground app before every tap. With both connected install pinned (`adb -s <serial> install -r`).
 - **Tests on a phone**: never `connectedDebugAndroidTest`; `am instrument` with `HiltTestRunner` (`DOCS/operational_notes.md`). Sit data: stream `adb logcat -v time -s REV_Motion:* REV_Event:* REV_SitLearning:*` to a PC file.
 
-## 🟢 Status: PASSED (Nov27.5-docs)
-- ISSUE-NOV27.5-O171: lean token workflow (Handover merged here, details and notes in their own files, test and comment rules in `CLAUDE.md`); `:core-shared:test` only (D5).
+## 🟢 Status: PASSED (Nov27.6)
+- ISSUE-NOV27.1-O169: a still Sensor sends one row in 10 s on the charger too (A15 on USB: `Interval: 10000ms`); `RowClockTest` and 6 Sensor instrumented classes (11/11 on the A15).
 
 ## 🎯 Next Resumption Focus
-1. O169 then O168 (queue order 2026-11-27); with the user at hand instead: O163 part 4 after 254.3's car recording, chapter 258.3, 257.3.
+1. O168 (queue order 2026-11-27); with the user at hand instead: O163 part 4 after 254.3's car recording, chapter 258.3, 257.3.
 2. SIMP-NOV25.0-S1's look on the S21FE waits for O133 (an alarm both ended and acknowledged).
 3. O133: after the reset, deploy relay v6.050, then the live checks 182.2, 226.3, 227.4, 237.3, 237.4, 238.2, 240.3, 241.3, 244.3, 249.3, 250.3, 251.3, 253.2, 254.5, 258.4, 259.3, 263.2; then O166 unless the relay leaves Render's free plan.
 4. Right after item 3, before new features: O72 in one dedicated version (`/effort high`, plan in its Open Gap).
@@ -45,8 +45,7 @@ Take one item at a time and display it before fixing it (Rule 1); read its secti
 | 94 | ISSUE-NOV25.25-O161 | Graphs in landscape with a side column | core-ui |
 | 96 | ISSUE-NOV26.0-O163 | Sit for many seats: part 4, Feedback, left | `/effort high`; after 254.3 |
 | 99 | ISSUE-NOV27.1-O166 | Relay traffic meter (Sensor keeps the month) | Relay, wire; `/effort medium`; after O133 |
-| 101 | ISSUE-NOV27.1-O168 | Thin older trails, both alike; `thinned up to` marker with guard | Monitor, core-shared; `/effort high`; after O169 |
-| 102 | ISSUE-NOV27.1-O169 | Charging alone no longer raises the row rate | core-shared, Sensor; `/effort medium` |
+| 101 | ISSUE-NOV27.1-O168 | Thin older trails, both alike; `thinned up to` marker with guard | Monitor, core-shared; `/effort high` |
 
 ## Open Gaps
 One line each; the full text is in `DOCS/issue_details.md`. Active warning: Compose `SnapshotStateList` lock verification (monitored).

@@ -12,6 +12,7 @@ Chapter numbers are not reused, so older references in `issues.md`, `ARCHIVE/tes
 | 78, 84 | Sensor and Monitor are separate apps, so roles cannot mix or share restoration logic |
 | 89 | One-time cleanup check for legacy ViewModels from before the split |
 | 117 | Record of the Nov4.44 release procedure, not a repeatable test |
+| 150, 158, 160 | Described document layouts and the SOT lists and audit line, replaced in Nov23.6-docs and Nov27.5-docs; `TrackingDocumentIntegrityTest` still runs and its KDoc says what it checks (user decision 2026-11-27, ISSUE-NOV27.5-O171) |
 | 8.3, 26.2, 26.3 | Superseded in Nov7.3 by the user decision of 2026-11-07: the siren sounds until it is acknowledged, with no 30-second auto-stop or mute lockout (chapter 129). Chapter 8.2 lost the same `30s Siren` wording |
 
 ---

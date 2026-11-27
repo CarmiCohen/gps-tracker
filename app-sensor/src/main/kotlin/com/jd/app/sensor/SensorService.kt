@@ -843,7 +843,6 @@ class SensorService : Service(), SensorEventListener {
         val isAlarmed = SensingEngine.isInAlarmWindow(lastAlarmElapsedMs, SystemClock.elapsedRealtime())
         val newInterval = SensingEngine.getOptimalIntervalMs(
             currentTemp = lastTempCelsius,
-            isCharging = lastIsPluggedIn, // On outside power the fast rate costs no battery (ISSUE-NOV17.15-O114).
             batteryLevel = lastBatteryLevel,
             isMoving = fixStore.isMoving, // Debounced, not one fix's speed (ISSUE-NOV25.25-O162).
             isAlarmed = isAlarmed

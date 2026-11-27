@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  */
 const val MAX_TRAIL_POINTS = 1000
 
-/** Rows stored per tracker. About 1.4 hours at the 10Hz charging rate, or 5.8 days at the 10s rate. */
+/** Rows stored per tracker. About 14 hours at one row a second (moving or alarmed), or 5.8 days at the still rate of one in 10 s. */
 const val MAX_STORED_TRAIL_POINTS = 50_000
 
 /** Also a row of the settings file (ISSUE-NOV10.8-O80). */
